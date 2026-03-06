@@ -1,111 +1,111 @@
-# 🤝 Contributing to SingerOS
+# 🤝 为 SingerOS 做贡献
 
-Welcome to SingerOS! We're excited that you're interested in contributing to our enterprise digital workforce operating system. This guide will help you get started with contributing to our project.
+欢迎来到 SingerOS！很高兴你愿意为我们的企业数字员工操作系统贡献力量。本指南将帮助你快速开始参与项目。
 
-## 🔍 Code of Conduct
+## 🔍 行为准则
 
-By participating in this project, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md). We pledge to foster an open and welcoming environment.
+参与本项目即表示你同意遵守我们的[行为准则](CODE_OF_CONDUCT.md)。我们承诺共同营造开放、友好的协作环境。
 
-## 🎯 Types of Contributions
+## 🎯 贡献类型
 
-We welcome various types of contributions:
+我们欢迎多种形式的贡献：
 
-### 💡 Ideas & Feedback
-- Reporting bugs
-- Suggesting new features
-- Providing feedback on existing functionality
+### 💡 想法与反馈
+- 报告缺陷
+- 提出新功能建议
+- 对现有功能提供反馈
 
-### 🛠️ Development
-- Fixing bugs
-- Implementing new features
-- Improving documentation
-- Writing tests
+### 🛠️ 开发贡献
+- 修复缺陷
+- 实现新功能
+- 完善文档
+- 编写测试
 
-### 📚 Documentation
-- Updating README files
-- Creating guides and tutorials
-- Improving API documentation
+### 📚 文档贡献
+- 更新 README 文件
+- 编写指南和教程
+- 改进 API 文档
 
-## 🚀 Getting Started
+## 🚀 快速开始
 
-1. Fork the repository
-2. Create a new branch for your feature/fix
-3. Make your changes
-4. Run tests to ensure everything works
-5. Submit a pull request
+1. Fork 本仓库
+2. 为你的功能或修复创建新分支
+3. 完成代码修改
+4. 运行测试并确保功能正常
+5. 提交 Pull Request
 
-## 📦 Project Structure
+## 📦 项目结构
 
-```
+```text
 singeros/
-├── control-plane/     # Governance & management components
-├── data-plane/        # Runtime execution components
-├── plugins/           # Plugin architecture
-└── infrastructure/    # Infrastructure layer
+├── control-plane/     # 治理与管理组件
+├── data-plane/        # 运行时执行组件
+├── plugins/           # 插件架构
+└── infrastructure/    # 基础设施层
 ```
 
-## 🧪 Testing
+## 🧪 测试
 
-Before submitting your contribution:
-1. Run existing tests to ensure you didn't break anything
-2. Add new tests for your changes if applicable
-3. Ensure all tests pass
+提交贡献前请确认：
+1. 运行现有测试，确保没有引入回归
+2. 如有必要，为你的改动补充测试
+3. 确保所有测试通过
 
-### Running Tests
+### 运行测试
 ```bash
-# Run all tests
+# 运行全部测试
 make test
 
-# Run tests with coverage
+# 运行带覆盖率的测试
 make test-cover
 ```
 
-## 📝 Code Style
+## 📝 代码规范
 
-### Go Code
-- Follow Go best practices
-- Use clear, descriptive variable and function names
-- Maintain consistent formatting (use `gofmt`)
-- Add comments for exported functions
-- Write unit tests for new functionality
+### Go 代码
+- 遵循 Go 语言最佳实践
+- 使用清晰且具描述性的变量名和函数名
+- 保持统一格式（使用 `gofmt`）
+- 为导出函数添加注释
+- 为新增功能编写单元测试
 
-### Documentation
-- Keep documentation clear and concise
-- Use consistent terminology
-- Include examples where appropriate
+### 文档规范
+- 文档保持清晰、简洁
+- 术语使用保持一致
+- 在合适处补充示例
 
-## 🐛 Bug Reports
+## 🐛 缺陷报告
 
-When filing a bug report:
+提交缺陷报告时，请尽量包含：
 
-1. **Describe the issue** in detail
-2. **Provide reproduction steps**
-3. **Include system/environment details**
-4. **Share any relevant logs or screenshots**
+1. **详细描述问题现象**
+2. **提供复现步骤**
+3. **说明系统或环境信息**
+4. **附上相关日志或截图**
 
-## 🔧 Pull Request Process
+## 🔧 Pull Request 流程
 
-1. **Ensure any install or build dependencies** are removed before the end of the layer when doing a build
-2. **Update the README.md** with details of changes to the interface
-3. **Increase the version numbers** in any examples files and the README.md to the new version that this Pull Request would represent
-4. **You may merge the Pull Request** once you have the sign-off of one other developer
+1. **在构建场景下，确保安装或构建依赖不会残留在最终镜像层中**
+2. **若接口有变更，请同步更新 README.md**
+3. **如果适用，请在示例文件和 README.md 中更新版本号**
+4. **获得至少一位开发者审批后再合并 Pull Request**
 
-## 📋 Contribution Checklist
+## 📋 贡献检查清单
 
-- [ ] My code follows the project's style guidelines
-- [ ] I have performed a self-review of my code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
-- [ ] My changes generate no new warnings
-- [ ] I have added tests that prove my fix is effective or that my feature works
+- [ ] 我的代码遵循项目代码规范
+- [ ] 我已对代码进行自检
+- [ ] 我已为难以理解的代码添加必要注释
+- [ ] 我已同步更新相关文档
+- [ ] 我的改动未引入新的警告
+- [ ] 我已添加测试来验证修复或新功能有效
 
-## 🌟 License
+## 🌟 许可协议
 
-By contributing, you agree that your contributions will be licensed under the GNU General Public License v3.0.
+通过提交贡献，你同意你的代码将按 GNU General Public License v3.0 进行许可。
 
-## 📬 Contact
+## 📬 联系方式
 
-- GitHub Discussions: [link to discussions]
-- Email: [contact email if applicable]
+- GitHub Discussions: [讨论区链接]
+- Email: [如适用请填写联系邮箱]
 
-Thank you for contributing to SingerOS! 🐶
+感谢你为 SingerOS 做出贡献！ 🐶
