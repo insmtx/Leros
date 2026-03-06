@@ -286,12 +286,12 @@ Enterprise partners are welcome to collaborate.
 
 ## 🐶 Why “Singer”?
 
-Border Singers are:
+Singers are:
 
-* Intelligent
-* Agile
-* Highly trainable
-* Excellent coordinators
+* Expressive
+* Adaptive
+* Highly disciplined
+* Excellent collaborators
 
 SingerOS aims to embody the same traits in enterprise AI systems.
 

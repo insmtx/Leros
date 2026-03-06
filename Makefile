@@ -2,6 +2,7 @@ PROJECT := SingerOS
 REGISTRY ?= registry.yygu.cn/insmtx/
 
 docker-build:
+	docker build -t $(REGISTRY)$(PROJECT):latest -f deployments/build/Dockerfile .
 
 docker-push:
 	docker push $(REGISTRY)$(PROJECT):latest
