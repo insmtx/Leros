@@ -1,4 +1,4 @@
-# 🐶 CollieOS
+# SingerOS
 
 ## Enterprise Digital Workforce Operating System
 
@@ -6,18 +6,18 @@
 
 ---
 
-## 🚀 What is CollieOS?
+## 🚀 What is SingerOS?
 
-**CollieOS** is an enterprise-grade Multi-Agent Operating System designed to power the next generation of digital workforce.
+**SingerOS** is an enterprise-grade Multi-Agent Operating System designed to power the next generation of digital workforce.
 
 It is not a chatbot framework.
 It is not a simple workflow engine.
 
-CollieOS is:
+SingerOS is:
 
 > A distributed, governance-first AI execution system for enterprise digital transformation.
 
-CollieOS enables organizations to:
+SingerOS enables organizations to:
 
 * Design AI-powered digital employees
 * Orchestrate multi-agent workflows
@@ -27,7 +27,7 @@ CollieOS enables organizations to:
 
 ---
 
-## 🧠 Why CollieOS?
+## 🧠 Why SingerOS?
 
 Traditional workflow systems focus on deterministic task automation.
 
@@ -40,21 +40,21 @@ Modern enterprises require:
 * Auditable AI execution
 * Enterprise-grade governance
 
-CollieOS is built to meet these needs.
+SingerOS is built to meet these needs.
 
 Compared to traditional workflow engines such as DeerFlow:
 
-* CollieOS embeds cognitive agents into workflows
-* CollieOS includes model routing and cost governance
-* CollieOS enforces Skill isolation via Skill Proxy
-* CollieOS supports multi-tenant enterprise deployment
-* CollieOS is designed as an AI OS, not just a flow engine
+* SingerOS embeds cognitive agents into workflows
+* SingerOS includes model routing and cost governance
+* SingerOS enforces Skill isolation via Skill Proxy
+* SingerOS supports multi-tenant enterprise deployment
+* SingerOS is designed as an AI OS, not just a flow engine
 
 ---
 
 ## 🏗 Architecture Overview
 
-CollieOS is built with strict separation between:
+SingerOS is built with strict separation between:
 
 * **Control Plane** (governance & management)
 * **Data Plane** (runtime execution)
@@ -100,7 +100,7 @@ CollieOS is built with strict separation between:
 
 ## 🎯 Design Principles
 
-CollieOS enforces the following architectural invariants:
+SingerOS enforces the following architectural invariants:
 
 1. Agent never directly calls external systems.
 2. Skill never performs orchestration logic.
@@ -112,7 +112,7 @@ CollieOS enforces the following architectural invariants:
 
 ## 🏢 Target Scenarios
 
-CollieOS is designed for:
+SingerOS is designed for:
 
 ### Enterprise Internal Digital Transformation
 
@@ -147,7 +147,7 @@ CollieOS is designed for:
 ## 📦 Core Modules
 
 ```text
-collieos/
+singeros/
 ├── control-plane/
 │   ├── agent-registry
 │   ├── skill-registry
@@ -195,7 +195,7 @@ All execution is:
 
 ## 🧩 Extensibility
 
-CollieOS supports plugin-based architecture:
+SingerOS supports plugin-based architecture:
 
 * Skill plugins
 * Agent templates
@@ -239,7 +239,7 @@ All plugins must be:
 
 ## ⚠ Non-Goals
 
-CollieOS is NOT:
+SingerOS is NOT:
 
 * A prompt playground
 * A simple chatbot UI
@@ -250,7 +250,7 @@ CollieOS is NOT:
 
 ## 🧬 Philosophy
 
-CollieOS treats AI agents as:
+SingerOS treats AI agents as:
 
 > First-class digital employees with governance, accountability, and operational boundaries.
 
@@ -260,7 +260,7 @@ We believe the future enterprise stack will include:
 * Software systems
 * Digital employees (AI Agents)
 
-CollieOS is designed to operate the third category.
+SingerOS is designed to operate the third category.
 
 ---
 
@@ -284,14 +284,14 @@ Enterprise partners are welcome to collaborate.
 
 ---
 
-## 🐶 Why “Collie”?
+## 🐶 Why “Singer”?
 
-Border Collies are:
+Border Singers are:
 
 * Intelligent
 * Agile
 * Highly trainable
 * Excellent coordinators
 
-CollieOS aims to embody the same traits in enterprise AI systems.
+SingerOS aims to embody the same traits in enterprise AI systems.
 
