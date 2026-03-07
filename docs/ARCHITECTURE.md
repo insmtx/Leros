@@ -164,7 +164,6 @@ backend/
 │   │       └── tool_sandbox.go
 │
 │   ├── interfaces/
-│   │
 │   │   ├── http/
 │   │   │   ├── handler_agent.go
 │   │   │   ├── handler_skill.go
