@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package collieos.event;
+package singeros.event;
 
-option go_package = "github.com/collieos/idl/gen/event";
+option go_package = "github.com/insmtx/SingerOS/proto/event";
 
 // 事件类型枚举
 enum EventType {

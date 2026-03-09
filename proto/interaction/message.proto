@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package collieos.interaction;
+package singeros.interaction;
 
 import "common/base.proto";
 
-option go_package = "github.com/collieos/idl/gen/interaction";
+option go_package = "github.com/insmtx/SingerOS/proto/interaction";
 
 // 渠道类型枚举
 enum ChannelType {
@@ -18,7 +18,7 @@ enum ChannelType {
 // 用户消息
 message UserMessage {
   // 元数据
-  collieos.common.Meta meta = 1;
+  singeros.common.Meta meta = 1;
 
   // 消息ID
   string message_id = 2;
@@ -42,7 +42,7 @@ message UserMessage {
 // 助手消息
 message AssistantMessage {
   // 元数据
-  collieos.common.Meta meta = 1;
+  singeros.common.Meta meta = 1;
 
   // 消息ID
   string message_id = 2;

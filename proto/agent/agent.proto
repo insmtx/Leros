@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package collieos.agent;
+package singeros.agent;
 
 import "common/base.proto";
 
-option go_package = "github.com/collieos/idl/gen/agent";
+option go_package = "github.com/insmtx/SingerOS/proto/agent";
 
 // Agent状态枚举
 enum AgentStatus {
@@ -17,7 +17,7 @@ enum AgentStatus {
 // Agent任务
 message AgentTask {
   // 元数据
-  collieos.common.Meta meta = 1;
+  singeros.common.Meta meta = 1;
 
   // 任务ID
   string task_id = 2;

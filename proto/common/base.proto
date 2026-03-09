@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package collieos.common;
+package singeros.common;
 
-option go_package = "github.com/collieos/idl/gen/common";
+option go_package = "github.com/insmtx/SingerOS/proto/common";
 
 // 元数据信息
 message Meta {
