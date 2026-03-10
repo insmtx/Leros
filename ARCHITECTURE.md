@@ -1,12 +1,12 @@
 
 * AI OS 架构哲学
-* DigitalEmployee / Agent / Skill / Workflow 体系
+* DigitalAssistant / Agent / Skill / Workflow 体系
 * 事件驱动架构
 * Skills 体系（类 OpenClaw 但更先进）
 * 多交互渠道（GitHub / GitLab / 企业微信 / 飞书 / App）
 * 权限与安全
 * Golang 工程结构
-* 代码助手 DigitalEmployee 的落地方案
+* 代码助手 DigitalAssistant 的落地方案
 * 研发阶段路线图
 
 ---
@@ -68,12 +68,12 @@ app.task.created
 
 ---
 
-## 2.2 DigitalEmployee 是最高抽象
+## 2.2 DigitalAssistant 是最高抽象
 
 系统核心结构：
 
 ```
-DigitalEmployee
+DigitalAssistant
     ↓
 Agent
     ↓
@@ -86,7 +86,7 @@ Tool
 
 | 层级              | 职责    |
 | --------------- | ----- |
-| DigitalEmployee | 数字员工  |
+| DigitalAssistant | 数字助手  |
 | Agent           | AI 决策 |
 | Skill           | 能力    |
 | Tool            | 外部系统  |
@@ -199,7 +199,7 @@ AI OS 的核心调度器。
 职责：
 
 ```
-事件 → 找到匹配的 DigitalEmployee
+事件 → 找到匹配的 DigitalAssistant
       → 找到 Agent
       → 执行 Workflow
 ```
@@ -218,12 +218,12 @@ CodeReviewWorkflow
 
 ---
 
-# 5. DigitalEmployee 设计
+# 5. DigitalAssistant 设计
 
-## 5.1 DigitalEmployee 结构
+## 5.1 DigitalAssistant 结构
 
 ```
-DigitalEmployee
+DigitalAssistant
   id
   name
   description
@@ -460,7 +460,7 @@ skill.feishu.reply
 权限控制粒度：
 
 ```
-DigitalEmployee
+DigitalAssistant
 Agent
 Skill
 Tool
@@ -555,9 +555,9 @@ aios/
 
 ---
 
-# 13. 第一个 DigitalEmployee
+# 13. 第一个 DigitalAssistant
 
-## CodeAssistantEmployee
+## CodeAssistantDigitalAssistant
 
 职责：
 
@@ -736,7 +736,7 @@ AI Sales
 Event Driven
 Skill Based
 Agent Orchestration
-DigitalEmployee
+DigitalAssistant
 ```
 
 系统特点：

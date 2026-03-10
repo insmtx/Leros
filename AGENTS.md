@@ -119,8 +119,8 @@ Based on the AI OS architecture described in docs/ARCHITECTURE_v2.md, the Singer
 1. **Event Gateway** - Receives external events from various channels
 2. **Event Bus** - Message queue system for decoupling components
 3. **Orchestrator** - Core scheduling and coordination mechanism
-4. **DigitalEmployee** - Top-level abstraction representing AI workers
-5. **Agent** - Decision-making entities within DigitalEmployees
+4. **DigitalAssistant** - Top-level abstraction representing AI workers
+5. **Agent** - Decision-making entities within DigitalAssistants
 6. **Skill** - Reusable capabilities that can be invoked
 7. **Tool** - External system integrations that Skills can call
 
@@ -162,7 +162,7 @@ Each channel is abstracted through a Channel adapter pattern for unified interac
 
 Granular permissions control at multiple levels:
 
-- DigitalEmployee
+- DigitalAssistant
 - Agent
 - Skill
 - Tool

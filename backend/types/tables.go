@@ -5,8 +5,8 @@ const (
 )
 
 const (
-	TableNameDigitalEmployee         = tablenamePrefix + "digital_employee"
-	TableNameDigitalEmployeeInstance = tablenamePrefix + "digital_employee_instance"
+	TableNameDigitalAssistant         = tablenamePrefix + "digital_assistant"
+	TableNameDigitalAssistantInstance = tablenamePrefix + "digital_assistant_instance"
 
 	TableNameEvent = tablenamePrefix + "event"
 )
