@@ -15,4 +15,9 @@ type EventBus struct {
 	subscriber Subscriber
 }
 
-func NewEventBus(publisher Publisher, subscriber Subscriber) *EventBus
+func NewEventBus(publisher Publisher, subscriber Subscriber) *EventBus {
+	return &EventBus{
+		publisher:  publisher,
+		subscriber: subscriber,
+	}
+}

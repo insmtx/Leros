@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"sync"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/ygpkg/yg-go/config"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 // rabbitmqPublisher 表示一个RabbitMQ客户端，实现原始接口
@@ -21,22 +21,27 @@ type rabbitmqPublisher struct {
 }
 
 // NewPublisher 创建一个新的RabbitMQ发布者的实例（与原始函数签名匹配）
-func NewPublisher(cfg config.RabbitMQConfig) *rabbitmqPublisher {
+func NewPublisher(cfg config.RabbitMQConfig) (*rabbitmqPublisher, *amqp.Channel, error) {
 	conn, err := amqp.Dial(cfg.URL)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to connect to RabbitMQ: %v", err))
+		logs.Errorf("Failed to connect to RabbitMQ: %v", err)
+		return nil, nil, fmt.Errorf("failed to connect to RabbitMQ: %w", err)
 	}
 
 	channel, err := conn.Channel()
 	if err != nil {
 		conn.Close()
-		panic(fmt.Sprintf("Failed to open a channel: %v", err))
+		logs.Errorf("Failed to open a channel: %v", err)
+		return nil, nil, fmt.Errorf("failed to open a channel: %w", err)
 	}
 
 	// 设置Qos以公平分配任务
 	err = channel.Qos(1, 0, false)
 	if err != nil {
-		log.Printf("Failed to set QoS: %v", err)
+		channel.Close()
+		conn.Close()
+		logs.Errorf("Failed to set QoS: %v", err)
+		return nil, nil, fmt.Errorf("failed to set QoS: %w", err)
 	}
 
 	publisher := &rabbitmqPublisher{
@@ -46,12 +51,8 @@ func NewPublisher(cfg config.RabbitMQConfig) *rabbitmqPublisher {
 		closed:  false,
 	}
 
-	return publisher
-}
-
-// Publish 发布消息到指定主题
-func (p *rabbitmqPublisher) Publish(topic string, message any) error {
-	return p.PublishWithContext(context.Background(), topic, message)
+	logs.Infof("Successfully connected to RabbitMQ at %s", cfg.URL)
+	return publisher, channel, nil
 }
 
 // PublishWithContext 在给定上下文环境中发布消息到指定主题
@@ -99,11 +100,6 @@ func (p *rabbitmqPublisher) PublishWithContext(ctx context.Context, topic string
 	}
 
 	return nil
-}
-
-// Subscribe 订阅特定主题的消息
-func (p *rabbitmqPublisher) Subscribe(topic string, handler func(event any)) error {
-	return p.SubscribeWithContext(context.Background(), topic, handler)
 }
 
 // SubscribeWithContext 在给定上下文环境中订阅特定主题的消息
@@ -174,18 +170,18 @@ func (p *rabbitmqPublisher) SubscribeWithContext(ctx context.Context, topic stri
 		for {
 			select {
 			case <-ctx.Done():
-				log.Printf("Subscription context cancelled for topic: %s", topic)
+				logs.Infof("Subscription context cancelled for topic: %s", topic)
 				return
 			case d, ok := <-msgs:
 				if !ok {
-					log.Printf("Message channel closed for topic: %s", topic)
+					logs.Warnf("Message channel closed for topic: %s", topic)
 					return
 				}
 
 				// 解析收到的消息
 				var message interface{}
 				if err := json.Unmarshal(d.Body, &message); err != nil {
-					log.Printf("Failed to unmarshal message for topic '%s': %v", topic, err)
+					logs.Errorf("Failed to unmarshal message for topic '%s': %v", topic, err)
 					continue
 				}
 

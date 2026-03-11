@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-github/v78/github"
 	"github.com/insmtx/SingerOS/backend/interaction"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 func (c *GitHubConnector) HandleWebhook(
@@ -22,11 +23,13 @@ func (c *GitHubConnector) HandleWebhook(
 
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
+		logs.Errorf("Failed to read GitHub webhook payload: %v", err)
 		http.Error(w, "bad request", 400)
 		return
 	}
 
 	if !c.verifySignature(r, payload) {
+		logs.Warnf("Invalid GitHub webhook signature for request: %s %s", r.Method, r.URL.Path)
 		http.Error(w, "invalid signature", 401)
 		return
 	}
@@ -35,6 +38,7 @@ func (c *GitHubConnector) HandleWebhook(
 
 	event, err := github.ParseWebHook(eventType, payload)
 	if err != nil {
+		logs.Errorf("Failed to parse GitHub webhook event (type: %s): %v", eventType, err)
 		http.Error(w, "parse error", 400)
 		return
 	}
