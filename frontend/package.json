@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
+    "@tabler/icons-react": "^3.40.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "react": "^19.2.0",
