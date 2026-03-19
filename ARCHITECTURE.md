@@ -5,7 +5,7 @@
 * Skills 体系（类 OpenClaw 但更先进）
 * 多交互渠道（GitHub / GitLab / 企业微信 / 飞书 / App）
 * 权限与安全
-* Golang 工程结构
+* Golang 工程结构（反映实际代码实现）
 * 代码助手 DigitalAssistant 的落地方案
 * 研发阶段路线图
 
@@ -93,6 +93,16 @@ Tool
 
 ---
 
+## 2.3 控制平面 vs 数据平面
+
+SingerOS 严格分离了：
+
+* **控制平面**（治理与管理）：Agent 注册、Skill 注册、工作流存储、租户管理、策略引擎
+* **数据平面**（运行时执行）：Orchestrator、Agent Runtime、Skill Proxy、Model Router、Memory Engine、Scheduler
+* **基础设施层**：数据库、消息队列、向量存储、缓存
+
+---
+
 # 3. 核心架构
 
 ## 3.1 架构总览
@@ -107,17 +117,17 @@ Tool
                            |
                            v
                   +----------------+
-                  | Event Gateway  |
+                  | Event Gateway  |  ✅ 已实现
                   +--------+-------+
                            |
                            v
                    +--------------+
-                   | Event Bus    |
+                   | Event Bus    |  ✅ RabbitMQ 已实现
                    +------+-------+
                           |
                           v
                   +---------------+
-                  | Orchestrator  |
+                  | Orchestrator  |  🔄 规划中
                   +-------+-------+
                           |
         +-----------------+----------------+
@@ -125,17 +135,17 @@ Tool
         v                                  v
 
  +-------------+                   +---------------+
- | Agent Engine|                   | Workflow Engine|
- +------+------ +                  +-------+-------+
+ | Agent Engine|  🔄 规划中         | Workflow Engine|  🔄 规划中
+ +------+------+                   +-------+-------+
         |                                  |
         v                                  v
   +------------+                    +-------------+
-  | Skill Exec |                    | Skill Exec  |
-  +-----+------+                    +------+------+ 
+  | Skill Proxy|  ✅ 骨架已实现      | Skill Proxy |  ✅ 骨架已实现
+  +-----+------+                    +------+------+
         |                                  |
         v                                  v
      +---------+                     +----------+
-     | Tools   |                     | Tools    |
+     | Tools   |  🔄 规划中           | Tools    |  🔄 规划中
      +---------+                     +----------+
 ```
 
@@ -145,43 +155,43 @@ Tool
 
 ---
 
-# 4.1 Event Gateway
+# 4.1 Event Gateway（✅ 已实现）
 
 负责接收所有外部事件。
 
 来源：
 
 ```
-GitHub Webhook
-GitLab Webhook
-企业微信
-飞书
-APP
-Webhook API
+GitHub Webhook      ✅ 已实现（含签名验证、事件解析）
+GitLab Webhook      🔄 Stub
+企业微信/WeWork      🔄 Stub
+飞书                 🔄 规划中
+APP                  🔄 规划中
+Webhook API          🔄 规划中
 ```
 
-统一转换为：
+统一转换为 `interaction.Event`：
 
-```
-Internal Event
-```
-
-示例：
-
-```
-event:
-  type: git.pr.opened
-  source: github
-  repo: org/repo
-  pr: 123
+```go
+type Event struct {
+    EventID    string
+    TraceID    string
+    Channel    string
+    EventType  string
+    Actor      string
+    Repository string
+    Context    map[string]interface{}
+    Payload    interface{}
+    CreatedAt  time.Time
+}
 ```
 
 ---
 
-# 4.2 Event Bus
+# 4.2 Event Bus（✅ RabbitMQ 已实现）
 
 ```
-RabbitMQ | Redis Stream
+RabbitMQ（当前实现）
 ```
 
 作用：
@@ -190,9 +200,11 @@ RabbitMQ | Redis Stream
 * 支持高并发
 * 支持异步
 
+Publisher/Subscriber 接口定义在 `backend/interaction/eventbus/bus.go`，RabbitMQ 实现在 `backend/interaction/eventbus/rabbitmq/`。
+
 ---
 
-# 4.3 Orchestrator
+# 4.3 Orchestrator（🔄 规划中）
 
 AI OS 的核心调度器。
 
@@ -218,20 +230,35 @@ CodeReviewWorkflow
 
 ---
 
-# 5. DigitalAssistant 设计
+# 5. DigitalAssistant 设计（✅ 类型已定义）
 
 ## 5.1 DigitalAssistant 结构
 
+定义于 `backend/types/digital_assistant.go`：
+
+```go
+type DigitalAssistant struct {
+    gorm.Model
+    Code        string          // 助手唯一标识符
+    OrgID       uint            // 所属组织
+    OwnerID     uint            // 拥有者
+    Name        string          // 助手名称
+    Description string          // 描述
+    Avatar      string          // 头像URL
+    Status      string          // 状态
+    Version     int             // 版本号
+    Config      AssistantConfig // 配置（Runtime、LLM、Skills、Channels、Memory、Policies）
+}
 ```
-DigitalAssistant
-  id
-  name
-  description
-  agents[]
-  permissions
-  knowledge_base
-  config
-```
+
+`AssistantConfig` 包含：
+- `RuntimeConfig` - 执行环境类型
+- `LLMConfig` - 大型语言模型配置
+- `Skills []SkillRef` - 技能引用列表
+- `Channels []ChannelRef` - 渠道引用列表
+- `Knowledge []KnowledgeRef` - 知识库引用列表
+- `MemoryConfig` - 记忆配置
+- `PolicyConfig` - 策略配置
 
 例：
 
@@ -250,7 +277,7 @@ issue 回复
 
 ---
 
-# 6. Agent 设计
+# 6. Agent 设计（🔄 规划中）
 
 Agent 负责：
 
@@ -273,7 +300,7 @@ Agent
 
 ---
 
-# 7. Workflow Engine
+# 7. Workflow Engine（🔄 规划中）
 
 Workflow 用于执行复杂流程。
 
@@ -294,7 +321,7 @@ PR Review Workflow
 
 ---
 
-# 8. Skills 系统（核心）
+# 8. Skills 系统（✅ 接口已实现）
 
 Skills 是 AI OS 的核心能力。
 
@@ -306,26 +333,36 @@ Skill = 可复用能力
 
 ---
 
-## 8.1 Skill 结构
+## 8.1 Skill 接口（backend/skills/skill.go）
+
+```go
+type Skill interface {
+    Info() *SkillInfo
+    Execute(ctx context.Context, input map[string]interface{}) (map[string]interface{}, error)
+    Validate(input map[string]interface{}) error
+    GetID() string
+    GetName() string
+    GetDescription() string
+}
+```
+
+`SkillInfo` 结构：
 
 ```
 Skill
   id
   name
   description
+  version
+  category
+  author
+  skill_type     // local | remote
   input_schema
   output_schema
   permissions
-  executor
 ```
 
-例：
-
-```
-skill: git.get_diff
-skill: github.comment_pr
-skill: opencode.generate_patch
-```
+嵌入 `BaseSkill` 可减少样板代码。参见 `backend/skills/examples/` 中的示例实现。
 
 ---
 
@@ -336,16 +373,16 @@ skill: opencode.generate_patch
 外部系统能力：
 
 ```
-github
-gitlab
-wechat
-feishu
-jira
+github      ✅ webhook connector 已实现
+gitlab      🔄 stub
+wechat      🔄 stub
+feishu      🔄 规划中
+jira        🔄 规划中
 ```
 
 ---
 
-### AI Skill
+### AI Skill（🔄 规划中）
 
 AI 推理能力：
 
@@ -357,7 +394,7 @@ classification
 
 ---
 
-### Tool Skill
+### Tool Skill（🔄 规划中）
 
 工具能力：
 
@@ -369,7 +406,7 @@ http_request
 
 ---
 
-### Workflow Skill
+### Workflow Skill（🔄 规划中）
 
 组合能力：
 
@@ -380,9 +417,13 @@ bug_triage_workflow
 
 ---
 
-# 9. Skill 执行架构
+# 9. Skill Proxy（✅ 服务骨架已实现）
 
-Skill Runner 设计：
+Skill Proxy 提供独立的技能执行隔离。
+
+入口：`backend/cmd/skill-proxy/main.go`
+
+Skill Runner 设计（规划中）：
 
 ```
 Skill Request
@@ -401,61 +442,41 @@ Tool
 系统必须支持：
 
 ```
-GitHub
-GitLab
-企业微信
-飞书
-App
-Webhook
+GitHub       ✅ 已实现
+GitLab       🔄 stub
+企业微信      🔄 stub
+飞书          🔄 规划中
+App          🔄 规划中
+Webhook      🔄 规划中
 ```
 
 ---
 
-## 10.1 Interaction Channel
+## 10.1 Connector 接口（✅ 已实现）
 
-统一抽象：
+统一抽象，定义于 `backend/interaction/connectors/connector.go`：
 
-```
-Channel
-```
-
-结构：
-
-```
-Channel
-  id
-  type
-  auth
-  skill_adapter
+```go
+type Connector interface {
+    ChannelCode() string
+    RegisterRoutes(r gin.IRouter)
+}
 ```
 
 ---
 
-## 10.2 Channel Adapter
+## 10.2 已实现的 Connector
 
-例如：
+**GitHub Connector**（`backend/interaction/connectors/github/`）：
 
-```
-github_adapter
-wechat_adapter
-feishu_adapter
-```
-
----
-
-## 10.3 Interaction Skill
-
-例如：
-
-```
-skill.github.comment
-skill.wechat.reply
-skill.feishu.reply
-```
+- Webhook 接收（`POST /github/webhook`）
+- HMAC-SHA256 签名验证
+- 事件解析（目前支持 `issue_comment`）
+- 事件发布至 RabbitMQ topic `interaction.github.issue_comment`
 
 ---
 
-# 11. 权限系统
+# 11. 权限系统（🔄 规划中）
 
 权限控制粒度：
 
@@ -485,77 +506,48 @@ CodeAssistantEmployee
 
 ---
 
-# 12. Golang 工程结构
-
-推荐结构：
+# 12. Golang 工程结构（实际代码）
 
 ```
-aios/
+SingerOS/
 │
-├── cmd/
-│   ├── api
-│   ├── worker
-│   └── scheduler
+├── backend/
+│   ├── cmd/
+│   │   ├── singer/          # 主服务（HTTP + Event Gateway）
+│   │   └── skill-proxy/     # Skill Proxy 服务
+│   │
+│   ├── config/              # 配置加载与类型定义
+│   │
+│   ├── gateway/             # HTTP gateway（预留扩展）
+│   │
+│   ├── interaction/         # 事件驱动交互层
+│   │   ├── connectors/
+│   │   │   ├── github/      # GitHub Webhook connector ✅
+│   │   │   ├── gitlab/      # GitLab connector 🔄 stub
+│   │   │   └── wework/      # 企业微信 connector 🔄 stub
+│   │   ├── eventbus/
+│   │   │   └── rabbitmq/    # RabbitMQ Publisher ✅
+│   │   └── gateway/         # Event Gateway 路由注册
+│   │
+│   ├── skills/              # Skill 接口、BaseSkill、SkillManager ✅
+│   │   └── examples/        # 示例 Skill 实现
+│   │
+│   └── types/               # 核心领域类型
+│       ├── digital_assistant.go          # DigitalAssistant, AssistantConfig ✅
+│       ├── digital_assistant_instance.go # DigitalAssistantInstance
+│       ├── event.go                      # Event（持久化）✅
+│       └── tables.go                    # DB 表名常量
 │
-├── internal/
-│
-│   ├── core/
-│   │   ├── employee
-│   │   ├── agent
-│   │   ├── workflow
-│   │   ├── skill
-│   │   └── event
-│
-│   ├── orchestrator/
-│   │   └── orchestrator.go
-│
-│   ├── engine/
-│   │   ├── agent_engine
-│   │   ├── workflow_engine
-│   │   └── skill_engine
-│
-│   ├── integrations/
-│   │   ├── github
-│   │   ├── gitlab
-│   │   ├── wechat
-│   │   └── feishu
-│
-│   ├── skills/
-│   │   ├── git
-│   │   ├── opencode
-│   │   ├── llm
-│   │   └── messaging
-│
-│   ├── storage/
-│   │   ├── postgres
-│   │   ├── redis
-│   │   └── vector
-│
-│   ├── eventbus/
-│   │   └── nats
-│
-│   ├── auth/
-│   │   └── permissions
-│
-│   └── config/
-│
-├── pkg/
-│
-│   ├── sdk
-│   └── client
-│
-├── api/
-│   └── proto
-│
-├── deployments/
-│   └── docker
-│
-└── docs/
+├── proto/                   # Protobuf 定义
+├── gen/                     # 生成的 proto 代码
+├── frontend/                # 前端应用
+├── deployments/             # Docker 构建配置
+└── docs/                    # 文档
 ```
 
 ---
 
-# 13. 第一个 DigitalAssistant
+# 13. 第一个 DigitalAssistant（🔄 规划中）
 
 ## CodeAssistantDigitalAssistant
 
@@ -598,7 +590,7 @@ Comment
 
 ---
 
-# 14. opencode Skill
+# 14. opencode Skill（🔄 规划中）
 
 opencode 用作：
 
@@ -618,7 +610,7 @@ skill.opencode.fix_bug
 
 ---
 
-# 15. GitHub / GitLab Hook
+# 15. GitHub / GitLab Hook（✅ GitHub 已实现）
 
 触发：
 
@@ -629,7 +621,13 @@ comment
 push
 ```
 
-事件：
+当前已支持的事件：
+
+```
+interaction.github.issue_comment   ✅
+```
+
+规划中的事件：
 
 ```
 git.pr.opened
@@ -639,7 +637,7 @@ git.issue.created
 
 ---
 
-# 16. 企业微信 / 飞书交互
+# 16. 企业微信 / 飞书交互（🔄 规划中）
 
 交互流程：
 
@@ -666,11 +664,14 @@ Reply
 第一阶段建议：
 
 ```
-1 Event Gateway
-2 Orchestrator
-3 Skill System
-4 GitHub Integration
-5 CodeAssistantEmployee
+1 Event Gateway          ✅ 已完成
+2 Event Bus (RabbitMQ)   ✅ 已完成
+3 Skill System 接口      ✅ 已完成
+4 GitHub Integration     ✅ Webhook + 事件解析已完成
+5 Skill Proxy 服务       ✅ 服务骨架已完成
+6 Orchestrator           🔄 规划中
+7 Agent Engine           🔄 规划中
+8 CodeAssistantEmployee  🔄 规划中
 ```
 
 ---
@@ -680,37 +681,27 @@ Reply
 MVP：
 
 ```
-PR 自动 Review
-PR 自动总结
-Issue 自动回复
-代码解释
+PR 自动 Review      🔄 规划中
+PR 自动总结         🔄 规划中
+Issue 自动回复      🔄 规划中（GitHub issue_comment 事件已接入）
+代码解释            🔄 规划中
 ```
 
 ---
 
 # 19. 技术栈
 
-推荐：
-
-```
-语言
-Golang
-
-消息系统
-NATS
-
-数据库
-Postgres
-
-缓存
-Redis
-
-向量库
-Qdrant
-
-LLM
-OpenAI / Claude / DeepSeek
-```
+| 组件 | 技术 | 状态 |
+|------|------|------|
+| 语言 | Golang | ✅ 已使用 |
+| HTTP 框架 | Gin | ✅ 已使用 |
+| CLI 框架 | Cobra | ✅ 已使用 |
+| 消息队列 | RabbitMQ | ✅ 已实现 |
+| ORM | GORM | ✅ 已使用（类型定义） |
+| 数据库 | Postgres | 🔄 规划中 |
+| 缓存 | Redis | 🔄 规划中 |
+| 向量库 | Qdrant | 🔄 规划中 |
+| LLM | OpenAI / Claude / DeepSeek | 🔄 规划中 |
 
 ---
 
@@ -747,3 +738,4 @@ DigitalAssistant
 多渠道交互
 可扩展 AI 能力
 ```
+
