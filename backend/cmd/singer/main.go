@@ -36,9 +36,24 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
-		// Initialize event bus using environment variable or docker-compose defaults
-		rmqUrl := os.Getenv("RABBITMQ_URL")
-		if rmqUrl == "" {
+		// Initialize event bus using configuration from config file
+		var rmqUrl string
+		if cfg.RabbitMQ != nil && cfg.RabbitMQ.URL != "" {
+			// Use URL from config file if available
+			rmqUrl = cfg.RabbitMQ.URL
+		} else if cfg.RabbitMQ != nil && cfg.RabbitMQ.Host != "" && cfg.RabbitMQ.Port > 0 {
+			// Construct URL from host/port config
+			username := cfg.RabbitMQ.Username
+			if username == "" {
+				username = "singer_user"
+			}
+			password := cfg.RabbitMQ.Password
+			if password == "" {
+				password = "singer_password"
+			}
+			rmqUrl = fmt.Sprintf("amqp://%s:%s@%s:%d/", username, password, cfg.RabbitMQ.Host, cfg.RabbitMQ.Port)
+		} else {
+			// Default URL as fallback
 			rmqUrl = "amqp://singer_user:singer_password@rabbitmq:5672/"
 		}
 
