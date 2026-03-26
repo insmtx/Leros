@@ -9,6 +9,10 @@ This document contains essential information for AI agents working with the Sing
 - `go build -o ./bundles/skill-proxy ./backend/cmd/skill-proxy/main.go` - Build the Skill Proxy service (output to `./bundles/`)
 - `make docker-build` - Build Docker image (tag: registry.yygu.cn/insmtx/SingerOS:latest)
 - `make docker-run` - Run the Docker image locally
+- `make run` - Start docker-compose services in foreground mode
+- `make run-detached` - Start docker-compose services in detached mode (background)
+- `make stop` - Stop docker-compose services
+- `make logs` - View docker-compose service logs
 
 ### Test Commands
 - `go test ./...` - Run all tests in the project
