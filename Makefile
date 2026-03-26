@@ -52,7 +52,7 @@ generate-proto-node:
 	which protoc-gen-es || npm install -g @bufbuild/protoc-gen-es
 	protoc --plugin=protoc-gen-es --es_out=. proto/*.proto
 
-.PHONY: run run-foreground run-detached stop logs
+.PHONY: run run-foreground run-detached run-build run-foreground-build run-detached-build stop logs
 
 # Default run command - runs docker-compose services in foreground mode (shows logs)
 run:
@@ -62,9 +62,21 @@ run:
 run-foreground:
 	docker-compose -f deployments/env/docker-compose.yml up
 
+# Run services in foreground with forced rebuild 
+run-build:
+	docker-compose -f deployments/env/docker-compose.yml up --build
+
+# Alternative for explicit foreground with forced rebuild
+run-foreground-build:
+	docker-compose -f deployments/env/docker-compose.yml up --build
+
 # Run services in detached mode (background)
 run-detached:
 	docker-compose -f deployments/env/docker-compose.yml up -d
+
+# Run services in detached mode with forced build
+run-detached-build:
+	docker-compose -f deployments/env/docker-compose.yml up -d --build
 
 # Stop services  
 stop:
