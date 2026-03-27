@@ -78,13 +78,13 @@ func NewConnector(cfg config.GithubAppConfig, publisher eventbus.Publisher, db *
 func (c *Connector) oAuthRedirect(ctx *gin.Context) {
 	state, err := generateState()
 	if err != nil {
-		logs.Errorf("Failed to generate state: %v", err)
+		logs.ErrorContextf(ctx, "Failed to generate state: %v", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
 	if c.cfg.ClientID == "" {
-		logs.Errorf("Missing GitHub OAuth Client ID")
+		logs.ErrorContext(ctx, "Missing GitHub OAuth Client ID")
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "GitHub OAuth not properly configured"})
 		return
 	}
@@ -109,14 +109,14 @@ func (c *Connector) oAuthCallback(ctx *gin.Context) {
 	}
 
 	if c.cfg.ClientID == "" || c.cfg.ClientSecret == "" {
-		logs.Errorf("Missing GitHub OAuth client credentials")
+		logs.ErrorContext(ctx, "Missing GitHub OAuth client credentials")
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "GitHub OAuth not properly configured"})
 		return
 	}
 
 	accessToken, err := c.exchangeCodeForToken(code)
 	if err != nil {
-		logs.Errorf("Failed to exchange code for token: %v", err)
+		logs.ErrorContextf(ctx, "Failed to exchange code for token: %v", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get access token"})
 		return
 	}
@@ -124,14 +124,14 @@ func (c *Connector) oAuthCallback(ctx *gin.Context) {
 	ghClient := github.NewTokenClient(context.Background(), accessToken)
 	user, _, err := ghClient.Users.Get(context.Background(), "")
 	if err != nil {
-		logs.Errorf("Failed to get user profile: %v", err)
+		logs.ErrorContextf(ctx, "Failed to get user profile: %v", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user profile"})
 		return
 	}
 
 	response := c.buildOAuthResponse(user, accessToken)
-	if err := c.saveUserIfNeeded(user, response); err != nil {
-		logs.Errorf("Failed to save user: %v", err)
+	if err := c.saveUserIfNeeded(ctx, user, response); err != nil {
+		logs.ErrorContextf(ctx, "Failed to save user: %v", err)
 	}
 
 	ctx.JSON(http.StatusOK, response)
@@ -198,9 +198,9 @@ func (c *Connector) buildOAuthResponse(user *github.User, accessToken string) gi
 }
 
 // saveUserIfNeeded saves user to database if available.
-func (c *Connector) saveUserIfNeeded(user *github.User, response gin.H) error {
+func (c *Connector) saveUserIfNeeded(ctx context.Context, user *github.User, response gin.H) error {
 	if c.db == nil {
-		logs.Warn("Database not available, user info will not be saved to DB")
+		logs.WarnContext(ctx, "Database not available, user info will not be saved to DB")
 		return nil
 	}
 

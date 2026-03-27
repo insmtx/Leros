@@ -49,30 +49,30 @@ func (o *Orchestrator) registerDefaultHandlers() {
 func (o *Orchestrator) Start(ctx context.Context) error {
 	for topic, handler := range o.handlers {
 		go func(t string, h EventHandlerFunc) {
-			logs.Infof("Starting subscription for topic: %s", t)
+			logs.InfoContextf(ctx, "Starting subscription for topic: %s", t)
 			err := o.subscriber.Subscribe(ctx, t, func(event any) {
 				// 将通用interface{}转换为interaction.Event
 				jsonBytes, err := json.Marshal(event)
 				if err != nil {
-					logs.Errorf("Failed to marshal event to JSON: %v", err)
+					logs.ErrorContextf(ctx, "Failed to marshal event to JSON: %v", err)
 					return
 				}
 
 				var interactionEvent interaction.Event
 				if err := json.Unmarshal(jsonBytes, &interactionEvent); err != nil {
-					logs.Errorf("Failed to unmarshal event: %v", err)
+					logs.ErrorContextf(ctx, "Failed to unmarshal event: %v", err)
 					return
 				}
 
-				logs.Debugf("Received event on topic %s: %+v", t, interactionEvent)
+				logs.DebugContextf(ctx, "Received event on topic %s: %+v", t, interactionEvent)
 
 				if err := h(ctx, &interactionEvent); err != nil {
-					logs.Errorf("Error handling event on topic %s: %v", t, err)
+					logs.ErrorContextf(ctx, "Error handling event on topic %s: %v", t, err)
 				}
 			})
 
 			if err != nil {
-				logs.Errorf("Failed to subscribe to topic %s: %v", t, err)
+				logs.ErrorContextf(ctx, "Failed to subscribe to topic %s: %v", t, err)
 			}
 		}(topic, handler)
 	}
@@ -82,10 +82,10 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 
 // handleIssueComment 处理 GitHub Issue 评论事件
 func (o *Orchestrator) handleIssueComment(ctx context.Context, event *interaction.Event) error {
-	logs.Infof("Processing GitHub issue comment event: %+v", event)
+	logs.InfoContextf(ctx, "Processing GitHub issue comment event: %+v", event)
 
 	// 在这里可以添加实际业务逻辑，比如使用LLM分析评论内容
-	logs.Infof("GitHub Issue Comment - Repository: %s, Actor: %s, Payload: %+v",
+	logs.InfoContextf(ctx, "GitHub Issue Comment - Repository: %s, Actor: %s, Payload: %+v",
 		event.Repository, event.Actor, event.Payload)
 
 	return nil
@@ -93,7 +93,7 @@ func (o *Orchestrator) handleIssueComment(ctx context.Context, event *interactio
 
 // handlePullRequest 处理 GitHub Pull Request 事件
 func (o *Orchestrator) handlePullRequest(ctx context.Context, event *interaction.Event) error {
-	logs.Infof("Processing GitHub pull request event: %+v", event)
+	logs.InfoContextf(ctx, "Processing GitHub pull request event: %+v", event)
 
 	// 在这里可以添加对PR事件的处理逻辑
 	action, ok := event.Payload.(map[string]interface{})["action"]
@@ -106,11 +106,11 @@ func (o *Orchestrator) handlePullRequest(ctx context.Context, event *interaction
 		number = "unknown"
 	}
 
-	logs.Infof("GitHub Pull Request - Action: %s, Number: %v, Repository: %s, Actor: %s",
+	logs.InfoContextf(ctx, "GitHub Pull Request - Action: %s, Number: %v, Repository: %s, Actor: %s",
 		action, number, event.Repository, event.Actor)
 
 	// 记录payload中的详细信息以便进行处理
-	logs.Debugf("GitHub Pull Request Payload: %+v", event.Payload)
+	logs.DebugContextf(ctx, "GitHub Pull Request Payload: %+v", event.Payload)
 
 	return nil
 }

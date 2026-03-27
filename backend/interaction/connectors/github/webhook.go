@@ -29,7 +29,7 @@ func (c *Connector) handleWebhook(ctx *gin.Context) {
 
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
-		logs.Errorf("Failed to read GitHub webhook payload: %v", err)
+		logs.ErrorContextf(ctx, "Failed to read GitHub webhook payload: %v", err)
 		http.Error(w, "bad request", httpBadRequest)
 		return
 	}
@@ -37,19 +37,18 @@ func (c *Connector) handleWebhook(ctx *gin.Context) {
 	// 只有配置了webhook_secret时才进行签名验证
 	if c.cfg.WebhookSecret != "" {
 		if !c.validateSignature(r, payload) {
-			logs.Warnf("Invalid GitHub webhook signature for request: %s %s", r.Method, r.URL.Path)
-			logs.Warnf("To skip verification, set github.skip_webhook_verify: true in config (DEVELOPMENT ONLY)")
+			logs.WarnContextf(ctx, "Invalid GitHub webhook signature for request: %s %s", r.Method, r.URL.Path)
 			http.Error(w, "invalid signature", httpUnauthorized)
 			return
 		}
 	} else {
-		logs.Warn("GitHub webhook_secret not configured - skipping signature verification")
+		logs.WarnContext(ctx, "GitHub webhook_secret not configured - skipping signature verification")
 	}
 
 	eventType := github.WebHookType(r)
 	event, err := github.ParseWebHook(eventType, payload)
 	if err != nil {
-		logs.Errorf("Failed to parse GitHub webhook event (type: %s): %v", eventType, err)
+		logs.ErrorContextf(ctx, "Failed to parse GitHub webhook event (type: %s): %v", eventType, err)
 		http.Error(w, "parse error", httpBadRequest)
 		return
 	}

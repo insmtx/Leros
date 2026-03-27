@@ -12,28 +12,28 @@ func (c *GitlabConnector) RegisterRoutes(r gin.IRouter) {
 func (c *GitlabConnector) HandleWebhook(ctx *gin.Context) {
 	eventType := ctx.GetHeader("X-Gitlab-Event")
 	if eventType == "" {
-		logs.Errorf("Missing X-Gitlab-Event header")
+		logs.ErrorContext(ctx, "Missing X-Gitlab-Event header")
 		ctx.JSON(400, gin.H{"error": "Missing X-Gitlab-Event header"})
 		return
 	}
 
-	logs.Infof("Received GitLab event: %s", eventType)
+	logs.InfoContextf(ctx, "Received GitLab event: %s", eventType)
 
 	payload, err := ctx.GetRawData()
 	if err != nil {
-		logs.Errorf("Failed to read request body: %v", err)
+		logs.ErrorContextf(ctx, "Failed to read request body: %v", err)
 		ctx.JSON(400, gin.H{"error": "Failed to read request body"})
 		return
 	}
 
 	if err := c.verifySignature(ctx, payload); err != nil {
-		logs.Errorf("Signature verification failed: %v", err)
+		logs.ErrorContextf(ctx, "Signature verification failed: %v", err)
 		ctx.JSON(403, gin.H{"error": "Invalid signature"})
 		return
 	}
 
 	if err := c.processEvent(ctx, eventType, payload); err != nil {
-		logs.Errorf("Failed to process event: %v", err)
+		logs.ErrorContextf(ctx, "Failed to process event: %v", err)
 		ctx.JSON(500, gin.H{"error": "Failed to process event"})
 		return
 	}

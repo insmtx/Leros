@@ -174,18 +174,18 @@ func (p *rabbitmqPublisher) SubscribeWithContext(ctx context.Context, topic stri
 		for {
 			select {
 			case <-ctx.Done():
-				logs.Infof("Subscription context cancelled for topic: %s", topic)
+				logs.InfoContextf(ctx, "Subscription context cancelled for topic: %s", topic)
 				return
 			case d, ok := <-msgs:
 				if !ok {
-					logs.Warnf("Message channel closed for topic: %s", topic)
+					logs.WarnContextf(ctx, "Message channel closed for topic: %s", topic)
 					return
 				}
 
 				// 解析收到的消息
 				var message interface{}
 				if err := json.Unmarshal(d.Body, &message); err != nil {
-					logs.Errorf("Failed to unmarshal message for topic '%s': %v", topic, err)
+					logs.ErrorContextf(ctx, "Failed to unmarshal message for topic '%s': %v", topic, err)
 					continue
 				}
 

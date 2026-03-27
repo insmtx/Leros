@@ -92,7 +92,7 @@ func (c *ClientConnector) RegisterRoutes(r gin.IRouter) {
 func (c *ClientConnector) handleWebSocket(ctx *gin.Context) {
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
-		logs.Errorf("Failed to upgrade connection to WebSocket: %v", err)
+		logs.ErrorContextf(ctx, "Failed to upgrade connection to WebSocket: %v", err)
 		return
 	}
 	defer conn.Close()
