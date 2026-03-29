@@ -16,7 +16,7 @@
 
 ## 1. 项目愿景
 
-本项目旨在构建一个 **企业级 AI 操作系统（AI OS）**，用于管理和运行 **AI Digital Employees（AI数字员工）**。
+本项目旨在构建一个 **企业级 AI 操作系统（AI OS）**，用于管理和运行 **AI Digital Assistants（AI数字员工）**。
 
 AI OS 提供：
 
@@ -221,7 +221,7 @@ AI OS 的核心调度器。
 ```
 git.pr.opened
       ↓
-CodeReviewerEmployee
+CodeReviewerAssistant
       ↓
 ReviewAgent
       ↓
@@ -263,7 +263,7 @@ type DigitalAssistant struct {
 例：
 
 ```
-CodeAssistantEmployee
+CodeAssistantDigitalAssistant
 ```
 
 职责：
@@ -496,7 +496,7 @@ RBAC + Capability
 例：
 
 ```
-CodeAssistantEmployee
+CodeAssistantDigitalAssistant
     可以：
         read repo
         comment pr
@@ -565,7 +565,7 @@ issue 回复
 ## 架构
 
 ```
-CodeAssistantEmployee
+CodeAssistantDigitalAssistant
     |
     +-- ReviewAgent
     |
@@ -671,7 +671,7 @@ Reply
 5 Skill Proxy 服务       ✅ 服务骨架已完成
 6 Orchestrator           🔄 规划中
 7 Agent Engine           🔄 规划中
-8 CodeAssistantEmployee  🔄 规划中
+8 CodeAssistantDigitalAssistant  🔄 规划中
 ```
 
 ---
