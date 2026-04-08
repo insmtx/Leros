@@ -19,6 +19,7 @@ import (
 	"github.com/insmtx/SingerOS/backend/agent/react"
 	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/database"
+	"github.com/insmtx/SingerOS/backend/gateway/trace"
 	"github.com/insmtx/SingerOS/backend/interaction/eventbus/rabbitmq"
 	gateway "github.com/insmtx/SingerOS/backend/interaction/gateway"
 	"github.com/insmtx/SingerOS/backend/llm"
@@ -28,6 +29,7 @@ import (
 	code_review_skill "github.com/insmtx/SingerOS/backend/skills/tool_skills/code_review_skill"
 	echo_skill "github.com/insmtx/SingerOS/backend/skills/tool_skills/echo_skill"
 	"github.com/spf13/cobra"
+	"github.com/ygpkg/yg-go/apis/runtime/middleware"
 	ygconfig "github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
@@ -138,7 +140,13 @@ var rootCmd = &cobra.Command{
 		}
 
 		// Set up the HTTP router
-		r := gin.Default()
+		r := gin.New()
+		{
+			r.Use(middleware.CORS())
+			r.Use(trace.CustomerHeader())
+			r.Use(trace.Logger(".Ping", "metrics"))
+			r.Use(middleware.Recovery())
+		}
 
 		// Set up gateway with connectors
 		gateway.SetupRouter(r, *cfg, publisher, db)
