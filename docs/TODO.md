@@ -1,9 +1,33 @@
-# 🚀 SingerOS 后端开发 TODO（融合最终版）
+# 🚀 SingerOS 后端开发 TODO（最新更新 2026-04-18）
 
 > 目标：2周内完成 GitHub PR 自动 Review MVP
 > 原则：**先闭环，再抽象；先能跑，再优雅**
 
 ---
+
+# 📊 当前实现状态摘要
+
+## 已完成的核心组件（Phase 1-2）
+
+| 组件 | 状态 | 说明 |
+|------|------|------|
+| Event Gateway | ✅ 完成 | GitHub webhook 接收、签名验证、事件解析 |
+| Event Bus (RabbitMQ) | ✅ 完成 | Publisher/Subscriber 模式，topic-based 路由 |
+| Orchestrator | ✅ 完成 | 事件路由到 Agent Runtime |
+| Agent Runtime (Eino) | ✅ 完成 | LLM 代理执行引擎，工具调用 |
+| Tools 系统 | ✅ 完成 | 注册表、执行运行时、权限解析 |
+| Skills 系统 | ✅ 完成 | Skill 接口、文件化技能目录 |
+| Auth 系统 | ✅ 完成 | OAuth 流程、账户管理、凭证解析 |
+| GitHub 集成 | ✅ 完成 | Webhook、OAuth、PR 读写工具集 |
+| 服务集成 | ✅ 完成 | Singer 主服务、Skill Proxy 框架 |
+
+## 进行中的功能（Phase 3）
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| PR 自动 Review | 🔄 集成中 | 技能已定义，工具已实现，完整流程待验证 |
+| Issue 自动回复 | 🔄 基础就绪 | issue_comment 事件已支持，需要 AI 回复技能 |
+| DigitalAssistant 管理 | 🔄 类型完成 | 数据库模型完成，API 层待实现 |
 
 # 🧭 总体阶段划分
 
@@ -16,352 +40,225 @@
 
 ---
 
-# 🔴 Phase 1：最小闭环（必须完成）
+# 🔴 Phase 1：最小闭环（✅ 已完成）
 
 > 核心目标：**PR → 自动评论（端到端跑通）**
 
----
+## ✅ 完成状态
 
-## 1.1 基础运行环境
+所有 Phase 1 任务已完成：
 
-### Task 1: Docker化项目（优先级最高）
-
-**目标**
-
-* 一键启动所有服务（singer + rabbitmq）
-
-**验收**
-
-* `docker-compose up` 能启动 ❌ *待完成*
-* singer服务可访问
-* RabbitMQ正常
+- ✅ Docker化项目 - docker-compose 配置完成
+- ✅ GitHub Webhook接入 - 签名验证、事件解析
+- ✅ 事件发布到 RabbitMQ
+- ✅ Orchestrator 事件消费
+- ✅ LLM Provider (OpenAI)
+- ✅ Skill 基础实现
+- ✅ GitHub API 能力（PR 读写工具）
+- ✅ 事件 → Skill 路由（Orchestrator）
 
 ---
 
-## 1.2 GitHub Connector（只做最小）
-
-### Task 2: GitHub Webhook接入 ✅ *已完成*
-
-**接口**
-
-```
-POST /webhook/github
-```
-
-**实现**
-
-* 验证签名 ✅ *已完成*
-* 解析 PR opened 事件 ✅ *已完成*
-* 转换为统一 Event ✅ *已完成*
-
-**Event结构（统一标准）**
-
-```go
-type Event struct {
-    ID        string
-    Type      string   // "pr_opened"
-    Source    string   // "github"
-    Payload   map[string]interface{}
-}
-```
-
-**验收**
-
-* 能打印PR事件日志 ✅ *已完成*
-* 能正确解析 repo / pr_number ✅ *已完成*
-
----
-
-## 1.3 EventBus（RabbitMQ）
-
-### Task 3: 事件发布 ✅ *已完成*
-
-**实现**
-
-* GitHub Connector → RabbitMQ ✅ *已完成*
-
-**Topic**
-
-```
-github.pr.opened
-```
-
----
-
-### Task 4: 事件消费（Orchestrator初版） ✅ *已完成*
-
-**实现**
-
-* 从RabbitMQ消费事件 ✅ *已完成*
-* 打日志验证 ✅ *已完成*
-
-**验收**
-
-* 收到PR事件 ✅ *已完成*
-
----
-
-## 1.4 LLM能力（必须抽象！）
-
-### Task 5: LLM Provider（简化版） ✅ *已完成*
-
-```go
-type LLM interface {
-    Generate(ctx context.Context, prompt string) (string, error)
-}
-```
-
-实现：
-
-* OpenAI Provider（先写死）✅ *已完成*
-
-**验收**
-
-* 能调用LLM返回结果 ✅ *已完成*
-
----
-
-## 1.5 第一个Skill（核心）
-
-### Task 6: PR Review Skill（本地实现）
-
-**输入**
-
-```json
-{
-  "diff": "...",
-}
-```
-
-**输出**
-
-```json
-{
-  "comments": ["xxx", "xxx"]
-}
-```
-
-**逻辑**
-
-* prompt + LLM
-
----
-
-## 1.6 GitHub API能力
-
-### Task 7: 评论PR
-
-**能力**
-
-* Create PR Comment ❌ *待完成*
-
----
-
-## 1.7 Orchestrator（最简版）
-
-### Task 8: 事件 → Skill（硬编码）✅ *已完成*
-
-```go
-if event.Type == "pr_opened" {
-    runPRReview()
-}
-```
-
-流程：
-
-```
-Event → 获取PR diff → 调用Review Skill → 发评论
-```
-
----
-
-## ✅ Phase 1验收标准（必须达成）
-
-✔ 提交PR → 自动生成评论 ❌ *待完成* - 还没有实际的PR评论，只有一个echo技能
-✔ 全链路日志可见 ✅ *已完成*
-✔ 无panic ✅ *已完成*
-
----
-
-# 🟡 Phase 2：核心抽象（避免后期推翻）
+# 🟡 Phase 2：核心抽象（✅ 已完成）
 
 > 这一阶段只做**必要抽象，不做过度设计**
 
----
+## ✅ 完成状态
 
-## 2.1 Skill体系标准化（关键！）
-
-### Task 9: 定义Skill接口 ✅ *已完成*
-
-```go
-type Skill interface {
-    Name() string
-    Execute(ctx context.Context, input map[string]interface{}) (map[string]interface{}, error)
-}
-```
+- ✅ Skill 接口定义和实现
+- ✅ Skill Manager (Catalog 系统)
+- ✅ Orchestrator 去硬编码（基于 topic 路由）
+- ✅ Agent Runtime (Eino 实现)
+- ✅ Tools Registry 和 Runtime
+- ✅ Auth 系统和 OAuth 流程
 
 ---
 
-### Task 10: Skill Manager（核心）✅ *已完成*
+# 🟢 Phase 3：MVP业务完善（🔄 进行中）
 
-```go
-type SkillManager struct {
-    registry map[string]Skill
-}
-```
+> 当前重点：完成 PR 自动 Review 完整流程
 
-能力：
+## 3.1 已完成的基础能力
 
-* Register ✅ *已完成*
-* Get ✅ *已完成*
-* Execute ✅ *已完成*
+### ✅ GitHub 工具集
 
----
+- ✅ 获取 PR 元数据 (`github.pr.get_metadata`)
+- ✅ 获取 PR 文件列表 (`github.pr.get_files`)
+- ✅ 对比 commits (`github.repo.compare_commits`)
+- ✅ 读取文件内容 (`github.repo.get_file`)
+- ✅ 发布 PR Review (`github.pr.publish_review`)
 
-## 2.2 Orchestrator升级
+### ✅ PR Review Skill
 
-### Task 11: 去硬编码 ❌ *待完成*
+- ✅ 文件化技能定义 (`backend/skills/bundled/github-pr-review/SKILL.md`)
+- ✅ 审查流程和规则定义
+- ✅ 工具依赖声明
 
-改为：
+### ✅ Agent Runtime
 
-```go
-type Handler func(ctx context.Context, event Event)
+- ✅ Eino LLM 集成
+- ✅ 工具调用能力
+- ✅ 权限解析和账户管理
 
-map[event.Type]Handler
-```
+## 3.2 待完成的集成工作
 
-*当前仍为硬编码*
+### Task 13: 完整 PR Review 流程验证 🔄 进行中
 
----
-
-## 2.3 Agent（轻量版，不做复杂）
-
-### Task 12: 引入Agent（但简化）
-
-```go
-type Agent interface {
-    Run(ctx context.Context, event Event) error
-}
-```
-
-实现：
-
-* PRReviewAgent ❌ *待完成*
-
-👉 注意：
-
-* ❌ 不做Plan
-* ❌ 不做Reflect
-
----
-
-# 🟢 Phase 3：MVP业务完善
-
----
-
-## 3.1 GitHub能力补全
-
-### Task 13: 获取PR Diff ❌ *待完成*
-
----
-
-### Task 14: 支持Issue Comment ❌ *待完成*
-
----
-
-## 3.2 第二个Skill
-
-### Task 15: Issue Reply Skill ❌ *待完成*
-
----
-
-## 3.3 CodeAssistant
-
-### Task 16: Digital Assistant ❌ *待完成*
-
-职责：
-
-* 绑定：
-
-  * PR → PRReviewAgent
-  * Issue → IssueReplyAgent
-
----
-
-## 3.4 完整Workflow
-
-### Task 17: PR Review流程 ❌ *待完成*
+**流程：**
 
 ```
-Webhook → Event → Orchestrator → Agent → Skill → GitHub API
+GitHub PR Opened Webhook
+    ↓
+Event Gateway 接收并验证
+    ↓
+发布到 RabbitMQ
+    ↓
+Orchestrator 消费事件
+    ↓
+EinoRunner 执行 LLM Agent
+    ↓
+LLM 调用工具获取 PR 信息
+    ↓
+LLM 分析代码变更
+    ↓
+LLM 调用 github.pr.publish_review
+    ↓
+Review 发布到 GitHub
 ```
 
+**需要验证：**
+
+- [ ] Webhook 正确接收 PR opened 事件
+- [ ] Event 正确发布和消费
+- [ ] EinoRunner 正确执行
+- [ ] 工具调用成功（需要有效的 GitHub token）
+- [ ] Review 正确发布
+
+**验收：**
+
+- [ ] 在测试仓库提交 PR 后自动收到 AI Review
+- [ ] Review 包含具体的代码分析
+- [ ] 无错误日志
+
+### Task 14: Issue Comment 自动回复 🔄 待实现
+
+**当前状态：**
+
+- ✅ `issue_comment` 事件已支持
+- ✅ Event 路由已配置
+- ❌ 需要 AI 回复技能
+
+**需要实现：**
+
+1. 创建 `issue-reply` SKILL.md
+2. 验证 issue_comment 事件流
+3. 测试回复发布
+
+### Task 15: DigitalAssistant 配置管理 ❌ 待实现
+
+**需要实现：**
+
+1. DigitalAssistant CRUD API
+2. 配置界面（可选）
+3. Runtime 实例化
+4. 事件到 Assistant 的绑定
+
 ---
 
-## ✅ Phase 3验收
+## ✅ Phase 3 验收标准
 
-✔ PR自动Review ❌ *待完成*
-✔ Issue自动回复 ❌ *待完成*
-✔ 多事件支持 ❌ *待完成*
-
----
-
-# 🔵 Phase 4：扩展能力（不要提前做）
+- [ ] PR 自动 Review 端到端跑通
+- [ ] Issue 自动回复可用
+- [ ] 支持至少 2 种事件类型（PR + Issue）
+- [ ] 所有工具调用使用正确的 OAuth 凭证
 
 ---
+
+# 🔵 Phase 4：扩展能力（暂不优先）
+
+> 以下功能目前不建议实现，除非有明确需求
 
 ## 4.1 Skill Proxy（远程化）
 
-👉 只有当你需要：
+**现状：** ✅ 框架已完成
 
-* 多实例  
-* 多语言Skill
+只有当你需要：
 
-再做
+* 多实例部署
+* 多语言 Skill
+* 资源隔离
 
-✅ *已完成* - Skill Proxy框架已建立
+才需要进一步完善。
+
+## 4.2 Memory 系统
+
+只有当：
+
+* 需要多轮对话
+* 需要长上下文记忆
+
+才需要实现。
+
+**可能的实现：**
+
+- Redis 存储短期记忆
+- Vector DB 存储长期记忆
+- 对话历史管理
+
+## 4.3 多 Agent 编排
+
+等复杂任务场景出现后再考虑。
+
+## 4.4 多租户
+
+目前单租户模式已足够 MVP 验证。
+
+## 4.5 Workflow Engine
+
+当前通过 Orchestrator + Eino Agent 已能处理基本流程。
 
 ---
 
-## 4.2 Memory系统
-
-👉 只有当：
-
-* 多轮对话
-* 长上下文
-
-再做
-
-❌ *未开始*
-
 ---
 
-## 4.3 多Agent编排
-
-👉 等复杂任务再说
-
-❌ *未开始*
-
----
-
-# 📁 推荐目录结构（已优化）
+# 📁 当前目录结构
 
 ```
 backend/
 ├── cmd/
-│   └── singer/
-├── interaction/
-│   └── connectors/github/
-├── eventbus/
-├── orchestrator/
-├── agent/
-│   └── pr_review/
-├── skills/
-│   ├── manager.go
-│   ├── github/
-│   └── ai/
-├── llm/
-├── integration/github/
+│   ├── singer/              # 主服务入口
+│   └── skill-proxy/         # Skill Proxy 服务
+├── config/                  # 配置管理
+├── interaction/             # 事件交互层
+│   ├── connectors/          # 渠道连接器
+│   │   ├── github/          # GitHub 集成（完整）
+│   │   ├── gitlab/          # GitLab 集成（stub）
+│   │   └── wework/          # 企业微信（stub）
+│   ├── eventbus/            # 事件总线
+│   │   └── rabbitmq/        # RabbitMQ 实现
+│   └── gateway/             # 事件网关
+├── orchestrator/            # 事件编排器
+├── runtime/                 # Agent Runtime
+│   ├── eino/                # Eino 适配器
+│   ├── prompt/              # 提示词构建
+│   └── eino_runner.go       # Eino Runner 实现
+├── tools/                   # Tools 系统
+│   ├── registry.go          # 工具注册表
+│   └── github/              # GitHub 工具集
+├── toolruntime/             # Tool 运行时
+├── skills/                  # Skills 系统
+│   ├── catalog/             # 技能目录
+│   └── bundled/             # 内置技能
+│       └── github-pr-review/# PR Review 技能
+├── auth/                    # 认证授权系统
+│   ├── providers/github/    # GitHub OAuth
+│   └── service.go           # Auth 服务
+├── types/                   # 领域类型定义
+├── database/                # 数据库连接
+├── gateway/                 # HTTP Gateway
+│   └── trace/               # 请求追踪
+└── providers/               # 外部服务提供者
+    └── github/              # GitHub Client 工厂
 ```
 
 ---

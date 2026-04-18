@@ -1,10 +1,41 @@
-# SingerOS 后端开发 TODO 清单
+# SingerOS 后端开发 TODO 清单（最新更新 2026-04-18）
 
 > 本清单按照可独立提交、可自测、可验收的原则组织,每个条目代表一次完整的开发迭代。
 
 ---
 
-## 第一阶段: 基础设施完善 (P0)
+## 📊 当前状态摘要（2026-04-18）
+
+### ✅ 已完成的第一阶段任务：
+
+- ✅ LLM Provider 接口设计与实现
+- ✅ OpenAI Provider 实现
+- ✅ Skill 系统接口和 Manager
+- ✅ Event Gateway (GitHub Webhook)
+- ✅ Event Bus (RabbitMQ)
+- ✅ Orchestrator 基础实现
+- ✅ Tools 系统（Registry + Runtime）
+- ✅ Auth 系统（OAuth + 账户管理）
+- ✅ GitHub 工具集（PR 读写、文件对比等）
+
+### 🔄 进行中：
+
+- 🔄 PR Review 端到端流程验证
+- 🔄 Issue Comment 自动回复技能
+
+### ❌ 待开始：
+
+- ❌ DigitalAssistant 管理 API
+- ❌ 多渠道扩展（GitLab、企业微信）
+- ❌ Memory 系统
+
+---
+
+## 历史：第一阶段: 基础设施完善 (✅ 已完成)
+
+> 以下任务已全部完成，详见各文件实现。
+
+
 
 ### 1.1 LLM Provider 接口设计与实现
 
