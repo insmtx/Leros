@@ -205,7 +205,6 @@ Complete documentation is available in the `docs/` directory:
 | Document | Description |
 |----------|-------------|
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | AI OS architecture design (v2 - Three-Plane Model) |
-| [ARCHITECTURE_V2_MIGRATION.md](docs/ARCHITECTURE_V2_MIGRATION.md) | Guide for migrating from v1 to v2 architecture |
 | [DESIGN_PHILOSOPHY.md](docs/DESIGN_PHILOSOPHY.md) | Core design philosophy and principles |
 | [PRD.md](docs/PRD.md) | Product requirements (Employee View/AI Workbench) |
 | [TODO.md](docs/TODO.md) | Backend development roadmap (2-week MVP plan) |

@@ -230,7 +230,6 @@ SingerOS 致力于在企业人工智能系统中体现同样的特质。
 | 文档 | 描述 |
 |------|------|
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | AI OS 架构设计（v2 - 三平面模型） |
-| [ARCHITECTURE_V2_MIGRATION.md](docs/ARCHITECTURE_V2_MIGRATION.md) | 从 v1 到 v2 架构迁移指南 |
 | [DESIGN_PHILOSOPHY.md](docs/DESIGN_PHILOSOPHY.md) | 核心设计哲学和原则 |
 | [PRD.md](docs/PRD.md) | 产品需求文档（员工视图/AI工作台） |
 | [TODO.md](docs/TODO.md) | 后端开发路线图（2周 MVP 计划） |
