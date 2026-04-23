@@ -11,7 +11,7 @@ import (
 	"github.com/google/go-github/v78/github"
 	"github.com/ygpkg/yg-go/logs"
 
-	"github.com/insmtx/SingerOS/backend/interaction"
+	"github.com/insmtx/SingerOS/backend/pkg/event"
 )
 
 const (
@@ -87,12 +87,12 @@ func (c *Connector) validateSignature(r *http.Request, payload []byte) bool {
 func (c *Connector) determineTopic(eventType string) string {
 	switch eventType {
 	case "issue_comment":
-		return interaction.TopicGithubIssueComment
+		return event.TopicGithubIssueComment
 	case "pull_request":
-		return interaction.TopicGithubPullRequest
+		return event.TopicGithubPullRequest
 	case "push":
-		return interaction.TopicGithubPush
+		return event.TopicGithubPush
 	default:
-		return interaction.TopicGithubIssueComment
+		return event.TopicGithubIssueComment
 	}
 }

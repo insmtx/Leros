@@ -3,12 +3,12 @@ package eventengine
 import (
 	"context"
 
-	"github.com/insmtx/SingerOS/backend/interaction"
-	"github.com/insmtx/SingerOS/backend/interaction/eventbus"
 	"github.com/insmtx/SingerOS/backend/internal/execution"
+	"github.com/insmtx/SingerOS/backend/internal/infra/mq"
+	"github.com/insmtx/SingerOS/backend/pkg/event"
 )
 
-type EventHandler func(ctx context.Context, event *interaction.Event) error
+type EventHandler func(ctx context.Context, event *event.Event) error
 
 type EventEngine struct {
 	subscriber      eventbus.Subscriber

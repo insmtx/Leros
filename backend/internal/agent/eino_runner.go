@@ -9,9 +9,9 @@ import (
 	einomodel "github.com/cloudwego/eino/components/model"
 	auth "github.com/insmtx/SingerOS/backend/auth"
 	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/interaction"
 	einoimpl "github.com/insmtx/SingerOS/backend/internal/agent/eino"
 	prompt "github.com/insmtx/SingerOS/backend/internal/agent/prompt"
+	"github.com/insmtx/SingerOS/backend/pkg/event"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -58,7 +58,7 @@ func NewEinoRunner(ctx context.Context, llmConfig *config.LLMConfig, runtimeConf
 }
 
 // HandleEvent routes the event through the Eino agent execution loop.
-func (r *EinoRunner) HandleEvent(ctx context.Context, event *interaction.Event) error {
+func (r *EinoRunner) HandleEvent(ctx context.Context, event *event.Event) error {
 	if event == nil {
 		return errors.New("event is nil")
 	}
@@ -95,7 +95,7 @@ func (r *EinoRunner) HandleEvent(ctx context.Context, event *interaction.Event) 
 	return nil
 }
 
-func authSelectorFromEvent(event *interaction.Event) *auth.AuthSelector {
+func authSelectorFromEvent(event *event.Event) *auth.AuthSelector {
 	selector := &auth.AuthSelector{
 		ScopeType: auth.ScopeTypeEvent,
 	}
@@ -161,7 +161,7 @@ func nestedString(payload map[string]interface{}, path ...string) string {
 	}
 }
 
-func (r *EinoRunner) systemPromptForEvent(event *interaction.Event) string {
+func (r *EinoRunner) systemPromptForEvent(event *event.Event) string {
 	prompt := strings.TrimSpace(r.systemPrompt)
 	if event == nil {
 		return prompt

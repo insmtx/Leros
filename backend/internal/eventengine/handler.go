@@ -3,22 +3,22 @@ package eventengine
 import (
 	"context"
 
-	"github.com/insmtx/SingerOS/backend/interaction"
+	"github.com/insmtx/SingerOS/backend/pkg/event"
 	"github.com/ygpkg/yg-go/logs"
 )
 
 func (e *EventEngine) registerDefaultHandlers() {
-	e.handlers[interaction.TopicGithubIssueComment] = e.handleIssueComment
-	e.handlers[interaction.TopicGithubPullRequest] = e.handlePullRequest
-	e.handlers[interaction.TopicGithubPush] = e.handlePush
+	e.handlers[event.TopicGithubIssueComment] = e.handleIssueComment
+	e.handlers[event.TopicGithubPullRequest] = e.handlePullRequest
+	e.handlers[event.TopicGithubPush] = e.handlePush
 }
 
 func (e *EventEngine) Start(ctx context.Context) error {
 	for topic, handler := range e.handlers {
 		go func(t string, h EventHandler) {
 			logs.InfoContextf(ctx, "Starting subscription for topic: %s", t)
-			err := e.subscriber.Subscribe(ctx, t, func(event any) {
-				interactionEvent, ok := event.(*interaction.Event)
+			err := e.subscriber.Subscribe(ctx, t, func(rawEvent any) {
+				interactionEvent, ok := rawEvent.(*event.Event)
 				if !ok {
 					logs.ErrorContextf(ctx, "Invalid event type received")
 					return
@@ -52,17 +52,17 @@ func (e *EventEngine) GetHandler(topic string) (EventHandler, error) {
 	return handler, nil
 }
 
-func (e *EventEngine) handleIssueComment(ctx context.Context, event *interaction.Event) error {
-	logs.InfoContextf(ctx, "Processing GitHub issue comment event: %+v", event)
+func (e *EventEngine) handleIssueComment(ctx context.Context, evt *event.Event) error {
+	logs.InfoContextf(ctx, "Processing GitHub issue comment event: %+v", evt)
 	return nil
 }
 
-func (e *EventEngine) handlePullRequest(ctx context.Context, event *interaction.Event) error {
-	logs.InfoContextf(ctx, "Processing GitHub pull request event: %+v", event)
+func (e *EventEngine) handlePullRequest(ctx context.Context, evt *event.Event) error {
+	logs.InfoContextf(ctx, "Processing GitHub pull request event: %+v", evt)
 	return nil
 }
 
-func (e *EventEngine) handlePush(ctx context.Context, event *interaction.Event) error {
-	logs.InfoContextf(ctx, "Processing GitHub push event: %+v", event)
+func (e *EventEngine) handlePush(ctx context.Context, evt *event.Event) error {
+	logs.InfoContextf(ctx, "Processing GitHub push event: %+v", evt)
 	return nil
 }

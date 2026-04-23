@@ -14,10 +14,10 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 	auth "github.com/insmtx/SingerOS/backend/auth"
 	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/interaction"
-	githubprovider "github.com/insmtx/SingerOS/backend/providers/github"
 	runtimeeino "github.com/insmtx/SingerOS/backend/internal/agent/eino"
 	runtimeprompt "github.com/insmtx/SingerOS/backend/internal/agent/prompt"
+	"github.com/insmtx/SingerOS/backend/pkg/event"
+	githubprovider "github.com/insmtx/SingerOS/backend/providers/github"
 	"github.com/insmtx/SingerOS/backend/toolruntime"
 	"github.com/insmtx/SingerOS/backend/tools"
 	githubtools "github.com/insmtx/SingerOS/backend/tools/github"
@@ -28,7 +28,7 @@ func TestEinoRunnerSystemPromptForPullRequestEvent(t *testing.T) {
 		systemPrompt: "base prompt",
 	}
 
-	prompt := runner.systemPromptForEvent(&interaction.Event{
+	prompt := runner.systemPromptForEvent(&event.Event{
 		EventType: "pull_request",
 	})
 
@@ -48,7 +48,7 @@ func TestEinoRunnerSystemPromptForGenericEvent(t *testing.T) {
 		systemPrompt: "base prompt",
 	}
 
-	prompt := runner.systemPromptForEvent(&interaction.Event{
+	prompt := runner.systemPromptForEvent(&event.Event{
 		EventType: "issue_comment",
 	})
 
@@ -79,7 +79,7 @@ func TestEinoRunnerSystemPromptForPushEvent(t *testing.T) {
 		systemPrompt: "base prompt",
 	}
 
-	prompt := runner.systemPromptForEvent(&interaction.Event{
+	prompt := runner.systemPromptForEvent(&event.Event{
 		EventType: "push",
 	})
 
@@ -92,7 +92,7 @@ func TestEinoRunnerSystemPromptForPushEvent(t *testing.T) {
 }
 
 func TestAuthSelectorFromEventPrefersSenderAndInstallationRefs(t *testing.T) {
-	selector := authSelectorFromEvent(&interaction.Event{
+	selector := authSelectorFromEvent(&event.Event{
 		EventID:    "evt_1",
 		Channel:    "github",
 		EventType:  "pull_request",
@@ -255,7 +255,7 @@ func TestEinoRunnerHandlePullRequestEventEndToEnd(t *testing.T) {
 		systemPrompt: defaultEinoSystemPrompt,
 	}
 
-	err := runner.HandleEvent(context.Background(), &interaction.Event{
+	err := runner.HandleEvent(context.Background(), &event.Event{
 		Channel:    "github",
 		EventType:  "pull_request",
 		Actor:      "u1",

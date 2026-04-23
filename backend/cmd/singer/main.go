@@ -20,11 +20,11 @@ import (
 	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/database"
 	agentruntime "github.com/insmtx/SingerOS/backend/internal/agent"
-	"github.com/insmtx/SingerOS/backend/internal/connectors"
 	"github.com/insmtx/SingerOS/backend/internal/eventengine"
 	"github.com/insmtx/SingerOS/backend/internal/execution"
 	"github.com/insmtx/SingerOS/backend/internal/infra/mq/rabbitmq"
 	"github.com/insmtx/SingerOS/backend/internal/service/middleware"
+	trace "github.com/insmtx/SingerOS/backend/internal/service/middleware"
 	agentruntime "github.com/insmtx/SingerOS/backend/runtime"
 	"github.com/insmtx/SingerOS/backend/tools"
 	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
@@ -99,13 +99,13 @@ var rootCmd = &cobra.Command{
 		r := gin.New()
 		{
 			r.Use(middleware.CORS())
-			r.Use(middleware.RequestID())
-			r.Use(middleware.Logger())
+			r.Use(trace.CustomerHeader())
+			r.Use(trace.Logger(".Ping", "metrics"))
 			r.Use(middleware.Recovery())
 		}
 
 		// Set up gateway with connectors
-		connectors.SetupRouter(r, *cfg, publisher, db, authService)
+		SetupRouter(r, *cfg, publisher, db, authService)
 
 		// Create HTTP server
 		srv := &http.Server{
@@ -232,7 +232,7 @@ func buildTooling(catalog *skilltools.Catalog) (*tools.Registry, error) {
 	return registry, nil
 }
 
-func buildRuntimeRunner(ctx context.Context, cfg *config.Config, runtimeConfig agentruntime.Config) (agentruntime.Runner, error) {
+func buildRuntimeRunner(ctx context.Context, cfg *config.Config, runtimeConfig agentruntime.Config) (agentruntime.Runtime, error) {
 	if cfg == nil || cfg.LLM == nil || cfg.LLM.APIKey == "" {
 		return nil, fmt.Errorf("llm config is required")
 	}

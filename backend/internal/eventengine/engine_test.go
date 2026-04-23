@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/insmtx/SingerOS/backend/interaction"
 	"github.com/insmtx/SingerOS/backend/internal/execution"
+	"github.com/insmtx/SingerOS/backend/pkg/event"
 )
 
 type mockSubscriber struct{}
@@ -47,7 +47,7 @@ func TestEventEngineRegisterAndGet(t *testing.T) {
 
 	customTopic := "test.custom.topic"
 	called := false
-	handler := func(ctx context.Context, event *interaction.Event) error {
+	handler := func(ctx context.Context, event *event.Event) error {
 		called = true
 		return nil
 	}
@@ -63,7 +63,7 @@ func TestEventEngineRegisterAndGet(t *testing.T) {
 		t.Errorf("Expected non-nil handler for %s", customTopic)
 	}
 
-	testEvent := &interaction.Event{EventID: "test"}
+	testEvent := &event.Event{EventID: "test"}
 	err = retrievedHandler(context.Background(), testEvent)
 	if err != nil {
 		t.Errorf("Unexpected error when calling handler: %v", err)

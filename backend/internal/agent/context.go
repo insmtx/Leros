@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/insmtx/SingerOS/backend/interaction"
+	"github.com/insmtx/SingerOS/backend/pkg/event"
 )
 
-func buildQueryFromEvent(event *interaction.Event) string {
+func buildQueryFromEvent(event *event.Event) string {
 	if event == nil {
 		return ""
 	}
@@ -29,7 +29,7 @@ func buildQueryFromEvent(event *interaction.Event) string {
 	return strings.Join(filterEmptyStrings(sections), "\n\n")
 }
 
-func buildEventEnvelope(event *interaction.Event) string {
+func buildEventEnvelope(event *event.Event) string {
 	lines := []string{"Event envelope:"}
 	if event.Channel != "" {
 		lines = append(lines, "- channel: "+event.Channel)
@@ -52,7 +52,7 @@ func buildEventEnvelope(event *interaction.Event) string {
 	return strings.Join(lines, "\n")
 }
 
-func buildEventTask(event *interaction.Event) string {
+func buildEventTask(event *event.Event) string {
 	base := "Task:\n- Understand what happened from the event payload.\n- Use available skills and tools to gather authoritative details before making claims.\n- If the event requires an external response, decide whether to publish one and keep it evidence-based."
 
 	switch event.EventType {

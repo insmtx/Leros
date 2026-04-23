@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/insmtx/SingerOS/backend/internal/execution"
-	"github.com/insmtx/SingerOS/backend/interaction"
+	"github.com/insmtx/SingerOS/backend/pkg/event"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -34,7 +34,7 @@ func (e *AgentExecutor) Execute(ctx context.Context, task *execution.Task) *exec
 		}
 	}
 
-	interactionEvent, ok := eventRaw.(*interaction.Event)
+	interactionEvent, ok := eventRaw.(*event.Event)
 	if !ok {
 		return &execution.Result{
 			Success: false,

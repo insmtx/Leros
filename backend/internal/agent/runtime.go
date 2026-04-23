@@ -10,10 +10,10 @@ package agent
 import (
 	"context"
 
-	"github.com/insmtx/SingerOS/backend/interaction"
+	"github.com/insmtx/SingerOS/backend/pkg/event"
 )
 
 // Runtime handles agent execution within the SingerOS system.
 type Runtime interface {
-	HandleEvent(ctx context.Context, event *interaction.Event) error
+	HandleEvent(ctx context.Context, event *event.Event) error
 }

@@ -4,11 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/insmtx/SingerOS/backend/interaction"
+	"github.com/insmtx/SingerOS/backend/pkg/event"
 )
 
 func TestBuildQueryFromEvent(t *testing.T) {
-	query := buildQueryFromEvent(&interaction.Event{
+	query := buildQueryFromEvent(&event.Event{
 		Channel:    "github",
 		EventID:    "evt-1",
 		TraceID:    "trace-1",
@@ -52,7 +52,7 @@ func TestBuildQueryFromEvent(t *testing.T) {
 }
 
 func TestBuildQueryFromPushEvent(t *testing.T) {
-	query := buildQueryFromEvent(&interaction.Event{
+	query := buildQueryFromEvent(&event.Event{
 		Channel:    "github",
 		EventType:  "push",
 		Actor:      "octocat",
