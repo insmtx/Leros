@@ -1,22 +1,8 @@
-// main 包是 SingerOS 后端服务的主入口
-//
-// SingerOS 是一个 AI 驱动的操作系统，提供事件驱动的交互能力、
-// 技能系统、数字助手等功能。该服务负责处理 API 请求、事件路由
-// 和业务逻辑的协调。
 package main
 
 import (
-	"context"
-	"fmt"
-	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
-	"github.com/gin-gonic/gin"
-	auth "github.com/insmtx/SingerOS/backend/auth"
-	github "github.com/insmtx/SingerOS/backend/pkg/providers/github"
 	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/database"
 	agentruntime "github.com/insmtx/SingerOS/backend/internal/agent"
@@ -33,136 +19,23 @@ import (
 	"github.com/insmtx/SingerOS/backend/tools"
 	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
 	"github.com/spf13/cobra"
-	"github.com/ygpkg/yg-go/apis/runtime/middleware"
-	ygconfig "github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/logs"
-	"gorm.io/gorm"
 )
 
-var (
-	configPath string
-	httpAddr   string
-)
+var configPath string
 
 var rootCmd = &cobra.Command{
 	Use:   "singer",
 	Short: "Backend service for the SingerOS Backend",
 	Long:  `This is the backend service for the SingerOS Backend, responsible for handling API requests and business logic.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		// Load configuration from file
-		cfg, err := loadConfig()
-		if err != nil {
-			logs.Fatalf("Failed to load config: %v", err)
-			return
-		}
-
-		// Initialize event bus - require URL from config file
-		rmqUrl := "amqp://singer_user:singer_password@rabbitmq:5672/" // default for docker-compose
-		if cfg.RabbitMQ != nil && cfg.RabbitMQ.URL != "" {
-			rmqUrl = cfg.RabbitMQ.URL // override with config file value
-		}
-
-		rmqCfg := ygconfig.RabbitMQConfig{URL: rmqUrl}
-		publisher, _, err := rabbitmq.NewPublisher(rmqCfg)
-		if err != nil {
-			logs.Fatalf("Failed to create event publisher: %v", err)
-			return
-		}
-
-		if cfg.LLM == nil || cfg.LLM.APIKey == "" {
-			logs.Fatalf("LLM configuration is required for Eino runtime")
-			return
-		}
-
-		authService := buildAuthService(cfg)
-
-		// Create Execution Engine
-		executionEngine := execution.NewExecutionEngine()
-
-		// Create Event Engine with Execution Engine
-		eventEngine := eventengine.NewEventEngine(publisher, executionEngine)
-
-		// Initialize database if configuration is provided
-		var db *gorm.DB
-		if cfg.Database != nil && cfg.Database.URL != "" {
-			var err error
-			db, err = database.InitDB(*cfg.Database)
-			if err != nil {
-				logs.Fatalf("Failed to initialize database: %v", err)
-				return
-			}
-			logs.Info("Database initialized successfully")
-		} else {
-			logs.Warn("No database configuration provided")
-			logs.Warn("  - Database-dependent features (user persistence, etc.) will be unavailable")
-			logs.Warn("  - To enable database, add database.url to your config file")
-			logs.Warn("  - See example-config.yaml for database configuration example")
-		}
-
-		// Set up the HTTP router
-		r := gin.New()
-		{
-			r.Use(middleware.CORS())
-			r.Use(trace.CustomerHeader())
-			r.Use(trace.Logger(".Ping", "metrics"))
-			r.Use(middleware.Recovery())
-		}
-
-		// Set up gateway with connectors
-		SetupRouter(r, *cfg, publisher, db, authService)
-
-		// Create HTTP server
-		srv := &http.Server{
-			Addr:    httpAddr,
-			Handler: r,
-		}
-
-		logs.Info("Starting SingerOS backend service...")
-		logs.Infof("Listening on %s", httpAddr)
-
-		// Start Event Engine to consume events
-		ctx := context.Background()
-		if err := eventEngine.Start(ctx); err != nil {
-			logs.Errorf("Failed to start Event Engine: %v", err)
-		} else {
-			logs.Info("Event Engine started successfully")
-		}
-
-		// Start the server in a goroutine
-		go func() {
-			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				logs.Fatalf("Failed to start server: %v", err)
-			}
-		}()
-
-		// Wait for interrupt signal to gracefully shutdown
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-		<-sigChan
-		logs.Info("Shutting down server...")
-
-		// Gracefully shutdown the server
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := srv.Shutdown(ctx); err != nil {
-			logs.Errorf("Server forced to shutdown: %v", err)
-		}
-
-		// Close publisher connection
-		if publisher != nil {
-			publisher.Close()
-		}
-
-		logs.Info("Server exited")
-	},
 }
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", "Configuration file path")
-	rootCmd.PersistentFlags().StringVar(&httpAddr, "addr", ":8080", "HTTP server address")
 }
 
 func loadConfig() (*config.Config, error) {
+<<<<<<< HEAD
 	var cfg config.Config
 
 	if configPath != "" {
@@ -272,6 +145,9 @@ func buildRuntimeRunner(ctx context.Context, cfg *config.Config, runtimeConfig a
 	default:
 		return nil, fmt.Errorf("unsupported Eino chat model provider: %s", cfg.LLM.Provider)
 	}
+=======
+	return config.Load(configPath)
+>>>>>>> a93d3ab (refactor(cmd): 拆分 singer 命令为 server 和 worker 子命令)
 }
 
 func main() {
