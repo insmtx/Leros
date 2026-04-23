@@ -82,6 +82,7 @@ func JSONString(value interface{}) (string, error) {
 type ToolContext struct {
 	RunID          string
 	TraceID        string
+	AssistantID    string
 	UserID         string
 	AccountID      string
 	Channel        string
@@ -92,57 +93,7 @@ type ToolContext struct {
 	Metadata       map[string]any
 }
 
-// ToolContextBinder is implemented by tools that return a run-scoped copy with injected context.
-type ToolContextBinder interface {
-	WithToolContext(toolCtx ToolContext) Tool
-}
-
-// ToolContextSetter is implemented by tools that can receive run-scoped context.
-type ToolContextSetter interface {
-	SetToolContext(toolCtx ToolContext)
-}
-
-// CloneableTool is implemented by stateful tools that need cloning before context injection.
-type CloneableTool interface {
-	CloneTool() Tool
-}
-
 type toolContextKey struct{}
-
-// BindToolContext returns a tool bound to the current run context.
-func BindToolContext(tool Tool, toolCtx ToolContext) (Tool, error) {
-	if tool == nil {
-		return nil, fmt.Errorf("tool is required")
-	}
-	toolCtx = cloneToolContext(toolCtx)
-
-	if binder, ok := tool.(ToolContextBinder); ok {
-		bound := binder.WithToolContext(toolCtx)
-		if bound == nil {
-			return nil, fmt.Errorf("tool %s returned nil bound tool", tool.Name())
-		}
-		return bound, nil
-	}
-
-	if _, ok := tool.(ToolContextSetter); ok {
-		cloner, ok := tool.(CloneableTool)
-		if !ok {
-			return nil, fmt.Errorf("tool %s implements ToolContextSetter without CloneableTool", tool.Name())
-		}
-		cloned := cloner.CloneTool()
-		if cloned == nil {
-			return nil, fmt.Errorf("tool %s returned nil cloned tool", tool.Name())
-		}
-		clonedSetter, ok := cloned.(ToolContextSetter)
-		if !ok {
-			return nil, fmt.Errorf("tool %s clone does not implement ToolContextSetter", tool.Name())
-		}
-		clonedSetter.SetToolContext(toolCtx)
-		return cloned, nil
-	}
-
-	return tool, nil
-}
 
 // ContextWithToolContext stores run-scoped tool context on a context.Context.
 func ContextWithToolContext(ctx context.Context, toolCtx ToolContext) context.Context {
@@ -162,6 +113,15 @@ func ToolContextFrom(ctx context.Context) (ToolContext, bool) {
 		return ToolContext{}, false
 	}
 	return cloneToolContext(toolCtx), true
+}
+
+// RequireToolContext returns run-scoped tool context or an error when it is missing.
+func RequireToolContext(ctx context.Context) (ToolContext, error) {
+	toolCtx, ok := ToolContextFrom(ctx)
+	if !ok {
+		return ToolContext{}, fmt.Errorf("tool context is required")
+	}
+	return toolCtx, nil
 }
 
 func cloneToolContext(toolCtx ToolContext) ToolContext {

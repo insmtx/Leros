@@ -27,12 +27,8 @@ func newNodeShellToolWithExecutor(executor nodeExecutor) *NodeShellTool {
 			"Execute a shell command inside an assistant node Docker container",
 			tools.Schema{
 				Type:     "object",
-				Required: []string{"container_id", "command"},
+				Required: []string{"command"},
 				Properties: map[string]*tools.Property{
-					"container_id": {
-						Type:        "string",
-						Description: "Docker container id for the assistant node",
-					},
 					"command": {
 						Type:        "string",
 						Description: "Shell command to execute",
@@ -57,9 +53,6 @@ func (t *NodeShellTool) Validate(input map[string]interface{}) error {
 	if input == nil {
 		return fmt.Errorf("input is required")
 	}
-	if stringValue(input, "container_id") == "" {
-		return fmt.Errorf("container_id is required")
-	}
 	if stringValue(input, "command") == "" {
 		return fmt.Errorf("command is required")
 	}
@@ -74,14 +67,20 @@ func (t *NodeShellTool) Validate(input map[string]interface{}) error {
 
 // Execute runs the shell command inside the target node container.
 func (t *NodeShellTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
-	if err := t.Validate(input); err != nil {
-		return "", err
-	}
 	if t.executor == nil {
 		return "", fmt.Errorf("node executor is required")
 	}
 
-	containerID := stringValue(input, "container_id")
+	toolCtx, err := tools.RequireToolContext(ctx)
+	if err != nil {
+		return "", err
+	}
+	nodeInfo, err := nodeInfoForAssistant(toolCtx)
+	if err != nil {
+		return "", err
+	}
+	containerID := nodeInfo.ContainerID
+
 	command := stringValue(input, "command")
 	workingDir := stringValue(input, "working_dir")
 	if workingDir == "" {

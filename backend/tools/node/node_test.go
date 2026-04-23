@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/insmtx/SingerOS/backend/tools"
 )
 
 type fakeNodeExecutor struct {
@@ -35,11 +37,10 @@ func TestNodeShellToolExecute(t *testing.T) {
 	}
 	tool := newNodeShellToolWithExecutor(executor)
 
-	rawOutput, err := tool.Execute(context.Background(), map[string]interface{}{
-		"container_id": "container-1",
-		"command":      "pwd",
-		"working_dir":  "/workspace/repo",
-		"timeout":      1,
+	rawOutput, err := tool.Execute(testNodeToolContext(), map[string]interface{}{
+		"command":     "pwd",
+		"working_dir": "/workspace/repo",
+		"timeout":     1,
 	})
 	if err != nil {
 		t.Fatalf("execute node shell tool: %v", err)
@@ -56,9 +57,6 @@ func TestNodeShellToolExecute(t *testing.T) {
 		t.Fatalf("expected 1 executor call, got %d", len(executor.calls))
 	}
 	call := executor.calls[0]
-	if call.ContainerID != "container-1" {
-		t.Fatalf("unexpected container id: %s", call.ContainerID)
-	}
 	if len(call.Args) != 3 || call.Args[0] != "sh" || call.Args[1] != "-c" {
 		t.Fatalf("unexpected command args: %#v", call.Args)
 	}
@@ -77,11 +75,10 @@ func TestNodeFileReadToolExecute(t *testing.T) {
 	}
 	tool := newNodeFileReadToolWithExecutor(executor)
 
-	rawOutput, err := tool.Execute(context.Background(), map[string]interface{}{
-		"container_id": "container-1",
-		"path":         "/workspace/app/main.go",
-		"offset":       3,
-		"limit":        2,
+	rawOutput, err := tool.Execute(testNodeToolContext(), map[string]interface{}{
+		"path":   "/workspace/app/main.go",
+		"offset": 3,
+		"limit":  2,
 	})
 	if err != nil {
 		t.Fatalf("execute node file read tool: %v", err)
@@ -115,11 +112,10 @@ func TestNodeFileWriteToolExecute(t *testing.T) {
 	}
 	tool := newNodeFileWriteToolWithExecutor(executor)
 
-	rawOutput, err := tool.Execute(context.Background(), map[string]interface{}{
-		"container_id": "container-1",
-		"path":         "/workspace/app/main.go",
-		"content":      "package main\n",
-		"append":       true,
+	rawOutput, err := tool.Execute(testNodeToolContext(), map[string]interface{}{
+		"path":    "/workspace/app/main.go",
+		"content": "package main\n",
+		"append":  true,
 	})
 	if err != nil {
 		t.Fatalf("execute node file write tool: %v", err)
@@ -141,6 +137,31 @@ func TestNodeFileWriteToolExecute(t *testing.T) {
 	if !strings.Contains(executor.calls[1].Args[2], "tee -a '/workspace/app/main.go'") {
 		t.Fatalf("unexpected tee command: %s", executor.calls[1].Args[2])
 	}
+}
+
+func TestNodeToolValidateDoesNotRequireContainerID(t *testing.T) {
+	if err := newNodeShellToolWithExecutor(nil).Validate(map[string]interface{}{
+		"command": "pwd",
+	}); err != nil {
+		t.Fatalf("shell validate should not require container_id: %v", err)
+	}
+	if err := newNodeFileReadToolWithExecutor(nil).Validate(map[string]interface{}{
+		"path": "/workspace/app/main.go",
+	}); err != nil {
+		t.Fatalf("file read validate should not require container_id: %v", err)
+	}
+	if err := newNodeFileWriteToolWithExecutor(nil).Validate(map[string]interface{}{
+		"path":    "/workspace/app/main.go",
+		"content": "package main\n",
+	}); err != nil {
+		t.Fatalf("file write validate should not require container_id: %v", err)
+	}
+}
+
+func testNodeToolContext() context.Context {
+	return tools.ContextWithToolContext(context.Background(), tools.ToolContext{
+		AssistantID: "assistant-1",
+	})
 }
 
 func decodeNodeToolOutput(t *testing.T, output string) map[string]interface{} {

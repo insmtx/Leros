@@ -25,6 +25,7 @@ type FlowConfig struct {
 	Model        einomodel.ToolCallingChatModel
 	ToolAdapter  *ToolAdapter
 	Binding      ToolBinding
+	Emitter      *runtimeevents.Emitter
 	SystemPrompt string
 	MaxStep      int
 }
@@ -41,7 +42,7 @@ func NewFlow(ctx context.Context, cfg *FlowConfig) (*Flow, error) {
 		return nil, fmt.Errorf("tool adapter is required")
 	}
 
-	toolList, err := cfg.ToolAdapter.EinoTools(cfg.Binding)
+	toolList, err := cfg.ToolAdapter.EinoTools(cfg.Binding, cfg.Emitter)
 	if err != nil {
 		return nil, fmt.Errorf("build eino tools: %w", err)
 	}

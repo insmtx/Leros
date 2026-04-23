@@ -46,7 +46,6 @@ type ToolAdapter struct {
 type ToolBinding struct {
 	ToolContext  tools.ToolContext
 	AllowedTools []string
-	Emitter      *runtimeevents.Emitter
 }
 
 // NewToolAdapter creates a new adapter over the shared tool registry.
@@ -75,8 +74,8 @@ func (a *ToolAdapter) Definitions() []ToolDefinition {
 	return definitions
 }
 
-// EinoTools returns actual Eino tools bound to the current runtime identity.
-func (a *ToolAdapter) EinoTools(binding ToolBinding) ([]einotool.BaseTool, error) {
+// EinoTools returns Eino wrappers that inject runtime identity at call time.
+func (a *ToolAdapter) EinoTools(binding ToolBinding, emitter *runtimeevents.Emitter) ([]einotool.BaseTool, error) {
 	if a == nil || a.registry == nil {
 		return nil, nil
 	}
@@ -88,14 +87,11 @@ func (a *ToolAdapter) EinoTools(binding ToolBinding) ([]einotool.BaseTool, error
 
 	result := make([]einotool.BaseTool, 0, len(boundTools))
 	for _, tool := range boundTools {
-		boundTool, err := tools.BindToolContext(tool, binding.ToolContext)
-		if err != nil {
-			return nil, err
-		}
 		result = append(result, &invokableTool{
 			adapter: a,
-			tool:    boundTool,
+			tool:    tool,
 			binding: binding,
+			emitter: emitter,
 		})
 	}
 
@@ -146,11 +142,7 @@ func (a *ToolAdapter) Invoke(ctx context.Context, req *ToolCallRequest) (*ToolCa
 		return nil, err
 	}
 
-	boundTool, err := tools.BindToolContext(tool, req.ToolContext)
-	if err != nil {
-		return nil, err
-	}
-	return invokeTool(ctx, boundTool, req.Arguments, req.ToolContext)
+	return invokeTool(ctx, tool, req.Arguments, req.ToolContext)
 }
 
 func invokeTool(ctx context.Context, tool tools.Tool, arguments map[string]interface{}, toolCtx tools.ToolContext) (*ToolCallResult, error) {
@@ -159,7 +151,6 @@ func invokeTool(ctx context.Context, tool tools.Tool, arguments map[string]inter
 	}
 
 	input := cloneToolInput(arguments)
-	applyLegacyIdentityInput(input, toolCtx)
 	if validator, ok := tool.(tools.Validator); ok {
 		if err := validator.Validate(input); err != nil {
 			return nil, fmt.Errorf("validate tool %s input: %w", tool.Name(), err)
@@ -181,6 +172,7 @@ type invokableTool struct {
 	adapter *ToolAdapter
 	tool    tools.Tool
 	binding ToolBinding
+	emitter *runtimeevents.Emitter
 }
 
 func (t *invokableTool) Info(ctx context.Context) (*einoschema.ToolInfo, error) {
@@ -232,10 +224,10 @@ func (t *invokableTool) InvokableRun(ctx context.Context, argumentsInJSON string
 }
 
 func (t *invokableTool) emitToolEvent(ctx context.Context, eventType runtimeevents.RunEventType, content string) error {
-	if t == nil || t.binding.Emitter == nil {
+	if t == nil || t.emitter == nil {
 		return nil
 	}
-	err := t.binding.Emitter.Emit(ctx, &runtimeevents.RunEvent{
+	err := t.emitter.Emit(ctx, &runtimeevents.RunEvent{
 		Type:    eventType,
 		Content: content,
 	})
@@ -263,22 +255,6 @@ func cloneToolInput(input map[string]interface{}) map[string]interface{} {
 		cloned[key] = value
 	}
 	return cloned
-}
-
-func applyLegacyIdentityInput(input map[string]interface{}, toolCtx tools.ToolContext) {
-	if input == nil {
-		return
-	}
-	if toolCtx.UserID != "" {
-		if _, exists := input["user_id"]; !exists {
-			input["user_id"] = toolCtx.UserID
-		}
-	}
-	if toolCtx.AccountID != "" {
-		if _, exists := input["account_id"]; !exists {
-			input["account_id"] = toolCtx.AccountID
-		}
-	}
 }
 
 func toEinoToolInfo(tool tools.Tool) *einoschema.ToolInfo {

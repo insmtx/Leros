@@ -2,22 +2,14 @@ package eino
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
-	auth "github.com/insmtx/SingerOS/backend/auth"
-	"github.com/insmtx/SingerOS/backend/config"
-	githubprovider "github.com/insmtx/SingerOS/backend/providers/github"
 	runtimeevents "github.com/insmtx/SingerOS/backend/runtime/events"
 	"github.com/insmtx/SingerOS/backend/tools"
-	githubtools "github.com/insmtx/SingerOS/backend/tools/github"
 )
 
 func TestFlowGenerate(t *testing.T) {
@@ -74,89 +66,6 @@ func TestFlowGenerate(t *testing.T) {
 	}
 	if !foundSystemPrompt {
 		t.Fatalf("expected system prompt with skills summary to be injected")
-	}
-}
-
-func TestFlowGenerateWithRealToolContext(t *testing.T) {
-	store := auth.NewInMemoryStore()
-	resolver := auth.NewAccountResolver(store)
-	authService := auth.NewService(store, resolver)
-
-	now := time.Now().UTC()
-	account := &auth.AuthorizedAccount{
-		ID:                "github:u1:1001",
-		UserID:            "u1",
-		Provider:          auth.ProviderGitHub,
-		OwnerType:         auth.AccountOwnerTypeUser,
-		AccountType:       auth.AccountTypeUserOAuth,
-		ExternalAccountID: "1001",
-		DisplayName:       "octocat",
-		Scopes:            []string{"read:user"},
-		Status:            auth.AccountStatusActive,
-		CreatedAt:         now,
-		UpdatedAt:         now,
-	}
-	credential := &auth.AccountCredential{
-		AccountID:   account.ID,
-		GrantType:   auth.GrantTypeOAuth2,
-		AccessToken: "test-token",
-	}
-	if err := store.UpsertAuthorizedAccount(context.Background(), account, credential); err != nil {
-		t.Fatalf("upsert account: %v", err)
-	}
-	if err := store.SetDefaultAccount(context.Background(), &auth.UserProviderBinding{
-		UserID:    "u1",
-		Provider:  auth.ProviderGitHub,
-		AccountID: account.ID,
-		IsDefault: true,
-		Priority:  100,
-	}); err != nil {
-		t.Fatalf("set default account: %v", err)
-	}
-
-	responseBody, err := json.Marshal(map[string]interface{}{
-		"id":    1001,
-		"login": "octocat",
-	})
-	if err != nil {
-		t.Fatalf("marshal response body: %v", err)
-	}
-
-	githubFactory := githubprovider.NewClientFactoryWithHTTPClient(config.GithubAppConfig{
-		BaseURL: "https://api.github.test/",
-	}, authService, &http.Client{
-		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body:       io.NopCloser(strings.NewReader(string(responseBody))),
-				Request:    req,
-			}, nil
-		}),
-	})
-
-	registry := tools.NewRegistry()
-	if err := registry.Register(githubtools.NewAccountInfoTool(githubFactory)); err != nil {
-		t.Fatalf("register github tool: %v", err)
-	}
-
-	model := &fakeToolCallingModel{}
-	adapter := NewToolAdapter(registry)
-	flow, err := NewFlow(context.Background(), &FlowConfig{
-		Model:       model,
-		ToolAdapter: adapter,
-		Binding:     ToolBinding{ToolContext: tools.ToolContext{UserID: "u1"}},
-	})
-	if err != nil {
-		t.Fatalf("new flow: %v", err)
-	}
-
-	message, err := flow.Generate(context.Background(), "show my github account")
-	if err != nil {
-		t.Fatalf("generate response: %v", err)
-	}
-	if !strings.Contains(message.Content, "octocat") {
-		t.Fatalf("expected real tool output in final content: %s", message.Content)
 	}
 }
 

@@ -27,12 +27,8 @@ func newNodeFileWriteToolWithExecutor(executor nodeExecutor) *NodeFileWriteTool 
 			"Create or modify a file inside an assistant node Docker container",
 			tools.Schema{
 				Type:     "object",
-				Required: []string{"container_id", "path", "content"},
+				Required: []string{"path", "content"},
 				Properties: map[string]*tools.Property{
-					"container_id": {
-						Type:        "string",
-						Description: "Docker container id for the assistant node",
-					},
 					"path": {
 						Type:        "string",
 						Description: "File path inside the container",
@@ -57,9 +53,6 @@ func (t *NodeFileWriteTool) Validate(input map[string]interface{}) error {
 	if input == nil {
 		return fmt.Errorf("input is required")
 	}
-	if stringValue(input, "container_id") == "" {
-		return fmt.Errorf("container_id is required")
-	}
 	if stringValue(input, "path") == "" {
 		return fmt.Errorf("path is required")
 	}
@@ -74,14 +67,20 @@ func (t *NodeFileWriteTool) Validate(input map[string]interface{}) error {
 
 // Execute writes a file to the target node container.
 func (t *NodeFileWriteTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
-	if err := t.Validate(input); err != nil {
-		return "", err
-	}
 	if t.executor == nil {
 		return "", fmt.Errorf("node executor is required")
 	}
 
-	containerID := stringValue(input, "container_id")
+	toolCtx, err := tools.RequireToolContext(ctx)
+	if err != nil {
+		return "", err
+	}
+	nodeInfo, err := nodeInfoForAssistant(toolCtx)
+	if err != nil {
+		return "", err
+	}
+	containerID := nodeInfo.ContainerID
+
 	path := stringValue(input, "path")
 	content := input["content"].(string)
 	appendMode, _ := boolValue(input["append"])

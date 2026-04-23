@@ -28,12 +28,8 @@ func newNodeFileReadToolWithExecutor(executor nodeExecutor) *NodeFileReadTool {
 			"Read a file from an assistant node Docker container with optional line ranges",
 			tools.Schema{
 				Type:     "object",
-				Required: []string{"container_id", "path"},
+				Required: []string{"path"},
 				Properties: map[string]*tools.Property{
-					"container_id": {
-						Type:        "string",
-						Description: "Docker container id for the assistant node",
-					},
 					"path": {
 						Type:        "string",
 						Description: "File path inside the container",
@@ -58,9 +54,6 @@ func (t *NodeFileReadTool) Validate(input map[string]interface{}) error {
 	if input == nil {
 		return fmt.Errorf("input is required")
 	}
-	if stringValue(input, "container_id") == "" {
-		return fmt.Errorf("container_id is required")
-	}
 	if stringValue(input, "path") == "" {
 		return fmt.Errorf("path is required")
 	}
@@ -79,14 +72,20 @@ func (t *NodeFileReadTool) Validate(input map[string]interface{}) error {
 
 // Execute reads a file from the target node container.
 func (t *NodeFileReadTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
-	if err := t.Validate(input); err != nil {
-		return "", err
-	}
 	if t.executor == nil {
 		return "", fmt.Errorf("node executor is required")
 	}
 
-	containerID := stringValue(input, "container_id")
+	toolCtx, err := tools.RequireToolContext(ctx)
+	if err != nil {
+		return "", err
+	}
+	nodeInfo, err := nodeInfoForAssistant(toolCtx)
+	if err != nil {
+		return "", err
+	}
+	containerID := nodeInfo.ContainerID
+
 	path := stringValue(input, "path")
 	offset, _ := intValue(input["offset"])
 	limit, _ := intValue(input["limit"])
