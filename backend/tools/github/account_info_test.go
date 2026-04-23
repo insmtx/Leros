@@ -11,7 +11,7 @@ import (
 
 	auth "github.com/insmtx/SingerOS/backend/auth"
 	"github.com/insmtx/SingerOS/backend/config"
-	githubprovider "github.com/insmtx/SingerOS/backend/providers/github"
+	githubprovider "github.com/insmtx/SingerOS/backend/pkg/providers/github"
 )
 
 func TestAccountInfoToolExecute(t *testing.T) {

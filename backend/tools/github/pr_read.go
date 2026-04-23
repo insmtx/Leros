@@ -6,7 +6,7 @@ import (
 
 	gogithub "github.com/google/go-github/v78/github"
 	auth "github.com/insmtx/SingerOS/backend/auth"
-	githubprovider "github.com/insmtx/SingerOS/backend/providers/github"
+	githubprovider "github.com/insmtx/SingerOS/backend/pkg/providers/github"
 	"github.com/insmtx/SingerOS/backend/tools"
 )
 

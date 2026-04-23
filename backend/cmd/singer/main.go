@@ -24,7 +24,7 @@ import (
 	"github.com/insmtx/SingerOS/backend/internal/execution"
 	"github.com/insmtx/SingerOS/backend/internal/infra/mq/rabbitmq"
 	trace "github.com/insmtx/SingerOS/backend/internal/service/middleware"
-	githubprovider "github.com/insmtx/SingerOS/backend/providers/github"
+	githubprovider "github.com/insmtx/SingerOS/backend/pkg/providers/github"
 	bundledskills "github.com/insmtx/SingerOS/backend/skills/bundled"
 	skillcatalog "github.com/insmtx/SingerOS/backend/skills/catalog"
 	"github.com/insmtx/SingerOS/backend/toolruntime"
@@ -228,7 +228,7 @@ func buildTooling(cfg *config.Config, authService *auth.Service) (*tools.Registr
 
 	var githubFactory *githubprovider.ClientFactory
 	if cfg != nil && cfg.Github != nil {
-		githubFactory = githubprovider.NewClientFactory(*cfg.Github, authService)
+		githubFactory = github.NewClientFactory(*cfg.Github, authService)
 		if err := registry.Register(githubtools.NewAccountInfoTool(nil)); err != nil {
 			return nil, nil, fmt.Errorf("register github account info tool: %w", err)
 		}
