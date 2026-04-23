@@ -19,13 +19,13 @@ import (
 	authgithub "github.com/insmtx/SingerOS/backend/auth/providers/github"
 	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/database"
-	"github.com/insmtx/SingerOS/backend/gateway/trace"
-	"github.com/insmtx/SingerOS/backend/interaction/eventbus/rabbitmq"
-	gateway "github.com/insmtx/SingerOS/backend/interaction/gateway"
+	"github.com/insmtx/SingerOS/backend/internal/service/middleware"
+	"github.com/insmtx/SingerOS/backend/internal/infra/mq/rabbitmq"
+	"github.com/insmtx/SingerOS/backend/internal/connectors"
 	"github.com/insmtx/SingerOS/backend/internal/eventengine"
 	"github.com/insmtx/SingerOS/backend/internal/execution"
 	githubprovider "github.com/insmtx/SingerOS/backend/providers/github"
-	agentruntime "github.com/insmtx/SingerOS/backend/runtime"
+	agentruntime "github.com/insmtx/SingerOS/backend/internal/agent"
 	bundledskills "github.com/insmtx/SingerOS/backend/skills/bundled"
 	skillcatalog "github.com/insmtx/SingerOS/backend/skills/catalog"
 	"github.com/insmtx/SingerOS/backend/toolruntime"
@@ -102,13 +102,13 @@ var rootCmd = &cobra.Command{
 		r := gin.New()
 		{
 			r.Use(middleware.CORS())
-			r.Use(trace.CustomerHeader())
-			r.Use(trace.Logger(".Ping", "metrics"))
+			r.Use(middleware.RequestID())
+			r.Use(middleware.Logger())
 			r.Use(middleware.Recovery())
 		}
 
 		// Set up gateway with connectors
-		gateway.SetupRouter(r, *cfg, publisher, db, authService)
+		connectors.SetupRouter(r, *cfg, publisher, db, authService)
 
 		// Create HTTP server
 		srv := &http.Server{

@@ -2,7 +2,7 @@
 //
 // 该包负责事件的定义、分发和处理，是 SingerOS 的核心交互层。
 // 支持多种渠道的事件接入，并通过事件总线进行分发。
-package interaction
+package event
 
 import "time"
 

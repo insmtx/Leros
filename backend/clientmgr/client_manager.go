@@ -3,7 +3,7 @@ package clientmgr
 import (
 	"sync"
 
-	"github.com/insmtx/SingerOS/backend/interaction/connectors/client"
+	"github.com/insmtx/SingerOS/backend/internal/connectors/client"
 )
 
 // ClientConnectorInterface defines methods needed from the client connector for messaging
