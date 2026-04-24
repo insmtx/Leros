@@ -4,31 +4,29 @@ import (
 	"context"
 	"fmt"
 	"sync"
-
-	"github.com/insmtx/SingerOS/backend/internal/api/dto"
 )
 
 // InMemoryStore 是 Store 的内存实现。
 type InMemoryStore struct {
 	mu          sync.RWMutex
-	oauthStates map[string]*dto.OAuthState
-	accounts    map[string]*dto.AuthorizedAccount
-	credentials map[string]*dto.AccountCredential
-	defaults    map[string]*dto.UserProviderBinding
+	oauthStates map[string]*OAuthState
+	accounts    map[string]*AuthorizedAccount
+	credentials map[string]*AccountCredential
+	defaults    map[string]*UserProviderBinding
 }
 
 // NewInMemoryStore 创建一个新的内存授权存储。
 func NewInMemoryStore() *InMemoryStore {
 	return &InMemoryStore{
-		oauthStates: make(map[string]*dto.OAuthState),
-		accounts:    make(map[string]*dto.AuthorizedAccount),
-		credentials: make(map[string]*dto.AccountCredential),
-		defaults:    make(map[string]*dto.UserProviderBinding),
+		oauthStates: make(map[string]*OAuthState),
+		accounts:    make(map[string]*AuthorizedAccount),
+		credentials: make(map[string]*AccountCredential),
+		defaults:    make(map[string]*UserProviderBinding),
 	}
 }
 
 // SaveOAuthState 保存一次 OAuth state。
-func (s *InMemoryStore) SaveOAuthState(_ context.Context, state *dto.OAuthState) error {
+func (s *InMemoryStore) SaveOAuthState(_ context.Context, state *OAuthState) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -37,7 +35,7 @@ func (s *InMemoryStore) SaveOAuthState(_ context.Context, state *dto.OAuthState)
 }
 
 // ConsumeOAuthState 读取并删除一次 OAuth state。
-func (s *InMemoryStore) ConsumeOAuthState(_ context.Context, provider, state string) (*dto.OAuthState, error) {
+func (s *InMemoryStore) ConsumeOAuthState(_ context.Context, provider, state string) (*OAuthState, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -52,7 +50,7 @@ func (s *InMemoryStore) ConsumeOAuthState(_ context.Context, provider, state str
 }
 
 // UpsertAuthorizedAccount 保存或更新授权账户和凭证。
-func (s *InMemoryStore) UpsertAuthorizedAccount(_ context.Context, account *dto.AuthorizedAccount, credential *dto.AccountCredential) error {
+func (s *InMemoryStore) UpsertAuthorizedAccount(_ context.Context, account *AuthorizedAccount, credential *AccountCredential) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -62,7 +60,7 @@ func (s *InMemoryStore) UpsertAuthorizedAccount(_ context.Context, account *dto.
 }
 
 // GetAuthorizedAccount 返回指定账户。
-func (s *InMemoryStore) GetAuthorizedAccount(_ context.Context, accountID string) (*dto.AuthorizedAccount, error) {
+func (s *InMemoryStore) GetAuthorizedAccount(_ context.Context, accountID string) (*AuthorizedAccount, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -75,11 +73,11 @@ func (s *InMemoryStore) GetAuthorizedAccount(_ context.Context, accountID string
 }
 
 // ListUserAccounts 返回某用户在某 provider 下的所有账户。
-func (s *InMemoryStore) ListUserAccounts(_ context.Context, userID, provider string) ([]*dto.AuthorizedAccount, error) {
+func (s *InMemoryStore) ListUserAccounts(_ context.Context, userID, provider string) ([]*AuthorizedAccount, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	accounts := make([]*dto.AuthorizedAccount, 0)
+	accounts := make([]*AuthorizedAccount, 0)
 	for _, account := range s.accounts {
 		if account.UserID != userID || account.Provider != provider {
 			continue
@@ -91,7 +89,7 @@ func (s *InMemoryStore) ListUserAccounts(_ context.Context, userID, provider str
 }
 
 // GetCredential 返回指定账户的凭证。
-func (s *InMemoryStore) GetCredential(_ context.Context, accountID string) (*dto.AccountCredential, error) {
+func (s *InMemoryStore) GetCredential(_ context.Context, accountID string) (*AccountCredential, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -104,7 +102,7 @@ func (s *InMemoryStore) GetCredential(_ context.Context, accountID string) (*dto
 }
 
 // SetDefaultAccount 设置某用户在某 provider 下的默认账户。
-func (s *InMemoryStore) SetDefaultAccount(_ context.Context, binding *dto.UserProviderBinding) error {
+func (s *InMemoryStore) SetDefaultAccount(_ context.Context, binding *UserProviderBinding) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -117,7 +115,7 @@ func (s *InMemoryStore) SetDefaultAccount(_ context.Context, binding *dto.UserPr
 }
 
 // GetDefaultAccount 返回某用户在某 provider 下的默认账户。
-func (s *InMemoryStore) GetDefaultAccount(_ context.Context, userID, provider string) (*dto.AuthorizedAccount, error) {
+func (s *InMemoryStore) GetDefaultAccount(_ context.Context, userID, provider string) (*AuthorizedAccount, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -142,7 +140,7 @@ func (s *InMemoryStore) defaultBindingKey(userID, provider string) string {
 	return userID + ":" + provider
 }
 
-func cloneAuthorizedAccount(account *dto.AuthorizedAccount) *dto.AuthorizedAccount {
+func cloneAuthorizedAccount(account *AuthorizedAccount) *AuthorizedAccount {
 	if account == nil {
 		return nil
 	}
@@ -161,7 +159,7 @@ func cloneAuthorizedAccount(account *dto.AuthorizedAccount) *dto.AuthorizedAccou
 	return &cloned
 }
 
-func cloneCredential(credential *dto.AccountCredential) *dto.AccountCredential {
+func cloneCredential(credential *AccountCredential) *AccountCredential {
 	if credential == nil {
 		return nil
 	}
@@ -181,7 +179,7 @@ func cloneCredential(credential *dto.AccountCredential) *dto.AccountCredential {
 	return &cloned
 }
 
-func cloneBinding(binding *dto.UserProviderBinding) *dto.UserProviderBinding {
+func cloneBinding(binding *UserProviderBinding) *UserProviderBinding {
 	if binding == nil {
 		return nil
 	}
@@ -190,7 +188,7 @@ func cloneBinding(binding *dto.UserProviderBinding) *dto.UserProviderBinding {
 	return &cloned
 }
 
-func cloneOAuthState(state *dto.OAuthState) *dto.OAuthState {
+func cloneOAuthState(state *OAuthState) *OAuthState {
 	if state == nil {
 		return nil
 	}

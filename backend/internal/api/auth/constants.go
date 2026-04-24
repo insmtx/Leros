@@ -1,4 +1,4 @@
-package dto
+package auth
 
 const (
 	// ProviderGitHub 表示 GitHub 平台。

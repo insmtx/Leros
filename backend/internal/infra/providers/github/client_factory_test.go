@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/insmtx/SingerOS/backend/internal/api/dto"
 	"github.com/insmtx/SingerOS/backend/config"
+	"github.com/insmtx/SingerOS/backend/internal/api/auth"
 )
 
 func TestClientFactoryResolveClientUsesInstallationSelector(t *testing.T) {
@@ -53,8 +53,8 @@ func TestClientFactoryResolveClientUsesInstallationSelector(t *testing.T) {
 	})
 
 	resolved, err := factory.ResolveClient(context.Background(), &ResolveClientRequest{
-		Selector: &dto.AuthSelector{
-			Provider: dto.ProviderGitHub,
+		Selector: &auth.AuthSelector{
+			Provider: auth.ProviderGitHub,
 			ExternalRefs: map[string]string{
 				"github.installation_id": "99",
 			},
@@ -66,7 +66,7 @@ func TestClientFactoryResolveClientUsesInstallationSelector(t *testing.T) {
 	if resolved.ResolvedBy != "github_installation" {
 		t.Fatalf("expected github_installation, got %s", resolved.ResolvedBy)
 	}
-	if resolved.Account == nil || resolved.Account.AccountType != dto.AccountTypeAppInstallation {
+	if resolved.Account == nil || resolved.Account.AccountType != auth.AccountTypeAppInstallation {
 		t.Fatalf("unexpected resolved account: %+v", resolved.Account)
 	}
 	if installationTokenCalls != 1 {

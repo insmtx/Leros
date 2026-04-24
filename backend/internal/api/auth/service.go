@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"time"
-
-	"github.com/insmtx/SingerOS/backend/internal/api/dto"
 )
 
 const oauthStateBytes = 16
@@ -52,7 +50,7 @@ func (s *Service) RegisterAuthResolver(provider string, resolver ProviderAuthRes
 }
 
 // StartAuthorization 发起某个 provider 的用户授权。
-func (s *Service) StartAuthorization(ctx context.Context, req *dto.StartAuthorizationRequest) (string, error) {
+func (s *Service) StartAuthorization(ctx context.Context, req *StartAuthorizationRequest) (string, error) {
 	if req == nil {
 		return "", fmt.Errorf("authorization request is required")
 	}
@@ -70,7 +68,7 @@ func (s *Service) StartAuthorization(ctx context.Context, req *dto.StartAuthoriz
 		return "", err
 	}
 
-	state := &dto.OAuthState{
+	state := &OAuthState{
 		State:       stateValue,
 		UserID:      req.UserID,
 		Provider:    req.Provider,
@@ -86,7 +84,7 @@ func (s *Service) StartAuthorization(ctx context.Context, req *dto.StartAuthoriz
 }
 
 // HandleAuthorizationCallback 处理 provider 回调并保存授权账户。
-func (s *Service) HandleAuthorizationCallback(ctx context.Context, req *dto.AuthorizationCallbackRequest) (*dto.AuthorizationResult, error) {
+func (s *Service) HandleAuthorizationCallback(ctx context.Context, req *AuthorizationCallbackRequest) (*AuthorizationResult, error) {
 	if req == nil {
 		return nil, fmt.Errorf("authorization callback request is required")
 	}
@@ -107,7 +105,7 @@ func (s *Service) HandleAuthorizationCallback(ctx context.Context, req *dto.Auth
 		return nil, err
 	}
 
-	result, err := provider.CompleteAuthorization(&dto.CompleteAuthorizationRequest{
+	result, err := provider.CompleteAuthorization(&CompleteAuthorizationRequest{
 		State: state,
 		Code:  req.Code,
 	})
@@ -124,7 +122,7 @@ func (s *Service) HandleAuthorizationCallback(ctx context.Context, req *dto.Auth
 	}
 
 	if _, err := s.store.GetDefaultAccount(ctx, result.Account.UserID, result.Account.Provider); err != nil {
-		if err := s.store.SetDefaultAccount(ctx, &dto.UserProviderBinding{
+		if err := s.store.SetDefaultAccount(ctx, &UserProviderBinding{
 			UserID:    result.Account.UserID,
 			Provider:  result.Account.Provider,
 			AccountID: result.Account.ID,
@@ -139,17 +137,17 @@ func (s *Service) HandleAuthorizationCallback(ctx context.Context, req *dto.Auth
 }
 
 // ResolveAccount 解析运行时可用账户。
-func (s *Service) ResolveAccount(ctx context.Context, req *dto.ResolveAccountRequest) (*dto.ResolvedAccount, error) {
+func (s *Service) ResolveAccount(ctx context.Context, req *ResolveAccountRequest) (*ResolvedAccount, error) {
 	return s.resolver.Resolve(ctx, req)
 }
 
 // ResolveAuthorization resolves runtime authorization through provider-specific resolvers first.
-func (s *Service) ResolveAuthorization(ctx context.Context, req *dto.ResolveAuthorizationRequest) (*dto.ResolvedAuthorization, error) {
+func (s *Service) ResolveAuthorization(ctx context.Context, req *ResolveAuthorizationRequest) (*ResolvedAuthorization, error) {
 	if req == nil {
 		return nil, fmt.Errorf("resolve authorization request is required")
 	}
 
-	selector := mergeSelector(&dto.ResolveAccountRequest{
+	selector := mergeSelector(&ResolveAccountRequest{
 		Selector:  req.Selector,
 		UserID:    req.UserID,
 		Provider:  req.Provider,
@@ -159,7 +157,7 @@ func (s *Service) ResolveAuthorization(ctx context.Context, req *dto.ResolveAuth
 		return nil, fmt.Errorf("provider is required")
 	}
 
-	request := &dto.ResolveAuthorizationRequest{
+	request := &ResolveAuthorizationRequest{
 		Selector:  selector,
 		UserID:    req.UserID,
 		Provider:  selector.Provider,

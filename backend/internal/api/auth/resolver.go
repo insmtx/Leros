@@ -3,8 +3,6 @@ package auth
 import (
 	"context"
 	"fmt"
-
-	"github.com/insmtx/SingerOS/backend/internal/api/dto"
 )
 
 // AccountResolver 负责按 user + provider 解析运行时可用账户。
@@ -18,7 +16,7 @@ func NewAccountResolver(store Store) *AccountResolver {
 }
 
 // Resolve 解析运行时应使用的账户与凭证。
-func (r *AccountResolver) Resolve(ctx context.Context, req *dto.ResolveAccountRequest) (*dto.ResolvedAccount, error) {
+func (r *AccountResolver) Resolve(ctx context.Context, req *ResolveAccountRequest) (*ResolvedAccount, error) {
 	if req == nil {
 		return nil, fmt.Errorf("resolve request is required")
 	}
@@ -44,10 +42,10 @@ func (r *AccountResolver) Resolve(ctx context.Context, req *dto.ResolveAccountRe
 		if account.Provider != selector.Provider {
 			return nil, fmt.Errorf("account does not belong to the requested provider")
 		}
-		if selector.SubjectID != "" && selector.SubjectType == dto.SubjectTypeUser && account.UserID != selector.SubjectID {
+		if selector.SubjectID != "" && selector.SubjectType == SubjectTypeUser && account.UserID != selector.SubjectID {
 			return nil, fmt.Errorf("account does not belong to the requested user")
 		}
-		if account.Status != dto.AccountStatusActive {
+		if account.Status != AccountStatusActive {
 			return nil, fmt.Errorf("account is not active")
 		}
 
@@ -56,7 +54,7 @@ func (r *AccountResolver) Resolve(ctx context.Context, req *dto.ResolveAccountRe
 			return nil, err
 		}
 
-		return &dto.ResolvedAccount{
+		return &ResolvedAccount{
 			Account:    account,
 			Credential: credential,
 			ResolvedBy: "explicit_profile_id",
@@ -65,10 +63,10 @@ func (r *AccountResolver) Resolve(ctx context.Context, req *dto.ResolveAccountRe
 
 	if selector.SubjectID != "" {
 		account, err := r.store.GetDefaultAccount(ctx, selector.SubjectID, selector.Provider)
-		if err == nil && account != nil && account.Status == dto.AccountStatusActive {
+		if err == nil && account != nil && account.Status == AccountStatusActive {
 			credential, credErr := r.store.GetCredential(ctx, account.ID)
 			if credErr == nil {
-				return &dto.ResolvedAccount{
+				return &ResolvedAccount{
 					Account:    account,
 					Credential: credential,
 					ResolvedBy: "subject_default",
@@ -82,7 +80,7 @@ func (r *AccountResolver) Resolve(ctx context.Context, req *dto.ResolveAccountRe
 		}
 
 		for _, candidate := range accounts {
-			if candidate.Status != dto.AccountStatusActive {
+			if candidate.Status != AccountStatusActive {
 				continue
 			}
 
@@ -91,7 +89,7 @@ func (r *AccountResolver) Resolve(ctx context.Context, req *dto.ResolveAccountRe
 				continue
 			}
 
-			return &dto.ResolvedAccount{
+			return &ResolvedAccount{
 				Account:    candidate,
 				Credential: credential,
 				ResolvedBy: "first_available",
@@ -106,12 +104,12 @@ func (r *AccountResolver) Resolve(ctx context.Context, req *dto.ResolveAccountRe
 }
 
 // ResolveAuthorization resolves a stored account profile as a generic runtime authorization.
-func (r *AccountResolver) ResolveAuthorization(ctx context.Context, req *dto.ResolveAuthorizationRequest) (*dto.ResolvedAuthorization, bool, error) {
+func (r *AccountResolver) ResolveAuthorization(ctx context.Context, req *ResolveAuthorizationRequest) (*ResolvedAuthorization, bool, error) {
 	if req == nil {
 		return nil, true, fmt.Errorf("resolve authorization request is required")
 	}
 
-	resolved, err := r.Resolve(ctx, &dto.ResolveAccountRequest{
+	resolved, err := r.Resolve(ctx, &ResolveAccountRequest{
 		Selector:  req.Selector,
 		UserID:    req.UserID,
 		Provider:  req.Provider,
@@ -128,7 +126,7 @@ func (r *AccountResolver) ResolveAuthorization(ctx context.Context, req *dto.Res
 		profileID = resolved.Account.ID
 	}
 
-	return &dto.ResolvedAuthorization{
+	return &ResolvedAuthorization{
 		Provider:   provider,
 		ProfileID:  profileID,
 		ResolvedBy: resolved.ResolvedBy,
@@ -137,8 +135,8 @@ func (r *AccountResolver) ResolveAuthorization(ctx context.Context, req *dto.Res
 	}, true, nil
 }
 
-func mergeSelector(req *dto.ResolveAccountRequest) *dto.AuthSelector {
-	selector := &dto.AuthSelector{}
+func mergeSelector(req *ResolveAccountRequest) *AuthSelector {
+	selector := &AuthSelector{}
 	if req != nil && req.Selector != nil {
 		selector = cloneSelector(req.Selector)
 	}
@@ -155,14 +153,14 @@ func mergeSelector(req *dto.ResolveAccountRequest) *dto.AuthSelector {
 		selector.SubjectID = req.UserID
 	}
 	if selector.SubjectType == "" && selector.SubjectID != "" {
-		selector.SubjectType = dto.SubjectTypeUser
+		selector.SubjectType = SubjectTypeUser
 	}
 	return selector
 }
 
-func cloneSelector(selector *dto.AuthSelector) *dto.AuthSelector {
+func cloneSelector(selector *AuthSelector) *AuthSelector {
 	if selector == nil {
-		return &dto.AuthSelector{}
+		return &AuthSelector{}
 	}
 	cloned := *selector
 	if selector.ExternalRefs != nil {

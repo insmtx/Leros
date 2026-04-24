@@ -14,11 +14,10 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
 
-	auth "github.com/insmtx/SingerOS/backend/internal/api/auth"
 	"github.com/insmtx/SingerOS/backend/config"
+	"github.com/insmtx/SingerOS/backend/internal/api/auth"
 	"github.com/insmtx/SingerOS/backend/internal/api/connectors"
 	eventbus "github.com/insmtx/SingerOS/backend/internal/infra/mq"
-	"github.com/insmtx/SingerOS/backend/internal/api/dto"
 	"github.com/insmtx/SingerOS/backend/types"
 )
 
@@ -82,9 +81,9 @@ func (c *Connector) oAuthRedirect(ctx *gin.Context) {
 		return
 	}
 
-	redirectURL, err := c.authSvc.StartAuthorization(ctx.Request.Context(), &dto.StartAuthorizationRequest{
+	redirectURL, err := c.authSvc.StartAuthorization(ctx.Request.Context(), &auth.StartAuthorizationRequest{
 		UserID:      userID,
-		Provider:    dto.ProviderGitHub,
+		Provider:    auth.ProviderGitHub,
 		RedirectURI: ctx.Query("redirect_uri"),
 	})
 	if err != nil {
@@ -115,8 +114,8 @@ func (c *Connector) oAuthCallback(ctx *gin.Context) {
 		return
 	}
 
-	result, err := c.authSvc.HandleAuthorizationCallback(ctx.Request.Context(), &dto.AuthorizationCallbackRequest{
-		Provider: dto.ProviderGitHub,
+	result, err := c.authSvc.HandleAuthorizationCallback(ctx.Request.Context(), &auth.AuthorizationCallbackRequest{
+		Provider: auth.ProviderGitHub,
 		State:    state,
 		Code:     code,
 	})
@@ -135,7 +134,7 @@ func (c *Connector) oAuthCallback(ctx *gin.Context) {
 }
 
 // buildOAuthResponse constructs the OAuth response.
-func (c *Connector) buildOAuthResponse(account *dto.AuthorizedAccount) gin.H {
+func (c *Connector) buildOAuthResponse(account *auth.AuthorizedAccount) gin.H {
 	user := gin.H{
 		"github_id":    account.ExternalAccountID,
 		"github_login": account.Metadata["github_login"],
@@ -150,7 +149,7 @@ func (c *Connector) buildOAuthResponse(account *dto.AuthorizedAccount) gin.H {
 }
 
 // saveUserIfNeeded saves user to database if available.
-func (c *Connector) saveUserIfNeeded(ctx context.Context, account *dto.AuthorizedAccount, response gin.H) error {
+func (c *Connector) saveUserIfNeeded(ctx context.Context, account *auth.AuthorizedAccount, response gin.H) error {
 	if c.db == nil {
 		logs.WarnContext(ctx, "Database not available, user info will not be saved to DB")
 		return nil
