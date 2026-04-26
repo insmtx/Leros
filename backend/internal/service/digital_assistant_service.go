@@ -26,9 +26,9 @@ func NewDigitalAssistantService(db *gorm.DB) contract.DigitalAssistantService {
 }
 
 func (s *digitalAssistantService) CreateDigitalAssistant(ctx context.Context, req *contract.CreateDigitalAssistantRequest) (*contract.DigitalAssistant, error) {
-	orgID, err := getOrgIDFromContext(ctx)
-	if err != nil {
-		return nil, err
+	caller, _ := auth.FromContext(ctx)
+	if caller == nil || caller.OrgID == 0 {
+		return nil, errors.New("user not authenticated or org not set")
 	}
 
 	if req.Code == "" {
@@ -46,10 +46,9 @@ func (s *digitalAssistantService) CreateDigitalAssistant(ctx context.Context, re
 		return nil, errors.New("digital assistant with this code already exists")
 	}
 
-	caller, _ := auth.FromContext(ctx)
 	da := &types.DigitalAssistant{
 		Code:        req.Code,
-		OrgID:       orgID,
+		OrgID:       caller.OrgID,
 		OwnerID:     caller.Uin,
 		Name:        req.Name,
 		Description: req.Description,
