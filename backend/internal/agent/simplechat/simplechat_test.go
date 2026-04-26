@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/insmtx/SingerOS/backend/internal/agent"
 	"github.com/insmtx/SingerOS/backend/internal/agent/simplechat"
 )
 
@@ -18,7 +19,7 @@ func TestLoadFromEnv(t *testing.T) {
 	}
 }
 
-func TestNewRunner(t *testing.T) {
+func TestNewSimpleChat(t *testing.T) {
 	cfg := &simplechat.Config{
 		LLMProvider: "openai",
 		APIKey:      "test-key",
@@ -26,16 +27,16 @@ func TestNewRunner(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runner, err := simplechat.NewRunner(ctx, cfg)
+	sc, err := simplechat.New(ctx, cfg)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if runner == nil {
-		t.Fatal("expected runner to be non-nil")
+	if sc == nil {
+		t.Fatal("expected simplechat to be non-nil")
 	}
 }
 
-func TestRunner_Ask_RequiresAPIKey(t *testing.T) {
+func TestSimpleChat_Run_RequiresAPIKey(t *testing.T) {
 	if os.Getenv("OPENAI_API_KEY") == "" {
 		t.Skip("skipping test: OPENAI_API_KEY not set")
 	}
@@ -47,14 +48,21 @@ func TestRunner_Ask_RequiresAPIKey(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runner, err := simplechat.NewRunner(ctx, cfg)
+	sc, err := simplechat.New(ctx, cfg)
 	if err != nil {
-		t.Fatalf("failed to create runner: %v", err)
+		t.Fatalf("failed to create simplechat: %v", err)
 	}
 
-	result, err := runner.Ask(ctx, "Hello, how are you?")
+	req := &agent.RequestContext{
+		Input: agent.InputContext{
+			Type: agent.InputTypeMessage,
+			Text: "Hello, how are you?",
+		},
+	}
+
+	result, err := sc.Run(ctx, req)
 	if err != nil {
-		t.Fatalf("failed to ask question: %v", err)
+		t.Fatalf("failed to run simplechat: %v", err)
 	}
 
 	if result == nil {
@@ -66,23 +74,28 @@ func TestRunner_Ask_RequiresAPIKey(t *testing.T) {
 	}
 }
 
-func ExampleRunner_Ask() {
+func TestSimpleChat_Run_EmptyInput(t *testing.T) {
 	cfg := &simplechat.Config{
 		LLMProvider: "openai",
-		APIKey:      "your-api-key-here",
+		APIKey:      "test-key",
 		Model:       "gpt-4",
 	}
 
 	ctx := context.Background()
-	runner, err := simplechat.NewRunner(ctx, cfg)
+	sc, err := simplechat.New(ctx, cfg)
 	if err != nil {
-		panic(err)
+		t.Fatalf("failed to create simplechat: %v", err)
 	}
 
-	result, err := runner.Ask(ctx, "What is Go language?")
-	if err != nil {
-		panic(err)
+	req := &agent.RequestContext{
+		Input: agent.InputContext{
+			Type: agent.InputTypeMessage,
+			Text: "",
+		},
 	}
 
-	println(result.Message)
+	_, err = sc.Run(ctx, req)
+	if err == nil {
+		t.Error("expected error for empty input")
+	}
 }

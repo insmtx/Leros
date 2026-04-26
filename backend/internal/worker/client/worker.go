@@ -16,7 +16,7 @@ import (
 )
 
 type Worker struct {
-	agent      *agent.Agent
+	runtime    agent.AgentRuntime
 	config     *WorkerConfig
 	workerID   string
 	startedAt  time.Time
@@ -25,6 +25,7 @@ type Worker struct {
 }
 
 type WorkerConfig struct {
+	Runtime      agent.AgentRuntime
 	LLMConfig    *config.LLMConfig
 	SkillsDir    string
 	ToolsEnabled bool
@@ -36,37 +37,19 @@ func NewWorker(ctx context.Context, cfg *WorkerConfig) (*Worker, error) {
 		return nil, fmt.Errorf("worker config is required")
 	}
 
-	if cfg.LLMConfig == nil {
-		return nil, fmt.Errorf("LLM config is required")
+	runtime := cfg.Runtime
+	if runtime == nil {
+		runtime = buildDefaultRuntime(ctx, cfg)
 	}
 
-	catalog, err := loadSkillsCatalog(cfg.SkillsDir)
-	if err != nil {
-		return nil, fmt.Errorf("load skills catalog: %w", err)
-	}
-
-	toolRegistry := tools.NewRegistry()
-
-	if cfg.ToolsEnabled {
-		if err := skilltools.Register(toolRegistry, catalog); err != nil {
-			return nil, fmt.Errorf("register tools: %w", err)
-		}
-	}
-
-	runtimeConfig := agent.Config{
-		SkillsCatalog: catalog,
-		ToolRegistry:  toolRegistry,
-	}
-
-	agentInstance, err := agent.NewAgent(ctx, cfg.LLMConfig, runtimeConfig)
-	if err != nil {
-		return nil, fmt.Errorf("create agent: %w", err)
+	if runtime == nil {
+		return nil, fmt.Errorf("either Runtime or LLMConfig must be provided")
 	}
 
 	workerID := fmt.Sprintf("worker_%d", time.Now().UnixNano())
 
 	w := &Worker{
-		agent:     agentInstance,
+		runtime:   runtime,
 		config:    cfg,
 		workerID:  workerID,
 		startedAt: time.Now(),
@@ -80,13 +63,47 @@ func NewWorker(ctx context.Context, cfg *WorkerConfig) (*Worker, error) {
 	return w, nil
 }
 
+func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) agent.AgentRuntime {
+	if cfg.LLMConfig == nil {
+		return nil
+	}
+
+	catalog, err := loadSkillsCatalog(cfg.SkillsDir)
+	if err != nil {
+		logs.Errorf("load skills catalog: %v", err)
+		return nil
+	}
+
+	toolRegistry := tools.NewRegistry()
+
+	if cfg.ToolsEnabled {
+		if err := skilltools.Register(toolRegistry, catalog); err != nil {
+			logs.Errorf("register tools: %v", err)
+			return nil
+		}
+	}
+
+	agentConfig := agent.Config{
+		SkillsCatalog: catalog,
+		ToolRegistry:  toolRegistry,
+	}
+
+	agentInstance, err := agent.NewAgent(ctx, cfg.LLMConfig, agentConfig)
+	if err != nil {
+		logs.Errorf("create agent: %v", err)
+		return nil
+	}
+
+	return agentInstance
+}
+
 func (w *Worker) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {
-	if w == nil || w.agent == nil {
-		return nil, fmt.Errorf("worker agent is not initialized")
+	if w == nil || w.runtime == nil {
+		return nil, fmt.Errorf("worker runtime is not initialized")
 	}
 	
 	w.status = "processing"
-	result, err := w.agent.Run(ctx, req)
+	result, err := w.runtime.Run(ctx, req)
 	if err != nil {
 		w.status = "error"
 		return nil, err

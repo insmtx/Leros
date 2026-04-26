@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/internal/agent"
+	"github.com/insmtx/SingerOS/backend/internal/agent/simplechat"
 	"github.com/insmtx/SingerOS/backend/internal/worker"
 	"github.com/spf13/cobra"
 	"github.com/ygpkg/yg-go/logs"
@@ -37,21 +37,25 @@ var simpleChatCmd = &cobra.Command{
 			return
 		}
 
-		llmConfig := &config.LLMConfig{
-			Provider: "openai",
-			APIKey:   apiKey,
-			Model:    simpleChatModel,
-			BaseURL:  simpleChatBaseURL,
-		}
-
-		workerCfg := &worker.WorkerConfig{
-			LLMConfig:    llmConfig,
-			SkillsDir:    "",
-			ToolsEnabled: false,
-			ServerAddr:   simpleChatServer,
+		scCfg := &simplechat.Config{
+			LLMProvider: "openai",
+			APIKey:      apiKey,
+			Model:       simpleChatModel,
+			BaseURL:     simpleChatBaseURL,
 		}
 
 		ctx := context.Background()
+		scRuntime, err := simplechat.New(ctx, scCfg)
+		if err != nil {
+			logs.Fatalf("Failed to create SimpleChat runtime: %v", err)
+			return
+		}
+
+		workerCfg := &worker.WorkerConfig{
+			Runtime:    scRuntime,
+			ServerAddr: simpleChatServer,
+		}
+
 		w, err := worker.NewWorker(ctx, workerCfg)
 		if err != nil {
 			logs.Fatalf("Failed to create worker: %v", err)

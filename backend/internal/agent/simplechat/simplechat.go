@@ -3,15 +3,21 @@ package simplechat
 import (
 	"context"
 	"fmt"
+	"time"
 
+	einomodel "github.com/cloudwego/eino/components/model"
+	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/internal/agent"
-	"github.com/insmtx/SingerOS/backend/tools"
-	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
+	einoadapter "github.com/insmtx/SingerOS/backend/internal/agent/eino"
+	"github.com/ygpkg/yg-go/logs"
 )
 
-type Runner struct {
-	agent *agent.Agent
+var _ agent.AgentRuntime = (*SimpleChat)(nil)
+
+type SimpleChat struct {
+	chatModel    einomodel.ToolCallingChatModel
+	systemPrompt string
 }
 
 type Config struct {
@@ -30,7 +36,7 @@ func LoadFromEnv() *Config {
 	}
 }
 
-func NewRunner(ctx context.Context, cfg *Config) (*Runner, error) {
+func New(ctx context.Context, cfg *Config) (*SimpleChat, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config is required")
 	}
@@ -42,56 +48,97 @@ func NewRunner(ctx context.Context, cfg *Config) (*Runner, error) {
 		BaseURL:  cfg.BaseURL,
 	}
 
-	catalog := skilltools.NewEmptyCatalog()
-	toolRegistry := tools.NewRegistry()
-
-	runtimeConfig := agent.Config{
-		SkillsCatalog: catalog,
-		ToolRegistry:  toolRegistry,
-	}
-
-	agentInstance, err := agent.NewAgent(ctx, llmConfig, runtimeConfig)
+	chatModel, err := einoadapter.NewOpenAIChatModel(ctx, llmConfig)
 	if err != nil {
-		return nil, fmt.Errorf("create agent: %w", err)
+		return nil, fmt.Errorf("create chat model: %w", err)
 	}
 
-	return &Runner{
-		agent: agentInstance,
+	return &SimpleChat{
+		chatModel:    chatModel,
+		systemPrompt: "You are a helpful assistant.",
 	}, nil
 }
 
-type ChatRequest struct {
-	Question string
-	Sink     agent.RunEventSink
-}
-
-func (r *Runner) Ask(ctx context.Context, question string) (*agent.RunResult, error) {
-	if question == "" {
-		return nil, fmt.Errorf("question is required")
+func (s *SimpleChat) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {
+	if s == nil || s.chatModel == nil {
+		return nil, fmt.Errorf("agent is not initialized")
 	}
 
-	req := &agent.RequestContext{
-		Input: agent.InputContext{
-			Type: agent.InputTypeMessage,
-			Text: question,
+	startedAt := time.Now().UTC()
+
+	if req.RunID == "" {
+		req.RunID = fmt.Sprintf("run_%d", time.Now().UnixNano())
+	}
+	if req.TraceID == "" {
+		req.TraceID = req.RunID
+	}
+
+	userInput := buildUserInput(req)
+	if userInput == "" {
+		return nil, fmt.Errorf("empty user input")
+	}
+
+	userMsg := agent.InputMessage{
+		Role:    "user",
+		Content: userInput,
+	}
+	req.Input.Messages = append(req.Input.Messages, userMsg)
+
+	messages := []*einoschema.Message{
+		{
+			Role:    einoschema.System,
+			Content: s.systemPrompt,
+		},
+		{
+			Role:    einoschema.User,
+			Content: userInput,
 		},
 	}
 
-	return r.agent.Run(ctx, req)
+	response, err := s.chatModel.Generate(ctx, messages)
+	if err != nil {
+		return nil, fmt.Errorf("generate response: %w", err)
+	}
+
+	resultMessage := ""
+	if response != nil && len(response.Content) > 0 {
+		resultMessage = response.Content
+	}
+
+	usage := &agent.UsagePayload{}
+	if response != nil && response.ResponseMeta != nil && response.ResponseMeta.Usage != nil {
+		usage.InputTokens = response.ResponseMeta.Usage.PromptTokens
+		usage.OutputTokens = response.ResponseMeta.Usage.CompletionTokens
+		usage.TotalTokens = response.ResponseMeta.Usage.TotalTokens
+	}
+
+	result := &agent.RunResult{
+		RunID:       req.RunID,
+		TraceID:     req.TraceID,
+		Status:      agent.RunStatusCompleted,
+		Message:     resultMessage,
+		Usage:       usage,
+		StartedAt:   startedAt,
+		CompletedAt: time.Now().UTC(),
+	}
+
+	logs.InfoContextf(ctx, "SimpleChat run completed: run_id=%s status=%s message_len=%d",
+		req.RunID, result.Status, len(resultMessage))
+
+	return result, nil
 }
 
-func (r *Runner) ChatStream(ctx context.Context, req *ChatRequest) (*agent.RunResult, error) {
-	if req.Question == "" {
-		return nil, fmt.Errorf("question is required")
+func buildUserInput(req *agent.RequestContext) string {
+	if req == nil {
+		return ""
 	}
 
-	requestCtx := &agent.RequestContext{
-		Input: agent.InputContext{
-			Type: agent.InputTypeMessage,
-			Text: req.Question,
-		},
-		EventSink: req.Sink,
+	switch {
+	case req.Input.Text != "":
+		return req.Input.Text
+	case len(req.Input.Messages) > 0:
+		return req.Input.Messages[len(req.Input.Messages)-1].Content
+	default:
+		return ""
 	}
-
-	return r.agent.Run(ctx, requestCtx)
 }
