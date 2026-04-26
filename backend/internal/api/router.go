@@ -10,8 +10,8 @@ import (
 	auth "github.com/insmtx/SingerOS/backend/internal/api/auth"
 	"github.com/insmtx/SingerOS/backend/internal/api/connectors/github"
 	"github.com/insmtx/SingerOS/backend/internal/api/connectors/gitlab"
-	"github.com/insmtx/SingerOS/backend/internal/api/contract"
 	"github.com/insmtx/SingerOS/backend/internal/api/handler"
+	"github.com/insmtx/SingerOS/backend/internal/service"
 	eventbus "github.com/insmtx/SingerOS/backend/internal/infra/mq"
 	githubprovider "github.com/insmtx/SingerOS/backend/internal/infra/providers/github"
 	"github.com/insmtx/SingerOS/backend/internal/infra/websocket"
@@ -50,19 +50,12 @@ func SetupRouter(r gin.IRouter, cfg config.Config, publisher eventbus.Publisher,
 	websocket.RegisterWebSocketRoutes(v1, publisher)
 	logs.Info("WebSocket connector registered successfully")
 
-	digitalAssistantService := initDigitalAssistantService(db)
+	digitalAssistantService := service.NewDigitalAssistantService(db)
 	handler.RegisterDigitalAssistantRoutes(v1, digitalAssistantService)
 	logs.Info("Digital assistant routes registered successfully")
 
 	// Swagger UI 路由
 	v1.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-}
-
-// initDigitalAssistantService 初始化DigitalAssistant服务
-func initDigitalAssistantService(db *gorm.DB) contract.DigitalAssistantService {
-	// TODO: 初始化实际的 service 实例
-	// 这里可以注入相关依赖，如 repository 等
-	return nil
 }
 
 // initThirdPartyAuthService 初始化第三方平台授权服务并注册 provider
