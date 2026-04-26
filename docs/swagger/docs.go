@@ -60,9 +60,360 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/DeleteDigitalAssistant": {
+            "post": {
+                "description": "根据ID删除数字助手",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "DigitalAssistant"
+                ],
+                "summary": "删除数字助手",
+                "parameters": [
+                    {
+                        "description": "删除数字助手请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.DeleteDigitalAssistantRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/GetDigitalAssistant": {
+            "post": {
+                "description": "根据ID或Code获取数字助手详情",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "DigitalAssistant"
+                ],
+                "summary": "获取数字助手详情",
+                "parameters": [
+                    {
+                        "description": "获取数字助手请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.GetDigitalAssistantRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.CreateDigitalAssistantResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ListDigitalAssistant": {
+            "post": {
+                "description": "分页查询数字助手列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "DigitalAssistant"
+                ],
+                "summary": "查询数字助手列表",
+                "parameters": [
+                    {
+                        "description": "查询列表请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_contract.ListDigitalAssistantRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.CreateDigitalAssistantResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/UpdateDigitalAssistant": {
+            "post": {
+                "description": "更新数字助手基本信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "DigitalAssistant"
+                ],
+                "summary": "更新数字助手",
+                "parameters": [
+                    {
+                        "description": "更新数字助手请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.UpdateDigitalAssistantRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.CreateDigitalAssistantResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/UpdateDigitalAssistantConfig": {
+            "post": {
+                "description": "更新数字助手的配置信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "DigitalAssistant"
+                ],
+                "summary": "更新数字助手配置",
+                "parameters": [
+                    {
+                        "description": "更新配置请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.UpdateDigitalAssistantConfigRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.CreateDigitalAssistantResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/UpdateDigitalAssistantStatus": {
+            "post": {
+                "description": "更新数字助手的运行状态",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "DigitalAssistant"
+                ],
+                "summary": "更新数字助手状态",
+                "parameters": [
+                    {
+                        "description": "更新状态请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.UpdateDigitalAssistantStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "backend_internal_api_handler.DeleteDigitalAssistantRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "backend_internal_api_handler.GetDigitalAssistantRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "backend_internal_api_handler.UpdateDigitalAssistantConfigRequest": {
+            "type": "object",
+            "required": [
+                "config",
+                "id"
+            ],
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_contract.AssistantConfig"
+                },
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "backend_internal_api_handler.UpdateDigitalAssistantRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "config": {
+                    "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_contract.AssistantConfig"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_api_handler.UpdateDigitalAssistantStatusRequest": {
+            "type": "object",
+            "required": [
+                "id",
+                "status"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_insmtx_SingerOS_backend_internal_api_contract.AssistantConfig": {
             "type": "object",
             "properties": {
@@ -202,6 +553,29 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_insmtx_SingerOS_backend_internal_api_contract.ListDigitalAssistantRequest": {
+            "type": "object",
+            "properties": {
+                "keyword": {
+                    "type": "string"
+                },
+                "org_id": {
+                    "type": "integer"
+                },
+                "owner_id": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "per_page": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_insmtx_SingerOS_backend_internal_api_contract.MemoryConfig": {
             "type": "object",
             "properties": {
@@ -233,6 +607,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_SingerOS_backend_internal_api_dto.BaseResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "message": {
                     "type": "string"
                 }
             }

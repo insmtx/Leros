@@ -11,18 +11,15 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/internal/agent"
 	"github.com/insmtx/SingerOS/backend/internal/api"
-	"github.com/insmtx/SingerOS/backend/internal/api/trace"
 	"github.com/insmtx/SingerOS/backend/internal/eventengine"
 	infradb "github.com/insmtx/SingerOS/backend/internal/infra/db"
 	"github.com/insmtx/SingerOS/backend/internal/infra/mq"
 	"github.com/insmtx/SingerOS/backend/tools"
 	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
 	"github.com/spf13/cobra"
-	"github.com/ygpkg/yg-go/apis/runtime/middleware"
 	ygconfig "github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/lifecycle"
 	"github.com/ygpkg/yg-go/logs"
@@ -91,15 +88,7 @@ var serverCmd = &cobra.Command{
 			logs.Warn("  - See example-config.yaml for database configuration example")
 		}
 
-		r := gin.New()
-		{
-			r.Use(middleware.CORS())
-			r.Use(trace.CustomerHeader())
-			r.Use(trace.Logger(".Ping", "metrics"))
-			r.Use(middleware.Recovery())
-		}
-
-		api.SetupRouter(r, *cfg, publisher, db)
+		r := api.SetupRouter(*cfg, publisher, db)
 
 		srv := &http.Server{
 			Addr:    serverHttpAddr,

@@ -1,5 +1,54 @@
 basePath: /v1
 definitions:
+  backend_internal_api_handler.DeleteDigitalAssistantRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  backend_internal_api_handler.GetDigitalAssistantRequest:
+    properties:
+      code:
+        type: string
+      id:
+        type: integer
+    type: object
+  backend_internal_api_handler.UpdateDigitalAssistantConfigRequest:
+    properties:
+      config:
+        $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_contract.AssistantConfig'
+      id:
+        type: integer
+    required:
+    - config
+    - id
+    type: object
+  backend_internal_api_handler.UpdateDigitalAssistantRequest:
+    properties:
+      avatar:
+        type: string
+      config:
+        $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_contract.AssistantConfig'
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+    required:
+    - id
+    type: object
+  backend_internal_api_handler.UpdateDigitalAssistantStatusRequest:
+    properties:
+      id:
+        type: integer
+      status:
+        type: string
+    required:
+    - id
+    - status
+    type: object
   github_com_insmtx_SingerOS_backend_internal_api_contract.AssistantConfig:
     properties:
       channels:
@@ -92,6 +141,21 @@ definitions:
       type:
         type: string
     type: object
+  github_com_insmtx_SingerOS_backend_internal_api_contract.ListDigitalAssistantRequest:
+    properties:
+      keyword:
+        type: string
+      org_id:
+        type: integer
+      owner_id:
+        type: integer
+      page:
+        type: integer
+      per_page:
+        type: integer
+      status:
+        type: string
+    type: object
   github_com_insmtx_SingerOS_backend_internal_api_contract.MemoryConfig:
     properties:
       type:
@@ -112,6 +176,13 @@ definitions:
       skill_code:
         type: string
       version:
+        type: string
+    type: object
+  github_com_insmtx_SingerOS_backend_internal_api_dto.BaseResponse:
+    properties:
+      code:
+        type: integer
+      message:
         type: string
     type: object
   github_com_insmtx_SingerOS_backend_internal_api_dto.CreateDigitalAssistantResponse:
@@ -167,6 +238,186 @@ paths:
           schema:
             $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
       summary: 创建数字助手
+      tags:
+      - DigitalAssistant
+  /DeleteDigitalAssistant:
+    post:
+      consumes:
+      - application/json
+      description: 根据ID删除数字助手
+      parameters:
+      - description: 删除数字助手请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/backend_internal_api_handler.DeleteDigitalAssistantRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.BaseResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
+        "500":
+          description: 内部服务器错误
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
+      summary: 删除数字助手
+      tags:
+      - DigitalAssistant
+  /GetDigitalAssistant:
+    post:
+      consumes:
+      - application/json
+      description: 根据ID或Code获取数字助手详情
+      parameters:
+      - description: 获取数字助手请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/backend_internal_api_handler.GetDigitalAssistantRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.CreateDigitalAssistantResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
+        "500":
+          description: 内部服务器错误
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
+      summary: 获取数字助手详情
+      tags:
+      - DigitalAssistant
+  /ListDigitalAssistant:
+    post:
+      consumes:
+      - application/json
+      description: 分页查询数字助手列表
+      parameters:
+      - description: 查询列表请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_contract.ListDigitalAssistantRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.CreateDigitalAssistantResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
+        "500":
+          description: 内部服务器错误
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
+      summary: 查询数字助手列表
+      tags:
+      - DigitalAssistant
+  /UpdateDigitalAssistant:
+    post:
+      consumes:
+      - application/json
+      description: 更新数字助手基本信息
+      parameters:
+      - description: 更新数字助手请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/backend_internal_api_handler.UpdateDigitalAssistantRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.CreateDigitalAssistantResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
+        "500":
+          description: 内部服务器错误
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
+      summary: 更新数字助手
+      tags:
+      - DigitalAssistant
+  /UpdateDigitalAssistantConfig:
+    post:
+      consumes:
+      - application/json
+      description: 更新数字助手的配置信息
+      parameters:
+      - description: 更新配置请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/backend_internal_api_handler.UpdateDigitalAssistantConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.CreateDigitalAssistantResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
+        "500":
+          description: 内部服务器错误
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
+      summary: 更新数字助手配置
+      tags:
+      - DigitalAssistant
+  /UpdateDigitalAssistantStatus:
+    post:
+      consumes:
+      - application/json
+      description: 更新数字助手的运行状态
+      parameters:
+      - description: 更新状态请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/backend_internal_api_handler.UpdateDigitalAssistantStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.BaseResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
+        "500":
+          description: 内部服务器错误
+          schema:
+            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
+      summary: 更新数字助手状态
       tags:
       - DigitalAssistant
 schemes:
