@@ -18,9 +18,9 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
 
+	_ "github.com/insmtx/SingerOS/docs/swagger" // Swagger 文档生成的导入
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	_ "github.com/insmtx/SingerOS/docs/swagger" // Swagger 文档生成的导入
 )
 
 // SetupRouter 设置事件网关的路由，注册所有连接器
@@ -28,7 +28,6 @@ import (
 // 根据配置初始化并注册 GitHub、GitLab 等渠道连接器，
 // 同时设置客户端 WebSocket 连接器，并将所有连接器的路由注册到 HTTP 服务器。
 func SetupRouter(r gin.IRouter, cfg config.Config, publisher eventbus.Publisher, db *gorm.DB) {
-	digitalAssistantService := initDigitalAssistantService(db)
 	if cfg.Github != nil {
 		logs.Info("Setting up GitHub connector")
 		authService := initThirdPartyAuthService(&cfg)
@@ -48,6 +47,7 @@ func SetupRouter(r gin.IRouter, cfg config.Config, publisher eventbus.Publisher,
 
 	websocket.RegisterWebSocketRoutes(r, publisher)
 	logs.Info("WebSocket connector registered successfully")
+	digitalAssistantService := initDigitalAssistantService(db)
 
 	handler.RegisterDigitalAssistantRoutes(r, digitalAssistantService)
 	logs.Info("Digital assistant routes registered successfully")
