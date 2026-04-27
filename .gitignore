@@ -32,8 +32,9 @@ go.work.sum
 .vscode/
 
 .agents/
-bundles
+bundles/
 deployments/env/config.yaml
+example/
 
 .cache/
 

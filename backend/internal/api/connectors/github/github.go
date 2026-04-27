@@ -49,6 +49,12 @@ func (c *Connector) RegisterRoutes(r gin.IRouter) {
 	r.GET("/github/callback", c.oAuthCallback)
 }
 
+// RegisterGitHubRoutes 注册GitHub路由(便捷函数)
+func RegisterGitHubRoutes(r gin.IRouter, cfg config.GithubAppConfig, publisher eventbus.Publisher, db *gorm.DB, authSvc *auth.ThirdPartyAuthService) {
+	connector := NewConnector(cfg, publisher, db, authSvc)
+	connector.RegisterRoutes(r)
+}
+
 // NewConnector creates a new GitHub connector instance.
 func NewConnector(cfg config.GithubAppConfig, publisher eventbus.Publisher, db *gorm.DB, authSvc *auth.ThirdPartyAuthService) *Connector {
 	logs.Infof("Creating new GitHub connector for app ID: %d", cfg.AppID)

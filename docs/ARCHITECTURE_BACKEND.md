@@ -13,7 +13,28 @@
 
 ## 2. 设计原则
 
-### 2.1 按"领域分层"，不是按技术分层
+### 2.1 架构定位：契约驱动服务架构
+
+> **Contract-driven Service Architecture**
+
+SingerOS 采用**契约驱动的服务架构**，而不是：
+- ❌ Clean Architecture
+- ❌ DDD
+- ❌ Hexagonal Architecture
+
+**特点：**
+- ✔ 类 RPC 风格（类 RPC，但不绑定 RPC 实现）
+- ✔ 轻抽象（无 Repository 层）
+- ✔ 高工程效率
+- ✔ 适合 Agent / Workflow / OS 类系统扩展
+
+**核心原则：**
+1. **contract 定义能力** - 系统能力的"语言"
+2. **service 实现能力** - 直接操作 DB
+3. **handler 适配输入输出** - HTTP 适配
+4. **db 提供执行能力** - 真实数据库操作
+
+### 2.2 按"领域分层"，不是按技术分层
 
 > ❌ 旧模式：controller / service / dao / model
 > ✅ 新模式：event / execution / agent / skill
@@ -22,15 +43,11 @@
 - 技术分层导致模块间耦合严重
 - 领域分层让每个模块职责清晰、可独立演进
 
-### 2.2 核心引擎必须"内聚 + 可替换"
+### 2.3 核心引擎必须"内聚 + 可替换"
 
 - Event Engine 可以单独部署
 - Execution Engine 可以替换
 - Agent Runtime 可扩展
-
-### 2.3 接口优先（interface-driven）
-
-每一层都必须定义 interface，而不是直接依赖实现
 
 ### 2.4 强制隔离（Enforced Isolation）
 
@@ -41,55 +58,176 @@
 
 ## 3. 推荐的 Golang 包结构
 
+### 3.1 完整目录结构（推荐版本）
+
 ```bash
-singeros/backend/
+backend/
 │
-├── cmd/                       # 启动入口（多进程）
-│   └── singer/                # 主服务（HTTP + Engine）
+├── cmd/
+│   └── singer/                # 主后端服务（HTTP + 事件网关）
+│       └── main.go
 │
 ├── internal/                  # 私有核心代码（强制隔离）
-│   ├── eventengine/           # ⭐ 事件引擎
-│   ├── execution/             # ⭐ 执行引擎
-│   ├── agent/                 # ⭐ Agent Runtime
-│   ├── skill/                 # ⭐ Skill 体系
-│   ├── connectors/            # ⭐ 外部接入
-│   ├── service/               # ⭐ 对外 API 层
-│   ├── policy/                # 策略引擎
-│   ├── session/               # 会话管理（规划中）
-│   ├── workflow/              # 工作流引擎（规划中）
-│   └── infra/                 # 基础设施
 │
-├── pkg/                       # 可复用库（可对外）
-│   ├── event/                 # Event 定义（对外共享）
-│   ├── client/                # SDK（调用 SingerOS）
-│   └── providers/             # 第三方服务提供者
+│   ├── api/                   # HTTP 适配层
+│   │   ├── handler/
+│   │   │   ├── event_handler.go
+│   │   │   ├── agent_handler.go
+│   │   │   └── session_handler.go
+│   │   ├── dto/
+│   │   │   ├── event.go
+│   │   │   ├── agent.go
+│   │   │   └── session.go
+│   │   ├── contract/          # ⭐ 系统能力定义（核心）
+│   │   │   ├── event.go
+│   │   │   ├── task.go
+│   │   │   ├── agent.go
+│   │   │   └── session.go
+│   │   └── router.go          # 路由注册
+
+│   │
+│   ├── eventengine/           # ⭐ 事件引擎
+│   │   ├── engine.go              # Event Engine 核心
+│   │   ├── router.go              # 事件路由
+│   │   ├── registry.go            # Handler 注册中心
+│   │   └── builtins/              # 内置事件处理器
+│   │
+│   ├── execution/             # ⭐ 执行引擎
+│   │   ├── engine.go              # Execution Engine 核心
+│   │   ├── dispatcher.go          # 调度器
+│   │   ├── executor.go            # 执行器接口
+│   │   ├── context/               # 执行上下文
+│   │   └── retry.go               # 重试控制
+│   │
+│   ├── agent/                 # ⭐ Agent Runtime
+│   │   ├── runtime.go             # Agent Runtime 接口
+│   │   ├── lifecycle.go           # 生命周期管理
+│   │   ├── context.go             # 上下文管理
+│   │   └── eino/                  # Eino 具体实现
+│   │
+│   ├── skill/                 # ⭐ Skill 体系
+│   │   ├── registry.go            # Skill 注册中心
+│   │   ├── executor.go            # Skill 执行器
+│   │   ├── base_skill.go          # 基础 Skill
+│   │   └── builtin/               # 内置技能
+│   │
+│   ├── service/               # ⭐ 业务逻辑层（直接操作 DB）
+│   │   ├── event_service.go
+│   │   ├── agent_service.go
+│   │   └── session_service.go
+│   │
+│   ├── db/                    # 数据访问层
+│   │   ├── client.go              # GORM client
+│   │   ├── event_repo.go          # 直接 DB 操作
+│   │   ├── agent_repo.go
+│   │   └── model/                 # 数据库模型
+│   │       ├── event_model.go
+│   │       └── agent_model.go
+│   │
+│   ├── convert/               # 结构转换层
+│   │   ├── event_convert.go
+│   │   └── agent_convert.go
+│   │
+│   ├── wire/                  # 依赖组装层
+│   │   ├── event_wire.go
+│   │   └── agent_wire.go
+│   │
+│   ├── connectors/            # 外部接入
+│   │   ├── connector.go
+│   │   ├── github/
+│   │   ├── gitlab/
+│   │   └── wework/
+│   │
+│   └── infra/                 # 基础设施
+│       ├── mq/                    # 消息队列（NATS）
+│       ├── db/                    # 数据库连接
+│       └── logger/                # 日志
+│
+├── pkg/                       # 对外公开接口
+│   ├── event/                 # Event 定义
+│   ├── client/                # SDK
+│   └── types/                 # 公开类型
 │
 ├── types/                     # 核心类型定义
 ├── config/                    # 配置管理
-├── database/                  # 数据库
 ├── auth/                      # 认证系统
-├── tools/                     # 工具定义
-└── toolruntime/               # 工具运行时
+└── skills/                    # 技能体系（旧版，逐步迁移）
 ```
 
 ## 4. 核心模块说明
 
-### 4.1 `internal/eventengine/` - 事件引擎
+### 4.1 `internal/api/` - HTTP 适配层 ⭐⭐
 
-**职责：** 事件订阅、路由、Handler 调用
+包含：handler / dto / contract / router
 
-**子目录：**
-- `engine.go` - Event Engine 核心
-- `registry.go` - Handler 注册中心（插件化）
-- `router.go` - 事件路由（不写死 switch）
-- `builtins/` - 内置事件处理器（PR、Issue、Push 等）
+**定位：** HTTP → Command → service
 
-**⚠️ 常见错误：**
-- ❌ 把业务逻辑直接写在 Handler 中
-- ❌ 使用 `switch` 硬编码路由
-- ✅ 正确：Handler → 调用 Execution Engine
+#### contract 示例（在 api/contract/ 中）
 
-### 4.2 `internal/execution/` - 执行引擎
+```go
+package contract
+
+type EventService interface {
+    CreateEvent(ctx context.Context, cmd CreateEventCommand) error
+    GetEvent(ctx context.Context, id string) (*Event, error)
+}
+
+type CreateEventCommand struct {
+    ChannelName string
+    EventType   string
+    Payload     map[string]interface{}
+    Timestamp   int64
+}
+```
+
+**特点：**
+* ✔ 不依赖 Gin
+* ✔ 不依赖 DB
+* ✔ 是系统"能力语言"
+
+---
+
+#### handler 示例（在 api/handler/ 中）
+
+```go
+func (h *EventHandler) Create(c *gin.Context) {
+    var req dto.CreateEventRequest
+    _ = c.ShouldBindJSON(&req)
+
+    cmd := convert.ToCommand(req)
+
+    err := h.service.CreateEvent(c.Request.Context(), cmd)
+
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(200, gin.H{"ok": true})
+}
+```
+
+**特点：**
+* ❌ 不写业务逻辑
+* ❌ 不操作 DB
+* ✔ 只做转换 + 调用
+
+---
+
+#### router 示例（在 api/ 根目录）
+
+```go
+func Register(r *gin.Engine, h *EventHandler) {
+    r.POST("/events", h.Create)
+    r.GET("/events/:id", h.Get)
+}
+```
+
+---
+
+### 4.2 `internal/eventengine/` - 事件引擎 ⭐⭐⭐
+
+### 4.3 `internal/execution/` - 执行引擎
 
 **职责：** 任务调度、执行控制、重试/超时管理
 
@@ -106,7 +244,9 @@ singeros/backend/
 - 支持重试和降级
 - 支持超时控制
 
-### 4.3 `internal/agent/` - Agent Runtime
+---
+
+### 4.4 `internal/agent/` - Agent Runtime
 
 **职责：** Agent 生命周期管理、LLM 调用、上下文维护
 
@@ -119,9 +259,102 @@ singeros/backend/
 
 **⚠️ 常见错误：**
 - ❌ Agent Runtime 直接调用 MQ / DB
-- ✅ 必须通过 Execution Engine / Skill / Infra
+- ✅ 必须通过 contract.AgentService
 
-### 4.4 `internal/skill/` - Skill 体系
+---
+
+### 4.5 `internal/service/` - 业务逻辑层 ⭐⭐⭐
+
+**定位：** 业务编排 + 直接 DB 操作
+
+#### 实现 contract
+
+```go
+type eventService struct {
+    db *db.Client
+}
+
+var _ contract.EventService = (*eventService)(nil)
+```
+
+#### 核心逻辑
+
+```go
+func (s *eventService) CreateEvent(
+    ctx context.Context,
+    cmd contract.CreateEventCommand,
+) error {
+    event := &db.EventModel{
+        ID:          uuid.New().String(),
+        ChannelName: cmd.ChannelName,
+        EventType:   cmd.EventType,
+        Payload:     cmd.Payload,
+        Timestamp:   cmd.Timestamp,
+    }
+
+    return s.db.CreateEvent(event)
+}
+```
+
+---
+
+### 4.6 `internal/db/` - 数据访问层 ⭐⭐
+
+**定位：** 真实数据库操作（只是 SQL/ORM wrapper）
+
+#### 示例
+
+```go
+type Client struct {
+    db *gorm.DB
+}
+
+func (c *Client) CreateEvent(e *EventModel) error {
+    return c.db.Create(e).Error
+}
+```
+
+---
+
+### 4.7 `internal/convert/` - 结构转换层 ⭐
+
+**定位：** DTO ↔ Command ↔ Model
+
+#### 示例
+
+```go
+func ToCommand(req dto.CreateEventRequest) contract.CreateEventCommand {
+    return contract.CreateEventCommand{
+        ChannelName: req.ChannelName,
+        EventType:   req.EventType,
+        Payload:     req.Payload,
+        Timestamp:   req.Timestamp,
+    }
+}
+```
+
+**特点：**
+* ✔ 避免 DTO 污染 service
+* ✔ 保持层隔离
+
+---
+
+### 4.8 `internal/wire/` - 依赖组装层 ⭐
+
+**定位：** 依赖组装，避免 main 爆炸
+
+#### 示例
+
+```go
+func NewEventModule(db *db.Client) contract.EventService {
+    svc := &eventService{db: db}
+    return svc
+}
+```
+
+---
+
+### 4.9 `internal/skill/` - Skill 体系
 
 **职责：** 技能注册、执行、管理
 
@@ -135,7 +368,7 @@ singeros/backend/
 - ❌ Skill 写死在代码中
 - ✅ 必须 Registry 化，支持动态注册
 
-### 4.5 `internal/connectors/` - 连接器
+### 4.10 `internal/connectors/` - 连接器
 
 **职责：** 外部系统接入（GitHub、GitLab、飞书等）
 
@@ -145,40 +378,23 @@ singeros/backend/
 - `gitlab/` - GitLab 连接器
 - `wework/` - 企业微信连接器
 
-### 4.6 `internal/service/` - 服务层
-
-**职责：** 对外 API 入口
-
-**子目录：**
-- `assistant_service.go` - 助手服务
-- `session_service.go` - 会话服务（规划中）
-- `middleware/` - 中间件（CORS、日志、Recovery）
-
-### 4.7 `internal/policy/` - 策略引擎
-
-**职责：** 权限控制、审计日志
-
-**子目录：**
-- `engine.go` - 策略引擎
-- `permission.go` - 权限控制
-- `audit.go` - 审计日志
-
-### 4.8 `internal/infra/` - 基础设施
+### 4.11 `internal/infra/` - 基础设施
 
 **职责：** 统一基础设施访问
 
 **子目录：**
-- `mq/` - 消息队列（Publisher / Subscriber）
-- `db/` - 数据库
+- `mq/` - 消息队列（NATS Publisher / Subscriber）
+- `db/` - 数据库连接
 - `logger/` - 日志
 
-### 4.9 `pkg/` - 对外公开接口
+### 4.12 `pkg/` - 对外公开接口
 
 **职责：** 对外共享的类型和 SDK
 
 **子目录：**
-- `event/` - Event 定义（event.go、topic.go）
+- `event/` - Event 定义（对外共享）
 - `client/` - SingerOS SDK
+- `types/` - 公开类型
 
 ## 5. 进程拆分建议
 
@@ -221,39 +437,71 @@ Connector Process → Event Bus → Event Engine Process → Execution Engine Pr
 
 ## 6. 常见错误与最佳实践
 
-### 6.1 常见错误
+### 6.1 完整调用链（最重要）
+
+```
+HTTP Request
+   ↓
+handler (DTO → Command)
+   ↓
+contract.Service (interface)
+   ↓
+service (business logic)
+   ↓
+db client (SQL/ORM)
+   ↓
+Database
+```
+
+### 6.2 核心设计原则（架构本质）
+
+#### ✔ 1️⃣ contract 是系统语言
+
+不是 RPC，但类似 RPC 的"能力定义"
+
+#### ✔ 2️⃣ service 是唯一业务执行点
+
+不允许业务散落
+
+#### ✔ 3️⃣ DB 不抽象 interface
+
+直接调用
+
+#### ✔ 4️⃣ handler 只做适配
+
+不参与业务
+
+#### ✔ 5️⃣ convert 保持隔离
+
+避免 DTO 污染 service
+
+### 6.3 常见错误
 
 | ❌ 错误做法 | ✅ 正确做法 |
 |------------|------------|
-| 把所有逻辑写进 Event Handler | Handler → 调用 Execution Engine |
+| 把所有逻辑写进 Event Handler | Handler → 调用 contract.Service |
 | Event Handler 使用 `switch` 硬编码路由 | Router 独立 + Handler 插件化 |
-| Agent Runtime 直接调 MQ / DB | 通过 Execution Engine / Skill / Infra |
+| Agent Runtime 直接调 MQ / DB | 通过 contract.AgentService |
 | Skill 写死在代码中 | 必须 Registry 化，支持动态注册 |
-| 按技术分层（controller/service/model） | 按领域分层（event/execution/agent/skill） |
-| 缺少接口定义，直接依赖实现 | 每层定义 interface，支持替换 |
+| 按技术分层（controller/service/model） | 按领域分层（contract/handler/service/db） |
+| 添加 Repository 抽象 | service 直接调用 db.client |
+| 缺少接口定义，直接依赖实现 | contract 定义所有能力 |
 
-### 6.2 最佳实践
+### 6.4 最佳实践
 
-1. **每个包只暴露必要的接口**
-2. **使用 `internal/` 强制隔离核心实现**
-3. **使用 `pkg/` 对外公开稳定接口**
-4. **Handler 必须插件化，不写死 `switch`**
-5. **Skill 必须 Registry 化**
-6. **每个引擎独立测试**
-7. **依赖注入，避免全局变量**
+1. **contract 定义系统能力** - 每层定义 interface，支持替换
+2. **service 直接操作 DB** - 无 Repository 抽象
+3. **handler 只做转换 + 调用** - 不写业务逻辑
+4. **convert 保持隔离** - DTO ↔ Command ↔ Model
+5. **wire 组装依赖** - 避免 main 爆炸
+6. **每个包只暴露必要的接口**
+7. **使用 `internal/` 强制隔离核心实现**
+8. **使用 `pkg/` 对外公开稳定接口**
+9. **Handler 必须插件化，不写死 `switch`**
+10. **Skill 必须 Registry 化**
+11. **依赖注入，避免全局变量**
 
-## 7. 与 ARCHITECTURE.md 的对应关系
 
-| ARCHITECTURE.md 概念 | 对应 Go 包 |
-|---------------------|-----------|
-| Event Engine | `internal/eventengine/` |
-| Execution Engine | `internal/execution/` |
-| Agent Runtime | `internal/agent/` |
-| Skill System | `internal/skill/` |
-| Connector | `internal/connectors/` |
-| Assistant Service | `internal/service/` |
-| Event Bus | `internal/infra/mq/` |
-| Policy Engine | `internal/policy/` |
 
 ## 8. 下一步行动
 
@@ -287,13 +535,15 @@ MVC / service-based
 升级为：
 
 ```
-Event-Driven + Engine-Oriented + Runtime-Based + Domain-Driven
+Contract-driven Service Architecture
 ```
 
 **核心原则：**
 
-- 按领域分层，不按技术分层
-- 接口优先，支持替换
-- 核心引擎内聚可替换
-- 强制隔离（internal/）
-- 对外公开（pkg/）
+- **contract 定义能力** - 系统能力的"语言"
+- **service 实现能力** - 直接操作 DB
+- **handler 适配输入输出** - HTTP 适配
+- **db 提供执行能力** - 真实数据库操作
+- **convert 保持隔离** - DTO ↔ Command ↔ Model
+- **wire 组装依赖** - 避免 main 爆炸
+- **无 Repository 抽象** - service 直接调用 db

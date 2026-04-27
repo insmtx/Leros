@@ -56,7 +56,6 @@ func runMigrations(db *gorm.DB) error {
 		&types.Skill{},
 		&types.SkillRegistry{},
 		&types.SkillExecutionLog{},
-		&types.DigitalAssistantInstance{},
 	}
 
 	if err := dbtools.InitModel(db, models...); err != nil {

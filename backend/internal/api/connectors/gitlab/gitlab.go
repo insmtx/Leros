@@ -21,6 +21,16 @@ type GitlabConnector struct {
 	publisher eventbus.Publisher     // 事件发布者
 }
 
+// ChannelCode 返回 GitLab 渠道的标识符
+func (c *GitlabConnector) ChannelCode() string {
+	return "gitlab"
+}
+
+// RegisterRoutes registers GitLab webhook endpoints.
+func (c *GitlabConnector) RegisterRoutes(r gin.IRouter) {
+	r.POST("/gitlab/webhook", c.HandleWebhook)
+}
+
 // NewConnector 创建一个新的 GitLab 连接器实例
 func NewConnector(cfg config.GitlabAppConfig, publisher eventbus.Publisher) *GitlabConnector {
 	return &GitlabConnector{
@@ -29,13 +39,10 @@ func NewConnector(cfg config.GitlabAppConfig, publisher eventbus.Publisher) *Git
 	}
 }
 
-// ChannelCode 返回 GitLab 渠道的标识符
-func (c *GitlabConnector) ChannelCode() string {
-	return "gitlab"
-}
-
-func (c *GitlabConnector) RegisterRoutes(r gin.IRouter) {
-	r.POST("/gitlab/webhook", c.HandleWebhook)
+// RegisterGitLabRoutes 注册GitLab路由(便捷函数)
+func RegisterGitLabRoutes(r gin.IRouter, cfg config.GitlabAppConfig, publisher eventbus.Publisher) {
+	connector := NewConnector(cfg, publisher)
+	connector.RegisterRoutes(r)
 }
 
 func (c *GitlabConnector) HandleWebhook(ctx *gin.Context) {

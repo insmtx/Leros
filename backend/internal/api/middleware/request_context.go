@@ -1,4 +1,4 @@
-package trace
+package middleware
 
 import (
 	"fmt"
@@ -6,37 +6,23 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/insmtx/SingerOS/backend/internal/api/auth"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/ygpkg/yg-go/apis/constants"
 	"github.com/ygpkg/yg-go/apis/runtime"
-	"github.com/ygpkg/yg-go/encryptor/snowflake"
 	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/metrics"
 )
 
-// CustomerHeader .
-func CustomerHeader() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		reqID := ctx.Request.Header.Get(constants.HeaderKeyRequestID)
-		if reqID == "" {
-			reqID = snowflake.GenerateIDBase58()
-		}
-		traceID := ctx.Request.Header.Get(constants.HeaderKeyTraceID)
-		if traceID == "" {
-			traceID = reqID
-		}
-		ctx.Set(constants.CtxKeyRequestID, reqID)
-		ctx.Set(constants.CtxKeyTraceID, traceID)
-	}
-}
-
 // Logger .
 func Logger(whitelist ...string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		reqid := ctx.GetString(constants.CtxKeyRequestID)
-		traceid := ctx.GetString(constants.CtxKeyTraceID)
+		caller, trace := auth.FromContext(ctx)
 
-		logs.SetContextFields(ctx, constants.CtxKeyRequestID, reqid, constants.CtxKeyTraceID, traceid)
+		logs.SetContextFields(ctx, constants.CtxKeyRequestID, trace.RequestID,
+			constants.CtxKeyTraceID, trace.TraceID,
+			constants.CtxKeyUin, caller.Uin,
+		)
 		currReq := ctx.FullPath()
 		for _, whitelistItem := range whitelist {
 			if strings.HasSuffix(currReq, whitelistItem) {

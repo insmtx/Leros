@@ -94,4 +94,13 @@ stop:
 # View service logs
 logs:
 	docker-compose -f deployments/env/docker-compose.yml logs -f
-	
+
+# Swagger 文档生成
+.PHONY: swagger swagger-clean
+
+swagger:
+	swag init --parseDependency --generalInfo backend/cmd/singer/server.go --output docs/swagger --exclude example
+	sed -i '/LeftDelim/d; /RightDelim/d' docs/swagger/docs.go
+
+swagger-clean:
+	rm -rf docs/swagger

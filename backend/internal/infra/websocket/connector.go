@@ -68,6 +68,13 @@ func (c *Connector) RegisterRoutes(r gin.IRouter) {
 	r.GET("/api/client/status", c.getClientStatus)
 }
 
+// RegisterWebSocketRoutes 注册WebSocket路由(便捷函数)
+func RegisterWebSocketRoutes(r gin.IRouter, publisher eventbus.Publisher) {
+	connector := NewConnector(publisher)
+	connector.RegisterRoutes(r)
+	GetManager().SetConnector(connector)
+}
+
 func (c *Connector) handleWebSocket(ctx *gin.Context) {
 	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
