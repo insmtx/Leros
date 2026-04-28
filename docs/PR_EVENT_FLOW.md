@@ -222,9 +222,6 @@ const (
 ```bash
 # 构建主服务
 go build -o ./bundles/singer ./backend/cmd/singer/main.go
-
-# 构建 Skill Proxy
-go build -o ./bundles/skill-proxy ./backend/cmd/skill-proxy/main.go
 ```
 
 ### 单元测试

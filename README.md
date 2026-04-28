@@ -46,7 +46,6 @@ Compared to traditional workflow engines such as DeerFlow:
 
 * SingerOS embeds cognitive agents into workflows
 * SingerOS includes model routing and cost governance
-* SingerOS enforces Skill isolation via Skill Proxy
 * SingerOS supports multi-tenant enterprise deployment
 * SingerOS is designed as an AI OS, not just a flow engine
 
@@ -143,7 +142,6 @@ All plugins must be:
 
 * DAG execution engine
 * Agent runtime
-* Skill proxy
 * Model router
 * Multi-tenant basics
 

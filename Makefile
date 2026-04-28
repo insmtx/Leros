@@ -1,48 +1,33 @@
 PROJECT := SingerOS
 REGISTRY ?= registry.yygu.cn/insmtx/
 
-.PHONY: docker-build-singer docker-build-skill-proxy docker-push docker-release docker-run
+.PHONY: docker-build-singer docker-push docker-release docker-run
 
 docker-build-singer:
 	docker build -t $(REGISTRY)$(PROJECT)-singer:latest -f deployments/build/Dockerfile.singer .
 
-docker-build-skill-proxy:
-	docker build -t $(REGISTRY)$(PROJECT)-skill-proxy:latest -f deployments/build/Dockerfile.skill-proxy .
-
-docker-build-all: docker-build-singer docker-build-skill-proxy
+docker-build-all: docker-build-singer
 
 # Targets with Docker BuildKit for enhanced cache usage
 docker-build-singer-cache:
 	DOCKER_BUILDKIT=1 docker build --build-arg BUILDKIT_INLINE_CACHE=1 -t $(REGISTRY)$(PROJECT)-singer:latest -f deployments/build/Dockerfile.singer .
 
-docker-build-skill-proxy-cache:
-	DOCKER_BUILDKIT=1 docker build --build-arg BUILDKIT_INLINE_CACHE=1 -t $(REGISTRY)$(PROJECT)-skill-proxy:latest -f deployments/build/Dockerfile.skill-proxy .
-
-docker-build-cache-all: docker-build-singer-cache docker-build-skill-proxy-cache
+docker-build-cache-all: docker-build-singer-cache
 
 docker-push:
 
 docker-push-singer:
 	docker push $(REGISTRY)$(PROJECT)-singer:latest
 
-docker-push-skill-proxy:
-	docker push $(REGISTRY)$(PROJECT)-skill-proxy:latest
-
-docker-push-all: docker-push-singer docker-push-skill-proxy
+docker-push-all: docker-push-singer
 
 docker-release-singer: docker-build-singer docker-push-singer
-
-docker-release-skill-proxy: docker-build-skill-proxy docker-push-skill-proxy
 
 docker-release-all: docker-build-all docker-push-all
 
 docker-run-singer:
 	-docker rm -f $(PROJECT)-singer-dev
 	docker run -d --name $(PROJECT)-singer-dev -p 8080:8080 $(REGISTRY)$(PROJECT)-singer:latest
-
-docker-run-skill-proxy:
-	-docker rm -f $(PROJECT)-skill-proxy-dev
-	docker run -d --name $(PROJECT)-skill-proxy-dev -p 8081:8080 $(REGISTRY)$(PROJECT)-skill-proxy:latest
 
 install-protoc:
 	which protoc || (echo "protoc not found, please install it first" && exit 1)

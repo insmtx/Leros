@@ -6,7 +6,6 @@
 
 ### 构建命令
 - `go build -o ./bundles/singer ./backend/cmd/singer/main.go` - 构建主 SingerOS 后端服务（输出到 `./bundles/`）
-- `go build -o ./bundles/skill-proxy ./backend/cmd/skill-proxy/main.go` - 构建 Skill Proxy 服务（输出到 `./bundles/`）
 - `make docker-build` - 构建 Docker 镜像（标签：registry.yygu.cn/insmtx/SingerOS:latest）
 - `make docker-run` - 在本地运行 Docker 镜像
 - `make run` - 以前台模式启动 docker-compose 服务
@@ -100,7 +99,6 @@ import (
 
 - `/backend` - 主要 Go 应用程序代码
   - `/backend/cmd/singer` - 主 SingerOS 后端服务入口点
-  - `/backend/cmd/skill-proxy` - Skill Proxy 服务入口点
   - `/backend/config` - 配置加载和类型
   - `/backend/gateway` - HTTP 网关包
   - `/backend/interaction` - 事件驱动交互层
@@ -146,9 +144,8 @@ import (
 4. **DigitalAssistant** - 表示 AI worker 的顶级抽象（✅ 类型已定义）
 5. **Agent** - DigitalAssistant 中的决策实体（🔄 计划中）
 6. **Skill** - 可调用的可重用功能（✅ 接口和基础实现已完成）
-7. **Skill Proxy** - 隔离技能执行服务（✅ 服务框架已实现）
-8. **Model Router** - 多提供商 LLM 路由（🔄 计划中）
-9. **Memory System** - 短期和长期记忆（🔄 计划中）
+7. **Model Router** - 多提供商 LLM 路由（🔄 计划中）
+8. **Memory System** - 短期和长期记忆（🔄 计划中）
 
 ## 技能系统定义
 
@@ -229,8 +226,7 @@ SingerOS/
 │
 ├── backend/
 │   ├── cmd/
-│   │   ├── singer/          # 主后端服务（HTTP + 事件网关）
-│   │   └── skill-proxy/     # Skill Proxy 服务
+│   │   └── singer/          # 主后端服务（HTTP + 事件网关）
 │   │
 │   ├── config/              # 配置加载和类型（GitHub app config，等）
 │   │
@@ -267,10 +263,9 @@ SingerOS/
 2. Event Bus / NATS JetStream (✅ 已完成)
 3. Skill System 接口 (✅ 已完成)
 4. GitHub 集成 (✅ webhook + 事件解析已完成)
-5. Skill Proxy 服务 (✅ 服务框架已完成)
-6. Orchestrator (🔄 计划中)
-7. Agent Engine (🔄 计划中)
-8. CodeAssistantDigitalAssistant (🔄 计划中)
+5. Orchestrator (🔄 计划中)
+6. Agent Engine (🔄 计划中)
+7. CodeAssistantDigitalAssistant (🔄 计划中)
 
 MVP 特性：
 

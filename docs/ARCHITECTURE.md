@@ -629,16 +629,6 @@ Agent → Skill → Tool
 
 > Edge Runtime 是唯一可操作用户环境的组件
 
-### 5.3 Skill Proxy（能力代理层）
-
-**职责：**
-
-统一 Skill 调用：
-
-* 本地 Skill
-* 远程 Skill
-* MCP Skill（未来）
-
 ## 6. 关键执行链路（统一模型）
 
 ### 6.1 标准执行链路
