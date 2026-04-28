@@ -126,14 +126,12 @@ func TestRuntimeRouterClaudeRunnerCallsSingerOSEchoTool(t *testing.T) {
 		if result != nil {
 			resultJSON, _ := json.MarshalIndent(result, "", "  ")
 			t.Logf("failed run result:\n%s", string(resultJSON))
-			logProcessOutput(t, result)
 		}
 		t.Fatalf("run claude runner: %v", err)
 	}
 
 	resultJSON, _ := json.MarshalIndent(result, "", "  ")
 	t.Logf("final run result:\n%s", string(resultJSON))
-	logProcessOutput(t, result)
 
 	if result.Status != agent.RunStatusCompleted {
 		t.Fatalf("expected completed status, got %s", result.Status)
@@ -188,22 +186,4 @@ func findRepoRoot(t *testing.T) string {
 		}
 		dir = parent
 	}
-}
-
-func logProcessOutput(t *testing.T, result *agent.RunResult) {
-	t.Helper()
-	if result == nil || result.Metadata == nil {
-		return
-	}
-	logPath, _ := result.Metadata["log_path"].(string)
-	if strings.TrimSpace(logPath) == "" {
-		return
-	}
-	content, err := os.ReadFile(logPath)
-	if err != nil {
-		t.Logf("read runtime process log %s: %v", logPath, err)
-		return
-	}
-	t.Logf("runtime process log path: %s", logPath)
-	t.Logf("runtime process output:\n%s", string(content))
 }

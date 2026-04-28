@@ -5,8 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -60,23 +58,17 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 		workDir = "."
 	}
 	if err := r.engine.Prepare(ctx, engines.PrepareRequest{WorkDir: workDir}); err != nil {
-		return r.failedResult(ctx, emitter, req, startedAt, err, failureMetadata("", workDir)), err
-	}
-
-	logPath, err := logPathForRun(req.RunID, r.name)
-	if err != nil {
-		return r.failedResult(ctx, emitter, req, startedAt, err, failureMetadata("", workDir)), err
+		return r.failedResult(ctx, emitter, req, startedAt, err, failureMetadata(workDir)), err
 	}
 
 	handle, err := r.engine.Run(ctx, engines.RunRequest{
 		ExecutionID: req.RunID,
 		WorkDir:     workDir,
 		Prompt:      buildPrompt(req),
-		LogPath:     logPath,
 		Model:       modelForRequest(req, r.model),
 	})
 	if err != nil {
-		return r.failedResult(ctx, emitter, req, startedAt, err, failureMetadata(logPath, workDir)), err
+		return r.failedResult(ctx, emitter, req, startedAt, err, failureMetadata(workDir)), err
 	}
 
 	if handle != nil && handle.Process != nil {
@@ -86,24 +78,20 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 		})
 	}
 
-	if err := consumeEvents(ctx, emitter, handle); err != nil {
-		return r.failedResult(ctx, emitter, req, startedAt, err, failureMetadata(logPath, workDir)), err
+	message, err := consumeEvents(ctx, emitter, handle)
+	if err != nil {
+		return r.failedResult(ctx, emitter, req, startedAt, err, failureMetadata(workDir)), err
 	}
 
-	message := ""
-	if handle != nil && handle.ExtractResult != nil {
-		message = strings.TrimSpace(handle.ExtractResult(logPath))
-	}
 	result := &agent.RunResult{
 		RunID:       req.RunID,
 		TraceID:     req.TraceID,
 		Status:      agent.RunStatusCompleted,
-		Message:     message,
+		Message:     strings.TrimSpace(message),
 		StartedAt:   startedAt,
 		CompletedAt: time.Now().UTC(),
 		Metadata: map[string]any{
 			"runtime":  r.name,
-			"log_path": logPath,
 			"work_dir": workDir,
 		},
 	}
@@ -114,31 +102,48 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 	return result, nil
 }
 
-func consumeEvents(ctx context.Context, emitter *agentevents.Emitter, handle *engines.RunHandle) error {
+func consumeEvents(ctx context.Context, emitter *agentevents.Emitter, handle *engines.RunHandle) (string, error) {
 	if handle == nil || handle.Events == nil {
-		return nil
+		return "", nil
 	}
+	var result strings.Builder
+	resultSeen := false
 	for event := range handle.Events {
 		switch event.Type {
 		case engines.EventStarted:
 			continue
+		case engines.EventResult:
+			if strings.TrimSpace(event.Content) != "" {
+				result.Reset()
+				result.WriteString(event.Content)
+				resultSeen = true
+			}
 		case engines.EventDone:
-			return nil
+			return result.String(), nil
 		case engines.EventError:
 			if strings.TrimSpace(event.Content) == "" {
-				return fmt.Errorf("external runtime failed")
+				return result.String(), fmt.Errorf("external runtime failed")
 			}
-			return fmt.Errorf("%s", event.Content)
-		default:
+			return result.String(), fmt.Errorf("%s", event.Content)
+		case engines.EventMessageDelta:
 			if strings.TrimSpace(event.Content) != "" {
 				_ = emitter.Emit(ctx, &agentevents.RunEvent{
 					Type:    agentevents.RunEventMessageDelta,
 					Content: event.Content,
 				})
+				if !resultSeen {
+					result.WriteString(event.Content)
+				}
+			}
+		default:
+			if strings.TrimSpace(event.Content) != "" {
+				if !resultSeen {
+					result.WriteString(event.Content)
+				}
 			}
 		}
 	}
-	return nil
+	return result.String(), nil
 }
 
 func (r *Runner) failedResult(ctx context.Context, emitter *agentevents.Emitter, req *agent.RequestContext, startedAt time.Time, err error, metadata map[string]any) *agent.RunResult {
@@ -167,11 +172,8 @@ func (r *Runner) failedResult(ctx context.Context, emitter *agentevents.Emitter,
 	}
 }
 
-func failureMetadata(logPath string, workDir string) map[string]any {
+func failureMetadata(workDir string) map[string]any {
 	metadata := map[string]any{}
-	if strings.TrimSpace(logPath) != "" {
-		metadata["log_path"] = logPath
-	}
 	if strings.TrimSpace(workDir) != "" {
 		metadata["work_dir"] = workDir
 	}
@@ -226,39 +228,6 @@ func modelForRequest(req *agent.RequestContext, fallback engines.ModelConfig) en
 		model.Model = req.Model.Model
 	}
 	return model
-}
-
-func logPathForRun(runID string, runtimeName string) (string, error) {
-	dir := filepath.Join(os.TempDir(), "singeros-runtime")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("create runtime log dir: %w", err)
-	}
-	name := sanitizePathPart(runID)
-	if name == "" {
-		name = fmt.Sprintf("run_%d", time.Now().UTC().UnixNano())
-	}
-	runtimeName = sanitizePathPart(runtimeName)
-	if runtimeName == "" {
-		runtimeName = "external"
-	}
-	return filepath.Join(dir, fmt.Sprintf("%s-%s.jsonl", name, runtimeName)), nil
-}
-
-func sanitizePathPart(value string) string {
-	return strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z':
-			return r
-		case r >= 'A' && r <= 'Z':
-			return r
-		case r >= '0' && r <= '9':
-			return r
-		case r == '-', r == '_', r == '.':
-			return r
-		default:
-			return '_'
-		}
-	}, strings.TrimSpace(value))
 }
 
 var _ agent.Runner = (*Runner)(nil)

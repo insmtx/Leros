@@ -2,7 +2,6 @@ package externalcli
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/insmtx/SingerOS/backend/internal/agent"
@@ -56,18 +55,12 @@ func (e *fakeEngine) RegisterMCP(_ context.Context, _ engines.MCPServerConfig) e
 
 func (e *fakeEngine) Run(_ context.Context, req engines.RunRequest) (*engines.RunHandle, error) {
 	e.runReq = req
-	if err := os.WriteFile(req.LogPath, []byte(e.result), 0o644); err != nil {
-		return nil, err
-	}
-	events := make(chan engines.Event, 2)
+	events := make(chan engines.Event, 3)
 	events <- engines.Event{Type: engines.EventStarted}
+	events <- engines.Event{Type: engines.EventResult, Content: e.result}
 	events <- engines.Event{Type: engines.EventDone}
 	close(events)
 	return &engines.RunHandle{
 		Events: events,
-		ExtractResult: func(logPath string) string {
-			content, _ := os.ReadFile(logPath)
-			return string(content)
-		},
 	}, nil
 }

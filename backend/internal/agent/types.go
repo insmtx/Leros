@@ -260,6 +260,7 @@ const (
 	RunEventCancelled         = agentevents.RunEventCancelled
 	RunEventMessageDelta      = agentevents.RunEventMessageDelta
 	RunEventReasoningDelta    = agentevents.RunEventReasoningDelta
+	RunEventResult            = agentevents.RunEventResult
 	RunEventToolCallStarted   = agentevents.RunEventToolCallStarted
 	RunEventToolCallArguments = agentevents.RunEventToolCallArguments
 	RunEventToolCallOutput    = agentevents.RunEventToolCallOutput
