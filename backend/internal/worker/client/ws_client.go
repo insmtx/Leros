@@ -11,23 +11,43 @@ import (
 )
 
 type WSClient struct {
-	conn       *websocket.Conn
-	workerID   string
-	serverAddr string
-	send       chan map[string]interface{}
-	ctx        context.Context
-	cancel     context.CancelFunc
+	conn            *websocket.Conn
+	workerID        string
+	assistantCode   string
+	serverAddr      string
+	send            chan map[string]interface{}
+	ctx             context.Context
+	cancel          context.CancelFunc
+	onConfigReady   func(config map[string]interface{})
 }
 
-func NewWSClient(serverAddr, workerID string) *WSClient {
+type WSClientOption func(*WSClient)
+
+func WithAssistantCode(assistantCode string) WSClientOption {
+	return func(c *WSClient) {
+		c.assistantCode = assistantCode
+	}
+}
+
+func WithOnConfigReady(handler func(map[string]interface{})) WSClientOption {
+	return func(c *WSClient) {
+		c.onConfigReady = handler
+	}
+}
+
+func NewWSClient(serverAddr, workerID string, opts ...WSClientOption) *WSClient {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &WSClient{
+	c := &WSClient{
 		workerID:   workerID,
 		serverAddr: serverAddr,
 		send:       make(chan map[string]interface{}, 256),
 		ctx:        ctx,
 		cancel:     cancel,
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 func (c *WSClient) Connect(ctx context.Context) error {
@@ -118,10 +138,55 @@ func (c *WSClient) handleMessage(msg map[string]interface{}) {
 	switch msgType {
 	case "welcome":
 		logs.Infof("Received welcome from server")
+		if c.assistantCode != "" {
+			c.requestConfig()
+		}
+	case "configResponse":
+		c.handleConfigResponse(msg)
 	case "config_update":
 		logs.Infof("Received config update")
 	default:
 		logs.Debugf("Received message: %s", msgType)
+	}
+}
+
+func (c *WSClient) requestConfig() {
+	reqMsg := map[string]interface{}{
+		"type": "getConfig",
+		"payload": map[string]interface{}{
+			"assistant_code": c.assistantCode,
+		},
+	}
+	if err := c.sendJSON(reqMsg); err != nil {
+		logs.Errorf("Failed to request config: %v", err)
+	} else {
+		logs.Infof("Requested config for assistant %s", c.assistantCode)
+	}
+}
+
+func (c *WSClient) handleConfigResponse(msg map[string]interface{}) {
+	payload, ok := msg["payload"].(map[string]interface{})
+	if !ok {
+		logs.Errorf("Invalid configResponse payload")
+		return
+	}
+
+	if errMsg, ok := payload["error"].(string); ok && errMsg != "" {
+		logs.Errorf("Config response error: %s", errMsg)
+		return
+	}
+
+	config, ok := payload["config"].(map[string]interface{})
+	if !ok {
+		logs.Errorf("Config not found in response")
+		return
+	}
+
+	if c.onConfigReady != nil {
+		c.onConfigReady(config)
+		logs.Info("Config processed successfully")
+	} else {
+		logs.Warn("No config handler registered")
 	}
 }
 
