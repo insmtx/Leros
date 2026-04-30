@@ -237,14 +237,19 @@ type Handler interface {
 
 ```
 internal/eventengine/
-├── engine.go           # Event Engine 核心实现
-├── registry.go         # Handler 注册中心（插件化）
-├── router.go           # 事件路由（不写死 switch）
-└── builtins/           # 内置事件处理器
-    ├── pr_handler.go
-    ├── issue_handler.go
-    └── push_handler.go
+└── orchestrator.go     # Orchestrator 核心（当前实现）
+                        # 包含：Engine 实现 + Handler map 注册 + 事件路由
+                        # ⚠️ Router 未独立提取，Handler 未插件化
+                        # Phase 2 计划：拆分为 engine.go / registry.go / builtins/
 ```
+
+**当前实现状态（Phase 1.5）：**
+
+- ✅ Orchestrator 已实现事件订阅和路由
+- ✅ Handler 注册机制（使用 map[string]EventHandlerFunc）
+- ⚠️ Router 未独立提取（内联在 orchestrator.go）
+- ⚠️ Handler 未插件化（使用硬编码的 registerDefaultHandlers）
+- ⚠️ Execution Engine 未独立（执行逻辑在 runEvent 中直接调用 Agent）
 
 **本质：**
 
@@ -253,9 +258,10 @@ internal/eventengine/
 **⚠️ 常见错误：**
 
 - ❌ 把所有逻辑写进 Event Handler
-- ✅ 正确：Handler → 调用 Execution Engine
+- ✅ 正确：Handler → 调用 Execution Engine（Phase 2）
+- ℹ️ 当前状态：Handler → 直接调用 Agent Runtime（Execution Engine 待分离）
 
-### 3.5 Execution Engine（执行引擎）【新增关键模块】⭐
+### 3.5 Execution Engine（执行引擎）【Phase 2 计划中】⭐
 
 **职责：**
 
@@ -293,22 +299,28 @@ type Task struct {
 }
 ```
 
-**包结构：**
+**包结构（计划）：**
 
 ```
 internal/execution/
-├── engine.go           # Execution Engine 核心
-├── dispatcher.go       # 调度器（任务分发）
-├── executor.go         # 执行器接口
-├── sync_executor.go    # 同步执行器
-├── async_executor.go   # 异步执行器
-├── retry.go            # 重试控制
-├── timeout.go          # 超时控制
-└── context/            # 执行上下文
-    └── execution_context.go
+├── engine.go           # Execution Engine 核心（待实现）
+├── dispatcher.go       # 调度器（待实现）
+├── executor.go         # 执行器接口（待实现）
+├── sync_executor.go    # 同步执行器（待实现）
+├── async_executor.go   # 异步执行器（待实现）
+├── retry.go            # 重试控制（待实现）
+├── timeout.go          # 超时控制（待实现）
+└── context/            # 执行上下文（待实现）
 ```
 
-**与 Event Engine 的关系：**
+**当前实现状态（Phase 1.5）：**
+
+- ⚠️ Execution Engine **尚未独立实现**
+- ℹ️ 执行逻辑在 `internal/eventengine/orchestrator.go` 的 `runEvent` 方法中
+- ℹ️ 当前流程：Event Handler → 直接调用 Agent Runtime.Run()
+- 📅 Phase 2 计划：抽取为独立的 Execution Engine
+
+**与 Event Engine 的关系（计划）：**
 
 ```
 Event Engine：响应事件 → 决定何时执行
@@ -320,9 +332,10 @@ Execution Engine：执行逻辑 → 决定如何执行
 **⚠️ 常见错误：**
 
 - ❌ 直接在 Event Handler 中执行复杂逻辑
-- ✅ 正确：Handler → Execution Engine → 具体执行器
+- ✅ 正确：Handler → Execution Engine → 具体执行器（Phase 2）
+- ℹ️ 当前状态：Handler → Agent Runtime（Execution Engine 待分离）
 
-### 3.6 Agent Runtime（智能体运行时）
+### 3.6 Agent Runtime（智能体运行时）✅
 
 **职责：**
 
@@ -337,57 +350,63 @@ Execution Engine：执行逻辑 → 决定如何执行
 * 上下文维护
 * 推理循环（Reasoning Loop）
 * 工具调用协调
+* Session 上下文注入（Phase 1.5 已实现）
 
 **接口定义：**
 
 ```go
 package agent
 
-type Runtime interface {
-    Initialize(ctx context.Context, config AgentConfig) error
-    Execute(ctx context.Context, task *Task) (*Result, error)
-    Shutdown(ctx context.Context) error
-}
-
-type Task struct {
-    Type      TaskType
-    Context   *Context
-    Skills    []Skill
-    Tools     []Tool
-}
-
-type Result struct {
-    Output   string
-    Metadata map[string]interface{}
+type AgentRuntime interface {
+    Run(ctx context.Context, req *RequestContext) (*RunResult, error)
 }
 ```
 
-**包结构：**
+**包结构（实际实现）：**
 
 ```
 internal/agent/
 ├── runtime.go           # Agent Runtime 接口
-├── lifecycle.go         # 生命周期管理
-├── context.go           # 上下文管理
-├── reasoning.go         # 推理循环
-└── eino/               # Eino 具体实现
-    ├── eino_runtime.go
-    ├── agent_runner.go
-    ├── chatmodel.go
-    └── tool_adapter.go
+├── agent.go             # Agent 核心实现
+├── types.go             # 类型定义（RequestContext, RunResult）
+├── config.go            # 配置管理
+├── state.go             # 状态管理
+├── skills_prompt.go     # Skills Prompt 注入
+├── simplechat/          # SimpleChat 实现（Phase 1.5）
+│   ├── simplechat.go
+│   └── console.go
+├── eino/                # Eino 具体实现
+│   ├── chatmodel.go     # ChatModel 适配
+│   ├── flow.go          # Flow 编排
+│   ├── tool_adapter.go  # Tool 适配器
+│   └── flow_test.go
+└── events/              # Agent 事件系统
+    ├── events.go
+    ├── emitter.go
+    ├── event_sink.go
+    ├── event_sink_impl.go
+    └── log_sink.go
 ```
 
 **与 Execution Engine 的关系：**
 
 ```
-Execution Engine 调用 Agent Runtime
-Agent Runtime 专注于 Agent 的推理与决策
+当前（Phase 1.5）：Event Engine → 直接调用 Agent Runtime
+计划（Phase 2）：  Event Engine → Execution Engine → Agent Runtime
 ```
+
+**✅ 已实现能力：**
+
+- Session 上下文注入（requestFromInteractionEvent）
+- 事件流式输出（EventSink）
+- SimpleChat 和 Eino 双实现
+- Tool 适配层
 
 **⚠️ 常见错误：**
 
 - ❌ Agent Runtime 直接调 MQ / DB
-- ✅ 必须通过 Execution Engine / Skill / Infra
+- ✅ 必须通过 Execution Engine / Skill / Infra（Phase 2）
+- ℹ️ 当前状态：Event Engine 直接调用 Agent Runtime
 
 ### 3.7 Workflow Engine（工作流引擎）【规划中】
 
@@ -493,26 +512,38 @@ type SkillInfo struct {
 
 **技能加载方式：**
 
-- 文件系统：通过 SKILL.md 文件定义
+- 文件系统：通过 SKILL.md 文件定义（当前主要方式，位于 `backend/skills/`）
 - 代码嵌入：编译时打包的内置技能
 - 远程加载：从技能市场动态下载（规划中）
 
-**包结构：**
+**包结构（当前实现）：**
 
 ```
-internal/skill/
-├── registry.go         # Skill 注册中心（必须动态注册）
-├── executor.go         # Skill 执行器
-├── base_skill.go       # 基础 Skill 实现
-└── builtin/            # 内置技能
-    ├── github_pr_review.go
-    └── code_summarize.go
+backend/skills/             # Skill 定义文件（SKILL.md）
+├── code-review/
+├── commit-conventions/
+├── humanizer-zh/
+└── weather/
+
+backend/tools/              # Skill 执行代码
+├── registry.go             # Tool 注册中心
+├── tool.go                 # Tool 接口定义
+├── skill/                  # Skill 工具实现
+└── node/                   # Node.js 工具运行时
 ```
+
+**⚠️ 当前状态（Phase 1.5）：**
+
+- ✅ Skill Registry 化已完成（`backend/tools/registry.go`）
+- ✅ SKILL.md 定义在 `backend/skills/` 目录
+- ⚠️ Skill 执行代码在 `backend/tools/` 而非 `internal/skill/`
+- 📅 Phase 2 计划：统一 Skill 系统至 `internal/skill/`
 
 **⚠️ 常见错误：**
 
 - ❌ Skill 写死在代码中
 - ✅ 必须 Registry 化，支持动态注册
+- ℹ️ 当前目录：`backend/skills/`（定义）+ `backend/tools/`（执行）
 
 ### 3.13 Tools 工具系统
 
@@ -597,16 +628,6 @@ Agent → Skill → Tool
 安全原则：
 
 > Edge Runtime 是唯一可操作用户环境的组件
-
-### 5.3 Skill Proxy（能力代理层）
-
-**职责：**
-
-统一 Skill 调用：
-
-* 本地 Skill
-* 远程 Skill
-* MCP Skill（未来）
 
 ## 6. 关键执行链路（统一模型）
 
@@ -694,66 +715,80 @@ Remote Runtime    → 低权限（执行）
 ```bash
 backend/
 │
-├── cmd/                        # 启动入口（多进程）
-│   ├── singer/                # 主服务（Event Engine + Execution Engine）
-│   └── skill-proxy/           # Skill Proxy 服务
+├── cmd/                        # 启动入口（单进程 Server+Worker）
+│   └── singer/                # 主服务（Phase 1.5: Server+Orchestrator 单进程）
+│       ├── main.go            # 主入口
+│       ├── server.go          # Server 启动逻辑
+│       └── worker.go          # Worker stub（Phase 2 完善）
 │
 ├── internal/                  # 私有核心代码（强制隔离）
-│   ├── eventengine/          # ⭐ 事件引擎
-│   │   ├── engine.go         # Event Engine 核心
-│   │   ├── registry.go       # Handler 注册中心（插件化）
-│   │   └── builtins/         # 内置事件处理器
-│   │       ├── pr_handler.go
-│   │       └── issue_handler.go
+│   ├── api/                   # HTTP 适配层（契约驱动）
+│   │   ├── handler/           # HTTP 处理器
+│   │   ├── dto/               # 数据传输对象
+│   │   ├── contract/          # 系统能力定义
+│   │   ├── middleware/        # HTTP 中间件
+│   │   └── router.go          # 路由注册
 │   │
-│   ├── execution/            # ⭐ 执行引擎
-│   │   ├── engine.go         # Execution Engine
-│   │   ├── dispatcher.go     # 调度器
-│   │   ├── executor.go       # 执行器接口
-│   │   ├── sync_executor.go  # 同步执行器
-│   │   ├── async_executor.go # 异步执行器
-│   │   └── context/          # 执行上下文
+│   ├── eventengine/          # ⭐ 事件引擎（Phase 1.5 已实现）
+│   │   └── orchestrator.go   # Orchestrator（内联 Router + Handler map）
+│   │                         # ⚠️ Router 未独立，Handler 未插件化
+│   │                         # Phase 2: 拆分为 engine.go / registry.go / builtins/
 │   │
-│   ├── agent/                # ⭐ Agent Runtime
+│   ├── execution/            # ⭐ 执行引擎（Phase 2 计划中）
+│   │   └── [待实现]          # 当前 Execution 逻辑在 orchestrator.go 中
+│   │
+│   ├── agent/                # ⭐ Agent Runtime（Phase 1.5 已实现）
 │   │   ├── runtime.go        # Agent Runtime 接口
-│   │   ├── lifecycle.go      # 生命周期管理
-│   │   └── eino/             # Eino 实现
-│   │       ├── eino_runtime.go
-│   │       └── agent_runner.go
+│   │   ├── agent.go          # Agent 实现
+│   │   ├── types.go          # 类型定义
+│   │   ├── config.go         # 配置管理
+│   │   ├── state.go          # 状态管理
+│   │   ├── skills_prompt.go  # Skills Prompt 注入
+│   │   ├── simplechat/       # SimpleChat 实现
+│   │   ├── eino/             # Eino 实现
+│   │   │   ├── chatmodel.go
+│   │   │   ├── flow.go
+│   │   │   ├── tool_adapter.go
+│   │   │   └── flow_test.go
+│   │   └── events/           # Agent 事件系统
 │   │
-│   ├── connectors/           # 连接器
-│   │   ├── connector.go      # Connector 接口
-│   │   ├── github/
-│   │   ├── gitlab/
-│   │   └── wework/
+│   ├── service/              # 业务逻辑层（直接操作 DB）
+│   │   └── digital_assistant_service.go
 │   │
-│   ├── service/              # 服务层
-│   │   ├── assistant_service.go
-│   │   └── middleware/       # 中间件
+│   ├── worker/               # Worker 进程（Phase 1.5 stub）
+│   │   ├── worker.go
+│   │   ├── server/
+│   │   └── client/
 │   │
-│   ├── skill/                # Skill 系统
-│   │   ├── registry.go       # Skill 注册中心
-│   │   ├── executor.go       # Skill 执行器
-│   │   └── builtin/          # 内置技能
-│   │
-│   ├── policy/               # 策略引擎
 │   └── infra/                # 基础设施
-│       ├── mq/               # 消息队列
-│       ├── db/               # 数据库
-│       └── logger/           # 日志
+│       ├── mq/               # 消息队列（NATS JetStream）
+│       │   ├── nats.go
+│       │   ├── bus.go
+│       │   └── std.go
+│       ├── db/               # 数据库访问
+│       │   ├── database.go
+│       │   └── digital_assistant_dao.go
+│       ├── providers/        # 第三方服务 Provider
+│       │   └── github/
+│       └── websocket/        # WebSocket 支持
 │
 ├── pkg/                      # 对外公开接口
-│   ├── event/               # Event 定义（对外共享）
-│   │   ├── event.go
-│   │   └── topic.go
-│   └── client/              # SDK（可选）
+│   └── event/               # Event 定义
 │
 ├── types/                    # 核心类型定义
 ├── config/                   # 配置管理
-├── database/                 # 数据库
 ├── auth/                     # 认证系统
-├── tools/                    # 工具定义
-└── toolruntime/              # 工具运行时
+├── tools/                    # 工具定义和执行
+│   ├── registry.go
+│   ├── tool.go
+│   ├── skill/
+│   └── node/
+│
+└── skills/                   # Skill 定义文件（SKILL.md）
+    ├── code-review/
+    ├── commit-conventions/
+    ├── humanizer-zh/
+    └── weather/
 ```
 
 ### 8.3 目录说明
@@ -767,18 +802,20 @@ backend/
 - 对外公开的类型和 SDK
 - 其他项目可以安全导入
 
-**进程拆分建议：**
+**进程拆分阶段：**
 
 ```bash
-# Phase 1（当前）：单进程
-cmd/singer/               # 主服务
+# Phase 1.5（当前实际）：单进程 Server+Worker+Orchestrator
+cmd/singer/               # 主服务（包含所有功能）
 
-# Phase 2：分离执行节点
+# Phase 2（计划）：分离 Worker 进程
+cmd/singer/               # 拆分为 server.go 和 worker.go
+                          # 通过启动参数区分 Server/Worker 模式
+
+# Phase 3（远期）：独立进程部署
 cmd/server/               # API 服务
 cmd/worker/               # 执行节点
-
-# Phase 3：分离连接器
-cmd/connector/            # 连接器进程
+cmd/connector/            # 连接器进程（可选）
 ```
 
 ## 9. 技术栈
@@ -796,13 +833,22 @@ cmd/connector/            # 连接器进程
 
 ## 10. 架构演进路径
 
-### Phase 1（当前）
+### Phase 1.5（当前实际）
+
+* 单运行时（Server + Worker + Orchestrator 单进程）
+* GitHub 自动化闭环（Webhook → Event → Agent）
+* 基础 Event Bus（NATS JetStream）
+* Connector 层完成（GitHub/GitLab/WeWork）
+* Agent Runtime 完整实现（SimpleChat + Eino）
+* ⚠️ Event Engine 与 Execution Engine **未完全分离**（Phase 2）
+
+### Phase 1（原始计划）
 
 * 单运行时
 * GitHub 自动化闭环
 * 基础 Event Bus
 * Connector 层完成
-* Event Engine 与 Execution Engine 分离
+* ~~Event Engine 与 Execution Engine 分离~~ → 延期至 Phase 2
 
 ### Phase 2
 
@@ -831,13 +877,23 @@ cmd/connector/            # 连接器进程
 
 ## 11. 附录：架构演进历史
 
+### v3.1.1 (2026-04-27) - 架构实现状态更新
+
+更新 **当前实现状态** 与 **计划架构** 的差异说明：
+
+- ⚠️ Event Engine：Orchestrator 已实现，但 Router 未独立、Handler 未插件化（Phase 2）
+- ⚠️ Execution Engine：尚未独立实现，执行逻辑在 Orchestrator 中（Phase 2）
+- ✅ Agent Runtime：完整实现（SimpleChat + Eino + Session 上下文）
+- ✅ API 层：契约驱动服务架构（handler/dto/contract/middleware）
+- ✅ Skill System：Registry 化完成，SKILL.md 在 `backend/skills/` 目录
+
 ### v3.1 (2026-04-23) - Go 包结构优化
 
 引入 **领域驱动设计** 和 **强制隔离** 原则：
 
 - ✅ 使用 `internal/` 实现核心代码隔离
 - ✅ 使用 `pkg/` 对外公开接口
-- ✅ Event Engine Handler 插件化
+- 🔄 Event Engine Handler 插件化（Phase 2 计划）
 - ✅ Skill Registry 化
 - ✅ 接口优先设计（每层定义 interface）
 

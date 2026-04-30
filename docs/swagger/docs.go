@@ -52,6 +52,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
@@ -94,6 +100,24 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "权限不足",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
                         "schema": {
                             "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
                         }
@@ -144,6 +168,24 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "权限不足",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
@@ -186,6 +228,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
                         "schema": {
                             "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
                         }
@@ -236,6 +284,24 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "权限不足",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
@@ -282,6 +348,24 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "权限不足",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
@@ -324,6 +408,24 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "权限不足",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
                         "schema": {
                             "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
                         }

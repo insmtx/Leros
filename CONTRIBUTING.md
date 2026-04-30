@@ -4,7 +4,7 @@
 
 ## 🔍 行为准则
 
-参与本项目即表示你同意遵守我们的[行为准则](CODE_OF_CONDUCT.md)。我们承诺共同营造开放、友好的协作环境。
+参与本项目即表示你同意遵守行为准则。我们承诺共同营造开放、友好的协作环境。
 
 ## 🎯 贡献类型
 
@@ -26,32 +26,38 @@
 - 编写指南和教程
 - 改进 API 文档
 
-## 🚀 快速开始
+## 🛠️ 开发贡献
 
-1. Fork 本仓库
-2. 为你的功能或修复创建新分支
-3. 完成代码修改
-4. 运行测试并确保功能正常
-5. 提交 Pull Request
+### 1. Fork 仓库
 
-## 📦 项目结构
+访问 [SingerOS GitHub 仓库](https://github.com/insmtx/SingerOS) 并点击右上角的 "Fork" 按钮，创建你自己的派生仓库。
 
-```text
-singeros/
-├── control-plane/     # 治理与管理组件
-├── data-plane/        # 运行时执行组件
-├── plugins/           # 插件架构
-└── infrastructure/    # 基础设施层
+### 2. 克隆仓库
+
+```bash
+git clone https://github.com/insmtx/SingerOS.git
+cd SingerOS
 ```
 
-## 🧪 测试
+### 3. 创建功能分支
 
-提交贡献前请确认：
-1. 运行现有测试，确保没有引入回归
-2. 如有必要，为你的改动补充测试
-3. 确保所有测试通过
+```bash
+git checkout -b feat/your-feature-name
+```
 
-### 运行测试
+分支命名规范：
+- `feat/` - 新功能
+- `fix/` - 缺陷修复
+- `docs/` - 文档更新
+- `refactor/` - 代码重构
+- `test/` - 测试相关
+
+### 4. 完成代码修改
+
+按照[代码规范](#-代码规范)进行开发。
+
+### 5. 运行测试
+
 ```bash
 # 运行全部测试
 make test
@@ -59,6 +65,44 @@ make test
 # 运行带覆盖率的测试
 make test-cover
 ```
+
+### 6. 提交更改
+
+```bash
+git add .
+git commit -m "feat(scope): your changes"
+git push origin feat/your-feature-name
+```
+
+### 7. 提交 Pull Request
+
+1. 访问 [SingerOS 仓库](https://github.com/insmtx/SingerOS)
+2. 点击 "Pull requests" 标签
+3. 点击 "New pull request"
+4. 选择 "Compare across forks"
+5. 选择你的派生仓库和功能分支
+6. 填写 PR 标题和描述
+7. 提交 PR
+
+## 📋 提交 Issue
+
+### 报告缺陷
+
+访问 [Issues](https://github.com/insmtx/SingerOS/issues/new) 提交缺陷报告，请包含：
+
+1. **详细描述问题现象**
+2. **提供复现步骤**
+3. **说明系统或环境信息**（Go 版本、操作系统等）
+4. **附上相关日志或截图**
+
+### 功能建议
+
+访问 [Issues](https://github.com/insmtx/SingerOS/issues/new) 提出新功能建议，请说明：
+
+1. **功能描述** - 你想要实现什么
+2. **使用场景** - 为什么需要这个功能
+3. **预期行为** - 功能应该如何工作
+4. **替代方案** - 是否考虑过其他解决方案
 
 ## 📝 代码规范
 
@@ -88,7 +132,7 @@ make test-cover
 
 ## 🐛 缺陷报告
 
-提交缺陷报告时，请尽量包含：
+提交缺陷报告时，请访问 [Issues](https://github.com/insmtx/SingerOS/issues) 并尽量包含：
 
 1. **详细描述问题现象**
 2. **提供复现步骤**
@@ -117,7 +161,7 @@ make test-cover
 
 ## 📬 联系方式
 
-- GitHub Discussions: [讨论区链接]
-- Email: [如适用请填写联系邮箱]
+- GitHub Issues: [https://github.com/insmtx/SingerOS/issues](https://github.com/insmtx/SingerOS/issues)
+- GitHub Discussions: [https://github.com/insmtx/SingerOS/discussions](https://github.com/insmtx/SingerOS/discussions)
 
 感谢你为 SingerOS 做出贡献！ 🐶

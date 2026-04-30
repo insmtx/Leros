@@ -68,94 +68,113 @@ SingerOS 采用**契约驱动的服务架构**，而不是：
 backend/
 │
 ├── cmd/
-│   └── singer/                # 主后端服务（HTTP + 事件网关）
-│       └── main.go
+│   └── singer/                # 主后端服务（Phase 1.5: Server+Orchestrator 单进程）
+│       ├── main.go            # 主入口
+│       ├── server.go          # Server 启动逻辑
+│       └── worker.go          # Worker stub（Phase 2 完善）
 │
 ├── internal/                  # 私有核心代码（强制隔离）
 │
-│   ├── api/                   # HTTP 适配层
+│   ├── api/                   # HTTP 适配层（契约驱动服务架构）✅
 │   │   ├── handler/
-│   │   │   ├── event_handler.go
-│   │   │   ├── agent_handler.go
-│   │   │   └── session_handler.go
+│   │   │   ├── digital_assistant_handler.go  # 数字员工 handler
+│   │   │   └── [待定]
 │   │   ├── dto/
-│   │   │   ├── event.go
-│   │   │   ├── agent.go
-│   │   │   └── session.go
+│   │   │   ├── digital_assistant.go          # 数字员工 DTO
+│   │   │   ├── code.go
+│   │   │   └── response.go
 │   │   ├── contract/          # ⭐ 系统能力定义（核心）
-│   │   │   ├── event.go
-│   │   │   ├── task.go
-│   │   │   ├── agent.go
-│   │   │   └── session.go
+│   │   │   ├── digital_assistant.go          # 数字员工契约
+│   │   │   ├── digital_assistant_type.go
+│   │   │   ├── account_third_auth.go
+│   │   │   └── account_third_auth_type.go
+│   │   ├── middleware/        # HTTP 中间件
+│   │   │   ├── identify.go
+│   │   │   └── request_context.go
 │   │   └── router.go          # 路由注册
-
+│
+│   ├── eventengine/           # ⭐ 事件引擎（Phase 1.5 已实现）⚠️
+│   │   └── orchestrator.go    # Orchestrator（内联 Router + Handler map）
+│   │                          # 当前：Router 未独立，Handler 未插件化
+│   │                          # Phase 2 计划：拆分为 engine.go / registry.go / builtins/
 │   │
-│   ├── eventengine/           # ⭐ 事件引擎
-│   │   ├── engine.go              # Event Engine 核心
-│   │   ├── router.go              # 事件路由
-│   │   ├── registry.go            # Handler 注册中心
-│   │   └── builtins/              # 内置事件处理器
+│   ├── execution/             # ⭐ 执行引擎（Phase 2 计划中）
+│   │   └── [待实现]           # 当前 Execution 逻辑在 orchestrator.go 中
 │   │
-│   ├── execution/             # ⭐ 执行引擎
-│   │   ├── engine.go              # Execution Engine 核心
-│   │   ├── dispatcher.go          # 调度器
-│   │   ├── executor.go            # 执行器接口
-│   │   ├── context/               # 执行上下文
-│   │   └── retry.go               # 重试控制
+│   ├── agent/                 # ⭐ Agent Runtime（Phase 1.5 已实现）✅
+│   │   ├── runtime.go         # Agent Runtime 接口
+│   │   ├── agent.go           # Agent 核心实现
+│   │   ├── types.go           # 类型定义（RequestContext, RunResult）
+│   │   ├── config.go          # 配置管理
+│   │   ├── state.go           # 状态管理
+│   │   ├── skills_prompt.go   # Skills Prompt 注入
+│   │   ├── simplechat/        # SimpleChat 实现
+│   │   │   ├── simplechat.go
+│   │   │   └── console.go
+│   │   ├── eino/              # Eino 具体实现
+│   │   │   ├── chatmodel.go   # ChatModel 适配
+│   │   │   ├── flow.go        # Flow 编排
+│   │   │   ├── tool_adapter.go # Tool 适配器
+│   │   │   └── flow_test.go
+│   │   └── events/            # Agent 事件系统
+│   │       ├── events.go
+│   │       ├── emitter.go
+│   │       ├── event_sink.go
+│   │       ├── event_sink_impl.go
+│   │       └── log_sink.go
 │   │
-│   ├── agent/                 # ⭐ Agent Runtime
-│   │   ├── runtime.go             # Agent Runtime 接口
-│   │   ├── lifecycle.go           # 生命周期管理
-│   │   ├── context.go             # 上下文管理
-│   │   └── eino/                  # Eino 具体实现
+│   ├── service/               # ⭐ 业务逻辑层（直接操作 DB）✅
+│   │   ├── digital_assistant_service.go
+│   │   └── utils.go
 │   │
-│   ├── skill/                 # ⭐ Skill 体系
-│   │   ├── registry.go            # Skill 注册中心
-│   │   ├── executor.go            # Skill 执行器
-│   │   ├── base_skill.go          # 基础 Skill
-│   │   └── builtin/               # 内置技能
+│   ├── worker/                # Worker 进程（Phase 1.5 stub）⚠️
+│   │   ├── worker.go          # Worker 逻辑（待完善）
+│   │   ├── server/
+│   │   │   └── server.go
+│   │   └── client/
+│   │       ├── worker.go
+│   │       └── ws_client.go
 │   │
-│   ├── service/               # ⭐ 业务逻辑层（直接操作 DB）
-│   │   ├── event_service.go
-│   │   ├── agent_service.go
-│   │   └── session_service.go
+│   ├── infra/                 # 基础设施 ✅
+│   │   ├── mq/                # 消息队列（NATS JetStream）
+│   │   │   ├── nats.go
+│   │   │   ├── bus.go
+│   │   │   └── std.go
+│   │   ├── db/                # 数据库访问
+│   │   │   ├── database.go
+│   │   │   └── digital_assistant_dao.go
+│   │   ├── providers/         # 第三方服务 Provider
+│   │   │   └── github/
+│   │   │       ├── client_factory.go
+│   │   │       ├── oauth_provider.go
+│   │   │       └── resolvers.go
+│   │   └── websocket/         # WebSocket 支持
+│   │       ├── connector.go
+│   │       ├── manager.go
+│   │       └── types.go
 │   │
-│   ├── db/                    # 数据访问层
-│   │   ├── client.go              # GORM client
-│   │   ├── event_repo.go          # 直接 DB 操作
-│   │   ├── agent_repo.go
-│   │   └── model/                 # 数据库模型
-│   │       ├── event_model.go
-│   │       └── agent_model.go
-│   │
-│   ├── convert/               # 结构转换层
-│   │   ├── event_convert.go
-│   │   └── agent_convert.go
-│   │
-│   ├── wire/                  # 依赖组装层
-│   │   ├── event_wire.go
-│   │   └── agent_wire.go
-│   │
-│   ├── connectors/            # 外部接入
-│   │   ├── connector.go
-│   │   ├── github/
-│   │   ├── gitlab/
-│   │   └── wework/
-│   │
-│   └── infra/                 # 基础设施
-│       ├── mq/                    # 消息队列（NATS）
-│       ├── db/                    # 数据库连接
-│       └── logger/                # 日志
+│   └── connectors/            # 连接器（已迁移至 api/connectors）⚠️
+│       └── connector.go       # Connector 接口
 │
 ├── pkg/                       # 对外公开接口
-│   ├── event/                 # Event 定义
-│   ├── client/                # SDK
-│   └── types/                 # 公开类型
+│   └── event/                 # Event 定义
+│       └── topic.go
 │
 ├── types/                     # 核心类型定义
 ├── config/                    # 配置管理
 ├── auth/                      # 认证系统
-└── skills/                    # 技能体系（旧版，逐步迁移）
+├── database/                  # 数据库连接（已迁移至 infra/db）
+├── tools/                     # 工具定义和执行 ✅
+│   ├── registry.go            # Tool 注册中心
+│   ├── tool.go                # Tool 接口定义
+│   ├── skill/                 # Skill 工具实现
+│   └── node/                  # Node.js 工具运行时
+│
+└── skills/                    # Skill 定义文件（SKILL.md）✅
+    ├── code-review/
+    ├── commit-conventions/
+    ├── humanizer-zh/
+    └── weather/
 ```
 
 ## 4. 核心模块说明
@@ -624,24 +643,45 @@ type StreamPayload struct {
 
 ### 5.2 推荐的进程拆分方案
 
-#### Phase 1（当前）：单进程
+#### Phase 1.5（当前实际）：单进程 Server+Worker+Orchestrator
 
 ```bash
-cmd/singer/               # 主服务（所有功能）
+cmd/singer/               # 主服务（所有功能：Server + Worker + Orchestrator）
 ```
 
-#### Phase 2：分离执行节点
+**特点：**
+
+- Server 和 Worker 在同一进程中运行
+- Orchestrator 在 Server 端运行（而非独立 Worker）
+- 简化部署和开发
+- 适合 MVP 阶段
+
+#### Phase 2（计划）：分离 Worker 进程逻辑
+
+```bash
+cmd/singer/               # 通过启动参数区分模式
+                          # --mode=server   API 服务
+                          # --mode=worker   执行节点
+```
+
+**特点：**
+
+- 逻辑分离，但仍在同一二进制文件
+- 通过配置或启动参数区分角色
+- Worker 开始承担 Execution Engine 职责
+
+#### Phase 3（远期）：独立进程部署
 
 ```bash
 cmd/server/               # API 服务（HTTP + Event Engine）
 cmd/worker/               # 执行节点（Execution Engine + Agent Runtime）
 ```
 
-#### Phase 3：分离连接器
+**特点：**
 
-```bash
-cmd/connector/            # 连接器进程（Connectors + Event Bus Publisher）
-```
+- 完全独立的进程
+- 可独立扩缩容
+- 故障隔离
 
 ### 5.3 进程间通信
 
@@ -696,7 +736,7 @@ Database
 | ❌ 错误做法                            | ✅ 正确做法                               |
 | -------------------------------------- | ----------------------------------------- |
 | 把所有逻辑写进 Event Handler           | Handler → 调用 contract.Service           |
-| Event Handler 使用 `switch` 硬编码路由 | Router 独立 + Handler 插件化              |
+| Event Handler 使用 `switch` 硬编码路由 | Router 独立 + Handler 插件化（Phase 2）   |
 | Agent Runtime 直接调 MQ / DB           | 通过 contract.AgentService                |
 | Skill 写死在代码中                     | 必须 Registry 化，支持动态注册            |
 | 按技术分层（controller/service/model） | 按领域分层（contract/handler/service/db） |
@@ -721,22 +761,22 @@ Database
 
 ### 立即可做（低成本高收益）
 
-1. 创建 `internal/` 目录结构
-2. 移动现有代码到对应领域目录
-3. 定义各层 interface
-4. Event Engine Handler 插件化
+1. ✅ 创建 `internal/` 目录结构（已完成）
+2. ✅ 移动现有代码到对应领域目录（已完成）
+3. ✅ 定义各层 interface（API 层已完成）
+4. 🔄 Event Engine Handler 插件化（Phase 2 计划）
 
-### 中期优化
+### 中期优化（Phase 2）
 
-1. 实现 Execution Engine 的重试/超时控制
-2. 完善 Skill Registry
-3. 添加 Policy Engine 基础框架
+1. 🔄 实现 Execution Engine 的重试/超时控制
+2. 🔄 完善 Skill Registry（统一至 internal/skill/）
+3. 🔄 添加 Policy Engine 基础框架
 
 ### 长期规划
 
-1. 进程拆分（Server / Worker / Connector）
-2. 分布式部署
-3. 水平扩展
+1. 🔄 进程拆分（Server / Worker 逻辑分离）
+2. 🔄 分布式部署
+3. 🔄 水平扩展
 
 ## 9. 总结
 
@@ -761,3 +801,20 @@ Contract-driven Service Architecture
 - **convert 保持隔离** - DTO ↔ Command ↔ Model
 - **wire 组装依赖** - 避免 main 爆炸
 - **无 Repository 抽象** - service 直接调用 db
+
+**当前实现状态（Phase 1.5）：**
+
+- ✅ API 层完整实现（契约驱动服务架构）
+- ✅ Agent Runtime 完整实现（SimpleChat + Eino + Session 上下文）
+- ⚠️ Event Engine 部分实现（Orchestrator 已实现，Router/Execution Engine 待完善）
+- ⚠️ Worker 进程 stub 实现（Phase 2 完善）
+
+**架构演进路径：**
+
+```
+Phase 1.5（当前）: Server + Worker + Orchestrator 单进程
+    ↓
+Phase 2（计划）: Execution Engine 独立 + Event Engine 完善 + Worker 逻辑分离
+    ↓
+Phase 3（远期）: 独立进程部署（Server / Worker）
+```

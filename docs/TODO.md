@@ -238,7 +238,6 @@
 
 ### 不允许做的事情
 
-- ❌ 不要一开始搞Skill Proxy远程化
 - ❌ 不要设计复杂Agent（Plan/Reflect）
 - ❌ 不要做Memory系统（短期除外）
 - ❌ 不要做多租户

@@ -14,7 +14,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U singer_user -d singer_db"]
+      test: ["CMD", "pg_isready -U singer_user -d singer_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,10 +30,11 @@ services:
     volumes:
       - nats_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "nats server check"]
-      interval: 10s
+      test: ["CMD", "/nats-server", "--help"]
+      interval: 30s
       timeout: 5s
-      retries: 5
+      retries: 3
+      start_period: 5s
 
   redis:
     image: registry.yygu.cn/library/redis:8.2
@@ -49,9 +50,7 @@ services:
       retries: 3
 
   singer:
-    build:
-      context: ../..
-      dockerfile: deployments/build/Dockerfile.singer
+    image: localhost/env_singer:latest
     container_name: singer-app
     ports:
       - "8080:8080"
@@ -69,7 +68,26 @@ services:
       - GIN_MODE=release
     volumes:
       - ./config.yaml:/app/config.yaml
-    command: ["./singer", "--config", "/app/config.yaml"]
+    command: ["server", "--config", "/app/config.yaml"]
+    restart: unless-stopped
+
+  worker:
+    image: localhost/env_singer:latest
+    container_name: singer-worker
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://singer_user:singer_password@postgresql:5432/singer_db
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    command: ["worker", "--config", "/app/config.yaml"]
     restart: unless-stopped
 
 volumes:
