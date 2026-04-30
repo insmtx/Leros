@@ -1,0 +1,8 @@
+{
+  "name": "@singeros/biome",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    "./biome.json": "./biome.json"
+  }
+}

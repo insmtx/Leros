@@ -6,18 +6,18 @@
 
 | 类别 | 技术 | 版本 |
 |------|------|------|
-| 框架 | React | 19.x |
-| 语言 | TypeScript | 5.x (ES2020 target) |
-| 构建 | Vite 7 + @vitejs/plugin-react-swc | SWC 编译器 |
-| 样式 | TailwindCSS 4 + PostCSS | v4 新架构 |
+| 框架 | React | 19.2.3 |
+| 语言 | TypeScript | ^5.9.3 |
+| 包管理 | pnpm + Turborepo | pnpm@10 / turbo@2.5 |
+| Web 构建 | Next.js 16 + TailwindCSS 4 | App Router + PostCSS |
+| Desktop 构建 | Electron 39 + electron-vite + Vite 8 | CSR + @tailwindcss/vite |
 | 状态管理 | Zustand 5 (traditional + middleware) | subscribeWithSelector + devtools |
 | UI 基础 | @base-ui/react (无样式原语) | v1.x |
 | 变体系统 | class-variance-authority (CVA) | v0.7 |
 | CSS 合并 | clsx + tailwind-merge | cn() 工具函数 |
-| 图标 | @tabler/icons-react | v3.x |
-| 包管理 | Bun | lockb 格式 |
-| 代码检查 | Biome 2 (替代 ESLint + Prettier) | formatter + linter |
+| 代码检查 | Biome 2 (替代 ESLint + Prettier) | formatter + linter (共享配置) |
 | 测试 | Vitest 4 | --coverage 支持 |
+| 依赖版本 | pnpm catalog | 统一 React/TS/Tailwind 版本 |
 
 ## 文档索引
 
@@ -35,89 +35,145 @@
 
 ```
 frontend/
-├── index.html              # 入口 HTML (root 挂载点)
-├── vite.config.ts          # Vite 配置 (@ alias, react-swc, 代理)
-├── tsconfig.json           # TS 配置 (strict, @/* paths)
-├── biome.json              # Biome lint + format 配置
-├── package.json            # 依赖与脚本
-├── bun.lockb               # Bun 锁文件
-├── public/                 # 静态资源 (不经过构建)
-│
-└── src/
-    ├── main.tsx            # React 入口 (StrictMode 渲染 + Chunk 过期刷新)
-    ├── App.tsx             # 根组件 (→ Shell/Router)
-    ├── index.css           # 全局样式 (@import tailwindcss + @theme)
-    │
-    ├── api/                # API 层（按业务模块拆分，19 个模块）
-    ├── router/             # 路由层（路由定义 + 守卫 + 动态路由 + 菜单配置）
-    ├── pages/              # 页面视图（30 个业务模块）
-    ├── components/         # UI 组件（layout + ui + business + ai-float）
-    ├── store/              # Zustand 状态管理（11 个 Slice）
-    ├── hooks/              # 自定义 React Hooks（10 个）
-    ├── lib/                # 基础库（request + sse + websocket + utils）
-    ├── types/              # 类型定义
-    └── assets/             # 静态资源（icons + styles + brand）
+├── apps/                          # 应用入口
+│   ├── web/                       # @singeros/web — Next.js Web 应用
+│   │   ├── app/                   # App Router 页面 (layout + page + globals.css)
+│   │   ├── components/            # Web 业务组件 (chat/input/layout)
+│   │   ├── next.config.ts         # transpilePackages 配置
+│   │   └── tsconfig.json
+│   │
+│   └── desktop/                   # @singeros/desktop — Electron 桌面应用
+│   │   ├── src/
+│   │   │   ├── main/              # Electron 主进程
+│   │   │   ├── preload/           # Preload 脚本
+│   │   │   └── renderer/          # React 渲染进程 (BrowserRouter + routes)
+│   │   ├── electron.vite.config.ts
+│   │   ├── electron-builder.yml   # 打包配置 (dmg/nsis/AppImage)
+│   │   └── tsconfig.web.json / tsconfig.node.json
+│   │
+├── packages/                      # 共享包
+│   ├── ui/                        # @singeros/ui — UI 组件库 + Hooks + 工具库
+│   │   ├── components/            # ui/ (54 原语) + common/ (theme-provider)
+│   │   ├── hooks/                 # use-mobile, use-sse, use-websocket
+│   │   ├── lib/                   # request, sse, websocket, utils
+│   │   ├── styles/                # tokens.css, base.css (设计系统)
+│   │   └── package.json           # 细粒度 exports 路径映射
+│   │
+│   ├── store/                     # @singeros/store — Zustand 状态管理
+│   │   ├── appStore.ts            # 合并 layoutSlice + topicSlice + chatSlice
+│   │   ├── slices/                # layout / topic / chat 状态切片
+│   │   ├── types/                 # api.ts, chat.ts 领域类型
+│   │   ├── mocks/                 # chatMocks, streamSimulator
+│   │   ├── utils/                 # flattenActions, format
+│   │   └── package.json           # 导出路径映射 (含子路径类型导出)
+│   │
+│   ├── tsconfig/                  # @singeros/tsconfig — 共享 TS 配置
+│   │   ├── base.json              # strict, ESNext, bundler
+│   │   ├── next.json              # Next.js 专用
+│   │   └── react-library.json     # React 库专用
+│   │
+│   ├── biome/                     # @singeros/biome — 共享 lint 配置
+│   │   └── biome.json             # recommended + 自定义规则
+│   │
+├── pnpm-workspace.yaml            # 工作空间 + catalog 版本锁定
+├── turbo.json                     # Turborepo 任务 (build/dev/typecheck/test/lint)
+├── package.json                   # monorepo 根脚本
+├── biome.json                     # extends @singeros/biome
+├── .npmrc                         # shamefully-hoist + no-strict-peer
+└── .gitignore
 ```
 
 ## 架构分层概览
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                    Pages (页面视图)                    │
-│  30 个业务模块页面，按功能领域组织                        │
-├──────────────────────────────────────────────────────┤
-│               Layouts (布局框架)                       │
-│  Shell（三栏布局）/ BasicLayout（侧边栏+头部+内容）       │
-│  BlankLayout（独立全屏页）                              │
-├──────────────────────────────────────────────────────┤
-│            Components (公共组件)                       │
-│  business 业务组件库 · ai-float · DockerTerminal        │
-│  ui 原语包装组件 (56个)                                 │
-├──────────────────────────────────────────────────────┤
-│            Hooks (可复用逻辑)                           │
-│  useCrudPage · useDialogForm · useInlineAi             │
-│  useWebSocket · useNotification · useAiFloat           │
-├──────────────────────────────────────────────────────┤
-│            Store (Zustand Slice 模式)                  │
-│  layout · topic · user · appSettings · plugin          │
-│  notification · tabs · config · activeTasks │
-├──────────────────────────────────────────────────────┤
-│            Router (路由 + 守卫)                        │
-│  鉴权守卫 · 角色守卫 · 插件动态路由                      │
-├──────────────────────────────────────────────────────┤
-│             API (HTTP + SSE 接口)                     │
-│  19 个模块 API · HttpClient · SSE EventSource         │
-├──────────────────────────────────────────────────────┤
-│              Lib (基础库)                              │
-│  request.ts · sse.ts · websocket.ts · utils.ts        │
-├──────────────────────────────────────────────────────┤
-│           @base-ui/react (无样式原语)                   │
-│  CVA 变体系统 + cn() 工具函数 + TailwindCSS             │
-└──────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                Apps (双端应用)                             │
+│  @singeros/web (Next.js)    @singeros/desktop (Electron) │
+├──────────────────────────────────────────────────────────┤
+│              Packages (共享层)                              │
+│  @singeros/ui (组件+Hooks+工具库)   @singeros/store (状态) │
+│  @singeros/tsconfig (TS配置)  @singeros/biome (Lint配置)   │
+├──────────────────────────────────────────────────────────┤
+│               App 组件 (各端业务)                           │
+│  chat (气泡+时间轴) · input (输入框) · layout (Shell布局)  │
+├──────────────────────────────────────────────────────────┤
+│               Store (Zustand Slice 模式)                  │
+│  layout · topic · chat  (合并为 AppStore)                │
+├──────────────────────────────────────────────────────────┤
+│               UI 原语 (54个基础组件)                       │
+│  button · dialog · sheet · tabs · command · etc.         │
+├──────────────────────────────────────────────────────────┤
+│               Hooks + Lib (共享逻辑)                       │
+│  use-mobile · use-sse · use-websocket                    │
+│  request · sse · websocket · utils                       │
+├──────────────────────────────────────────────────────────┤
+│         @base-ui/react + CVA + TailwindCSS 4              │
+│  cn() 工具函数  ·  components.json (shadcn)              │
+└──────────────────────────────────────────────────────────┘
+```
+
+## 双端架构差异
+
+| 维度 | Web (@singeros/web) | Desktop (@singeros/desktop) |
+|------|---------------------|----------------------------|
+| 框架 | Next.js 16 (App Router) | Electron 39 + React SPA |
+| 路由 | `app/` 目录约定 | react-router-dom BrowserRouter |
+| 入口 | `layout.tsx` + `page.tsx` | `App.tsx` + `routes.tsx` |
+| 构建 | Next.js build (SSR+CSR) | electron-vite build (CSR) |
+| 样式引擎 | @tailwindcss/postcss | @tailwindcss/vite |
+| 开发端口 | 3005 | 5175 (renderer) |
+| 构建产物 | `.next/` | `out/` + `build/` |
+| 打包 | 无 | electron-builder (dmg/nsis/AppImage) |
+
+### Next.js 转译配置
+
+Web 应用需显式配置 `transpilePackages` 以正确引用 workspace 包：
+
+```ts
+// apps/web/next.config.ts
+const nextConfig: NextConfig = {
+  transpilePackages: ["@singeros/ui", "@singeros/store"],
+};
+```
+
+### Electron-Vite React 去重
+
+Desktop 渲染进程需 `dedupe` 配置避免 React 双实例：
+
+```ts
+// apps/desktop/electron.vite.config.ts
+renderer: {
+  resolve: {
+    dedupe: ["react", "react-dom"],
+  },
+}
 ```
 
 ## 快速导航
 
-### 入口层
+### Web 入口层
 
-`main.tsx` → `App.tsx` → Router → Shell / BasicLayout / BlankLayout
+`app/layout.tsx` (RootLayout) → `app/page.tsx` (→ Shell)
 
-- 渲染在 `#root` 挂载点，启用 `React.StrictMode`
-- Chunk 过期自动刷新: 监听 `vite:preloadError` → `sessionStorage` 标记 + `reload()`
+- ThemeProvider + Toaster 包裹全局
+- Next.js App Router 自动处理路由
+
+### Desktop 入口层
+
+`main/index.ts` (Electron 主进程) → `preload/index.ts` → `renderer/src/main.tsx` → `App.tsx` → `routes.tsx` (→ Shell)
+
+- BrowserRouter + ThemeProvider + Toaster 包裹渲染进程
+- Electron 主进程通过 `electron-vite` 管理
 
 ### 页面模块分类
 
 | 分类 | 模块 |
 |------|------|
-| 核心工作 | overview, chat, workspace |
-| 开发集成 | jenkins |
-| AI 能力 | ai-employees, ai-config, skills |
-| 知识与报表 | knowledge, reports |
-| 运维管理 | schedules, remote-nodes, logs, upgrade |
-| 系统配置 | plugins, marketplace, channels, contacts, agents, webhooks |
-| 用户 | login, profile, notifications, exception |
+| 核心 | Shell (布局), ChatHeader, MessageTimeline, ChatInput |
+| 布局 | LeftRail, ConversationListPanel, CenterCanvas, TopBar |
+| 组件 | UserMessageBubble, AIMessageBubble, ToolCallBlock, TypingIndicator |
 
 ## 相关文档
 
-- [后端架构文档](../../backend/ARCHITECTURE.md)
+- [前端 Monorepo README](../../frontend/README.md)
 - [布局风格设计](./Orbita_Layout_Arch.md)

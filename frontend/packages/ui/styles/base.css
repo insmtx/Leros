@@ -1,0 +1,30 @@
+@layer base {
+	* {
+		@apply outline-ring/50;
+		scrollbar-width: thin;
+		scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+	}
+	.border {
+		@apply border-border;
+	}
+	*::-webkit-scrollbar {
+		width: 6px;
+		height: 6px;
+	}
+	*::-webkit-scrollbar-track {
+		background: var(--scrollbar-track);
+	}
+	*::-webkit-scrollbar-thumb {
+		background: var(--scrollbar-thumb);
+		border-radius: 3px;
+	}
+	*::-webkit-scrollbar-thumb:hover {
+		background: var(--scrollbar-thumb-hover);
+	}
+	body {
+		@apply bg-background text-foreground;
+	}
+	html {
+		@apply font-sans;
+	}
+}

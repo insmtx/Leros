@@ -1,0 +1,16 @@
+{
+  "extends": "./base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "plugins": [{ "name": "next" }],
+    "noEmit": true,
+    "allowJs": true,
+    "incremental": true,
+    "paths": {
+      "@/*": ["./*"]
+    }
+  }
+}

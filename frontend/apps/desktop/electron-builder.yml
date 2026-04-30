@@ -1,0 +1,21 @@
+appId: com.singeros.desktop
+productName: SingerOSDesktop
+directories:
+  buildResources: build
+files:
+  - "!**/.vscode/*"
+  - "!src/*"
+  - "!electron.vite.config.*"
+  - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
+asarUnpack:
+  - resources/**
+mac:
+  target:
+    - dmg
+win:
+  target:
+    - nsis
+linux:
+  target:
+    - AppImage
+npmRebuild: false

@@ -1,41 +1,4 @@
 {
-  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "space"
-  },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true,
-      "correctness": {
-        "noUndeclaredVariables": "error",
-        "noUnusedVariables": "error",
-        "useHookAtTopLevel": "error"
-      },
-      "style": {
-        "noNamespace": "error"
-      },
-      "suspicious": {
-        "noEmptyBlockStatements": "error"
-      }
-    }
-  },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "single"
-    }
-  },
-  "css": {
-    "parser": {
-      "cssModules": false,
-      "tailwindDirectives": true
-    }
-  },
-  "vcs": {
-    "enabled": true,
-    "clientKind": "git",
-    "useIgnoreFile": true,
-    "defaultBranch": "main"
-  }
+  "$schema": "https://biomejs.dev/schemas/2.4.13/schema.json",
+  "extends": ["@singeros/biome/biome.json"]
 }

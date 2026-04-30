@@ -1,44 +1,26 @@
 {
-  "name": "vite-react-modern-starter",
+  "name": "singeros-frontend",
+  "version": "0.1.0",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "check": "biome check . --write",
-    "preview": "vite preview",
-    "test": "vitest",
-    "coverage": "vitest run --coverage"
+    "dev:web": "turbo dev --filter=@singeros/web",
+    "dev:desktop": "turbo dev --filter=@singeros/desktop",
+    "build": "turbo build",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "lint": "turbo lint",
+    "clean": "turbo clean && rm -rf node_modules",
+    "ui:add": "cd packages/ui && npx shadcn@latest add"
   },
-  "dependencies": {
-    "@base-ui/react": "^1.2.0",
-    "@tabler/icons-react": "^3.40.0",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
-    "tailwind-merge": "^3.5.0",
-    "zustand": "^5.0.11"
+  "packageManager": "pnpm@10.28.2",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "electron"]
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.7",
-    "@tailwindcss/postcss": "^4.1.17",
-    "@types/react": "^19.2.6",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react-swc": "^4.2.2",
-    "autoprefixer": "^10.4.22",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.17",
-    "typescript": "^5.9.3",
-    "vite": "^7.2.4",
-    "vitest": "^4.0.13"
-  },
-  "trustedDependencies": [
-    "@biomejs/biome",
-    "@swc/core",
-    "esbuild"
-  ]
+    "@singeros/biome": "workspace:*",
+    "turbo": "^2.5.4",
+    "typescript": "catalog:"
+  }
 }
