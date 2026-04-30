@@ -1,0 +1,30 @@
+{
+  "name": "@singeros/store",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ."
+  },
+  "exports": {
+    ".": "./index.ts",
+    "./types/chat": "./types/chat.ts",
+    "./types/layout": "./types/layout.ts",
+    "./types/topic": "./types/topic.ts"
+  },
+  "dependencies": {
+    "zustand": "^5.0.11",
+    "@singeros/ui": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@singeros/tsconfig": "workspace:*",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:"
+  }
+}

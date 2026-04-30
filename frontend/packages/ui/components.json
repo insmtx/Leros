@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "base-nova",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "styles/tokens.css",
+    "baseColor": "zinc",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@singeros/ui/components",
+    "ui": "@singeros/ui/components/ui",
+    "hooks": "@singeros/ui/hooks",
+    "lib": "@singeros/ui/lib",
+    "utils": "@singeros/ui/lib/utils"
+  }
+}
