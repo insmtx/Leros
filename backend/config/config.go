@@ -22,6 +22,14 @@ type CLIEnginesConfig struct {
 	Default string `yaml:"default,omitempty" json:"default,omitempty"`
 }
 
+// WorkerConfig is the configuration for a standalone task worker process.
+type WorkerConfig struct {
+	OrgID       string `yaml:"org_id" json:"org_id"`
+	WorkerID    string `yaml:"worker_id" json:"worker_id"`
+	Concurrency int    `yaml:"concurrency,omitempty" json:"concurrency,omitempty"`
+	AckWait     string `yaml:"ack_wait,omitempty" json:"ack_wait,omitempty"`
+}
+
 // Config 是 SingerOS 的主配置结构，包含所有子系统的配置
 type Config struct {
 	Github   *GithubAppConfig  `yaml:"github,omitempty"`
@@ -30,6 +38,7 @@ type Config struct {
 	Database *DatabaseConfig   `yaml:"database,omitempty"`
 	LLM      *LLMConfig        `yaml:"llm,omitempty"`
 	CLI      *CLIEnginesConfig `yaml:"cli,omitempty"`
+	Worker   *WorkerConfig     `yaml:"worker,omitempty"`
 }
 
 // DatabaseConfig 是数据库的配置结构

@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/nats-io/nats.go"
@@ -82,6 +83,30 @@ func (p *natsPublisher) PublishWithContext(ctx context.Context, topic string, me
 	return nil
 }
 
+// PublishRealtimeWithContext 在给定上下文环境中发布实时消息，不声明 JetStream Stream。
+func (p *natsPublisher) PublishRealtimeWithContext(ctx context.Context, topic string, message any) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.closed {
+		return fmt.Errorf("NATS client is closed")
+	}
+
+	body, err := json.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	if err := p.conn.Publish(topic, body); err != nil {
+		return fmt.Errorf("failed to publish message to subject '%s': %w", topic, err)
+	}
+	if err := p.conn.FlushWithContext(ctx); err != nil {
+		return fmt.Errorf("failed to flush message to subject '%s': %w", topic, err)
+	}
+
+	return nil
+}
+
 // SubscribeWithContext 在给定上下文环境中订阅特定主题的消息
 func (p *natsPublisher) SubscribeWithContext(ctx context.Context, topic string, handler func(event any)) error {
 	// 声明 Stream (如果不存在)
@@ -96,7 +121,7 @@ func (p *natsPublisher) SubscribeWithContext(ctx context.Context, topic string, 
 	}
 
 	// 创建持久化订阅
-	durableName := fmt.Sprintf("%s-subscriber", topic)
+	durableName := fmt.Sprintf("%s_SUBSCRIBER", strings.ReplaceAll(topic, ".", "_"))
 	sub, err := p.js.Subscribe(topic, func(msg *nats.Msg) {
 		// 解析收到的消息
 		var message interface{}
@@ -138,6 +163,11 @@ func (p *natsPublisher) Publish(ctx context.Context, topic string, event any) er
 	return p.PublishWithContext(ctx, topic, event)
 }
 
+// PublishRealtime implements the eventbus.RealtimePublisher interface.
+func (p *natsPublisher) PublishRealtime(ctx context.Context, topic string, event any) error {
+	return p.PublishRealtimeWithContext(ctx, topic, event)
+}
+
 // Subscribe implements the eventbus.Subscriber interface
 func (p *natsPublisher) Subscribe(ctx context.Context, topic string, handler func(event any)) error {
 	return p.SubscribeWithContext(ctx, topic, handler)
@@ -160,5 +190,5 @@ func (p *natsPublisher) Close() error {
 
 // streamNameFromTopic 根据 topic 生成 Stream 名称
 func streamNameFromTopic(topic string) string {
-	return fmt.Sprintf("%s_STREAM", topic)
+	return fmt.Sprintf("%s_STREAM", strings.ReplaceAll(topic, ".", "_"))
 }

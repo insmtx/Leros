@@ -12,6 +12,12 @@ type Publisher interface {
 	Publish(ctx context.Context, topic string, event any) error
 }
 
+// RealtimePublisher 是实时消息发布者接口，不要求 MQ 层持久化。
+type RealtimePublisher interface {
+	// PublishRealtime 发布实时消息，持久化由接收端按需处理。
+	PublishRealtime(ctx context.Context, topic string, event any) error
+}
+
 // Subscriber 是事件订阅者接口，定义了订阅指定主题事件的方法
 type Subscriber interface {
 	// Subscribe 订阅指定主题的事件，并使用提供的处理函数处理收到的事件

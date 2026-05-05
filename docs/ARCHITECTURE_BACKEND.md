@@ -18,17 +18,20 @@
 > **Contract-driven Service Architecture**
 
 SingerOS 采用**契约驱动的服务架构**，而不是：
+
 - ❌ Clean Architecture
 - ❌ DDD
 - ❌ Hexagonal Architecture
 
 **特点：**
+
 - ✔ 类 RPC 风格（类 RPC，但不绑定 RPC 实现）
 - ✔ 轻抽象（无 Repository 层）
 - ✔ 高工程效率
 - ✔ 适合 Agent / Workflow / OS 类系统扩展
 
 **核心原则：**
+
 1. **contract 定义能力** - 系统能力的"语言"
 2. **service 实现能力** - 直接操作 DB
 3. **handler 适配输入输出** - HTTP 适配
@@ -40,6 +43,7 @@ SingerOS 采用**契约驱动的服务架构**，而不是：
 > ✅ 新模式：event / execution / agent / skill
 
 **原因：**
+
 - 技术分层导致模块间耦合严重
 - 领域分层让每个模块职责清晰、可独立演进
 
@@ -51,10 +55,10 @@ SingerOS 采用**契约驱动的服务架构**，而不是：
 
 ### 2.4 强制隔离（Enforced Isolation）
 
-| 目录 | 用途 | 访问控制 |
-|------|------|----------|
+| 目录        | 用途         | 访问控制                                |
+| ----------- | ------------ | --------------------------------------- |
 | `internal/` | 私有核心代码 | Go 编译器强制隔离，只能被本项目内部引用 |
-| `pkg/` | 对外公开接口 | 其他项目可安全导入 |
+| `pkg/`      | 对外公开接口 | 其他项目可安全导入                      |
 
 ## 3. 推荐的 Golang 包结构
 
@@ -200,9 +204,10 @@ type CreateEventCommand struct {
 ```
 
 **特点：**
-* ✔ 不依赖 Gin
-* ✔ 不依赖 DB
-* ✔ 是系统"能力语言"
+
+- ✔ 不依赖 Gin
+- ✔ 不依赖 DB
+- ✔ 是系统"能力语言"
 
 ---
 
@@ -227,9 +232,10 @@ func (h *EventHandler) Create(c *gin.Context) {
 ```
 
 **特点：**
-* ❌ 不写业务逻辑
-* ❌ 不操作 DB
-* ✔ 只做转换 + 调用
+
+- ❌ 不写业务逻辑
+- ❌ 不操作 DB
+- ✔ 只做转换 + 调用
 
 ---
 
@@ -251,6 +257,7 @@ func Register(r *gin.Engine, h *EventHandler) {
 **职责：** 任务调度、执行控制、重试/超时管理
 
 **子目录：**
+
 - `engine.go` - Execution Engine 核心
 - `dispatcher.go` - 调度器（任务分发）
 - `executor.go` - 执行器接口
@@ -259,6 +266,7 @@ func Register(r *gin.Engine, h *EventHandler) {
 - `context/` - 执行上下文
 
 **关键点：**
+
 - 支持同步/异步执行
 - 支持重试和降级
 - 支持超时控制
@@ -270,6 +278,7 @@ func Register(r *gin.Engine, h *EventHandler) {
 **职责：** Agent 生命周期管理、LLM 调用、上下文维护
 
 **子目录：**
+
 - `runtime.go` - Agent Runtime 接口
 - `lifecycle.go` - 生命周期管理
 - `context.go` - 上下文管理
@@ -277,6 +286,7 @@ func Register(r *gin.Engine, h *EventHandler) {
 - `eino/` - Eino 具体实现
 
 **⚠️ 常见错误：**
+
 - ❌ Agent Runtime 直接调用 MQ / DB
 - ✅ 必须通过 contract.AgentService
 
@@ -353,8 +363,9 @@ func ToCommand(req dto.CreateEventRequest) contract.CreateEventCommand {
 ```
 
 **特点：**
-* ✔ 避免 DTO 污染 service
-* ✔ 保持层隔离
+
+- ✔ 避免 DTO 污染 service
+- ✔ 保持层隔离
 
 ---
 
@@ -378,12 +389,14 @@ func NewEventModule(db *db.Client) contract.EventService {
 **职责：** 技能注册、执行、管理
 
 **子目录：**
+
 - `registry.go` - Skill 注册中心（必须动态注册）
 - `executor.go` - Skill 执行器
 - `base_skill.go` - 基础 Skill 实现
 - `builtin/` - 内置技能
 
 **⚠️ 常见错误：**
+
 - ❌ Skill 写死在代码中
 - ✅ 必须 Registry 化，支持动态注册
 
@@ -392,6 +405,7 @@ func NewEventModule(db *db.Client) contract.EventService {
 **职责：** 外部系统接入（GitHub、GitLab、飞书等）
 
 **子目录：**
+
 - `connector.go` - Connector 接口
 - `github/` - GitHub 连接器
 - `gitlab/` - GitLab 连接器
@@ -402,6 +416,7 @@ func NewEventModule(db *db.Client) contract.EventService {
 **职责：** 统一基础设施访问
 
 **子目录：**
+
 - `mq/` - 消息队列（NATS Publisher / Subscriber）
 - `db/` - 数据库连接
 - `logger/` - 日志
@@ -411,18 +426,237 @@ func NewEventModule(db *db.Client) contract.EventService {
 **职责：** 对外共享的类型和 SDK
 
 **子目录：**
+
 - `event/` - Event 定义（对外共享）
+- `dm/` - Domain Messaging
 - `client/` - SingerOS SDK
 - `types/` - 公开类型
+
+#### `pkg/dm` - 领域消息协议
+
+**定位：**
+
+- `pkg/dm` 只定义 topic 构造规则和消息结构体
+- Server、Worker、UI 网关可以共同引用 `dm` 中的协议类型
+
+**当前已确定的 topic：**
+
+```text
+# UI -> Server，用户发起需求，由 Server 路由消费
+org.{org_id}.session.{session_id}.message
+
+# Server -> Worker，Server 调度任务，指定 Worker 消费
+org.{org_id}.worker.{worker_id}.task
+
+# Worker -> Server -> UI，Worker 执行过程流式输出
+org.{org_id}.session.{session_id}.message.stream
+```
+
+任务投递和回复通道使用不同可靠性策略：
+
+- `org.{org_id}.worker.{worker_id}.task` 使用 JetStream，负责任务可靠投递和 Worker 手动 Ack。
+- `org.{org_id}.session.{session_id}.message.stream` 使用实时消息 subject，负责 chunk / done / failed 推送，不要求 MQ 层持久化。
+- Worker 不使用 NATS `reply subject` 返回业务消息。
+- Worker 输出消息是否持久化由接收端负责，例如 Server / Gateway 订阅后写库或转发到 UI。
+- `message.stream` 中的 `stream` 描述的是流式消息形态，不表示底层必须使用 JetStream。
+
+`*` 仅用于订阅通配，不用于 publish。例如订阅某组织下所有 Worker 任务：
+
+```text
+org.{org_id}.worker.*.task
+```
+
+JetStream 的 Stream、Consumer、Durable 等名称不直接使用带 `.` 的 topic，应由基础设施模块将 `.` 替换为 `_` 后再追加业务后缀。例如：
+
+```text
+topic:       org.1001.worker.worker_1.task
+stream name: org_1001_worker_worker_1_task_STREAM
+durable:     org_1001_worker_worker_1_task_SUBSCRIBER
+```
+
+上述 JetStream 命名规则只适用于任务队列等需要持久化消费的 subject，不适用于 Worker 的普通回复 subject。
+
+**topic builder 示例：**
+
+```go
+taskTopic := dm.Topic().
+    Org("1001").
+    Worker("worker_1").
+    Task().
+    Build()
+// org.1001.worker.worker_1.task
+
+streamTopic := dm.Topic().
+    Org("1001").
+    Session("sess_1").
+    Message().
+    Stream().
+    Build()
+// org.1001.session.sess_1.message.stream
+
+workerTaskSubTopic := dm.Topic().
+    Org("1001").
+    Add("worker").
+    Wildcard().
+    Task().
+    Build()
+// org.1001.worker.*.task
+```
+
+**统一 Envelope：**
+
+所有跨进程消息使用统一外层信封，避免 `trace_id`、`task_id`、`org_id` 等字段散落到不同消息顶层。
+
+```go
+type Envelope[T any] struct {
+    ID        string      `json:"id"`
+    Type      MessageType `json:"type"`
+    CreatedAt time.Time   `json:"created_at"`
+
+    Trace TraceContext `json:"trace"`
+    Route RouteContext `json:"route"`
+
+    Body     T              `json:"body"`
+    Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+type TraceContext struct {
+    TraceID   string `json:"trace_id"`
+    RequestID string `json:"request_id,omitempty"`
+    TaskID    string `json:"task_id,omitempty"`
+    RunID     string `json:"run_id,omitempty"`
+    ParentID  string `json:"parent_id,omitempty"`
+}
+
+type RouteContext struct {
+    OrgID     string `json:"org_id"`
+    SessionID string `json:"session_id,omitempty"`
+    WorkerID  string `json:"worker_id,omitempty"`
+}
+```
+
+`TraceContext` 用于链路追踪、日志排查和幂等；`RouteContext` 用于租户隔离、topic 构造和消息投递。
+
+**Server → Worker：任务消息结构示例**
+
+```go
+type WorkerTaskMessage = Envelope[WorkerTaskBody]
+
+type WorkerTaskBody struct {
+    TaskType TaskType `json:"task_type"`
+
+    Actor     ActorContext    `json:"actor"`
+    Execution ExecutionTarget `json:"execution"`
+    Input     TaskInput       `json:"input"`
+
+    Runtime RuntimeOptions `json:"runtime,omitempty"`
+    Policy  TaskPolicy     `json:"policy,omitempty"`
+}
+
+type TaskInput struct {
+    Type        InputType      `json:"type"`
+    Text        string         `json:"text,omitempty"`
+    Messages    []ChatMessage  `json:"messages,omitempty"`
+    Attachments []Attachment   `json:"attachments,omitempty"`
+    Metadata    map[string]any `json:"metadata,omitempty"`
+}
+```
+
+示例 JSON：
+
+```json
+{
+  "id": "msg_1",
+  "type": "worker.task",
+  "created_at": "2026-04-29T12:00:00Z",
+  "trace": {
+    "trace_id": "trace_1",
+    "request_id": "req_1",
+    "task_id": "task_1",
+    "run_id": "run_1"
+  },
+  "route": {
+    "org_id": "1001",
+    "session_id": "sess_1",
+    "worker_id": "worker_1"
+  },
+  "body": {
+    "task_type": "agent.run",
+    "actor": {
+      "user_id": "user_1",
+      "channel": "web"
+    },
+    "execution": {
+      "assistant_id": "assistant_1",
+      "agent_id": "agent_1"
+    },
+    "input": {
+      "type": "message",
+      "text": "帮我总结这个 PR"
+    }
+  }
+}
+```
+
+**Worker → Server → UI：流式消息结构示例**
+
+```go
+type MessageStreamMessage = Envelope[StreamBody]
+
+type StreamBody struct {
+    Seq     int64           `json:"seq"`
+    Event   StreamEventType `json:"event"`
+    Payload StreamPayload   `json:"payload"`
+
+    Usage *UsagePayload `json:"usage,omitempty"`
+    Error *StreamError  `json:"error,omitempty"`
+}
+
+type StreamPayload struct {
+    Role       MessageRole      `json:"role,omitempty"`
+    Content    string           `json:"content,omitempty"`
+    ToolCall   *ToolCallEvent   `json:"tool_call,omitempty"`
+    ToolResult *ToolResultEvent `json:"tool_result,omitempty"`
+}
+```
+
+示例 JSON：
+
+```json
+{
+  "id": "evt_1",
+  "type": "message.stream",
+  "created_at": "2026-04-29T12:00:01Z",
+  "trace": {
+    "trace_id": "trace_1",
+    "request_id": "req_1",
+    "task_id": "task_1",
+    "run_id": "run_1"
+  },
+  "route": {
+    "org_id": "1001",
+    "session_id": "sess_1",
+    "worker_id": "worker_1"
+  },
+  "body": {
+    "seq": 1,
+    "event": "message.delta",
+    "payload": {
+      "role": "assistant",
+      "content": "这个 PR 主要修改了"
+    }
+  }
+}
+```
 
 ## 5. 进程拆分建议
 
 ### 5.1 为什么需要进程拆分？
 
-| 优势 | 说明 |
-|------|------|
-| 水平扩展 | 不同组件独立扩缩容 |
-| 解耦 | 故障隔离 |
+| 优势     | 说明                 |
+| -------- | -------------------- |
+| 水平扩展 | 不同组件独立扩缩容   |
+| 解耦     | 故障隔离             |
 | 负载分离 | 不同负载类型分开处理 |
 
 ### 5.2 推荐的进程拆分方案
@@ -434,6 +668,7 @@ cmd/singer/               # 主服务（所有功能：Server + Worker + Orchest
 ```
 
 **特点：**
+
 - Server 和 Worker 在同一进程中运行
 - Orchestrator 在 Server 端运行（而非独立 Worker）
 - 简化部署和开发
@@ -448,6 +683,7 @@ cmd/singer/               # 通过启动参数区分模式
 ```
 
 **特点：**
+
 - 逻辑分离，但仍在同一二进制文件
 - 通过配置或启动参数区分角色
 - Worker 开始承担 Execution Engine 职责
@@ -460,6 +696,7 @@ cmd/worker/               # 执行节点（Execution Engine + Agent Runtime）
 ```
 
 **特点：**
+
 - 完全独立的进程
 - 可独立扩缩容
 - 故障隔离
@@ -514,66 +751,29 @@ Database
 
 ### 6.3 常见错误
 
-| ❌ 错误做法 | ✅ 正确做法 |
-|------------|------------|
-| 把所有逻辑写进 Event Handler | Handler → 调用 contract.Service |
-| Event Handler 使用 `switch` 硬编码路由 | Router 独立 + Handler 插件化（Phase 2）|
-| Agent Runtime 直接调 MQ / DB | 通过 contract.AgentService |
-| Skill 写死在代码中 | 必须 Registry 化，支持动态注册 |
+| ❌ 错误做法                            | ✅ 正确做法                               |
+| -------------------------------------- | ----------------------------------------- |
+| 把所有逻辑写进 Event Handler           | Handler → 调用 contract.Service           |
+| Event Handler 使用 `switch` 硬编码路由 | Router 独立 + Handler 插件化（Phase 2）   |
+| Agent Runtime 直接调 MQ / DB           | 通过 contract.AgentService                |
+| Skill 写死在代码中                     | 必须 Registry 化，支持动态注册            |
 | 按技术分层（controller/service/model） | 按领域分层（contract/handler/service/db） |
-| 添加 Repository 抽象 | service 直接调用 db.client |
-| 缺少接口定义，直接依赖实现 | contract 定义所有能力 |
+| 添加 Repository 抽象                   | service 直接调用 db.client                |
+| 缺少接口定义，直接依赖实现             | contract 定义所有能力                     |
 
-**ℹ️ 当前实现状态备注：**
+### 6.4 最佳实践
 
-- Event Engine：Orchestrator 使用 map 注册 Handler，Router 未独立（Phase 2 完善）
-- Execution Engine：尚未独立实现，执行逻辑在 Orchestrator.runEvent 中（Phase 2 完善）
-- Worker 进程：当前为 stub 实现，与 Server 同进程运行（Phase 2 完善）
-
-### 8.2 核心设计原则（架构本质）
-
-#### ✔ 1️⃣ contract 是系统语言
-
-不是 RPC，但类似 RPC 的"能力定义"
-
-#### ✔ 2️⃣ service 是唯一业务执行点
-
-不允许业务散落
-
-#### ✔ 3️⃣ DB 不抽象 interface
-
-直接调用
-
-#### ✔ 4️⃣ handler 只做适配
-
-不参与业务
-
-#### ✔ 5️⃣ convert 保持隔离
-
-避免 DTO 污染 service
-
-### 8.3 当前实现状态（Phase 1.5）
-
-**✅ 已完成：**
-- API 层：契约驱动服务架构（handler/dto/contract/middleware）
-- Agent Runtime：完整实现（SimpleChat + Eino + Session 上下文）
-- Event Bus：NATS JetStream 基础功能
-- Connectors：GitHub/GitLab/WeWork 连接器框架
-- Tools：Tool Registry 化完成
-- Skills：SKILL.md 定义 + Tools 执行
-
-**⚠️ 部分完成：**
-- Event Engine：Orchestrator 已实现，但 Router 未独立、Handler 未插件化
-- Worker 进程：stub 实现，与 Server 同进程运行
-
-**📅 Phase 2 计划：**
-- Execution Engine：独立实现，与 Event Engine 解耦
-- Event Engine 完善：Router 独立提取、Handler 插件化
-- Worker 进程：完善启动逻辑和职责分离
-
-### 8.4 常见错误
-
-
+1. **contract 定义系统能力** - 每层定义 interface，支持替换
+2. **service 直接操作 DB** - 无 Repository 抽象
+3. **handler 只做转换 + 调用** - 不写业务逻辑
+4. **convert 保持隔离** - DTO ↔ Command ↔ Model
+5. **wire 组装依赖** - 避免 main 爆炸
+6. **每个包只暴露必要的接口**
+7. **使用 `internal/` 强制隔离核心实现**
+8. **使用 `pkg/` 对外公开稳定接口**
+9. **Handler 必须插件化，不写死 `switch`**
+10. **Skill 必须 Registry 化**
+11. **依赖注入，避免全局变量**
 
 ## 8. 下一步行动
 
