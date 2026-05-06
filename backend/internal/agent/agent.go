@@ -72,14 +72,14 @@ func NewAgent(ctx context.Context, llmConfig *config.LLMConfig, runtimeConfig Co
 		return nil, fmt.Errorf("tool registry is required")
 	}
 
-	chatModel, err := 	einoadapter.NewOpenAIChatModel(ctx, llmConfig)
+	chatModel, err := einoadapter.NewOpenAIChatModel(ctx, llmConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Agent{
 		chatModel:     chatModel,
-		toolAdapter:   	einoadapter.NewToolAdapter(runtimeConfig.ToolRegistry),
+		toolAdapter:   einoadapter.NewToolAdapter(runtimeConfig.ToolRegistry),
 		skillsCatalog: runtimeConfig.SkillsCatalog,
 		systemPrompt:  defaultAgentSystemPrompt,
 	}, nil
@@ -156,8 +156,8 @@ func (a *Agent) Run(ctx context.Context, req *RequestContext) (*RunResult, error
 	}
 
 	if usage != nil {
-		_ = state.emitter.Emit(ctx, &	agentevents.RunEvent{
-			Type:    	agentevents.RunEventUsage,
+		_ = state.emitter.Emit(ctx, &agentevents.RunEvent{
+			Type:    agentevents.RunEventUsage,
 			Content: eventContentJSON(usage),
 		})
 	}
@@ -187,7 +187,7 @@ func (a *Agent) buildRunState(req *RequestContext) (*runState, error) {
 		return nil, err
 	}
 
-	emitter := 	agentevents.NewEmitter(req.RunID, req.TraceID, sinkForRequest(req))
+	emitter := agentevents.NewEmitter(req.RunID, req.TraceID, sinkForRequest(req))
 	toolCtx := tools.ToolContext{
 		RunID:          req.RunID,
 		TraceID:        req.TraceID,
@@ -205,7 +205,7 @@ func (a *Agent) buildRunState(req *RequestContext) (*runState, error) {
 		emitter:      emitter,
 		userInput:    userInput,
 		systemPrompt: systemPrompt,
-		toolBinding: 	einoadapter.ToolBinding{
+		toolBinding: einoadapter.ToolBinding{
 			ToolContext:  toolCtx,
 			AllowedTools: req.Capability.AllowedTools,
 		},

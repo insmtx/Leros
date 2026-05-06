@@ -9,22 +9,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/internal/worker"
 	"github.com/ygpkg/yg-go/logs"
 )
 
 type ProcessScheduler struct {
-	config    *ProcessConfig
+	config    *config.SchedulerConfig
 	instances map[string]*ProcessInstance
 	mu        sync.RWMutex
 }
 
-type ProcessConfig struct {
-	WorkerBinary string
-	WorkingDir   string
-	Env          map[string]string
-	ServerAddr   string
-}
+var _ worker.WorkerScheduler = (*ProcessScheduler)(nil)
 
 type ProcessInstance struct {
 	ID        string
@@ -37,7 +33,7 @@ type ProcessInstance struct {
 	mu        sync.RWMutex
 }
 
-func NewProcessScheduler(config *ProcessConfig) worker.WorkerScheduler {
+func NewProcessScheduler(config *config.SchedulerConfig) worker.WorkerScheduler {
 	return &ProcessScheduler{
 		config:    config,
 		instances: make(map[string]*ProcessInstance),

@@ -11,21 +11,20 @@ import (
 )
 
 type WSClient struct {
-	conn            *websocket.Conn
-	workerID        string
-	assistantCode   string
-	serverAddr      string
-	send            chan map[string]interface{}
-	ctx             context.Context
-	cancel          context.CancelFunc
-	onConfigReady   func(config map[string]interface{})
+	conn          *websocket.Conn
+	workerID      string
+	serverAddr    string
+	send          chan map[string]interface{}
+	ctx           context.Context
+	cancel        context.CancelFunc
+	onConfigReady func(config map[string]interface{})
 }
 
 type WSClientOption func(*WSClient)
 
-func WithAssistantCode(assistantCode string) WSClientOption {
+func WithWorkerID(workerID string) WSClientOption {
 	return func(c *WSClient) {
-		c.assistantCode = assistantCode
+		c.workerID = workerID
 	}
 }
 
@@ -138,7 +137,7 @@ func (c *WSClient) handleMessage(msg map[string]interface{}) {
 	switch msgType {
 	case "welcome":
 		logs.Infof("Received welcome from server")
-		if c.assistantCode != "" {
+		if c.workerID != "" {
 			c.requestConfig()
 		}
 	case "configResponse":
@@ -154,13 +153,13 @@ func (c *WSClient) requestConfig() {
 	reqMsg := map[string]interface{}{
 		"type": "getConfig",
 		"payload": map[string]interface{}{
-			"assistant_code": c.assistantCode,
+			"worker_id": c.workerID,
 		},
 	}
 	if err := c.sendJSON(reqMsg); err != nil {
 		logs.Errorf("Failed to request config: %v", err)
 	} else {
-		logs.Infof("Requested config for assistant %s", c.assistantCode)
+		logs.Infof("Requested config for worker %s", c.workerID)
 	}
 }
 

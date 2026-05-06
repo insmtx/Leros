@@ -15,14 +15,13 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
-type Worker struct {
-	runtime       agent.AgentRuntime
-	config        *WorkerConfig
-	workerID      string
-	assistantCode string
-	startedAt     time.Time
-	status        string
-	wsClient      *WSClient
+type WorkerClient struct {
+	runtime   agent.AgentRuntime
+	config    *WorkerConfig
+	workerID  string
+	startedAt time.Time
+	status    string
+	wsClient  *WSClient
 }
 
 type WorkerConfig struct {
@@ -31,27 +30,26 @@ type WorkerConfig struct {
 	SkillsDir    string
 	ToolsEnabled bool
 	ServerAddr   string
-	AssistantCode string
+	WorkerID     string
 }
 
-func NewWorker(ctx context.Context, cfg *WorkerConfig) (*Worker, error) {
+func NewWorker(ctx context.Context, cfg *WorkerConfig) (*WorkerClient, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("worker config is required")
 	}
 
 	workerID := fmt.Sprintf("worker_%d", time.Now().UnixNano())
 
-	w := &Worker{
-		config:        cfg,
-		workerID:      workerID,
-		assistantCode: cfg.AssistantCode,
-		startedAt:     time.Now(),
-		status:        "initialized",
+	w := &WorkerClient{
+		config:    cfg,
+		workerID:  workerID,
+		startedAt: time.Now(),
+		status:    "initialized",
 	}
 
 	if cfg.ServerAddr != "" {
 		w.wsClient = NewWSClient(cfg.ServerAddr, workerID,
-			WithAssistantCode(cfg.AssistantCode),
+			WithWorkerID(workerID),
 			WithOnConfigReady(func(assistantConfig map[string]interface{}) {
 				w.handleAssistantConfig(ctx, assistantConfig)
 			}),
@@ -61,7 +59,7 @@ func NewWorker(ctx context.Context, cfg *WorkerConfig) (*Worker, error) {
 	return w, nil
 }
 
-func (w *Worker) handleAssistantConfig(ctx context.Context, assistantConfig map[string]interface{}) {
+func (w *WorkerClient) handleAssistantConfig(ctx context.Context, assistantConfig map[string]interface{}) {
 	logs.Info("Processing assistant configuration from server")
 
 	llmConfigRaw, ok := assistantConfig["llm_config"]
@@ -140,7 +138,7 @@ func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) (agent.AgentRun
 	return agentInstance, nil
 }
 
-func (w *Worker) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {
+func (w *WorkerClient) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {
 	if w == nil || w.runtime == nil {
 		return nil, fmt.Errorf("worker runtime is not initialized")
 	}
@@ -156,7 +154,7 @@ func (w *Worker) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 	return result, nil
 }
 
-func (w *Worker) Start(ctx context.Context) error {
+func (w *WorkerClient) Start(ctx context.Context) error {
 	w.status = "running"
 	logs.Infof("Worker %s started", w.workerID)
 
@@ -181,7 +179,7 @@ func (w *Worker) Start(ctx context.Context) error {
 	}
 }
 
-func (w *Worker) Shutdown(ctx context.Context) error {
+func (w *WorkerClient) Shutdown(ctx context.Context) error {
 	logs.Info("Worker shutting down...")
 	w.status = "stopping"
 
@@ -192,15 +190,15 @@ func (w *Worker) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (w *Worker) GetWorkerID() string {
+func (w *WorkerClient) GetWorkerID() string {
 	return w.workerID
 }
 
-func (w *Worker) GetStartedAt() time.Time {
+func (w *WorkerClient) GetStartedAt() time.Time {
 	return w.startedAt
 }
 
-func (w *Worker) GetStatus() string {
+func (w *WorkerClient) GetStatus() string {
 	return w.status
 }
 

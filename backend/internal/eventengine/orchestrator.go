@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/insmtx/SingerOS/backend/internal/agent"
 	eventbus "github.com/insmtx/SingerOS/backend/internal/infra/mq"
 	interactionevent "github.com/insmtx/SingerOS/backend/pkg/event"
-	"github.com/insmtx/SingerOS/backend/internal/agent"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -22,12 +22,12 @@ type EventHandlerFunc func(ctx context.Context, event *interactionevent.Event) e
 // Orchestrator 是事件编排器，负责事件的订阅、分发和处理
 type Orchestrator struct {
 	subscriber eventbus.Subscriber         // 事件订阅者
-	runner     	agent.Runner         // 统一任务运行器
+	runner     agent.Runner                // 统一任务运行器
 	handlers   map[string]EventHandlerFunc // 事件主题到处理器的映射
 }
 
 // NewOrchestrator 创建一个新的事件编排器实例
-func NewOrchestrator(subscriber eventbus.Subscriber, runner 	agent.Runner) *Orchestrator {
+func NewOrchestrator(subscriber eventbus.Subscriber, runner agent.Runner) *Orchestrator {
 	orchestrator := &Orchestrator{
 		subscriber: subscriber,
 		runner:     runner,
@@ -65,7 +65,7 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 					return
 				}
 
-				var interactionEvent 	interactionevent.Event
+				var interactionEvent interactionevent.Event
 				if err := json.Unmarshal(jsonBytes, &interactionEvent); err != nil {
 					logs.ErrorContextf(ctx, "Failed to unmarshal event: %v", err)
 					return
@@ -88,27 +88,27 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 }
 
 // handleIssueComment 处理 GitHub Issue 评论事件
-func (o *Orchestrator) handleIssueComment(ctx context.Context, event *	interactionevent.Event) error {
+func (o *Orchestrator) handleIssueComment(ctx context.Context, event *interactionevent.Event) error {
 	logs.InfoContextf(ctx, "Processing GitHub issue comment event with agent runtime: %+v", event)
 
 	return o.runEvent(ctx, event)
 }
 
 // handlePullRequest 处理 GitHub Pull Request 事件
-func (o *Orchestrator) handlePullRequest(ctx context.Context, event *	interactionevent.Event) error {
+func (o *Orchestrator) handlePullRequest(ctx context.Context, event *interactionevent.Event) error {
 	logs.InfoContextf(ctx, "Processing GitHub pull request event with agent runtime: %+v", event)
 
 	return o.runEvent(ctx, event)
 }
 
 // handlePush 处理 GitHub Push 提交事件
-func (o *Orchestrator) handlePush(ctx context.Context, event *	interactionevent.Event) error {
+func (o *Orchestrator) handlePush(ctx context.Context, event *interactionevent.Event) error {
 	logs.InfoContextf(ctx, "Processing GitHub push event with agent runtime: %+v", event)
 
 	return o.runEvent(ctx, event)
 }
 
-func (o *Orchestrator) runEvent(ctx context.Context, event *	interactionevent.Event) error {
+func (o *Orchestrator) runEvent(ctx context.Context, event *interactionevent.Event) error {
 	if o.runner == nil {
 		return fmt.Errorf("agent runtime runner is required")
 	}
@@ -123,25 +123,25 @@ func (o *Orchestrator) runEvent(ctx context.Context, event *	interactionevent.Ev
 	return nil
 }
 
-func requestFromInteractionEvent(event *	interactionevent.Event) *	agent.RequestContext {
+func requestFromInteractionEvent(event *interactionevent.Event) *agent.RequestContext {
 	if event == nil {
-		return &	agent.RequestContext{
-			Input: 	agent.InputContext{
-				Type: 	agent.InputTypeEvent,
+		return &agent.RequestContext{
+			Input: agent.InputContext{
+				Type: agent.InputTypeEvent,
 			},
 		}
 	}
 
-	return &	agent.RequestContext{
+	return &agent.RequestContext{
 		RunID:   event.EventID,
 		TraceID: event.TraceID,
-		Actor: 	agent.ActorContext{
+		Actor: agent.ActorContext{
 			UserID:     event.Actor,
 			Channel:    event.Channel,
 			ExternalID: event.Actor,
 		},
-		Input: 	agent.InputContext{
-			Type: 	agent.InputTypeEvent,
+		Input: agent.InputContext{
+			Type: agent.InputTypeEvent,
 			Text: buildInteractionEventInput(event),
 		},
 		Metadata: map[string]any{
@@ -154,7 +154,7 @@ func requestFromInteractionEvent(event *	interactionevent.Event) *	agent.Request
 	}
 }
 
-func buildInteractionEventInput(event *	interactionevent.Event) string {
+func buildInteractionEventInput(event *interactionevent.Event) string {
 	if event == nil {
 		return ""
 	}
@@ -176,7 +176,7 @@ func buildInteractionEventInput(event *	interactionevent.Event) string {
 	return strings.Join(filterEmptyStrings(sections), "\n\n")
 }
 
-func buildInteractionEventEnvelope(event *	interactionevent.Event) string {
+func buildInteractionEventEnvelope(event *interactionevent.Event) string {
 	lines := []string{"Event envelope:"}
 	if event.Channel != "" {
 		lines = append(lines, "- channel: "+event.Channel)

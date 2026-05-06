@@ -34,49 +34,49 @@ import (
 // 同时设置客户端 WebSocket 连接器，并将所有连接器的路由注册到 HTTP 服务器。
 func SetupRouter(cfg config.Config, publisher eventbus.Publisher, db *gorm.DB) *gin.Engine {
 	r := gin.New()
-	{
-		r.Use(ygmiddleware.CORS())
-		r.Use(middleware.CallerMiddleware())
-		r.Use(middleware.Logger(".Ping", "metrics"))
-		r.Use(ygmiddleware.Recovery())
-	}
+	r.Use(ygmiddleware.CORS())
+	r.Use(middleware.CallerMiddleware())
+	r.Use(middleware.Logger(".Ping", "metrics"))
+	r.Use(ygmiddleware.Recovery())
 	v1 := r.Group("/v1")
+	{
+		if cfg.Github != nil {
+			logs.Info("Setting up GitHub connector")
+			authService := initThirdPartyAuthService(&cfg)
+			github.RegisterGitHubRoutes(v1, *cfg.Github, publisher, db, authService)
+			logs.Info("GitHub connector registered successfully")
+		} else {
+			logs.Debug("No GitHub configuration provided, skipping GitHub connector setup")
+		}
 
-	if cfg.Github != nil {
-		logs.Info("Setting up GitHub connector")
-		authService := initThirdPartyAuthService(&cfg)
-		github.RegisterGitHubRoutes(v1, *cfg.Github, publisher, db, authService)
-		logs.Info("GitHub connector registered successfully")
-	} else {
-		logs.Debug("No GitHub configuration provided, skipping GitHub connector setup")
+		if cfg.Gitlab != nil {
+			logs.Info("Setting up GitLab connector")
+			gitlab.RegisterGitLabRoutes(v1, *cfg.Gitlab, publisher)
+			logs.Info("GitLab connector registered successfully")
+		} else {
+			logs.Debug("No GitLab configuration provided, skipping GitLab connector setup")
+		}
+	}
+	{
+		websocket.RegisterWebSocketRoutes(v1, publisher)
+		logs.Info("WebSocket connector registered successfully")
+	}
+	{
+		workerScheduler := scheduler.NewProcessScheduler(cfg.Scheduler)
+
+		workerManager := workerserver.NewServer(workerScheduler, db)
+		workerManager.RegisterRoutes(v1)
+		logs.Info("Worker server routes registered successfully")
+
+		digitalAssistantService := service.NewDigitalAssistantService(db, workerScheduler)
+		handler.RegisterDigitalAssistantRoutes(v1, digitalAssistantService)
+		logs.Info("Digital assistant routes registered successfully")
 	}
 
-	if cfg.Gitlab != nil {
-		logs.Info("Setting up GitLab connector")
-		gitlab.RegisterGitLabRoutes(v1, *cfg.Gitlab, publisher)
-		logs.Info("GitLab connector registered successfully")
-	} else {
-		logs.Debug("No GitLab configuration provided, skipping GitLab connector setup")
+	{
+		singerMCP.RegisterRoutes(v1, singerMCP.NewServer())
+		logs.Info("MCP routes registered successfully")
 	}
-
-	websocket.RegisterWebSocketRoutes(v1, publisher)
-	logs.Info("WebSocket connector registered successfully")
-
-	workerScheduler := scheduler.NewProcessScheduler(&scheduler.ProcessConfig{
-		ServerAddr: ":8080",
-	})
-
-	workerServer := workerserver.NewServer(workerScheduler, db)
-	workerServer.RegisterRoutes(v1)
-	logs.Info("Worker server routes registered successfully")
-
-	digitalAssistantService := service.NewDigitalAssistantService(db, workerScheduler)
-	handler.RegisterDigitalAssistantRoutes(v1, digitalAssistantService)
-	logs.Info("Digital assistant routes registered successfully")
-
-	singerMCP.RegisterRoutes(v1, singerMCP.NewServer())
-	logs.Info("MCP routes registered successfully")
-
 	// Swagger UI 路由
 	v1.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	return r

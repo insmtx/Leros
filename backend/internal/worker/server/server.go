@@ -23,32 +23,22 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-type Server struct {
+type WorkerManager struct {
 	workers   map[string]*WorkerConnection
 	mu        sync.RWMutex
 	scheduler worker.WorkerScheduler
 	db        *gorm.DB
 }
 
-func NewServer(scheduler worker.WorkerScheduler, db *gorm.DB) *Server {
-	return &Server{
+func NewServer(scheduler worker.WorkerScheduler, db *gorm.DB) *WorkerManager {
+	return &WorkerManager{
 		workers:   make(map[string]*WorkerConnection),
 		scheduler: scheduler,
 		db:        db,
 	}
 }
 
-type WorkerConnection struct {
-	ID         string
-	Conn       *websocket.Conn
-	Send       chan map[string]interface{}
-	Status     string
-	Registered time.Time
-	LastSeen   time.Time
-	mu         sync.RWMutex
-}
-
-func (s *Server) RegisterRoutes(r gin.IRouter) {
+func (s *WorkerManager) RegisterRoutes(r gin.IRouter) {
 	r.GET("/ws/worker", s.handleWorkerWebSocket)
 	r.POST("/ListWorkers", s.listWorkers)
 	r.POST("/GetWorkerInfo", s.getWorkerInfo)
@@ -56,7 +46,7 @@ func (s *Server) RegisterRoutes(r gin.IRouter) {
 	r.POST("/CreateWorker", s.createWorker)
 }
 
-func (s *Server) handleWorkerWebSocket(c *gin.Context) {
+func (s *WorkerManager) handleWorkerWebSocket(c *gin.Context) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		logs.Errorf("Failed to upgrade WebSocket: %v", err)
@@ -124,7 +114,7 @@ func (s *Server) handleWorkerWebSocket(c *gin.Context) {
 	<-ctx.Done()
 }
 
-func (s *Server) readPump(worker *WorkerConnection) {
+func (s *WorkerManager) readPump(worker *WorkerConnection) {
 	defer func() {
 		s.unregisterWorker(worker.ID)
 		worker.Conn.Close()
@@ -159,7 +149,7 @@ func (s *Server) readPump(worker *WorkerConnection) {
 	}
 }
 
-func (s *Server) writePump(worker *WorkerConnection) {
+func (s *WorkerManager) writePump(worker *WorkerConnection) {
 	ticker := time.NewTicker(54 * time.Second)
 	defer ticker.Stop()
 
@@ -192,7 +182,7 @@ func (s *Server) writePump(worker *WorkerConnection) {
 	}
 }
 
-func (s *Server) handleWorkerMessage(worker *WorkerConnection, msg map[string]interface{}) {
+func (s *WorkerManager) handleWorkerMessage(worker *WorkerConnection, msg map[string]interface{}) {
 	msgType, _ := msg["type"].(string)
 
 	switch msgType {
@@ -228,7 +218,7 @@ func (s *Server) handleWorkerMessage(worker *WorkerConnection, msg map[string]in
 	}
 }
 
-func (s *Server) handleGetConfig(worker *WorkerConnection, msg map[string]interface{}) {
+func (s *WorkerManager) handleGetConfig(worker *WorkerConnection, msg map[string]interface{}) {
 	assistantCode := ""
 	if payload, ok := msg["payload"].(map[string]interface{}); ok {
 		if code, ok := payload["assistant_code"].(string); ok {
@@ -318,7 +308,7 @@ func (s *Server) handleGetConfig(worker *WorkerConnection, msg map[string]interf
 	}
 }
 
-func (s *Server) unregisterWorker(workerID string) {
+func (s *WorkerManager) unregisterWorker(workerID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -329,7 +319,7 @@ func (s *Server) unregisterWorker(workerID string) {
 	}
 }
 
-func (s *Server) heartbeatChecker(worker *WorkerConnection) {
+func (s *WorkerManager) heartbeatChecker(worker *WorkerConnection) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
@@ -359,7 +349,7 @@ type WorkerInfo struct {
 	LastSeen   time.Time `json:"last_seen"`
 }
 
-func (s *Server) listWorkers(c *gin.Context) {
+func (s *WorkerManager) listWorkers(c *gin.Context) {
 	var req struct{}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -390,7 +380,7 @@ type GetWorkerInfoRequest struct {
 	WorkerID string `json:"worker_id" binding:"required"`
 }
 
-func (s *Server) getWorkerInfo(c *gin.Context) {
+func (s *WorkerManager) getWorkerInfo(c *gin.Context) {
 	var req GetWorkerInfoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -422,7 +412,7 @@ type ShutdownWorkerRequest struct {
 	WorkerID string `json:"worker_id" binding:"required"`
 }
 
-func (s *Server) shutdownWorker(c *gin.Context) {
+func (s *WorkerManager) shutdownWorker(c *gin.Context) {
 	var req ShutdownWorkerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -466,7 +456,7 @@ type CreateWorkerRequest struct {
 	WorkingDir  string            `json:"working_dir"`
 }
 
-func (s *Server) createWorker(c *gin.Context) {
+func (s *WorkerManager) createWorker(c *gin.Context) {
 	var req CreateWorkerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -501,10 +491,4 @@ func (s *Server) createWorker(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, instance)
-}
-
-func (wc *WorkerConnection) SendJSON(msg map[string]interface{}) error {
-	wc.mu.RLock()
-	defer wc.mu.RUnlock()
-	return wc.Conn.WriteJSON(msg)
 }

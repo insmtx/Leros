@@ -80,8 +80,8 @@ func TestFlowStreamEmitsMessageEvents(t *testing.T) {
 		t.Fatalf("new flow: %v", err)
 	}
 
-	var emitted []*	agentevents.RunEvent
-	emitter := 	agentevents.NewEmitter("run_stream", "trace_stream", 	agentevents.SinkFunc(func(ctx context.Context, event *	agentevents.RunEvent) error {
+	var emitted []*agentevents.RunEvent
+	emitter := agentevents.NewEmitter("run_stream", "trace_stream", agentevents.SinkFunc(func(ctx context.Context, event *agentevents.RunEvent) error {
 		emitted = append(emitted, event)
 		return nil
 	}))
@@ -96,7 +96,7 @@ func TestFlowStreamEmitsMessageEvents(t *testing.T) {
 	var deltaCount int
 	for _, event := range emitted {
 		switch event.Type {
-		case 	agentevents.RunEventMessageDelta:
+		case agentevents.RunEventMessageDelta:
 			deltaCount++
 		}
 	}

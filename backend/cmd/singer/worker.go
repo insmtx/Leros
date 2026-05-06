@@ -23,10 +23,10 @@ import (
 )
 
 var (
-	workerConfigPath    string
-	workerServerAddr    string
-	workerListenAddr    string
-	workerAssistantCode string
+	workerConfigPath string
+	workerServerAddr string
+	workerListenAddr string
+	workerWorkerID   string
 )
 
 var workerCmd = &cobra.Command{
@@ -52,21 +52,21 @@ func init() {
 	workerCmd.Flags().StringVar(&workerConfigPath, "config", "", "Configuration file path")
 	workerCmd.Flags().StringVar(&workerServerAddr, "server-addr", "127.0.0.1:8080", "Server address for WebSocket connection")
 	workerCmd.Flags().StringVar(&workerListenAddr, "listen-addr", ":8081", "Worker MCP server listen address for runtime bootstrap")
-	workerCmd.Flags().StringVar(&workerAssistantCode, "assistant-code", "", "Assistant code for configuration retrieval")
+	workerCmd.Flags().StringVar(&workerWorkerID, "worker-id", "", "Worker ID for configuration retrieval")
 	rootCmd.AddCommand(workerCmd)
 }
 
-func createWorker(ctx context.Context) (*client.Worker, error) {
+func createWorker(ctx context.Context) (*client.WorkerClient, error) {
 	_, err := loadWorkerConfig()
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
 
 	return client.NewWorker(ctx, &client.WorkerConfig{
-		ServerAddr:    workerServerAddr,
-		AssistantCode: workerAssistantCode,
-		SkillsDir:     "",
-		ToolsEnabled:  true,
+		ServerAddr:   workerServerAddr,
+		WorkerID:     workerWorkerID,
+		SkillsDir:    "",
+		ToolsEnabled: true,
 	})
 }
 
@@ -78,9 +78,9 @@ func loadWorkerConfig() (*config.WorkerConfig, error) {
 			return nil, fmt.Errorf("failed to load config from %s: %w", workerConfigPath, err)
 		}
 	}
-	if strings.TrimSpace(workerAssistantCode) != "" {
-		cfg.AssistantCode = workerAssistantCode
-		logs.Infof("Using assistant code from flag: %s", workerAssistantCode)
+	if strings.TrimSpace(workerWorkerID) != "" {
+		cfg.WorkerID = workerWorkerID
+		logs.Infof("Using worker ID from flag: %s", workerWorkerID)
 	}
 	if strings.TrimSpace(workerServerAddr) != "" {
 		cfg.ServerAddr = workerServerAddr
