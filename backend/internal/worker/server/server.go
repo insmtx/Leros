@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"sync"
@@ -8,7 +9,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	infradb "github.com/insmtx/SingerOS/backend/internal/infra/db"
+	"github.com/insmtx/SingerOS/backend/internal/worker"
 	"github.com/ygpkg/yg-go/logs"
+	"gorm.io/gorm"
 )
 
 var upgrader = websocket.Upgrader{
@@ -20,8 +24,18 @@ var upgrader = websocket.Upgrader{
 }
 
 type Server struct {
-	workers map[string]*WorkerConnection
-	mu      sync.RWMutex
+	workers   map[string]*WorkerConnection
+	mu        sync.RWMutex
+	scheduler worker.WorkerScheduler
+	db        *gorm.DB
+}
+
+func NewServer(scheduler worker.WorkerScheduler, db *gorm.DB) *Server {
+	return &Server{
+		workers:   make(map[string]*WorkerConnection),
+		scheduler: scheduler,
+		db:        db,
+	}
 }
 
 type WorkerConnection struct {
@@ -34,17 +48,12 @@ type WorkerConnection struct {
 	mu         sync.RWMutex
 }
 
-func NewServer() *Server {
-	return &Server{
-		workers: make(map[string]*WorkerConnection),
-	}
-}
-
 func (s *Server) RegisterRoutes(r gin.IRouter) {
 	r.GET("/ws/worker", s.handleWorkerWebSocket)
 	r.POST("/ListWorkers", s.listWorkers)
 	r.POST("/GetWorkerInfo", s.getWorkerInfo)
 	r.POST("/ShutdownWorker", s.shutdownWorker)
+	r.POST("/CreateWorker", s.createWorker)
 }
 
 func (s *Server) handleWorkerWebSocket(c *gin.Context) {
@@ -213,6 +222,99 @@ func (s *Server) handleWorkerMessage(worker *WorkerConnection, msg map[string]in
 				worker.mu.Unlock()
 			}
 		}
+
+	case "getConfig":
+		s.handleGetConfig(worker, msg)
+	}
+}
+
+func (s *Server) handleGetConfig(worker *WorkerConnection, msg map[string]interface{}) {
+	assistantCode := ""
+	if payload, ok := msg["payload"].(map[string]interface{}); ok {
+		if code, ok := payload["assistant_code"].(string); ok {
+			assistantCode = code
+		}
+	}
+
+	if assistantCode == "" {
+		resp := map[string]interface{}{
+			"type": "configResponse",
+			"payload": map[string]interface{}{
+				"config": nil,
+				"error":  "assistant_code is required",
+			},
+		}
+		select {
+		case worker.Send <- resp:
+		default:
+			logs.Warnf("Config response dropped for worker %s", worker.ID)
+		}
+		return
+	}
+
+	if s.db == nil {
+		resp := map[string]interface{}{
+			"type": "configResponse",
+			"payload": map[string]interface{}{
+				"config": nil,
+				"error":  "database not available",
+			},
+		}
+		select {
+		case worker.Send <- resp:
+		default:
+			logs.Warnf("Config response dropped for worker %s", worker.ID)
+		}
+		return
+	}
+
+	da, err := infradb.GetDigitalAssistantByCode(context.Background(), s.db, assistantCode)
+	if err != nil {
+		logs.Errorf("Failed to get digital assistant %s: %v", assistantCode, err)
+		resp := map[string]interface{}{
+			"type": "configResponse",
+			"payload": map[string]interface{}{
+				"config": nil,
+				"error":  err.Error(),
+			},
+		}
+		select {
+		case worker.Send <- resp:
+		default:
+			logs.Warnf("Config response dropped for worker %s", worker.ID)
+		}
+		return
+	}
+
+	if da == nil {
+		logs.Warnf("Digital assistant %s not found", assistantCode)
+		resp := map[string]interface{}{
+			"type": "configResponse",
+			"payload": map[string]interface{}{
+				"config": nil,
+				"error":  "digital assistant not found",
+			},
+		}
+		select {
+		case worker.Send <- resp:
+		default:
+			logs.Warnf("Config response dropped for worker %s", worker.ID)
+		}
+		return
+	}
+
+	resp := map[string]interface{}{
+		"type": "configResponse",
+		"payload": map[string]interface{}{
+			"config": da.Config,
+			"error":  nil,
+		},
+	}
+	select {
+	case worker.Send <- resp:
+		logs.Infof("Config sent to worker %s for assistant %s", worker.ID, assistantCode)
+	default:
+		logs.Warnf("Config response dropped for worker %s", worker.ID)
 	}
 }
 
@@ -349,6 +451,56 @@ func (s *Server) shutdownWorker(c *gin.Context) {
 	default:
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "worker send buffer full"})
 	}
+}
+
+type CreateWorkerRequest struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
+	EnvType     string            `json:"env_type"`
+	Image       string            `json:"image"`
+	Command     []string          `json:"command"`
+	Args        []string          `json:"args"`
+	Env         map[string]string `json:"env"`
+	WorkingDir  string            `json:"working_dir"`
+}
+
+func (s *Server) createWorker(c *gin.Context) {
+	var req CreateWorkerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if s.scheduler == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "worker scheduler not initialized"})
+		return
+	}
+
+	spec := &worker.WorkerSpec{
+		ID:          req.ID,
+		Name:        req.Name,
+		Labels:      req.Labels,
+		Annotations: req.Annotations,
+		EnvType:     worker.WorkerEnvType(req.EnvType),
+		Image:       req.Image,
+		Command:     req.Command,
+		Args:        req.Args,
+		Env:         req.Env,
+		WorkingDir:  req.WorkingDir,
+	}
+
+	spec.EnvType = worker.WorkerEnvProcess
+
+	instance, err := s.scheduler.Start(c.Request.Context(), spec)
+	if err != nil {
+		logs.Errorf("Failed to create worker: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, instance)
 }
 
 func (wc *WorkerConnection) SendJSON(msg map[string]interface{}) error {

@@ -10,18 +10,22 @@ import (
 	"github.com/insmtx/SingerOS/backend/internal/api/auth"
 	"github.com/insmtx/SingerOS/backend/internal/api/contract"
 	"github.com/insmtx/SingerOS/backend/internal/infra/db"
+	"github.com/insmtx/SingerOS/backend/internal/worker"
 	"github.com/insmtx/SingerOS/backend/types"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 var _ contract.DigitalAssistantService = (*digitalAssistantService)(nil)
 
 type digitalAssistantService struct {
-	db *gorm.DB
+	db              *gorm.DB
+	workerScheduler worker.WorkerScheduler
 }
 
-func NewDigitalAssistantService(db *gorm.DB) contract.DigitalAssistantService {
+func NewDigitalAssistantService(db *gorm.DB, workerScheduler worker.WorkerScheduler) contract.DigitalAssistantService {
 	return &digitalAssistantService{
-		db: db,
+		db:              db,
+		workerScheduler: workerScheduler,
 	}
 }
 
@@ -68,6 +72,17 @@ func (s *digitalAssistantService) CreateDigitalAssistant(ctx context.Context, re
 
 	if err := db.CreateDigitalAssistant(ctx, s.db, da); err != nil {
 		return nil, err
+	}
+
+	if s.workerScheduler != nil && da.Status == string(contract.DigitalAssistantStatusActive) {
+		spec := &worker.WorkerSpec{
+			ID:      da.Code,
+			Name:    da.Name,
+			EnvType: worker.WorkerEnvProcess,
+		}
+		if _, err := s.workerScheduler.Start(ctx, spec); err != nil {
+			logs.Warnf("Failed to start worker for assistant %s: %v", da.Code, err)
+		}
 	}
 
 	return convertToContractDigitalAssistant(da), nil

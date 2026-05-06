@@ -16,6 +16,7 @@ import (
 	githubprovider "github.com/insmtx/SingerOS/backend/internal/infra/providers/github"
 	"github.com/insmtx/SingerOS/backend/internal/infra/websocket"
 	"github.com/insmtx/SingerOS/backend/internal/service"
+	"github.com/insmtx/SingerOS/backend/internal/worker/scheduler"
 	workerserver "github.com/insmtx/SingerOS/backend/internal/worker/server"
 	singerMCP "github.com/insmtx/SingerOS/backend/mcp"
 	ygmiddleware "github.com/ygpkg/yg-go/apis/runtime/middleware"
@@ -61,13 +62,17 @@ func SetupRouter(cfg config.Config, publisher eventbus.Publisher, db *gorm.DB) *
 	websocket.RegisterWebSocketRoutes(v1, publisher)
 	logs.Info("WebSocket connector registered successfully")
 
-	digitalAssistantService := service.NewDigitalAssistantService(db)
-	handler.RegisterDigitalAssistantRoutes(v1, digitalAssistantService)
-	logs.Info("Digital assistant routes registered successfully")
+	workerScheduler := scheduler.NewProcessScheduler(&scheduler.ProcessConfig{
+		ServerAddr: ":8080",
+	})
 
-	workerServer := workerserver.NewServer()
+	workerServer := workerserver.NewServer(workerScheduler, db)
 	workerServer.RegisterRoutes(v1)
 	logs.Info("Worker server routes registered successfully")
+
+	digitalAssistantService := service.NewDigitalAssistantService(db, workerScheduler)
+	handler.RegisterDigitalAssistantRoutes(v1, digitalAssistantService)
+	logs.Info("Digital assistant routes registered successfully")
 
 	singerMCP.RegisterRoutes(v1, singerMCP.NewServer())
 	logs.Info("MCP routes registered successfully")
