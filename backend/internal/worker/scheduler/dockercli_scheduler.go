@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -62,6 +63,10 @@ func (ds *DockerCLIScheduler) execDocker(ctx context.Context, args ...string) (s
 	return strings.TrimSpace(stdout.String()), stderr.String(), nil
 }
 
+func (ds *DockerCLIScheduler) containerWorkingDir(workid string) string {
+	return filepath.Join(ds.config.WorkingDir, "workspace", workid)
+}
+
 func (ds *DockerCLIScheduler) buildEnvVars(spec *worker.WorkerSpec) map[string]string {
 	env := make(map[string]string)
 
@@ -73,9 +78,6 @@ func (ds *DockerCLIScheduler) buildEnvVars(spec *worker.WorkerSpec) map[string]s
 		env[key] = value
 	}
 
-	if spec.ID != "" {
-		env["SINGEROS_ASSISTANT_CODE"] = spec.ID
-	}
 	if ds.config.ServerAddr != "" {
 		env["SINGEROS_SERVER_ADDR"] = ds.config.ServerAddr
 	}
@@ -86,7 +88,7 @@ func (ds *DockerCLIScheduler) buildEnvVars(spec *worker.WorkerSpec) map[string]s
 
 func (ds *DockerCLIScheduler) createAndStartContainer(ctx context.Context, instance *DockerInstance, spec *worker.WorkerSpec, cName string) error {
 	args := []string{"create", "--name", cName}
-
+	args = append(args, "-v", ds.containerWorkingDir(spec.ID)+":/workspace")
 	if spec.WorkingDir != "" {
 		args = append(args, "-w", spec.WorkingDir)
 	} else {
