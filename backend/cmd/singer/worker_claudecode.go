@@ -18,29 +18,28 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
-var (
-	taskWorkerConfigPath string
-	taskWorkerServerAddr string
-)
+func init() {
+	workerCmd.AddCommand(claudeWorkerCmd)
+}
 
 var claudeWorkerCmd = &cobra.Command{
-	Use:   "claude-worker",
+	Use:   "claude-code",
 	Short: "Start a standalone task worker backed by Claude Code",
 	Long:  `Start a standalone SingerOS worker that subscribes to org.{org_id}.worker.{worker_id}.task and executes agent.run tasks through Claude Code.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		mcpServer, err := startWorkerMCPServer(taskWorkerServerAddr)
-		if err != nil {
-			logs.Fatalf("Failed to start worker MCP server: %v", err)
-			return
-		}
-
-		cfg, err := loadWorkerConfig(taskWorkerConfigPath, taskWorkerServerAddr)
+		cfg, err := loadWorkerConfig()
 		if err != nil {
 			logs.Fatalf("Failed to load config: %v", err)
 			return
 		}
 		if err := validateTaskWorkerConfig(cfg); err != nil {
 			logs.Fatalf("Invalid worker config: %v", err)
+			return
+		}
+
+		mcpServer, err := startWorkerMCPServer(workerListenAddr)
+		if err != nil {
+			logs.Fatalf("Failed to start worker MCP server: %v", err)
 			return
 		}
 
@@ -64,8 +63,8 @@ var claudeWorkerCmd = &cobra.Command{
 
 		ctx, cancel := context.WithCancel(context.Background())
 		consumer, err := taskconsumer.New(taskconsumer.Config{
-			OrgID:    cfg.Worker.OrgID,
-			WorkerID: cfg.Worker.WorkerID,
+			OrgID:    cfg.OrgID,
+			WorkerID: cfg.WorkerID,
 		}, bus, bus, runner)
 		if err != nil {
 			cancel()
@@ -91,35 +90,23 @@ var claudeWorkerCmd = &cobra.Command{
 		})
 		lifecycle.Std().AddCloseFunc(bus.Close)
 
-		logs.Infof("Claude worker started: org_id=%s worker_id=%s topic=%s", cfg.Worker.OrgID, cfg.Worker.WorkerID, consumer.TaskTopic())
+		logs.Infof("Claude worker started: org_id=%s worker_id=%s topic=%s", cfg.OrgID, cfg.WorkerID, consumer.TaskTopic())
 		lifecycle.Std().WaitExit()
 		logs.Info("Claude worker exited")
 	},
 }
 
-func init() {
-	claudeWorkerCmd.Flags().StringVar(&taskWorkerConfigPath, "config", "", "Configuration file path")
-	claudeWorkerCmd.Flags().StringVar(&taskWorkerServerAddr, "server-addr", ":8081", "Worker MCP server listen address for runtime bootstrap")
-	rootCmd.AddCommand(claudeWorkerCmd)
-}
-
-func validateTaskWorkerConfig(cfg *config.Config) error {
+func validateTaskWorkerConfig(cfg *config.WorkerConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("config is required")
 	}
-	if cfg.Worker == nil {
-		return fmt.Errorf("worker config is required")
-	}
-	if strings.TrimSpace(cfg.Worker.OrgID) == "" {
-		return fmt.Errorf("worker.org_id is required")
-	}
-	if strings.TrimSpace(cfg.Worker.WorkerID) == "" {
-		return fmt.Errorf("worker.worker_id is required")
+	if strings.TrimSpace(cfg.AssistantCode) == "" {
+		return fmt.Errorf("worker.assistant_code is required")
 	}
 	return nil
 }
 
-func buildClaudeCodeRunner(cfg *config.Config) (agent.Runner, error) {
+func buildClaudeCodeRunner(cfg *config.WorkerConfig) (agent.Runner, error) {
 	cliRegistry, err := builtin.NewRegistryFromConfig(cfg.CLI)
 	if err != nil {
 		return nil, fmt.Errorf("create CLI engine registry: %w", err)
