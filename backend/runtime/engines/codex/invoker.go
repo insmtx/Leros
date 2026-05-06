@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/insmtx/SingerOS/backend/runtime/engines"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 // Invoker 启动 Codex CLI 进程。
@@ -125,6 +126,7 @@ func (inv *Invoker) scanStdout(ctx context.Context, r interface{ Read([]byte) (i
 }
 
 func parseCodexLine(line string) (engines.Event, string) {
+	logs.Infof("Parse Codex line: %s", line)
 	line = strings.TrimSpace(line)
 	if line == "" {
 		return engines.Event{}, ""

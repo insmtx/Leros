@@ -2,6 +2,7 @@ package claude
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"strings"
@@ -85,6 +86,25 @@ func TestParseClaudeLineTracksAssistantFallback(t *testing.T) {
 	}
 	if state.lastAssistantText != "answer" {
 		t.Fatalf("got %q, want answer", state.lastAssistantText)
+	}
+}
+
+func TestClaudeFailureContentPrefersClaudeResult(t *testing.T) {
+	err := errors.New("exit status 1")
+	state := &claudeStreamState{result: "authentication failed"}
+
+	content := claudeFailureContent(err, state, "stderr detail")
+	if content != "authentication failed (exit status 1)" {
+		t.Fatalf("got %q", content)
+	}
+}
+
+func TestClaudeFailureContentFallsBackToStderr(t *testing.T) {
+	err := errors.New("exit status 1")
+
+	content := claudeFailureContent(err, &claudeStreamState{}, "stderr detail")
+	if content != "stderr detail (exit status 1)" {
+		t.Fatalf("got %q", content)
 	}
 }
 

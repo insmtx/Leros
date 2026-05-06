@@ -25,8 +25,9 @@ import (
 )
 
 var (
-	workerConfigPath string
-	workerServerAddr string
+	workerConfigPath     string
+	workerServerAddr     string
+	workerDefaultRuntime string
 )
 
 var workerCmd = &cobra.Command{
@@ -64,7 +65,7 @@ var workerCmd = &cobra.Command{
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
-		runner, err := buildRuntimeRunner(ctx, cfg, runtimeConfig)
+		runner, err := buildRuntimeRunner(ctx, cfg, runtimeConfig, workerDefaultRuntime)
 		if err != nil {
 			cancel()
 			logs.Fatalf("Failed to create agent runtime: %v", err)
@@ -102,6 +103,7 @@ var workerCmd = &cobra.Command{
 func init() {
 	workerCmd.Flags().StringVar(&workerConfigPath, "config", "", "Configuration file path")
 	workerCmd.Flags().StringVar(&workerServerAddr, "server-addr", ":8081", "Worker MCP server listen address for runtime CLI bootstrap")
+	workerCmd.Flags().StringVar(&workerDefaultRuntime, "default-runtime", "", "Default agent runtime kind, for example singeros, claude, or codex")
 	rootCmd.AddCommand(workerCmd)
 }
 
@@ -214,13 +216,14 @@ func buildTooling(catalog *skilltools.Catalog) (*tools.Registry, error) {
 	return registry, nil
 }
 
-func buildRuntimeRunner(ctx context.Context, cfg *config.Config, runtimeConfig agent.Config) (agent.Runner, error) {
+func buildRuntimeRunner(ctx context.Context, cfg *config.Config, runtimeConfig agent.Config, defaultRuntime string) (agent.Runner, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config is required")
 	}
 
 	router := agent.NewRuntimeRouter(agent.RuntimeKindSingerOS)
 	registered := 0
+	registeredKinds := make(map[string]struct{})
 
 	if cfg.LLM != nil && cfg.LLM.APIKey != "" {
 		switch cfg.LLM.Provider {
@@ -234,6 +237,7 @@ func buildRuntimeRunner(ctx context.Context, cfg *config.Config, runtimeConfig a
 				return nil, err
 			}
 			registered++
+			registeredKinds[agent.RuntimeKindSingerOS] = struct{}{}
 		default:
 			logs.Warnf("Skipping SingerOS agent runtime for unsupported Eino chat model provider: %s", cfg.LLM.Provider)
 		}
@@ -257,20 +261,38 @@ func buildRuntimeRunner(ctx context.Context, cfg *config.Config, runtimeConfig a
 			return nil, err
 		}
 		registered++
+		registeredKinds[strings.ToLower(strings.TrimSpace(name))] = struct{}{}
 		logs.Infof("Registering external agent CLI runtime: %s", name)
 	}
 
 	if registered == 0 {
 		return nil, fmt.Errorf("no agent runtime is available")
 	}
-	if cfg.LLM == nil || cfg.LLM.APIKey == "" {
-		if cfg.CLI != nil && cfg.CLI.Default != "" {
-			router.SetDefault(cfg.CLI.Default)
-		} else if len(cliNames) > 0 {
-			router.SetDefault(cliNames[0])
-		}
-	} else {
-		router.SetDefault(agent.RuntimeKindSingerOS)
+
+	selectedDefault := selectDefaultRuntime(defaultRuntime, cfg, cliNames)
+	if selectedDefault == "" {
+		selectedDefault = agent.RuntimeKindSingerOS
 	}
+	normalizedDefault := strings.ToLower(strings.TrimSpace(selectedDefault))
+	if _, ok := registeredKinds[normalizedDefault]; !ok {
+		return nil, fmt.Errorf("default agent runtime %q is not available", selectedDefault)
+	}
+	router.SetDefault(selectedDefault)
 	return router, nil
+}
+
+func selectDefaultRuntime(defaultRuntime string, cfg *config.Config, cliNames []string) string {
+	if strings.TrimSpace(defaultRuntime) != "" {
+		return defaultRuntime
+	}
+	if cfg != nil && cfg.CLI != nil && strings.TrimSpace(cfg.CLI.Default) != "" {
+		return cfg.CLI.Default
+	}
+	if cfg != nil && cfg.LLM != nil && cfg.LLM.APIKey != "" {
+		return agent.RuntimeKindSingerOS
+	}
+	if len(cliNames) > 0 {
+		return cliNames[0]
+	}
+	return ""
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/insmtx/SingerOS/backend/internal/agent"
 	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
 	"github.com/insmtx/SingerOS/backend/runtime/engines"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 // Runner executes one SingerOS agent request through an external CLI engine.
@@ -72,10 +73,7 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 	}
 
 	if handle != nil && handle.Process != nil {
-		_ = emitter.Emit(ctx, &agentevents.RunEvent{
-			Type:    agentevents.RunEventMessageDelta,
-			Content: fmt.Sprintf("external runtime %s started with pid %d", r.name, handle.Process.PID()),
-		})
+		logs.InfoContextf(ctx, "External runtime %s started with pid %d", r.name, handle.Process.PID())
 	}
 
 	message, err := consumeEvents(ctx, emitter, handle)

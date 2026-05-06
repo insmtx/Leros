@@ -62,6 +62,7 @@ func (c *Consumer) Start(ctx context.Context) error {
 	topic := c.TaskTopic()
 	logs.InfoContextf(ctx, "Starting worker task subscription: %s", topic)
 	return c.subscriber.Subscribe(ctx, topic, func(event any) {
+		logs.InfoContextf(ctx, "Received worker task event from topic: %s", topic)
 		if err := c.handleEvent(ctx, event); err != nil {
 			logs.ErrorContextf(ctx, "Failed to handle worker task: %v", err)
 		}
@@ -80,8 +81,28 @@ func (c *Consumer) handleEvent(ctx context.Context, event any) error {
 		return fmt.Errorf("unsupported worker task type %q", msg.Body.TaskType)
 	}
 
+	logs.InfoContextf(ctx,
+		"Received worker task: msg_id=%s task_id=%s run_id=%s org_id=%s worker_id=%s session_id=%s task_type=%s",
+		msg.ID,
+		msg.Trace.TaskID,
+		msg.Trace.RunID,
+		msg.Route.OrgID,
+		msg.Route.WorkerID,
+		msg.Route.SessionID,
+		msg.Body.TaskType,
+	)
+
 	req := RequestFromWorkerTask(msg)
 	req.EventSink = NewMQStreamSink(c.publisher, msg)
+
+	logs.InfoContextf(ctx,
+		"Starting worker task run: task_id=%s run_id=%s runtime=%s assistant_id=%s agent_id=%s",
+		req.TaskID,
+		req.RunID,
+		req.Runtime.Kind,
+		req.Assistant.ID,
+		msg.Body.Execution.AgentID,
+	)
 
 	result, err := c.runner.Run(ctx, req)
 	if err != nil {

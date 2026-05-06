@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/insmtx/SingerOS/backend/runtime/engines"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 // Invoker 启动 Claude Code 进程。
@@ -82,6 +83,7 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Pr
 		defer cancel()
 
 		parseState := &claudeStreamState{}
+		var stderrText string
 		var wg sync.WaitGroup
 		wg.Add(2)
 		go func() {
@@ -90,13 +92,13 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Pr
 		}()
 		go func() {
 			defer wg.Done()
-			scanPlainOutput(ctx, stderr, events, engines.EventMessageDelta)
+			stderrText = scanPlainOutput(ctx, stderr, events, engines.EventMessageDelta)
 		}()
 
 		err := cmd.Wait()
 		wg.Wait()
 		if err != nil {
-			events <- engines.Event{Type: engines.EventError, Content: err.Error()}
+			events <- engines.Event{Type: engines.EventError, Content: claudeFailureContent(err, parseState, stderrText)}
 			return
 		}
 		if parseState.isError {
@@ -134,6 +136,7 @@ func scanClaudeStdout(ctx context.Context, r interface{ Read([]byte) (int, error
 }
 
 func parseClaudeLine(line string, state *claudeStreamState) engines.Event {
+	logs.Infof("Parse Claude line: %s", line)
 	line = strings.TrimSpace(line)
 	if line == "" {
 		return engines.Event{}
@@ -178,14 +181,20 @@ func parseClaudeLine(line string, state *claudeStreamState) engines.Event {
 	return engines.Event{}
 }
 
-func scanPlainOutput(ctx context.Context, r interface{ Read([]byte) (int, error) }, events chan<- engines.Event, eventType engines.EventType) {
+func scanPlainOutput(ctx context.Context, r interface{ Read([]byte) (int, error) }, events chan<- engines.Event, eventType engines.EventType) string {
+	var output strings.Builder
 	engines.ScanJSONLines(r, func(line string) bool {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			return true
 		}
+		if output.Len() > 0 {
+			output.WriteString("\n")
+		}
+		output.WriteString(line)
 		return sendEvent(ctx, events, engines.Event{Type: eventType, Content: line})
 	})
+	return output.String()
 }
 
 func sendEvent(ctx context.Context, events chan<- engines.Event, event engines.Event) bool {
@@ -214,4 +223,21 @@ func buildArgs(req engines.RunRequest) []string {
 		}
 	}
 	return append(args, "--print")
+}
+
+func claudeFailureContent(err error, state *claudeStreamState, stderrText string) string {
+	detail := ""
+	if state != nil {
+		detail = strings.TrimSpace(state.result)
+	}
+	if detail == "" {
+		detail = strings.TrimSpace(stderrText)
+	}
+	if err == nil {
+		return detail
+	}
+	if detail == "" {
+		return err.Error()
+	}
+	return fmt.Sprintf("%s (%v)", detail, err)
 }
