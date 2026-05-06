@@ -18,7 +18,6 @@ var (
 	simpleChatAPIKey  string
 	simpleChatModel   string
 	simpleChatBaseURL string
-	
 )
 
 var simpleChatCmd = &cobra.Command{
@@ -53,7 +52,7 @@ var simpleChatCmd = &cobra.Command{
 
 		workerCfg := &worker.WorkerConfig{
 			Runtime:    scRuntime,
-			ServerAddr: simpleChatServer,
+			ServerAddr: workerServerAddr,
 		}
 
 		w, err := worker.NewWorker(ctx, workerCfg)
@@ -76,7 +75,7 @@ func init() {
 	simpleChatCmd.Flags().StringVar(&simpleChatAPIKey, "api-key", "", "OpenAI API key (or set OPENAI_API_KEY env)")
 	simpleChatCmd.Flags().StringVar(&simpleChatModel, "model", "gpt-4", "LLM model to use")
 	simpleChatCmd.Flags().StringVar(&simpleChatBaseURL, "base-url", "", "Custom API base URL")
-	
+
 	workerCmd.AddCommand(simpleChatCmd)
 }
 

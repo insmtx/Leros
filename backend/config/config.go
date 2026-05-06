@@ -19,11 +19,13 @@ type LLMConfig struct {
 
 // Config 是 SingerOS 的主配置结构，包含所有子系统的配置
 type Config struct {
-	Github   *GithubAppConfig `yaml:"github,omitempty"`
-	Gitlab   *GitlabAppConfig `yaml:"gitlab,omitempty"`
-	NATS     *NATSConfig      `yaml:"nats,omitempty"`
-	Database *DatabaseConfig  `yaml:"database,omitempty"`
-	LLM      *LLMConfig       `yaml:"llm,omitempty"`
+	ServerAddr string           `yaml:"server_addr,omitempty"` // 服务器地址
+	Github     *GithubAppConfig `yaml:"github,omitempty"`
+	Gitlab     *GitlabAppConfig `yaml:"gitlab,omitempty"`
+	NATS       *NATSConfig      `yaml:"nats,omitempty"`
+	Database   *DatabaseConfig  `yaml:"database,omitempty"`
+	LLM        *LLMConfig       `yaml:"llm,omitempty"`
+	Scheduler  *SchedulerConfig `yaml:"scheduler,omitempty"`
 }
 
 // DatabaseConfig 是数据库的配置结构
