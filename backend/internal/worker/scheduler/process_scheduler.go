@@ -20,6 +20,8 @@ type ProcessScheduler struct {
 	mu        sync.RWMutex
 }
 
+var _ worker.WorkerScheduler = (*ProcessScheduler)(nil)
+
 type ProcessInstance struct {
 	ID        string
 	WorkerID  string
