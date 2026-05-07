@@ -71,6 +71,10 @@ func SetupRouter(cfg config.Config, publisher eventbus.Publisher, db *gorm.DB) *
 		digitalAssistantService := service.NewDigitalAssistantService(db, workerScheduler)
 		handler.RegisterDigitalAssistantRoutes(v1, digitalAssistantService)
 		logs.Info("Digital assistant routes registered successfully")
+
+		sessionService := service.NewSessionService(db)
+		handler.RegisterSessionRoutes(v1, sessionService)
+		logs.Info("Session routes registered successfully")
 	}
 
 	{

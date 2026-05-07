@@ -1,0 +1,606 @@
+package service
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+
+	"github.com/insmtx/SingerOS/backend/internal/api/contract"
+	"github.com/insmtx/SingerOS/backend/types"
+)
+
+func setupTestService(t *testing.T) contract.SessionService {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("failed to open test database: %v", err)
+	}
+
+	if err := db.AutoMigrate(&types.Session{}, &types.SessionMessage{}); err != nil {
+		t.Fatalf("failed to migrate test database: %v", err)
+	}
+
+	return NewSessionService(db)
+}
+
+func TestCreateSession_ValidInput(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	req := &contract.CreateSessionRequest{
+		Type:  string(types.SessionTypeUserChat),
+		Title: "Test Session",
+	}
+
+	session, err := service.CreateSession(ctx, req)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	if session.SessionID == "" {
+		t.Error("expected session_id to be generated")
+	}
+
+	if session.Status != string(types.SessionStatusActive) {
+		t.Errorf("expected status to be active, got %s", session.Status)
+	}
+}
+
+func TestCreateSession_MissingType(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	req := &contract.CreateSessionRequest{
+		Title: "Test Session",
+	}
+
+	_, err := service.CreateSession(ctx, req)
+	if err == nil {
+		t.Error("expected error for missing type")
+	}
+
+	if err.Error() != "type is required" {
+		t.Errorf("expected 'type is required' error, got %s", err.Error())
+	}
+}
+
+func TestCreateSession_CustomSessionID(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	req := &contract.CreateSessionRequest{
+		SessionID: "custom_session_id",
+		Type:      string(types.SessionTypeUserChat),
+	}
+
+	session, err := service.CreateSession(ctx, req)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	if session.SessionID != "custom_session_id" {
+		t.Errorf("expected session_id to be custom_session_id, got %s", session.SessionID)
+	}
+}
+
+func TestCreateSession_DuplicateSessionID(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	req1 := &contract.CreateSessionRequest{
+		SessionID: "duplicate_id",
+		Type:      string(types.SessionTypeUserChat),
+	}
+
+	_, err := service.CreateSession(ctx, req1)
+	if err != nil {
+		t.Fatalf("first CreateSession failed: %v", err)
+	}
+
+	req2 := &contract.CreateSessionRequest{
+		SessionID: "duplicate_id",
+		Type:      string(types.SessionTypeUserChat),
+	}
+
+	_, err = service.CreateSession(ctx, req2)
+	if err == nil {
+		t.Error("expected error for duplicate session_id")
+	}
+
+	if err.Error() != "session with this session_id already exists" {
+		t.Errorf("expected 'session already exists' error, got %s", err.Error())
+	}
+}
+
+func TestGetSession_NotFound(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	_, err := service.GetSession(ctx, 1, "")
+	if err == nil {
+		t.Error("expected error for non-existent session")
+	}
+
+	if err.Error() != "session not found" {
+		t.Errorf("expected 'session not found' error, got %s", err.Error())
+	}
+}
+
+func TestGetSession_ByID(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	createReq := &contract.CreateSessionRequest{
+		Type:  string(types.SessionTypeUserChat),
+		Title: "Get By ID Test",
+	}
+
+	session, err := service.CreateSession(ctx, createReq)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	retrieved, err := service.GetSession(ctx, session.ID, "")
+	if err != nil {
+		t.Fatalf("GetSession failed: %v", err)
+	}
+
+	if retrieved.ID != session.ID {
+		t.Errorf("expected ID %d, got %d", session.ID, retrieved.ID)
+	}
+}
+
+func TestUpdateSession(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	createReq := &contract.CreateSessionRequest{
+		Type:  string(types.SessionTypeUserChat),
+		Title: "Original Title",
+	}
+
+	session, err := service.CreateSession(ctx, createReq)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	updateReq := &contract.UpdateSessionRequest{
+		Title: "Updated Title",
+	}
+
+	updated, err := service.UpdateSession(ctx, session.ID, updateReq)
+	if err != nil {
+		t.Fatalf("UpdateSession failed: %v", err)
+	}
+
+	if updated.Title != "Updated Title" {
+		t.Errorf("expected title to be updated, got %s", updated.Title)
+	}
+}
+
+func TestDeleteSession(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	createReq := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	}
+
+	session, err := service.CreateSession(ctx, createReq)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	err = service.DeleteSession(ctx, session.ID)
+	if err != nil {
+		t.Fatalf("DeleteSession failed: %v", err)
+	}
+
+	_, err = service.GetSession(ctx, session.ID, "")
+	if err == nil {
+		t.Error("expected error for deleted session")
+	}
+}
+
+func TestActivateSession_InvalidState(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	createReq := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	}
+
+	session, err := service.CreateSession(ctx, createReq)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	service.EndSession(ctx, session.ID)
+
+	err = service.ActivateSession(ctx, session.ID)
+	if err == nil {
+		t.Error("expected error for activating from ended state")
+	}
+
+	if err.Error() != "cannot activate from ended state" {
+		t.Errorf("expected 'cannot activate from ended state' error, got %s", err.Error())
+	}
+}
+
+func TestPauseSession(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	createReq := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	}
+
+	session, err := service.CreateSession(ctx, createReq)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	err = service.PauseSession(ctx, session.ID)
+	if err != nil {
+		t.Fatalf("PauseSession failed: %v", err)
+	}
+
+	retrieved, err := service.GetSession(ctx, session.ID, "")
+	if err != nil {
+		t.Fatalf("GetSession failed: %v", err)
+	}
+
+	if retrieved.Status != string(types.SessionStatusPaused) {
+		t.Errorf("expected status to be paused, got %s", retrieved.Status)
+	}
+}
+
+func TestEndSession_AlreadyEnded(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	createReq := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	}
+
+	session, err := service.CreateSession(ctx, createReq)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	service.EndSession(ctx, session.ID)
+
+	err = service.EndSession(ctx, session.ID)
+	if err == nil {
+		t.Error("expected error for ending already ended session")
+	}
+
+	if err.Error() != "session already ended" {
+		t.Errorf("expected 'session already ended' error, got %s", err.Error())
+	}
+}
+
+func TestResumeSession_NotPaused(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	createReq := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	}
+
+	session, err := service.CreateSession(ctx, createReq)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	err = service.ResumeSession(ctx, session.ID)
+	if err == nil {
+		t.Error("expected error for resuming non-paused session")
+	}
+
+	if err.Error() != "can only resume from paused state" {
+		t.Errorf("expected 'can only resume from paused state' error, got %s", err.Error())
+	}
+}
+
+func TestAddMessage_UpdatesSession(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	createReq := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	}
+
+	session, err := service.CreateSession(ctx, createReq)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	addReq := &contract.AddMessageRequest{
+		Role:    string(types.MessageRoleUser),
+		Content: "Test message",
+	}
+
+	_, err = service.AddMessage(ctx, session.ID, addReq)
+	if err != nil {
+		t.Fatalf("AddMessage failed: %v", err)
+	}
+
+	retrieved, err := service.GetSession(ctx, session.ID, "")
+	if err != nil {
+		t.Fatalf("GetSession failed: %v", err)
+	}
+
+	if retrieved.MessageCount != 1 {
+		t.Errorf("expected message_count to be 1, got %d", retrieved.MessageCount)
+	}
+
+	if retrieved.LastMessageAt == nil {
+		t.Error("expected last_message_at to be set")
+	}
+}
+
+func TestAddMessage_AutoSequence(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	createReq := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	}
+
+	session, err := service.CreateSession(ctx, createReq)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	for i := 1; i <= 3; i++ {
+		addReq := &contract.AddMessageRequest{
+			Role:    string(types.MessageRoleUser),
+			Content: "Message " + string(rune(i)),
+		}
+
+		msg, err := service.AddMessage(ctx, session.ID, addReq)
+		if err != nil {
+			t.Fatalf("AddMessage failed: %v", err)
+		}
+
+		if msg.Sequence != int64(i) {
+			t.Errorf("expected sequence %d, got %d", i, msg.Sequence)
+		}
+	}
+}
+
+func TestAddMessage_MissingContent(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	createReq := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	}
+
+	session, err := service.CreateSession(ctx, createReq)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	addReq := &contract.AddMessageRequest{
+		Role: string(types.MessageRoleUser),
+	}
+
+	_, err = service.AddMessage(ctx, session.ID, addReq)
+	if err == nil {
+		t.Error("expected error for missing content")
+	}
+
+	if err.Error() != "content is required" {
+		t.Errorf("expected 'content is required' error, got %s", err.Error())
+	}
+}
+
+func TestDeleteMessage_UpdatesSession(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	createReq := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	}
+
+	session, err := service.CreateSession(ctx, createReq)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	addReq := &contract.AddMessageRequest{
+		Role:    string(types.MessageRoleUser),
+		Content: "Test message",
+	}
+
+	// 添加消息获取 ID
+	msg, err := service.AddMessage(ctx, session.ID, addReq)
+	if err != nil {
+		t.Fatalf("AddMessage failed: %v", err)
+	}
+
+	// 将 string ID 转换回 uint
+	var messageID uint
+	fmt.Sscanf(msg.ID, "%d", &messageID)
+
+	err = service.DeleteMessage(ctx, messageID)
+	if err != nil {
+		t.Fatalf("DeleteMessage failed: %v", err)
+	}
+
+	retrieved, err := service.GetSession(ctx, session.ID, "")
+	if err != nil {
+		t.Fatalf("GetSession failed: %v", err)
+	}
+
+	if retrieved.MessageCount != 1 {
+		t.Errorf("expected message_count to be 1 after delete, got %d", retrieved.MessageCount)
+	}
+}
+
+func TestListSessions_FilterByType(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	req1 := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	}
+	req2 := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeAssistantInstance),
+	}
+
+	_, err := service.CreateSession(ctx, req1)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+	_, err = service.CreateSession(ctx, req2)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	typeFilter := string(types.SessionTypeUserChat)
+	listReq := &contract.ListSessionsRequest{
+		Type: &typeFilter,
+		Page: 1,
+		PerPage: 20,
+	}
+
+	result, err := service.ListSessions(ctx, listReq)
+	if err != nil {
+		t.Fatalf("ListSessions failed: %v", err)
+	}
+
+	if result.Total != 1 {
+		t.Errorf("expected 1 session, got %d", result.Total)
+	}
+
+	if result.Items[0].Type != string(types.SessionTypeUserChat) {
+		t.Errorf("expected user_chat type, got %s", result.Items[0].Type)
+	}
+}
+
+func TestListSessions_FilterByStatus(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	req1 := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	}
+	req2 := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	}
+
+	_, err := service.CreateSession(ctx, req1)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+	session2, _ := service.CreateSession(ctx, req2)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	service.PauseSession(ctx, session2.ID)
+
+	statusFilter := string(types.SessionStatusActive)
+	listReq := &contract.ListSessionsRequest{
+		Status: &statusFilter,
+		Page: 1,
+		PerPage: 20,
+	}
+
+	result, err := service.ListSessions(ctx, listReq)
+	if err != nil {
+		t.Fatalf("ListSessions failed: %v", err)
+	}
+
+	if result.Total != 1 {
+		t.Errorf("expected 1 active session, got %d", result.Total)
+	}
+}
+
+func TestGetSessionMessages(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	createReq := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	}
+
+	session, err := service.CreateSession(ctx, createReq)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	for i := 1; i <= 3; i++ {
+		addReq := &contract.AddMessageRequest{
+			Role:    string(types.MessageRoleUser),
+			Content: "Message " + string(rune(i)),
+		}
+		_, err := service.AddMessage(ctx, session.ID, addReq)
+		if err != nil {
+			t.Fatalf("AddMessage failed: %v", err)
+		}
+	}
+
+	result, err := service.GetSessionMessages(ctx, session.ID, 1, 20)
+	if err != nil {
+		t.Fatalf("GetSessionMessages failed: %v", err)
+	}
+
+	if result.Total != 3 {
+		t.Errorf("expected 3 messages, got %d", result.Total)
+	}
+
+	if len(result.Items) != 3 {
+		t.Errorf("expected 3 messages, got %d", len(result.Items))
+	}
+}
+
+func TestClearSessionMessages(t *testing.T) {
+	service := setupTestService(t)
+	ctx := context.Background()
+
+	createReq := &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	}
+
+	session, err := service.CreateSession(ctx, createReq)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	for i := 1; i <= 3; i++ {
+		addReq := &contract.AddMessageRequest{
+			Role:    string(types.MessageRoleUser),
+			Content: "Message " + string(rune(i)),
+		}
+		_, err := service.AddMessage(ctx, session.ID, addReq)
+		if err != nil {
+			t.Fatalf("AddMessage failed: %v", err)
+		}
+	}
+
+	err = service.ClearSessionMessages(ctx, session.ID)
+	if err != nil {
+		t.Fatalf("ClearSessionMessages failed: %v", err)
+	}
+
+	retrieved, err := service.GetSession(ctx, session.ID, "")
+	if err != nil {
+		t.Fatalf("GetSession failed: %v", err)
+	}
+
+	if retrieved.MessageCount != 0 {
+		t.Errorf("expected message_count to be 0 after clear, got %d", retrieved.MessageCount)
+	}
+
+	if retrieved.LastMessageAt != nil {
+		t.Error("expected last_message_at to be nil after clear")
+	}
+}
