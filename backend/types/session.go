@@ -34,6 +34,7 @@ const (
 	MessageRoleUser      MessageRole = "user"
 	MessageRoleAssistant MessageRole = "assistant"
 	MessageRoleSystem    MessageRole = "system"
+	MessageRoleTool      MessageRole = "tool"
 )
 
 // MessageType 消息类型常量
@@ -44,6 +45,16 @@ const (
 	MessageTypeImage MessageType = "image"
 	MessageTypeCode  MessageType = "code"
 	MessageTypeFile  MessageType = "file"
+)
+
+// MessageStatus 消息状态常量
+type MessageStatus string
+
+const (
+	MessageStatusSending   MessageStatus = "sending"
+	MessageStatusStreaming MessageStatus = "streaming"
+	MessageStatusComplete  MessageStatus = "complete"
+	MessageStatusError     MessageStatus = "error"
 )
 
 // Session 会话结构体定义了用户与数字助手之间的会话信息
@@ -125,7 +136,7 @@ type SessionMessage struct {
 	// session_message - 关联会话ID，VARCHAR(255)，NOT NULL，INDEX
 	SessionID string `gorm:"column:session_id;type:varchar(255);not null;index"`
 
-	// session_message - 消息角色（user/assistant/system），VARCHAR(50)，NOT NULL
+	// session_message - 消息角色（user/assistant/system/tool），VARCHAR(50)，NOT NULL
 	Role string `gorm:"column:role;type:varchar(50);not null"`
 
 	// session_message - 消息内容，TEXT，NOT NULL
@@ -134,11 +145,26 @@ type SessionMessage struct {
 	// session_message - 消息类型（text/image/code/file），VARCHAR(50)，DEFAULT 'text'
 	MessageType string `gorm:"column:message_type;type:varchar(50);default:'text'"`
 
+	// session_message - 消息状态（sending/streaming/complete/error），VARCHAR(50)，DEFAULT 'complete'
+	Status string `gorm:"column:status;type:varchar(50);default:'complete'"`
+
+	// session_message - 流式片段（JSON数组），JSONB，允许为空
+	Chunks StringSlice `gorm:"column:chunks;type:jsonb"`
+
+	// session_message - 思维链 / reasoning，TEXT，允许为空
+	Thinking string `gorm:"column:thinking;type:text"`
+
+	// session_message - 工具调用信息（JSON数组），JSONB，允许为空
+	ToolCalls ToolCallSlice `gorm:"column:tool_calls;type:jsonb"`
+
 	// session_message - 消息元数据，JSONB，允许为空
 	Metadata MessageMetadata `gorm:"column:metadata;type:jsonb"`
 
 	// session_message - 消息序号（用于排序），BIGINT，NOT NULL
 	Sequence int64 `gorm:"column:sequence;type:bigint;not null;index"`
+
+	// session_message - 时间戳（Unix毫秒），BIGINT，允许为空
+	Timestamp int64 `gorm:"column:timestamp;type:bigint"`
 }
 
 // TableName 指定SessionMessage结构体对应的数据库表名
@@ -156,8 +182,104 @@ type MessageMetadata struct {
 	FileURL string `json:"file_url,omitempty"`
 	// 文件名
 	FileName string `json:"file_name,omitempty"`
+	// LLM 模型名称
+	Model string `json:"model,omitempty"`
+	// Token 数量
+	Tokens int `json:"tokens,omitempty"`
+	// 延迟（毫秒）
+	Latency int `json:"latency,omitempty"`
 	// 其他扩展字段
 	Extra map[string]interface{} `json:"extra,omitempty"`
+}
+
+// ToolCallStatus 工具调用状态常量
+type ToolCallStatus string
+
+const (
+	ToolCallStatusPending ToolCallStatus = "pending"
+	ToolCallStatusRunning ToolCallStatus = "running"
+	ToolCallStatusSuccess ToolCallStatus = "success"
+	ToolCallStatusError   ToolCallStatus = "error"
+)
+
+// ToolCall 工具调用结构
+type ToolCall struct {
+	// 工具调用ID
+	ID string `json:"id"`
+	// 工具名称
+	Name string `json:"name"`
+	// 工具参数
+	Arguments map[string]interface{} `json:"arguments"`
+	// 工具调用状态
+	Status ToolCallStatus `json:"status"`
+	// 工具调用结果
+	Result interface{} `json:"result,omitempty"`
+	// 持续时间（毫秒）
+	Duration int `json:"duration,omitempty"`
+}
+
+// StringSlice 自定义字符串切片类型，支持 JSONB 存储
+type StringSlice []string
+
+// Scan 实现 sql.Scanner 接口
+func (s *StringSlice) Scan(value interface{}) error {
+	if value == nil {
+		*s = StringSlice{}
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("cannot scan %T into StringSlice", value)
+	}
+
+	var result []string
+	if err := json.Unmarshal(bytes, &result); err != nil {
+		return err
+	}
+
+	*s = StringSlice(result)
+	return nil
+}
+
+// Value 实现 driver.Valuer 接口
+func (s StringSlice) Value() (driver.Value, error) {
+	if len(s) == 0 {
+		return nil, nil
+	}
+	return json.Marshal([]string(s))
+}
+
+// ToolCallSlice 自定义 ToolCall 切片类型，支持 JSONB 存储
+type ToolCallSlice []ToolCall
+
+// Scan 实现 sql.Scanner 接口
+func (t *ToolCallSlice) Scan(value interface{}) error {
+	if value == nil {
+		*t = ToolCallSlice{}
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("cannot scan %T into ToolCallSlice", value)
+	}
+
+	var result []ToolCall
+	if err := json.Unmarshal(bytes, &result); err != nil {
+		return err
+	}
+
+	*t = ToolCallSlice(result)
+	return nil
+}
+
+// Value 实现 driver.Valuer 接口
+func (t ToolCallSlice) Value() (driver.Value, error) {
+	if len(t) == 0 {
+		return nil, nil
+	}
+	return json.Marshal([]ToolCall(t))
 }
 
 // Scan 实现 sql.Scanner 接口

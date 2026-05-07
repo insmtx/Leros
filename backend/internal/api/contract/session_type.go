@@ -42,10 +42,14 @@ type AddMessageRequest struct {
 	Role        string                     `json:"role" binding:"required"`
 	Content     string                     `json:"content" binding:"required"`
 	MessageType string                     `json:"message_type,omitempty"`
+	Status      string                     `json:"status,omitempty"`
+	Chunks      []string                   `json:"chunks,omitempty"`
+	Thinking    string                     `json:"thinking,omitempty"`
+	ToolCalls   []types.ToolCall           `json:"tool_calls,omitempty"`
 	Metadata    *types.MessageMetadata     `json:"metadata,omitempty"`
 }
 
-// Session 会话响应结构
+// Session 会话响应结构（对应前端的 Conversation）
 type Session struct {
 	ID            uint                      `json:"id"`
 	SessionID     string                    `json:"session_id"`
@@ -63,13 +67,18 @@ type Session struct {
 	UpdatedAt     time.Time                 `json:"updated_at"`
 }
 
-// SessionMessage 消息响应结构
+// SessionMessage 消息响应结构（对齐前端 Message 模型）
 type SessionMessage struct {
-	ID          uint                      `json:"id"`
-	SessionID   string                    `json:"session_id"`
+	ID          string                    `json:"id"`                 // 前端用 string
+	SessionID   string                    `json:"conversation_id"`    // 对应前端的 conversationId
 	Role        string                    `json:"role"`
 	Content     string                    `json:"content"`
-	MessageType string                    `json:"message_type"`
+	Chunks      []string                  `json:"chunks,omitempty"`   // 流式片段
+	Status      string                    `json:"status"`             // sending/streaming/complete/error
+	Timestamp   int64                     `json:"timestamp"`          // Unix 毫秒时间戳
+	ToolCalls   []types.ToolCall          `json:"tool_calls,omitempty"`
+	Thinking    string                    `json:"thinking,omitempty"` // 思维链
+	MessageType string                    `json:"message_type,omitempty"`
 	Metadata    *types.MessageMetadata    `json:"metadata,omitempty"`
 	Sequence    int64                     `json:"sequence"`
 	CreatedAt   time.Time                 `json:"created_at"`

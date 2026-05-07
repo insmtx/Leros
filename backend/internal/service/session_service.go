@@ -247,7 +247,21 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID uint, req *co
 		Role:        req.Role,
 		Content:     req.Content,
 		MessageType: req.MessageType,
+		Status:      req.Status,
 		Sequence:    sequence,
+		Timestamp:   time.Now().UnixMilli(), // Unix 毫秒时间戳
+	}
+
+	if req.Chunks != nil && len(req.Chunks) > 0 {
+		message.Chunks = req.Chunks
+	}
+
+	if req.Thinking != "" {
+		message.Thinking = req.Thinking
+	}
+
+	if req.ToolCalls != nil && len(req.ToolCalls) > 0 {
+		message.ToolCalls = req.ToolCalls
 	}
 
 	if req.Metadata != nil {
@@ -258,6 +272,10 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID uint, req *co
 
 	if message.MessageType == "" {
 		message.MessageType = string(types.MessageTypeText)
+	}
+
+	if message.Status == "" {
+		message.Status = string(types.MessageStatusComplete)
 	}
 
 	if err := db.CreateMessage(ctx, s.db, message); err != nil {
@@ -367,16 +385,30 @@ func convertToContractSession(session *types.Session) *contract.Session {
 
 func convertToContractSessionMessage(message *types.SessionMessage) *contract.SessionMessage {
 	result := &contract.SessionMessage{
-		ID:          message.ID,
+		ID:          fmt.Sprintf("%d", message.ID), // 转换为 string 以匹配前端
 		SessionID:   message.SessionID,
 		Role:        message.Role,
 		Content:     message.Content,
 		MessageType: message.MessageType,
+		Status:      message.Status,
+		Timestamp:   message.Timestamp,
 		Sequence:    message.Sequence,
 		CreatedAt:   message.CreatedAt,
 	}
 
-	if message.Metadata.ImageURL != "" || message.Metadata.Language != "" || message.Metadata.FileURL != "" || message.Metadata.FileName != "" || message.Metadata.Extra != nil {
+	if message.Chunks != nil && len(message.Chunks) > 0 {
+		result.Chunks = message.Chunks
+	}
+
+	if message.Thinking != "" {
+		result.Thinking = message.Thinking
+	}
+
+	if message.ToolCalls != nil && len(message.ToolCalls) > 0 {
+		result.ToolCalls = message.ToolCalls
+	}
+
+	if message.Metadata.ImageURL != "" || message.Metadata.Language != "" || message.Metadata.FileURL != "" || message.Metadata.FileName != "" || message.Metadata.Model != "" || message.Metadata.Extra != nil {
 		result.Metadata = &message.Metadata
 	}
 

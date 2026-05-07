@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"gorm.io/driver/sqlite"
@@ -418,12 +419,17 @@ func TestDeleteMessage_UpdatesSession(t *testing.T) {
 		Content: "Test message",
 	}
 
+	// 添加消息获取 ID
 	msg, err := service.AddMessage(ctx, session.ID, addReq)
 	if err != nil {
 		t.Fatalf("AddMessage failed: %v", err)
 	}
 
-	err = service.DeleteMessage(ctx, msg.ID)
+	// 将 string ID 转换回 uint
+	var messageID uint
+	fmt.Sscanf(msg.ID, "%d", &messageID)
+
+	err = service.DeleteMessage(ctx, messageID)
 	if err != nil {
 		t.Fatalf("DeleteMessage failed: %v", err)
 	}
