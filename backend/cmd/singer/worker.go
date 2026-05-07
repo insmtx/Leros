@@ -18,6 +18,7 @@ import (
 	"github.com/insmtx/SingerOS/backend/runtime/engines"
 	"github.com/insmtx/SingerOS/backend/runtime/engines/builtin"
 	"github.com/insmtx/SingerOS/backend/tools"
+	memorytools "github.com/insmtx/SingerOS/backend/tools/memory"
 	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
 	"github.com/spf13/cobra"
 	"github.com/ygpkg/yg-go/lifecycle"
@@ -209,6 +210,9 @@ func buildTooling(catalog *skilltools.Catalog) (*tools.Registry, error) {
 
 	if err := skilltools.Register(registry, catalog); err != nil {
 		return nil, fmt.Errorf("register skill use tool: %w", err)
+	}
+	if err := memorytools.Register(registry); err != nil {
+		return nil, fmt.Errorf("register memory tool: %w", err)
 	}
 
 	logs.Infof("Loaded %d tools for runtime", len(registry.List()))

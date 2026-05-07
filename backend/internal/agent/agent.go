@@ -14,6 +14,7 @@ import (
 	"github.com/insmtx/SingerOS/backend/config"
 	einoadapter "github.com/insmtx/SingerOS/backend/internal/agent/eino"
 	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
+	localmemory "github.com/insmtx/SingerOS/backend/internal/memory/local"
 	"github.com/insmtx/SingerOS/backend/tools"
 	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
 	"github.com/ygpkg/yg-go/logs"
@@ -72,14 +73,14 @@ func NewAgent(ctx context.Context, llmConfig *config.LLMConfig, runtimeConfig Co
 		return nil, fmt.Errorf("tool registry is required")
 	}
 
-	chatModel, err := 	einoadapter.NewOpenAIChatModel(ctx, llmConfig)
+	chatModel, err := einoadapter.NewOpenAIChatModel(ctx, llmConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Agent{
 		chatModel:     chatModel,
-		toolAdapter:   	einoadapter.NewToolAdapter(runtimeConfig.ToolRegistry),
+		toolAdapter:   einoadapter.NewToolAdapter(runtimeConfig.ToolRegistry),
 		skillsCatalog: runtimeConfig.SkillsCatalog,
 		systemPrompt:  defaultAgentSystemPrompt,
 	}, nil
@@ -156,8 +157,8 @@ func (a *Agent) Run(ctx context.Context, req *RequestContext) (*RunResult, error
 	}
 
 	if usage != nil {
-		_ = state.emitter.Emit(ctx, &	agentevents.RunEvent{
-			Type:    	agentevents.RunEventUsage,
+		_ = state.emitter.Emit(ctx, &agentevents.RunEvent{
+			Type:    agentevents.RunEventUsage,
 			Content: eventContentJSON(usage),
 		})
 	}
@@ -187,7 +188,7 @@ func (a *Agent) buildRunState(req *RequestContext) (*runState, error) {
 		return nil, err
 	}
 
-	emitter := 	agentevents.NewEmitter(req.RunID, req.TraceID, sinkForRequest(req))
+	emitter := agentevents.NewEmitter(req.RunID, req.TraceID, sinkForRequest(req))
 	toolCtx := tools.ToolContext{
 		RunID:          req.RunID,
 		TraceID:        req.TraceID,
@@ -205,7 +206,7 @@ func (a *Agent) buildRunState(req *RequestContext) (*runState, error) {
 		emitter:      emitter,
 		userInput:    userInput,
 		systemPrompt: systemPrompt,
-		toolBinding: 	einoadapter.ToolBinding{
+		toolBinding: einoadapter.ToolBinding{
 			ToolContext:  toolCtx,
 			AllowedTools: req.Capability.AllowedTools,
 		},
@@ -260,8 +261,24 @@ func (a *Agent) buildSystemPrompt(req *RequestContext) (string, error) {
 				}
 			}
 		}
+
+		if memoryBlock := buildMemoryContext(context.Background()); memoryBlock != "" {
+			sections = append(sections, memoryBlock)
+		}
 	}
 	return strings.Join(sections, "\n\n"), nil
+}
+
+func buildMemoryContext(ctx context.Context) string {
+	store, err := localmemory.NewStore(localmemory.Options{})
+	if err != nil {
+		return ""
+	}
+	block, err := store.BuildPromptBlock(ctx)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(block)
 }
 
 func (a *Agent) systemPromptForRequest(req *RequestContext) string {

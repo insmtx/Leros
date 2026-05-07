@@ -11,17 +11,18 @@ import (
 	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/internal/agent"
 	"github.com/insmtx/SingerOS/backend/tools"
+	memorytools "github.com/insmtx/SingerOS/backend/tools/memory"
 	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
 	"github.com/ygpkg/yg-go/logs"
 )
 
 type Worker struct {
-	runtime    agent.AgentRuntime
-	config     *WorkerConfig
-	workerID   string
-	startedAt  time.Time
-	status     string
-	wsClient   *WSClient
+	runtime   agent.AgentRuntime
+	config    *WorkerConfig
+	workerID  string
+	startedAt time.Time
+	status    string
+	wsClient  *WSClient
 }
 
 type WorkerConfig struct {
@@ -81,6 +82,10 @@ func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) agent.AgentRunt
 			logs.Errorf("register tools: %v", err)
 			return nil
 		}
+		if err := memorytools.Register(toolRegistry); err != nil {
+			logs.Errorf("register memory tools: %v", err)
+			return nil
+		}
 	}
 
 	agentConfig := agent.Config{
@@ -101,14 +106,14 @@ func (w *Worker) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 	if w == nil || w.runtime == nil {
 		return nil, fmt.Errorf("worker runtime is not initialized")
 	}
-	
+
 	w.status = "processing"
 	result, err := w.runtime.Run(ctx, req)
 	if err != nil {
 		w.status = "error"
 		return nil, err
 	}
-	
+
 	w.status = "idle"
 	return result, nil
 }

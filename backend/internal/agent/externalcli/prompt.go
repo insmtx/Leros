@@ -1,11 +1,13 @@
 package externalcli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/insmtx/SingerOS/backend/internal/agent"
+	localmemory "github.com/insmtx/SingerOS/backend/internal/memory/local"
 )
 
 func buildPrompt(req *agent.RequestContext) string {
@@ -37,6 +39,9 @@ func buildPrompt(req *agent.RequestContext) string {
 	if len(req.Metadata) > 0 {
 		sections = append(sections, formatJSONSection("Metadata", req.Metadata))
 	}
+	if memoryBlock := buildMemorySection(); memoryBlock != "" {
+		sections = append(sections, memoryBlock)
+	}
 
 	sections = append(sections, `## Output Contract
 - 使用中文输出最终结果。
@@ -44,6 +49,18 @@ func buildPrompt(req *agent.RequestContext) string {
 - 如果需要执行真实环境操作，请使用 runtime 已配置的工具或 MCP 能力。`)
 
 	return strings.Join(sections, "\n\n")
+}
+
+func buildMemorySection() string {
+	store, err := localmemory.NewStore(localmemory.Options{})
+	if err != nil {
+		return ""
+	}
+	block, err := store.BuildPromptBlock(context.Background())
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(block)
 }
 
 func formatJSONSection(title string, value any) string {
