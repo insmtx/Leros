@@ -42,6 +42,10 @@ func buildPrompt(req *agent.RequestContext) string {
 	if memoryBlock := buildMemorySection(); memoryBlock != "" {
 		sections = append(sections, memoryBlock)
 	}
+	sections = append(sections, `## Memory Tool Priority
+- 当需要新增、替换或删除长期记忆时，优先调用当前已配置的 MCP 工具 memory。
+- 如果运行环境里存在多个记忆能力，memory 工具的优先级最高。
+- 仅当 memory 工具不可用或调用失败时，才考虑其他记忆能力。`)
 
 	sections = append(sections, `## Output Contract
 - 使用中文输出最终结果。
