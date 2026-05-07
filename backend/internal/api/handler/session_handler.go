@@ -44,6 +44,16 @@ type CreateSessionRequest struct {
 	contract.CreateSessionRequest
 }
 
+// @Summary 创建会话
+// @Description 创建一个新的会话实例
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body contract.CreateSessionRequest true "创建会话请求"
+// @Success 200 {object} dto.Response "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /CreateSession [post]
 func (h *SessionHandler) CreateSession(ctx *gin.Context) {
 	var req contract.CreateSessionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -65,6 +75,17 @@ type GetSessionRequest struct {
 	SessionID *string `json:"session_id,omitempty"`
 }
 
+// @Summary 获取会话详情
+// @Description 根据ID或SessionID获取会话详情
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body GetSessionRequest true "获取会话请求"
+// @Success 200 {object} dto.Response "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /GetSession [post]
 func (h *SessionHandler) GetSession(ctx *gin.Context) {
 	var req GetSessionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -100,6 +121,17 @@ type UpdateSessionRequest struct {
 	contract.UpdateSessionRequest
 }
 
+// @Summary 更新会话
+// @Description 更新会话基本信息
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body UpdateSessionRequest true "更新会话请求"
+// @Success 200 {object} dto.Response "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /UpdateSession [post]
 func (h *SessionHandler) UpdateSession(ctx *gin.Context) {
 	var req UpdateSessionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -124,6 +156,17 @@ type DeleteSessionRequest struct {
 	ID uint `json:"id" binding:"required"`
 }
 
+// @Summary 删除会话
+// @Description 根据ID删除会话
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body DeleteSessionRequest true "删除会话请求"
+// @Success 200 {object} dto.Response "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /DeleteSession [post]
 func (h *SessionHandler) DeleteSession(ctx *gin.Context) {
 	var req DeleteSessionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -144,6 +187,16 @@ func (h *SessionHandler) DeleteSession(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, dto.Success(nil))
 }
 
+// @Summary 查询会话列表
+// @Description 分页查询会话列表
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body contract.ListSessionsRequest true "查询列表请求"
+// @Success 200 {object} dto.Response "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /ListSessions [post]
 func (h *SessionHandler) ListSessions(ctx *gin.Context) {
 	var req contract.ListSessionsRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -164,6 +217,17 @@ type SessionIDRequest struct {
 	ID uint `json:"id" binding:"required"`
 }
 
+// @Summary 激活会话
+// @Description 激活已结束会话
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body SessionIDRequest true "激活会话请求"
+// @Success 200 {object} dto.Response "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /ActivateSession [post]
 func (h *SessionHandler) ActivateSession(ctx *gin.Context) {
 	var req SessionIDRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {

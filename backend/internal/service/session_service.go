@@ -310,19 +310,8 @@ func (s *sessionService) DeleteMessage(ctx context.Context, messageID uint) erro
 		return errors.New("message not found")
 	}
 
-	session, err := db.GetSessionBySessionID(ctx, s.db, message.SessionID)
-	if err != nil {
-		return err
-	}
-
 	if err := db.DeleteMessage(ctx, s.db, messageID); err != nil {
 		return err
-	}
-
-	if session != nil {
-		if err := db.IncrementMessageCount(ctx, s.db, session.ID); err != nil {
-			return err
-		}
 	}
 
 	return nil
