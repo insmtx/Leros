@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"sync"
@@ -8,7 +9,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	infradb "github.com/insmtx/SingerOS/backend/internal/infra/db"
+	"github.com/insmtx/SingerOS/backend/internal/worker"
 	"github.com/ygpkg/yg-go/logs"
+	"gorm.io/gorm"
 )
 
 var upgrader = websocket.Upgrader{
@@ -19,35 +23,30 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-type Server struct {
-	workers map[string]*WorkerConnection
-	mu      sync.RWMutex
+type WorkerManager struct {
+	workers   map[string]*WorkerConnection
+	mu        sync.RWMutex
+	scheduler worker.WorkerScheduler
+	db        *gorm.DB
 }
 
-type WorkerConnection struct {
-	ID         string
-	Conn       *websocket.Conn
-	Send       chan map[string]interface{}
-	Status     string
-	Registered time.Time
-	LastSeen   time.Time
-	mu         sync.RWMutex
-}
-
-func NewServer() *Server {
-	return &Server{
-		workers: make(map[string]*WorkerConnection),
+func NewServer(scheduler worker.WorkerScheduler, db *gorm.DB) *WorkerManager {
+	return &WorkerManager{
+		workers:   make(map[string]*WorkerConnection),
+		scheduler: scheduler,
+		db:        db,
 	}
 }
 
-func (s *Server) RegisterRoutes(r gin.IRouter) {
+func (s *WorkerManager) RegisterRoutes(r gin.IRouter) {
 	r.GET("/ws/worker", s.handleWorkerWebSocket)
 	r.POST("/ListWorkers", s.listWorkers)
 	r.POST("/GetWorkerInfo", s.getWorkerInfo)
 	r.POST("/ShutdownWorker", s.shutdownWorker)
+	r.POST("/CreateWorker", s.createWorker)
 }
 
-func (s *Server) handleWorkerWebSocket(c *gin.Context) {
+func (s *WorkerManager) handleWorkerWebSocket(c *gin.Context) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		logs.Errorf("Failed to upgrade WebSocket: %v", err)
@@ -115,7 +114,7 @@ func (s *Server) handleWorkerWebSocket(c *gin.Context) {
 	<-ctx.Done()
 }
 
-func (s *Server) readPump(worker *WorkerConnection) {
+func (s *WorkerManager) readPump(worker *WorkerConnection) {
 	defer func() {
 		s.unregisterWorker(worker.ID)
 		worker.Conn.Close()
@@ -150,7 +149,7 @@ func (s *Server) readPump(worker *WorkerConnection) {
 	}
 }
 
-func (s *Server) writePump(worker *WorkerConnection) {
+func (s *WorkerManager) writePump(worker *WorkerConnection) {
 	ticker := time.NewTicker(54 * time.Second)
 	defer ticker.Stop()
 
@@ -183,7 +182,7 @@ func (s *Server) writePump(worker *WorkerConnection) {
 	}
 }
 
-func (s *Server) handleWorkerMessage(worker *WorkerConnection, msg map[string]interface{}) {
+func (s *WorkerManager) handleWorkerMessage(worker *WorkerConnection, msg map[string]interface{}) {
 	msgType, _ := msg["type"].(string)
 
 	switch msgType {
@@ -213,10 +212,103 @@ func (s *Server) handleWorkerMessage(worker *WorkerConnection, msg map[string]in
 				worker.mu.Unlock()
 			}
 		}
+
+	case "getConfig":
+		s.handleGetConfig(worker, msg)
 	}
 }
 
-func (s *Server) unregisterWorker(workerID string) {
+func (s *WorkerManager) handleGetConfig(worker *WorkerConnection, msg map[string]interface{}) {
+	assistantCode := ""
+	if payload, ok := msg["payload"].(map[string]interface{}); ok {
+		if code, ok := payload["assistant_code"].(string); ok {
+			assistantCode = code
+		}
+	}
+
+	if assistantCode == "" {
+		resp := map[string]interface{}{
+			"type": "configResponse",
+			"payload": map[string]interface{}{
+				"config": nil,
+				"error":  "assistant_code is required",
+			},
+		}
+		select {
+		case worker.Send <- resp:
+		default:
+			logs.Warnf("Config response dropped for worker %s", worker.ID)
+		}
+		return
+	}
+
+	if s.db == nil {
+		resp := map[string]interface{}{
+			"type": "configResponse",
+			"payload": map[string]interface{}{
+				"config": nil,
+				"error":  "database not available",
+			},
+		}
+		select {
+		case worker.Send <- resp:
+		default:
+			logs.Warnf("Config response dropped for worker %s", worker.ID)
+		}
+		return
+	}
+
+	da, err := infradb.GetDigitalAssistantByCode(context.Background(), s.db, assistantCode)
+	if err != nil {
+		logs.Errorf("Failed to get digital assistant %s: %v", assistantCode, err)
+		resp := map[string]interface{}{
+			"type": "configResponse",
+			"payload": map[string]interface{}{
+				"config": nil,
+				"error":  err.Error(),
+			},
+		}
+		select {
+		case worker.Send <- resp:
+		default:
+			logs.Warnf("Config response dropped for worker %s", worker.ID)
+		}
+		return
+	}
+
+	if da == nil {
+		logs.Warnf("Digital assistant %s not found", assistantCode)
+		resp := map[string]interface{}{
+			"type": "configResponse",
+			"payload": map[string]interface{}{
+				"config": nil,
+				"error":  "digital assistant not found",
+			},
+		}
+		select {
+		case worker.Send <- resp:
+		default:
+			logs.Warnf("Config response dropped for worker %s", worker.ID)
+		}
+		return
+	}
+
+	resp := map[string]interface{}{
+		"type": "configResponse",
+		"payload": map[string]interface{}{
+			"config": da.Config,
+			"error":  nil,
+		},
+	}
+	select {
+	case worker.Send <- resp:
+		logs.Infof("Config sent to worker %s for assistant %s", worker.ID, assistantCode)
+	default:
+		logs.Warnf("Config response dropped for worker %s", worker.ID)
+	}
+}
+
+func (s *WorkerManager) unregisterWorker(workerID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -227,7 +319,7 @@ func (s *Server) unregisterWorker(workerID string) {
 	}
 }
 
-func (s *Server) heartbeatChecker(worker *WorkerConnection) {
+func (s *WorkerManager) heartbeatChecker(worker *WorkerConnection) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
@@ -257,7 +349,7 @@ type WorkerInfo struct {
 	LastSeen   time.Time `json:"last_seen"`
 }
 
-func (s *Server) listWorkers(c *gin.Context) {
+func (s *WorkerManager) listWorkers(c *gin.Context) {
 	var req struct{}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -288,7 +380,7 @@ type GetWorkerInfoRequest struct {
 	WorkerID string `json:"worker_id" binding:"required"`
 }
 
-func (s *Server) getWorkerInfo(c *gin.Context) {
+func (s *WorkerManager) getWorkerInfo(c *gin.Context) {
 	var req GetWorkerInfoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -320,7 +412,7 @@ type ShutdownWorkerRequest struct {
 	WorkerID string `json:"worker_id" binding:"required"`
 }
 
-func (s *Server) shutdownWorker(c *gin.Context) {
+func (s *WorkerManager) shutdownWorker(c *gin.Context) {
 	var req ShutdownWorkerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -351,8 +443,52 @@ func (s *Server) shutdownWorker(c *gin.Context) {
 	}
 }
 
-func (wc *WorkerConnection) SendJSON(msg map[string]interface{}) error {
-	wc.mu.RLock()
-	defer wc.mu.RUnlock()
-	return wc.Conn.WriteJSON(msg)
+type CreateWorkerRequest struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
+	EnvType     string            `json:"env_type"`
+	Image       string            `json:"image"`
+	Command     []string          `json:"command"`
+	Args        []string          `json:"args"`
+	Env         map[string]string `json:"env"`
+	WorkingDir  string            `json:"working_dir"`
+}
+
+func (s *WorkerManager) createWorker(c *gin.Context) {
+	var req CreateWorkerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if s.scheduler == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "worker scheduler not initialized"})
+		return
+	}
+
+	spec := &worker.WorkerSpec{
+		ID:          req.ID,
+		Name:        req.Name,
+		Labels:      req.Labels,
+		Annotations: req.Annotations,
+		EnvType:     worker.WorkerEnvType(req.EnvType),
+		Image:       req.Image,
+		Command:     req.Command,
+		Args:        req.Args,
+		Env:         req.Env,
+		WorkingDir:  req.WorkingDir,
+	}
+
+	spec.EnvType = worker.WorkerEnvProcess
+
+	instance, err := s.scheduler.Start(c.Request.Context(), spec)
+	if err != nil {
+		logs.Errorf("Failed to create worker: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, instance)
 }

@@ -25,7 +25,7 @@ type FlowConfig struct {
 	Model        einomodel.ToolCallingChatModel
 	ToolAdapter  *ToolAdapter
 	Binding      ToolBinding
-	Emitter      *	agentevents.Emitter
+	Emitter      *agentevents.Emitter
 	SystemPrompt string
 	MaxStep      int
 }
@@ -100,7 +100,7 @@ func (f *Flow) Generate(ctx context.Context, userInput string) (*einoschema.Mess
 }
 
 // Stream runs one user request through the Eino agent loop and emits runtime events.
-func (f *Flow) Stream(ctx context.Context, userInput string, emitter *	agentevents.Emitter) (*einoschema.Message, error) {
+func (f *Flow) Stream(ctx context.Context, userInput string, emitter *agentevents.Emitter) (*einoschema.Message, error) {
 	if f == nil || f.agent == nil {
 		return nil, fmt.Errorf("flow is not initialized")
 	}
@@ -141,21 +141,21 @@ func (f *Flow) Stream(ctx context.Context, userInput string, emitter *	agenteven
 	return einoschema.ConcatMessages(chunks)
 }
 
-func emitMessageChunk(ctx context.Context, emitter *	agentevents.Emitter, chunk *einoschema.Message, contentSnapshot *strings.Builder, reasoningSnapshot *strings.Builder) error {
+func emitMessageChunk(ctx context.Context, emitter *agentevents.Emitter, chunk *einoschema.Message, contentSnapshot *strings.Builder, reasoningSnapshot *strings.Builder) error {
 	if emitter == nil || chunk == nil {
 		return nil
 	}
 	if chunk.Content != "" {
 		contentSnapshot.WriteString(chunk.Content)
-		_ = emitter.Emit(ctx, &	agentevents.RunEvent{
-			Type:    	agentevents.RunEventMessageDelta,
+		_ = emitter.Emit(ctx, &agentevents.RunEvent{
+			Type:    agentevents.RunEventMessageDelta,
 			Content: chunk.Content,
 		})
 	}
 	if chunk.ReasoningContent != "" {
 		reasoningSnapshot.WriteString(chunk.ReasoningContent)
-		_ = emitter.Emit(ctx, &	agentevents.RunEvent{
-			Type:    	agentevents.RunEventReasoningDelta,
+		_ = emitter.Emit(ctx, &agentevents.RunEvent{
+			Type:    agentevents.RunEventReasoningDelta,
 			Content: chunk.ReasoningContent,
 		})
 	}
@@ -164,8 +164,8 @@ func emitMessageChunk(ctx context.Context, emitter *	agentevents.Emitter, chunk 
 		if strings.TrimSpace(toolCall.Function.Arguments) != "" {
 			args["json"] = toolCall.Function.Arguments
 		}
-		_ = emitter.Emit(ctx, &	agentevents.RunEvent{
-			Type: 	agentevents.RunEventToolCallArguments,
+		_ = emitter.Emit(ctx, &agentevents.RunEvent{
+			Type: agentevents.RunEventToolCallArguments,
 			Content: eventContentJSON(map[string]any{
 				"call_id":   toolCall.ID,
 				"name":      toolCall.Function.Name,

@@ -23,7 +23,6 @@ import (
 
 var (
 	serverConfigPath string
-	serverHttpAddr   string
 )
 
 var serverCmd = &cobra.Command{
@@ -67,12 +66,12 @@ var serverCmd = &cobra.Command{
 		r := api.SetupRouter(*cfg, publisher, db)
 
 		srv := &http.Server{
-			Addr:    serverHttpAddr,
+			Addr:    cfg.ServerAddr,
 			Handler: r,
 		}
 
 		logs.Info("Starting SingerOS backend service...")
-		logs.Infof("Listening on %s", serverHttpAddr)
+		logs.Infof("Listening on %s", cfg.ServerAddr)
 
 		go func() {
 			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -96,7 +95,6 @@ var serverCmd = &cobra.Command{
 
 func init() {
 	serverCmd.Flags().StringVar(&serverConfigPath, "config", "", "Configuration file path")
-	serverCmd.Flags().StringVar(&serverHttpAddr, "addr", ":8080", "HTTP server address")
 	rootCmd.AddCommand(serverCmd)
 }
 

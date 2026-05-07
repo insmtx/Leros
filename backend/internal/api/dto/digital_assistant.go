@@ -4,9 +4,9 @@ import "github.com/insmtx/SingerOS/backend/internal/api/contract"
 
 // CreateDigitalAssistantResponse 创建数字助手响应
 type CreateDigitalAssistantResponse struct {
-	Code    int                          `json:"code"`
-	Message string                       `json:"message"`
-	Data    *contract.DigitalAssistant   `json:"data"`
+	Code    int                        `json:"code"`
+	Message string                     `json:"message"`
+	Data    *contract.DigitalAssistant `json:"data"`
 }
 
 // NewCreateDigitalAssistantResponse 创建成功响应

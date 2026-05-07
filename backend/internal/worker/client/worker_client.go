@@ -16,7 +16,7 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
-type Worker struct {
+type WorkerClient struct {
 	runtime   agent.AgentRuntime
 	config    *WorkerConfig
 	workerID  string
@@ -31,26 +31,17 @@ type WorkerConfig struct {
 	SkillsDir    string
 	ToolsEnabled bool
 	ServerAddr   string
+	WorkerID     string
 }
 
-func NewWorker(ctx context.Context, cfg *WorkerConfig) (*Worker, error) {
+func NewWorker(ctx context.Context, cfg *WorkerConfig) (*WorkerClient, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("worker config is required")
 	}
 
-	runtime := cfg.Runtime
-	if runtime == nil {
-		runtime = buildDefaultRuntime(ctx, cfg)
-	}
-
-	if runtime == nil {
-		return nil, fmt.Errorf("either Runtime or LLMConfig must be provided")
-	}
-
 	workerID := fmt.Sprintf("worker_%d", time.Now().UnixNano())
 
-	w := &Worker{
-		runtime:   runtime,
+	w := &WorkerClient{
 		config:    cfg,
 		workerID:  workerID,
 		startedAt: time.Now(),
@@ -58,21 +49,73 @@ func NewWorker(ctx context.Context, cfg *WorkerConfig) (*Worker, error) {
 	}
 
 	if cfg.ServerAddr != "" {
-		w.wsClient = NewWSClient(cfg.ServerAddr, workerID)
+		w.wsClient = NewWSClient(cfg.ServerAddr, workerID,
+			WithWorkerID(workerID),
+			WithOnConfigReady(func(assistantConfig map[string]interface{}) {
+				w.handleAssistantConfig(ctx, assistantConfig)
+			}),
+		)
 	}
 
 	return w, nil
 }
 
-func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) agent.AgentRuntime {
+func (w *WorkerClient) handleAssistantConfig(ctx context.Context, assistantConfig map[string]interface{}) {
+	logs.Info("Processing assistant configuration from server")
+
+	llmConfigRaw, ok := assistantConfig["llm_config"]
+	if !ok {
+		logs.Warn("llm_config not found in assistant config, using default")
+		return
+	}
+
+	llmConfigMap, ok := llmConfigRaw.(map[string]interface{})
+	if !ok {
+		logs.Warn("llm_config is not a valid object")
+		return
+	}
+
+	llmConfig := &config.LLMConfig{}
+	if provider, ok := llmConfigMap["type"].(string); ok {
+		llmConfig.Provider = provider
+	}
+	if apiKey, ok := llmConfigMap["api_key"].(string); ok {
+		llmConfig.APIKey = apiKey
+	}
+	if model, ok := llmConfigMap["model"].(string); ok {
+		llmConfig.Model = model
+	}
+	if baseURL, ok := llmConfigMap["base_url"].(string); ok {
+		llmConfig.BaseURL = baseURL
+	}
+
+	if llmConfig.Provider == "" || llmConfig.APIKey == "" {
+		logs.Warn("incomplete llm_config, skipping runtime initialization")
+		return
+	}
+
+	runtime, err := buildDefaultRuntime(ctx, &WorkerConfig{
+		LLMConfig:    llmConfig,
+		SkillsDir:    w.config.SkillsDir,
+		ToolsEnabled: w.config.ToolsEnabled,
+	})
+	if err != nil {
+		logs.Errorf("Failed to build runtime: %v", err)
+		return
+	}
+
+	w.runtime = runtime
+	w.status = "ready"
+	logs.Infof("Worker %s initialized with assistant config", w.workerID)
+}
+func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) (agent.AgentRuntime, error) {
 	if cfg.LLMConfig == nil {
-		return nil
+		return nil, fmt.Errorf("llm config is required")
 	}
 
 	catalog, err := loadSkillsCatalog(cfg.SkillsDir)
 	if err != nil {
-		logs.Errorf("load skills catalog: %v", err)
-		return nil
+		return nil, fmt.Errorf("load skills catalog: %w", err)
 	}
 
 	toolRegistry := tools.NewRegistry()
@@ -80,11 +123,11 @@ func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) agent.AgentRunt
 	if cfg.ToolsEnabled {
 		if err := skilltools.Register(toolRegistry, catalog); err != nil {
 			logs.Errorf("register tools: %v", err)
-			return nil
+			return nil, fmt.Errorf("register tools: %w", err)
 		}
 		if err := memorytools.Register(toolRegistry); err != nil {
 			logs.Errorf("register memory tools: %v", err)
-			return nil
+			return nil, fmt.Errorf("register memory tools: %w", err)
 		}
 	}
 
@@ -95,14 +138,13 @@ func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) agent.AgentRunt
 
 	agentInstance, err := agent.NewAgent(ctx, cfg.LLMConfig, agentConfig)
 	if err != nil {
-		logs.Errorf("create agent: %v", err)
-		return nil
+		return nil, fmt.Errorf("create agent: %w", err)
 	}
 
-	return agentInstance
+	return agentInstance, nil
 }
 
-func (w *Worker) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {
+func (w *WorkerClient) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {
 	if w == nil || w.runtime == nil {
 		return nil, fmt.Errorf("worker runtime is not initialized")
 	}
@@ -118,7 +160,7 @@ func (w *Worker) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 	return result, nil
 }
 
-func (w *Worker) Start(ctx context.Context) error {
+func (w *WorkerClient) Start(ctx context.Context) error {
 	w.status = "running"
 	logs.Infof("Worker %s started", w.workerID)
 
@@ -143,7 +185,7 @@ func (w *Worker) Start(ctx context.Context) error {
 	}
 }
 
-func (w *Worker) Shutdown(ctx context.Context) error {
+func (w *WorkerClient) Shutdown(ctx context.Context) error {
 	logs.Info("Worker shutting down...")
 	w.status = "stopping"
 
@@ -154,15 +196,15 @@ func (w *Worker) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (w *Worker) GetWorkerID() string {
+func (w *WorkerClient) GetWorkerID() string {
 	return w.workerID
 }
 
-func (w *Worker) GetStartedAt() time.Time {
+func (w *WorkerClient) GetStartedAt() time.Time {
 	return w.startedAt
 }
 
-func (w *Worker) GetStatus() string {
+func (w *WorkerClient) GetStatus() string {
 	return w.status
 }
 

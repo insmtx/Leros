@@ -6,28 +6,28 @@ import "time"
 type DigitalAssistantStatus string
 
 const (
-	DigitalAssistantStatusDraft     DigitalAssistantStatus = "draft"
-	DigitalAssistantStatusActive    DigitalAssistantStatus = "active"
-	DigitalAssistantStatusInactive  DigitalAssistantStatus = "inactive"
-	DigitalAssistantStatusArchived  DigitalAssistantStatus = "archived"
+	DigitalAssistantStatusDraft    DigitalAssistantStatus = "draft"
+	DigitalAssistantStatusActive   DigitalAssistantStatus = "active"
+	DigitalAssistantStatusInactive DigitalAssistantStatus = "inactive"
+	DigitalAssistantStatusArchived DigitalAssistantStatus = "archived"
 )
 
 // RuntimeType 运行时类型常量
 type RuntimeType string
 
 const (
-	RuntimeTypeDocker   RuntimeType = "docker"
-	RuntimeTypeProcess  RuntimeType = "process"
-	RuntimeTypeK8s      RuntimeType = "kubernetes"
+	RuntimeTypeDocker  RuntimeType = "docker"
+	RuntimeTypeProcess RuntimeType = "process"
+	RuntimeTypeK8s     RuntimeType = "kubernetes"
 )
 
 // LLMProviderType LLM提供商类型常量
 type LLMProviderType string
 
 const (
-	LLMProviderOpenAI    LLMProviderType = "openai"
-	LLMProviderClaude    LLMProviderType = "claude"
-	LLMProviderDeepSeek  LLMProviderType = "deepseek"
+	LLMProviderOpenAI   LLMProviderType = "openai"
+	LLMProviderClaude   LLMProviderType = "claude"
+	LLMProviderDeepSeek LLMProviderType = "deepseek"
 )
 
 // MemoryType 记忆类型常量
@@ -42,46 +42,46 @@ const (
 type ChannelType string
 
 const (
-	ChannelTypeGitHub  ChannelType = "github"
-	ChannelTypeGitLab  ChannelType = "gitlab"
-	ChannelTypeWeChat  ChannelType = "wechat"
-	ChannelTypeFeishu  ChannelType = "feishu"
+	ChannelTypeGitHub ChannelType = "github"
+	ChannelTypeGitLab ChannelType = "gitlab"
+	ChannelTypeWeChat ChannelType = "wechat"
+	ChannelTypeFeishu ChannelType = "feishu"
 )
 
 // KnowledgeType 知识库类型常量
 type KnowledgeType string
 
 const (
-	KnowledgeTypeVector  KnowledgeType = "vector"
-	KnowledgeTypeFile    KnowledgeType = "file"
+	KnowledgeTypeVector   KnowledgeType = "vector"
+	KnowledgeTypeFile     KnowledgeType = "file"
 	KnowledgeTypeDatabase KnowledgeType = "database"
 )
 
 // DigitalAssistant 数字助手信息
 type DigitalAssistant struct {
-	ID          uint               `json:"id"`
-	Code        string             `json:"code"`
-	OrgID       uint               `json:"org_id"`
-	OwnerID     uint               `json:"owner_id"`
-	Name        string             `json:"name"`
-	Description string             `json:"description"`
-	Avatar      string             `json:"avatar"`
-	Status      string             `json:"status"`
-	Version     int                `json:"version"`
-	Config      AssistantConfig    `json:"config"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
+	ID          uint            `json:"id"`
+	Code        string          `json:"code"`
+	OrgID       uint            `json:"org_id"`
+	OwnerID     uint            `json:"owner_id"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Avatar      string          `json:"avatar"`
+	Status      string          `json:"status"`
+	Version     int             `json:"version"`
+	Config      AssistantConfig `json:"config"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
 // AssistantConfig 数字助手配置
 type AssistantConfig struct {
-	Runtime  RuntimeConfig  `json:"runtime_config"`
-	LLM      LLMConfig      `json:"llm_config"`
-	Skills   []SkillRef     `json:"skills"`
-	Channels []ChannelRef   `json:"channels"`
+	Runtime   RuntimeConfig  `json:"runtime_config"`
+	LLM       LLMConfig      `json:"llm_config"`
+	Skills    []SkillRef     `json:"skills"`
+	Channels  []ChannelRef   `json:"channels"`
 	Knowledge []KnowledgeRef `json:"knowledge"`
-	Memory   MemoryConfig   `json:"memory_config"`
-	Policies PolicyConfig   `json:"policies_config"`
+	Memory    MemoryConfig   `json:"memory_config"`
+	Policies  PolicyConfig   `json:"policies_config"`
 }
 
 // SkillRef 技能引用
@@ -97,9 +97,9 @@ type ChannelRef struct {
 
 // KnowledgeRef 知识库引用
 type KnowledgeRef struct {
-	Type     string `json:"type"`
+	Type      string `json:"type"`
 	DatasetID string `json:"dataset_id"`
-	Repo     string `json:"repo"`
+	Repo      string `json:"repo"`
 }
 
 // RuntimeConfig 运行时配置
@@ -135,9 +135,9 @@ type CreateDigitalAssistantRequest struct {
 
 // UpdateDigitalAssistantRequest 更新数字助手请求
 type UpdateDigitalAssistantRequest struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Avatar      string          `json:"avatar"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	Avatar      string           `json:"avatar"`
 	Config      *AssistantConfig `json:"config,omitempty"`
 }
 
@@ -148,12 +148,12 @@ type UpdateDigitalAssistantStatusRequest struct {
 
 // ListDigitalAssistantRequest 查询数字助手列表请求
 type ListDigitalAssistantRequest struct {
-	OrgID   *uint    `form:"org_id,omitempty"`
-	OwnerID *uint    `form:"owner_id,omitempty"`
-	Status  *string  `form:"status,omitempty"`
-	Keyword *string  `form:"keyword,omitempty"`
-	Page    int      `form:"page,default=1"`
-	PerPage int      `form:"per_page,default=20"`
+	OrgID   *uint   `form:"org_id,omitempty"`
+	OwnerID *uint   `form:"owner_id,omitempty"`
+	Status  *string `form:"status,omitempty"`
+	Keyword *string `form:"keyword,omitempty"`
+	Page    int     `form:"page,default=1"`
+	PerPage int     `form:"per_page,default=20"`
 }
 
 // DigitalAssistantList 数字助手列表响应
