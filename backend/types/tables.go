@@ -25,4 +25,9 @@ const (
 	TableNameSkillLog = tablenamePrefix + "skill_execution_log"
 	// TableNameSkillRegistry 技能注册表名
 	TableNameSkillRegistry = tablenamePrefix + "skill_registry"
+
+	// TableNameSession 会话表名
+	TableNameSession = tablenamePrefix + "session"
+	// TableNameSessionMessage 会话消息表名
+	TableNameSessionMessage = tablenamePrefix + "session_message"
 )

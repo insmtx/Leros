@@ -1,0 +1,97 @@
+package db
+
+import (
+	"context"
+	"errors"
+
+	"gorm.io/gorm"
+
+	"github.com/insmtx/SingerOS/backend/types"
+)
+
+// CreateMessage 创建消息
+func CreateMessage(ctx context.Context, db *gorm.DB, message *types.SessionMessage) error {
+	return db.WithContext(ctx).Create(message).Error
+}
+
+// GetMessageByID 根据ID获取消息
+func GetMessageByID(ctx context.Context, db *gorm.DB, id uint) (*types.SessionMessage, error) {
+	var entity types.SessionMessage
+	err := db.WithContext(ctx).First(&entity, id).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &entity, nil
+}
+
+// GetSessionMessages 查询会话的所有消息（按 sequence 排序，支持分页）
+func GetSessionMessages(ctx context.Context, db *gorm.DB, sessionID string, page, perPage int) ([]*types.SessionMessage, int64, error) {
+	var entities []*types.SessionMessage
+	var total int64
+
+	query := db.WithContext(ctx).Model(&types.SessionMessage{}).Where("session_id = ?", sessionID)
+
+	err := query.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * perPage
+	err = query.Offset(offset).Limit(perPage).Order("sequence ASC").Find(&entities).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return entities, total, nil
+}
+
+// DeleteMessage 软删除消息
+func DeleteMessage(ctx context.Context, db *gorm.DB, id uint) error {
+	return db.WithContext(ctx).Delete(&types.SessionMessage{}, id).Error
+}
+
+// ClearSessionMessages 清空会话的所有消息（软删除）
+func ClearSessionMessages(ctx context.Context, db *gorm.DB, sessionID string) error {
+	return db.WithContext(ctx).Where("session_id = ?", sessionID).Delete(&types.SessionMessage{}).Error
+}
+
+// GetLatestMessage 获取会话的最新消息
+func GetLatestMessage(ctx context.Context, db *gorm.DB, sessionID string) (*types.SessionMessage, error) {
+	var entity types.SessionMessage
+	err := db.WithContext(ctx).Where("session_id = ?", sessionID).Order("sequence DESC").First(&entity).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &entity, nil
+}
+
+// GetMessageCount 获取会话的消息数量
+func GetMessageCount(ctx context.Context, db *gorm.DB, sessionID string) (int64, error) {
+	var count int64
+	err := db.WithContext(ctx).Model(&types.SessionMessage{}).Where("session_id = ?", sessionID).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// GetNextSequence 获取会话的下一个消息序号
+func GetNextSequence(ctx context.Context, db *gorm.DB, sessionID string) (int64, error) {
+	var maxSequence int64
+	err := db.WithContext(ctx).Model(&types.SessionMessage{}).Where("session_id = ?", sessionID).Select("COALESCE(MAX(sequence), 0)").Scan(&maxSequence).Error
+	if err != nil {
+		return 0, err
+	}
+	return maxSequence + 1, nil
+}
+
+// UpdateMessageSequence 更新消息序号
+func UpdateMessageSequence(ctx context.Context, db *gorm.DB, messageID uint, sequence int64) error {
+	return db.WithContext(ctx).Model(&types.SessionMessage{}).Where("id = ?", messageID).Update("sequence", sequence).Error
+}
