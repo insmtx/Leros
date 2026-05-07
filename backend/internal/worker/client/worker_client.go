@@ -11,6 +11,7 @@ import (
 	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/internal/agent"
 	"github.com/insmtx/SingerOS/backend/tools"
+	memorytools "github.com/insmtx/SingerOS/backend/tools/memory"
 	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
 	"github.com/ygpkg/yg-go/logs"
 )
@@ -121,7 +122,12 @@ func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) (agent.AgentRun
 
 	if cfg.ToolsEnabled {
 		if err := skilltools.Register(toolRegistry, catalog); err != nil {
+			logs.Errorf("register tools: %v", err)
 			return nil, fmt.Errorf("register tools: %w", err)
+		}
+		if err := memorytools.Register(toolRegistry); err != nil {
+			logs.Errorf("register memory tools: %v", err)
+			return nil, fmt.Errorf("register memory tools: %w", err)
 		}
 	}
 
@@ -150,7 +156,7 @@ func (w *WorkerClient) Run(ctx context.Context, req *agent.RequestContext) (*age
 		return nil, err
 	}
 
-	w.status = "ready"
+	w.status = "idle"
 	return result, nil
 }
 

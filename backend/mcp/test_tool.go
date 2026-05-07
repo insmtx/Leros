@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"github.com/insmtx/SingerOS/backend/tools"
+	memorytools "github.com/insmtx/SingerOS/backend/tools/memory"
 	testtools "github.com/insmtx/SingerOS/backend/tools/test"
 )
 
@@ -9,5 +10,6 @@ import (
 func NewTools() []tools.Tool {
 	return []tools.Tool{
 		testtools.NewEchoTool(),
+		memorytools.NewTool(),
 	}
 }

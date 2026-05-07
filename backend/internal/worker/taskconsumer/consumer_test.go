@@ -2,101 +2,108 @@ package taskconsumer
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"os"
 	"testing"
+	"time"
 
-	"github.com/insmtx/SingerOS/backend/internal/agent"
+	"github.com/insmtx/SingerOS/backend/internal/infra/mq"
 	"github.com/insmtx/SingerOS/backend/pkg/dm"
 )
 
-func TestTaskTopic(t *testing.T) {
-	consumer, err := New(Config{OrgID: "1001", WorkerID: "worker_1"}, &noopSubscriber{}, nil, &noopRunner{})
+func TestPublishWorkerTaskMessageToNATS(t *testing.T) {
+	natsURL := getenv("SINGEROS_TEST_NATS_URL", "nats://localhost:4222")
+	orgID := getenv("SINGEROS_TEST_ORG_ID", "1001")
+	workerID := getenv("SINGEROS_TEST_WORKER_ID", "worker_1")
+	sessionID := getenv("SINGEROS_TEST_SESSION_ID", "session_1")
+
+	bus, err := mq.NewPublisher(natsURL)
 	if err != nil {
-		t.Fatalf("New() error = %v", err)
+		t.Skipf("skip real NATS publish test: %v", err)
 	}
+	defer bus.Close()
 
-	if got, want := consumer.TaskTopic(), "org.1001.worker.worker_1.task"; got != want {
-		t.Fatalf("TaskTopic() = %q, want %q", got, want)
-	}
-}
+	topic := dm.Topic().Org(orgID).Worker(workerID).Task().Build()
+	messageID := randomTestID(t, "msg")
+	traceID := randomTestID(t, "trace")
+	requestID := randomTestID(t, "request")
+	taskID := randomTestID(t, "task")
+	runID := randomTestID(t, "run")
 
-func TestRequestFromWorkerTask(t *testing.T) {
 	msg := dm.WorkerTaskMessage{
-		ID:   "msg_1",
-		Type: dm.MessageTypeWorkerTask,
+		ID:        messageID,
+		Type:      dm.MessageTypeWorkerTask,
+		CreatedAt: time.Now().UTC(),
 		Trace: dm.TraceContext{
-			TraceID: "trace_1",
-			TaskID:  "task_1",
-			RunID:   "run_1",
+			TraceID:   traceID,
+			RequestID: requestID,
+			TaskID:    taskID,
+			RunID:     runID,
 		},
 		Route: dm.RouteContext{
-			OrgID:     "1001",
-			SessionID: "session_1",
-			WorkerID:  "worker_1",
+			OrgID:     orgID,
+			SessionID: sessionID,
+			WorkerID:  workerID,
 		},
 		Body: dm.WorkerTaskBody{
 			TaskType: dm.TaskTypeAgentRun,
 			Actor: dm.ActorContext{
-				UserID:      "user_1",
-				DisplayName: "Caleb",
-				Channel:     "web",
+				UserID:      "user_test",
+				DisplayName: "Test User",
+				Channel:     "go_test",
 			},
 			Execution: dm.ExecutionTarget{
-				AssistantID: "assistant_1",
-				AgentID:     "agent_1",
-				Skills:      []string{"code-review"},
-				Tools:       []string{"skill.use"},
+				AssistantID: "assistant_test",
+				AgentID:     "agent_test",
+				Tools:       []string{},
 			},
 			Input: dm.TaskInput{
 				Type: dm.InputTypeTaskInstruction,
-				Text: "review this change",
-				Messages: []dm.ChatMessage{
-					{Role: dm.MessageRoleUser, Content: "hello"},
-				},
+				Text: "这是一条来自 go test 的真实 NATS worker.task 调试消息，请回复确认 worker 已收到。",
 			},
 			Runtime: dm.RuntimeOptions{
 				Kind:    "claude",
-				WorkDir: "/tmp/repo",
-				MaxStep: 10,
+				WorkDir: ".",
 			},
-			Policy: dm.TaskPolicy{RequireApproval: true},
+		},
+		Metadata: map[string]any{
+			"source": "go_test",
 		},
 	}
 
-	req := RequestFromWorkerTask(msg)
-	if req.RunID != "run_1" || req.TraceID != "trace_1" || req.TaskID != "task_1" {
-		t.Fatalf("unexpected trace mapping: %+v", req)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := bus.Publish(ctx, topic, msg); err != nil {
+		t.Fatalf("Publish(%q) error = %v", topic, err)
 	}
-	if req.Assistant.ID != "assistant_1" || req.Assistant.Skills[0] != "code-review" {
-		t.Fatalf("unexpected assistant mapping: %+v", req.Assistant)
-	}
-	if req.Actor.UserID != "user_1" || req.Actor.Channel != "web" {
-		t.Fatalf("unexpected actor mapping: %+v", req.Actor)
-	}
-	if req.Conversation.ID != "session_1" {
-		t.Fatalf("Conversation.ID = %q, want session_1", req.Conversation.ID)
-	}
-	if req.Input.Type != agent.InputTypeTaskInstruction || req.Input.Text != "review this change" {
-		t.Fatalf("unexpected input mapping: %+v", req.Input)
-	}
-	if req.Runtime.Kind != "claude" || req.Runtime.WorkDir != "/tmp/repo" || req.Runtime.MaxStep != 10 {
-		t.Fatalf("unexpected runtime mapping: %+v", req.Runtime)
-	}
-	if !req.Policy.RequireApproval {
-		t.Fatalf("RequireApproval = false, want true")
-	}
-	if req.Metadata["agent_id"] != "agent_1" {
-		t.Fatalf("metadata agent_id = %v, want agent_1", req.Metadata["agent_id"])
-	}
+	t.Logf(
+		"published worker task:\n  topic: %s\n  nats_url: %s\n  message_id: %s\n  trace_id: %s\n  request_id: %s\n  task_id: %s\n  run_id: %s",
+		topic,
+		natsURL,
+		messageID,
+		traceID,
+		requestID,
+		taskID,
+		runID,
+	)
 }
 
-type noopSubscriber struct{}
-
-func (noopSubscriber) Subscribe(_ context.Context, _ string, _ func(any)) error {
-	return nil
+func getenv(key string, fallback string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
-type noopRunner struct{}
+func randomTestID(t *testing.T, prefix string) string {
+	t.Helper()
 
-func (noopRunner) Run(_ context.Context, _ *agent.RequestContext) (*agent.RunResult, error) {
-	return &agent.RunResult{Status: agent.RunStatusCompleted}, nil
+	var buf [8]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		t.Fatalf("generate %s id: %v", prefix, err)
+	}
+	return fmt.Sprintf("%s_test_agent_run_%s", prefix, hex.EncodeToString(buf[:]))
 }

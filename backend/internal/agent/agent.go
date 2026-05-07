@@ -14,6 +14,7 @@ import (
 	"github.com/insmtx/SingerOS/backend/config"
 	einoadapter "github.com/insmtx/SingerOS/backend/internal/agent/eino"
 	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
+	localmemory "github.com/insmtx/SingerOS/backend/internal/memory/local"
 	"github.com/insmtx/SingerOS/backend/tools"
 	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
 	"github.com/ygpkg/yg-go/logs"
@@ -260,8 +261,24 @@ func (a *Agent) buildSystemPrompt(req *RequestContext) (string, error) {
 				}
 			}
 		}
+
+		if memoryBlock := buildMemoryContext(context.Background()); memoryBlock != "" {
+			sections = append(sections, memoryBlock)
+		}
 	}
 	return strings.Join(sections, "\n\n"), nil
+}
+
+func buildMemoryContext(ctx context.Context) string {
+	store, err := localmemory.NewStore(localmemory.Options{})
+	if err != nil {
+		return ""
+	}
+	block, err := store.BuildPromptBlock(ctx)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(block)
 }
 
 func (a *Agent) systemPromptForRequest(req *RequestContext) string {

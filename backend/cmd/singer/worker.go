@@ -16,6 +16,7 @@ import (
 	"github.com/insmtx/SingerOS/backend/runtime/engines"
 	"github.com/insmtx/SingerOS/backend/runtime/engines/builtin"
 	"github.com/insmtx/SingerOS/backend/tools"
+	memorytools "github.com/insmtx/SingerOS/backend/tools/memory"
 	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
 	"github.com/spf13/cobra"
 	ygconfig "github.com/ygpkg/yg-go/config"
@@ -23,10 +24,11 @@ import (
 )
 
 var (
-	workerConfigPath string
-	workerServerAddr string
-	workerListenAddr string
-	workerWorkerID   string
+	workerConfigPath     string
+	workerServerAddr     string
+	workerDefaultRuntime string
+	workerListenAddr     string
+	workerWorkerID       string
 )
 
 var workerCmd = &cobra.Command{
@@ -53,6 +55,7 @@ func init() {
 	workerCmd.Flags().StringVar(&workerServerAddr, "server-addr", "127.0.0.1:8080", "Server address for WebSocket connection")
 	workerCmd.Flags().StringVar(&workerListenAddr, "listen-addr", ":8081", "Worker MCP server listen address for runtime bootstrap")
 	workerCmd.Flags().StringVar(&workerWorkerID, "worker-id", "", "Worker ID for configuration retrieval")
+	workerCmd.Flags().StringVar(&workerDefaultRuntime, "default-runtime", "", "Default agent runtime kind, for example singeros, claude, or codex")
 	rootCmd.AddCommand(workerCmd)
 }
 
@@ -176,19 +179,23 @@ func buildTooling(catalog *skilltools.Catalog) (*tools.Registry, error) {
 	if err := skilltools.Register(registry, catalog); err != nil {
 		return nil, fmt.Errorf("register skill use tool: %w", err)
 	}
+	if err := memorytools.Register(registry); err != nil {
+		return nil, fmt.Errorf("register memory tool: %w", err)
+	}
 
 	logs.Infof("Loaded %d tools for runtime", len(registry.List()))
 
 	return registry, nil
 }
 
-func buildRuntimeRunner(ctx context.Context, cfg *config.WorkerConfig, runtimeConfig agent.Config) (agent.Runner, error) {
+func buildRuntimeRunner(ctx context.Context, cfg *config.WorkerConfig, runtimeConfig agent.Config, defaultRuntime string) (agent.Runner, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config is required")
 	}
 
 	router := agent.NewRuntimeRouter(agent.RuntimeKindSingerOS)
 	registered := 0
+	registeredKinds := make(map[string]struct{})
 
 	if cfg.LLM != nil && cfg.LLM.APIKey != "" {
 		switch cfg.LLM.Provider {
@@ -202,6 +209,7 @@ func buildRuntimeRunner(ctx context.Context, cfg *config.WorkerConfig, runtimeCo
 				return nil, err
 			}
 			registered++
+			registeredKinds[agent.RuntimeKindSingerOS] = struct{}{}
 		default:
 			logs.Warnf("Skipping SingerOS agent runtime for unsupported Eino chat model provider: %s", cfg.LLM.Provider)
 		}
@@ -225,20 +233,38 @@ func buildRuntimeRunner(ctx context.Context, cfg *config.WorkerConfig, runtimeCo
 			return nil, err
 		}
 		registered++
+		registeredKinds[strings.ToLower(strings.TrimSpace(name))] = struct{}{}
 		logs.Infof("Registering external agent CLI runtime: %s", name)
 	}
 
 	if registered == 0 {
 		return nil, fmt.Errorf("no agent runtime is available")
 	}
-	if cfg.LLM == nil || cfg.LLM.APIKey == "" {
-		if cfg.CLI != nil && cfg.CLI.Default != "" {
-			router.SetDefault(cfg.CLI.Default)
-		} else if len(cliNames) > 0 {
-			router.SetDefault(cliNames[0])
-		}
-	} else {
-		router.SetDefault(agent.RuntimeKindSingerOS)
+
+	selectedDefault := selectDefaultRuntime(defaultRuntime, cfg, cliNames)
+	if selectedDefault == "" {
+		selectedDefault = agent.RuntimeKindSingerOS
 	}
+	normalizedDefault := strings.ToLower(strings.TrimSpace(selectedDefault))
+	if _, ok := registeredKinds[normalizedDefault]; !ok {
+		return nil, fmt.Errorf("default agent runtime %q is not available", selectedDefault)
+	}
+	router.SetDefault(selectedDefault)
 	return router, nil
+}
+
+func selectDefaultRuntime(defaultRuntime string, cfg *config.WorkerConfig, cliNames []string) string {
+	if strings.TrimSpace(defaultRuntime) != "" {
+		return defaultRuntime
+	}
+	if cfg != nil && cfg.CLI != nil && strings.TrimSpace(cfg.CLI.Default) != "" {
+		return cfg.CLI.Default
+	}
+	if cfg != nil && cfg.LLM != nil && cfg.LLM.APIKey != "" {
+		return agent.RuntimeKindSingerOS
+	}
+	if len(cliNames) > 0 {
+		return cliNames[0]
+	}
+	return ""
 }

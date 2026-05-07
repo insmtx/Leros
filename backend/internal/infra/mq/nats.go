@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/ygpkg/yg-go/logs"
@@ -22,6 +23,8 @@ type natsPublisher struct {
 	closed bool
 	mu     sync.Mutex
 }
+
+const defaultRealtimeFlushTimeout = 5 * time.Second
 
 // NewPublisher 创建一个新的 NATS JetStream 发布者实例
 func NewPublisher(url string) (*natsPublisher, error) {
@@ -100,7 +103,9 @@ func (p *natsPublisher) PublishRealtimeWithContext(ctx context.Context, topic st
 	if err := p.conn.Publish(topic, body); err != nil {
 		return fmt.Errorf("failed to publish message to subject '%s': %w", topic, err)
 	}
-	if err := p.conn.FlushWithContext(ctx); err != nil {
+	flushCtx, cancel := contextWithDefaultDeadline(ctx, defaultRealtimeFlushTimeout)
+	defer cancel()
+	if err := p.conn.FlushWithContext(flushCtx); err != nil {
 		return fmt.Errorf("failed to flush message to subject '%s': %w", topic, err)
 	}
 
@@ -130,13 +135,15 @@ func (p *natsPublisher) SubscribeWithContext(ctx context.Context, topic string, 
 			return
 		}
 
-		// 调用用户定义的处理函数
-		handler(message)
-
-		// 手动确认消息
+		// Ack before invoking the handler so long-running worker tasks do not
+		// exceed JetStream AckWait and get redelivered while still running.
 		if err := msg.Ack(); err != nil {
 			logs.ErrorContextf(ctx, "Failed to ack message for topic '%s': %v", topic, err)
+			return
 		}
+
+		// 调用用户定义的处理函数
+		handler(message)
 	},
 		nats.Durable(durableName),
 		nats.ManualAck(),
@@ -191,4 +198,14 @@ func (p *natsPublisher) Close() error {
 // streamNameFromTopic 根据 topic 生成 Stream 名称
 func streamNameFromTopic(topic string) string {
 	return fmt.Sprintf("%s_STREAM", strings.ReplaceAll(topic, ".", "_"))
+}
+
+func contextWithDefaultDeadline(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if ctx == nil {
+		return context.WithTimeout(context.Background(), timeout)
+	}
+	if _, ok := ctx.Deadline(); ok {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, timeout)
 }
