@@ -18,6 +18,7 @@ require (
 	github.com/ygpkg/yg-go v1.23.55
 	go.uber.org/zap v1.27.0
 	gopkg.in/yaml.v3 v3.0.1
+	gorm.io/driver/sqlite v1.5.6
 	gorm.io/gorm v1.30.1
 )
 
@@ -132,5 +133,4 @@ require (
 	gorm.io/driver/clickhouse v0.7.0 // indirect
 	gorm.io/driver/mysql v1.5.7 // indirect
 	gorm.io/driver/postgres v1.6.0 // indirect
-	gorm.io/driver/sqlite v1.5.6 // indirect
 )

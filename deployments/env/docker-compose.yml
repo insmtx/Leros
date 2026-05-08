@@ -39,12 +39,14 @@ services:
   redis:
     image: registry.yygu.cn/library/redis:8.2
     container_name: singer-redis
+    environment:
+      - REDIS_PASSWORD=redis_password
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "redis_password", "ping"]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -64,7 +66,7 @@ services:
     environment:
       - DATABASE_URL=postgres://singer_user:singer_password@postgresql:5432/singer_db
       - NATS_URL=nats://nats:4222
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:redis_password@redis:6379
       - GIN_MODE=release
     volumes:
       - ./config.yaml:/app/config.yaml
@@ -84,7 +86,7 @@ services:
     environment:
       - DATABASE_URL=postgres://singer_user:singer_password@postgresql:5432/singer_db
       - NATS_URL=nats://nats:4222
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:redis_password@redis:6379
     volumes:
       - ./config.yaml:/app/config.yaml
     command: ["worker", "--config", "/app/config.yaml"]

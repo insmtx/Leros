@@ -13,26 +13,17 @@ cd deployments/dev
 
 Edit `.env` file and set your `LLM_API_KEY` and other configuration.
 
-### Start Environment
+### Start Infrastructure
 
-Start infrastructure only (PostgreSQL, NATS, Redis):
-```bash
-./dev-start.sh --infra-only
-```
+Start infrastructure (PostgreSQL, NATS, Redis):
 
-Start with application services:
 ```bash
-./dev-start.sh
-```
-
-Rebuild and start:
-```bash
-./dev-start.sh --build
+docker-compose -f docker-compose.dev.yml up -d
 ```
 
 ### Start Individual Components
 
-After starting infrastructure (`--infra-only`), start components independently:
+After starting infrastructure, start components independently:
 
 ```bash
 # Start server
@@ -47,36 +38,20 @@ After starting infrastructure (`--infra-only`), start components independently:
 
 Each component supports `--build` flag to rebuild before starting.
 
-### View Status
-
-```bash
-./dev-status.sh
-```
-
 ### View Logs
 
 ```bash
 # All services
-./dev-logs.sh
-
-# Follow logs
-./dev-logs.sh -f
+docker-compose -f docker-compose.dev.yml logs -f
 
 # Specific service
-./dev-logs.sh -f postgresql
+docker-compose -f docker-compose.dev.yml logs -f postgresql
 ```
 
 ### Stop Environment
 
 ```bash
-./dev-stop.sh
-```
-
-### Restart Environment
-
-```bash
-./dev-restart.sh
-./dev-restart.sh --build    # Rebuild before restart
+docker-compose -f docker-compose.dev.yml down
 ```
 
 ## Service Ports
@@ -113,11 +88,7 @@ From project root:
 
 ```bash
 make dev-setup     # Initial setup
-make dev-start     # Start all services
-make dev-stop      # Stop all services
-make dev-status    # Check service status
-make dev-logs      # View logs
-make dev-server    # Start server only
-make dev-worker    # Start worker only
-make dev-frontend  # Start frontend only
+make dev-server    # Start server
+make dev-worker    # Start worker
+make dev-frontend  # Start frontend
 ```
