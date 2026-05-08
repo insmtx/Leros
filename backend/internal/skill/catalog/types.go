@@ -1,4 +1,4 @@
-package skilltools
+package catalog
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Manifest describes the metadata section of a file-based skill.
+// Manifest 描述文件型 Skill 的元数据区域。
 type Manifest struct {
 	Name        string           `yaml:"name"`
 	Description string           `yaml:"description"`
@@ -16,7 +16,7 @@ type Manifest struct {
 	Metadata    ManifestMetadata `yaml:"metadata,omitempty"`
 }
 
-// Normalize fills derived defaults after parsing a skill document.
+// Normalize 在解析 Skill 文档后补齐派生默认值。
 func (m *Manifest) Normalize(defaultName string) {
 	if m.Name == "" {
 		m.Name = defaultName
@@ -27,12 +27,12 @@ func (m *Manifest) Normalize(defaultName string) {
 	}
 }
 
-// ManifestMetadata stores SingerOS-specific metadata extensions.
+// ManifestMetadata 存储 SingerOS 专用的元数据扩展。
 type ManifestMetadata struct {
 	SingerOS SingerOSMetadata `yaml:"singeros,omitempty"`
 }
 
-// SingerOSMetadata stores the first set of skill routing hints used by runtime.
+// SingerOSMetadata 存储运行时使用的第一组 Skill 路由提示。
 type SingerOSMetadata struct {
 	Category      string   `yaml:"category,omitempty"`
 	Tags          []string `yaml:"tags,omitempty"`
@@ -40,7 +40,7 @@ type SingerOSMetadata struct {
 	RequiresTools []string `yaml:"requires_tools,omitempty"`
 }
 
-// Entry is a discovered skill document with parsed metadata and body.
+// Entry 表示一个已发现并解析出元数据和正文的 Skill 文档。
 type Entry struct {
 	Manifest Manifest
 	Body     string
@@ -48,7 +48,7 @@ type Entry struct {
 	Path     string
 }
 
-// Summary is the compact view injected into runtime prompts.
+// Summary 是注入运行时提示词的紧凑视图。
 type Summary struct {
 	Name          string
 	Description   string
@@ -59,7 +59,7 @@ type Summary struct {
 	RequiresTools []string
 }
 
-// Summary returns the prompt-friendly summary for the skill entry.
+// Summary 返回适合提示词使用的 Skill 条目摘要。
 func (e *Entry) Summary() Summary {
 	return Summary{
 		Name:          e.Manifest.Name,
@@ -72,7 +72,7 @@ func (e *Entry) Summary() Summary {
 	}
 }
 
-// ParseDocument parses a SKILL.md document with optional YAML frontmatter.
+// ParseDocument 解析带可选 YAML frontmatter 的 SKILL.md 文档。
 func ParseDocument(raw []byte) (*Manifest, string, error) {
 	manifest := &Manifest{}
 	content := strings.TrimSpace(string(raw))

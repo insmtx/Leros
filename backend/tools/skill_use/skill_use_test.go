@@ -1,4 +1,4 @@
-package skilltools
+package skilluse
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
 )
 
 func TestSkillUseToolListAndGet(t *testing.T) {
@@ -206,7 +208,7 @@ func TestSkillUseToolValidate(t *testing.T) {
 	}
 }
 
-func newTestCatalog(t *testing.T) *Catalog {
+func newTestCatalog(t *testing.T) *skillcatalog.Catalog {
 	t.Helper()
 
 	rootDir := t.TempDir()
@@ -241,7 +243,7 @@ Read the pull request before reviewing.
 		t.Fatalf("write large reference failed: %v", err)
 	}
 
-	catalog, err := NewCatalog(os.DirFS(rootDir))
+	catalog, err := skillcatalog.NewCatalog(os.DirFS(rootDir))
 	if err != nil {
 		t.Fatalf("load catalog failed: %v", err)
 	}
@@ -259,7 +261,7 @@ func decodeSkillToolOutput(t *testing.T, output string) map[string]interface{} {
 	return decoded
 }
 
-func newBundledSkillsCatalog(t *testing.T) *Catalog {
+func newBundledSkillsCatalog(t *testing.T) *skillcatalog.Catalog {
 	t.Helper()
 
 	_, currentFile, _, ok := runtime.Caller(0)
@@ -268,7 +270,7 @@ func newBundledSkillsCatalog(t *testing.T) *Catalog {
 	}
 
 	skillsDir := filepath.Join(filepath.Dir(currentFile), "..", "..", "skills")
-	catalog, err := NewCatalog(os.DirFS(skillsDir))
+	catalog, err := skillcatalog.NewCatalog(os.DirFS(skillsDir))
 	if err != nil {
 		t.Fatalf("load bundled skills catalog: %v", err)
 	}

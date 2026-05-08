@@ -3,6 +3,7 @@ package engines
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/insmtx/SingerOS/backend/pkg/singeros"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -25,25 +27,65 @@ var defaultSkillTargetDirs = []string{
 
 const skillManifestFile = "SKILL.md"
 
-// SyncBuiltinSkills copies SingerOS built-in skills into external agent skill directories.
+var errNoSkillDirs = errors.New("no skill directories found")
+
+// SyncBuiltinSkills copies SingerOS built-in and user-managed skills into external agent skill directories.
 func SyncBuiltinSkills(sourceDir string, targetDirs []string) error {
 	sourceDir, err := resolveBuiltinSkillsSource(sourceDir)
 	if err != nil {
 		return err
 	}
+
+	sourceDirs := []string{sourceDir}
+	if userDir, err := resolveSingerOSSkillsSource(); err == nil {
+		sourceDirs = append(sourceDirs, userDir)
+	}
+
+	return syncSkillDirs(sourceDirs, targetDirs)
+}
+
+// SyncSingerOSSkills copies all available SingerOS skills into external agent skill directories.
+func SyncSingerOSSkills(targetDirs []string) error {
+	userDir, err := defaultSingerOSSkillsDir()
+	if err != nil {
+		return err
+	}
+	return SyncSingerOSSkillsFrom(userDir, targetDirs)
+}
+
+// SyncSingerOSSkillsFrom copies built-in skills and the given user skill directory into external agent skill directories.
+func SyncSingerOSSkillsFrom(userSkillDir string, targetDirs []string) error {
+	sourceDirs := make([]string, 0, 2)
+	if builtinDir, err := resolveBuiltinSkillsSource(""); err == nil {
+		sourceDirs = append(sourceDirs, builtinDir)
+	}
+	if userDir, err := resolveSkillSourceDir(userSkillDir); err == nil {
+		sourceDirs = append(sourceDirs, userDir)
+	}
+	if len(sourceDirs) == 0 {
+		return nil
+	}
+	return syncSkillDirs(sourceDirs, targetDirs)
+}
+
+func syncSkillDirs(sourceDirs []string, targetDirs []string) error {
 	if len(targetDirs) == 0 {
 		targetDirs = defaultSkillTargetDirs
 	}
-
 	for _, targetDir := range targetDirs {
-		targetDir, err := expandPath(targetDir)
+		resolvedTargetDir, err := expandPath(targetDir)
 		if err != nil {
 			return err
 		}
-		if err := syncSkillDir(sourceDir, targetDir); err != nil {
-			return err
+		for _, sourceDir := range sourceDirs {
+			if err := syncSkillDir(sourceDir, resolvedTargetDir); err != nil {
+				if errors.Is(err, errNoSkillDirs) {
+					continue
+				}
+				return err
+			}
+			logs.Infof("Synced skills from %s to %s", sourceDir, resolvedTargetDir)
 		}
-		logs.Infof("Synced built-in skills from %s to %s", sourceDir, targetDir)
 	}
 	return nil
 }
@@ -69,6 +111,33 @@ func resolveBuiltinSkillsSource(sourceDir string) (string, error) {
 	}
 
 	return "", fmt.Errorf("built-in skills directory not found")
+}
+
+func resolveSingerOSSkillsSource() (string, error) {
+	skillsDir, err := defaultSingerOSSkillsDir()
+	if err != nil {
+		return "", err
+	}
+	return resolveSkillSourceDir(skillsDir)
+}
+
+func resolveSkillSourceDir(skillsDir string) (string, error) {
+	skillsDir = strings.TrimSpace(skillsDir)
+	if skillsDir == "" {
+		return "", fmt.Errorf("skill source path is empty")
+	}
+	info, err := os.Stat(skillsDir)
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("skill source path is not a directory: %s", skillsDir)
+	}
+	return skillsDir, nil
+}
+
+func defaultSingerOSSkillsDir() (string, error) {
+	return singeros.SkillsDir()
 }
 
 func syncSkillDir(sourceDir string, targetDir string) error {
@@ -110,7 +179,7 @@ func listSkillDirs(sourceDir string) ([]string, error) {
 		skillDirs = append(skillDirs, entry.Name())
 	}
 	if len(skillDirs) == 0 {
-		return nil, fmt.Errorf("no skill directories found in %s", sourceDir)
+		return nil, fmt.Errorf("%w in %s", errNoSkillDirs, sourceDir)
 	}
 	return skillDirs, nil
 }

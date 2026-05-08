@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
+	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
 )
 
 type skillsContext struct {
@@ -12,7 +12,7 @@ type skillsContext struct {
 	AlwaysSections []string
 }
 
-func buildSkillsContext(catalog *skilltools.Catalog) (*skillsContext, error) {
+func buildSkillsContext(catalog skillcatalog.SkillCatalog) (*skillsContext, error) {
 	if catalog == nil {
 		return &skillsContext{}, nil
 	}
@@ -48,7 +48,7 @@ func buildSkillsContext(catalog *skilltools.Catalog) (*skillsContext, error) {
 	return context, nil
 }
 
-func buildSkillSummarySection(summaries []skilltools.Summary) string {
+func buildSkillSummarySection(summaries []skillcatalog.Summary) string {
 	var builder strings.Builder
 
 	builder.WriteString("Available skills:\n")

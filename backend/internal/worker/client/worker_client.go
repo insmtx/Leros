@@ -10,9 +10,13 @@ import (
 
 	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/internal/agent"
+	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
+	skillruntime "github.com/insmtx/SingerOS/backend/internal/skill/runtime"
+	skillstore "github.com/insmtx/SingerOS/backend/internal/skill/store"
 	"github.com/insmtx/SingerOS/backend/tools"
 	memorytools "github.com/insmtx/SingerOS/backend/tools/memory"
-	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
+	skillmanagetools "github.com/insmtx/SingerOS/backend/tools/skill_manage"
+	skillusetools "github.com/insmtx/SingerOS/backend/tools/skill_use"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -113,7 +117,7 @@ func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) (agent.AgentRun
 		return nil, fmt.Errorf("llm config is required")
 	}
 
-	catalog, err := loadSkillsCatalog(cfg.SkillsDir)
+	catalogProvider, err := loadSkillsCatalogProvider(cfg.SkillsDir)
 	if err != nil {
 		return nil, fmt.Errorf("load skills catalog: %w", err)
 	}
@@ -121,9 +125,21 @@ func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) (agent.AgentRun
 	toolRegistry := tools.NewRegistry()
 
 	if cfg.ToolsEnabled {
-		if err := skilltools.Register(toolRegistry, catalog); err != nil {
+		if err := skillusetools.RegisterWithProvider(toolRegistry, catalogProvider); err != nil {
 			logs.Errorf("register tools: %v", err)
 			return nil, fmt.Errorf("register tools: %w", err)
+		}
+		store, err := skillstore.NewSkillStore("")
+		if err != nil {
+			return nil, fmt.Errorf("new skill store: %w", err)
+		}
+		manager, err := skillruntime.NewManager(store, skillruntime.NewPostProcessor(store.RootDir(), catalogProvider))
+		if err != nil {
+			return nil, fmt.Errorf("new skill manager: %w", err)
+		}
+		if err := skillmanagetools.RegisterWithManager(toolRegistry, manager); err != nil {
+			logs.Errorf("register skill manage tools: %v", err)
+			return nil, fmt.Errorf("register skill manage tools: %w", err)
 		}
 		if err := memorytools.Register(toolRegistry); err != nil {
 			logs.Errorf("register memory tools: %v", err)
@@ -132,8 +148,8 @@ func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) (agent.AgentRun
 	}
 
 	agentConfig := agent.Config{
-		SkillsCatalog: catalog,
-		ToolRegistry:  toolRegistry,
+		SkillsCatalogProvider: catalogProvider,
+		ToolRegistry:          toolRegistry,
 	}
 
 	agentInstance, err := agent.NewAgent(ctx, cfg.LLMConfig, agentConfig)
@@ -208,14 +224,10 @@ func (w *WorkerClient) GetStatus() string {
 	return w.status
 }
 
-func loadSkillsCatalog(skillsDir string) (*skilltools.Catalog, error) {
+func loadSkillsCatalogProvider(skillsDir string) (*skillcatalog.FileCatalogProvider, error) {
 	if skillsDir == "" {
-		return skilltools.NewEmptyCatalog(), nil
+		return skillcatalog.NewFileCatalogProvider(context.Background())
 	}
 
-	catalog, _, err := skilltools.LoadDefaultCatalog()
-	if err != nil {
-		return nil, err
-	}
-	return catalog, nil
+	return skillcatalog.NewFileCatalogProvider(context.Background())
 }

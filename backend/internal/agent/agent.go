@@ -15,8 +15,8 @@ import (
 	einoadapter "github.com/insmtx/SingerOS/backend/internal/agent/eino"
 	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
 	localmemory "github.com/insmtx/SingerOS/backend/internal/memory/local"
+	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
 	"github.com/insmtx/SingerOS/backend/tools"
-	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -58,10 +58,10 @@ const defaultAgentSystemPrompt = `你是 SingerOS 助手。
 
 // Agent is the SingerOS runtime agent entrypoint.
 type Agent struct {
-	chatModel     einomodel.ToolCallingChatModel
-	toolAdapter   *einoadapter.ToolAdapter
-	skillsCatalog *skilltools.Catalog
-	systemPrompt  string
+	chatModel      einomodel.ToolCallingChatModel
+	toolAdapter    *einoadapter.ToolAdapter
+	skillsProvider skillcatalog.CatalogProvider
+	systemPrompt   string
 }
 
 // NewAgent creates the SingerOS agent backed by the Eino flow framework.
@@ -79,10 +79,10 @@ func NewAgent(ctx context.Context, llmConfig *config.LLMConfig, runtimeConfig Co
 	}
 
 	return &Agent{
-		chatModel:     chatModel,
-		toolAdapter:   einoadapter.NewToolAdapter(runtimeConfig.ToolRegistry),
-		skillsCatalog: runtimeConfig.SkillsCatalog,
-		systemPrompt:  defaultAgentSystemPrompt,
+		chatModel:      chatModel,
+		toolAdapter:    einoadapter.NewToolAdapter(runtimeConfig.ToolRegistry),
+		skillsProvider: skillsProviderForConfig(runtimeConfig),
+		systemPrompt:   defaultAgentSystemPrompt,
 	}, nil
 }
 
@@ -247,7 +247,7 @@ func (a *Agent) buildSystemPrompt(req *RequestContext) (string, error) {
 			sections = append(sections, base)
 		}
 
-		skillsContext, err := buildSkillsContext(a.skillsCatalog)
+		skillsContext, err := buildSkillsContext(a.currentSkillsCatalog())
 		if err != nil {
 			return "", err
 		}
@@ -267,6 +267,20 @@ func (a *Agent) buildSystemPrompt(req *RequestContext) (string, error) {
 		}
 	}
 	return strings.Join(sections, "\n\n"), nil
+}
+
+func (a *Agent) currentSkillsCatalog() skillcatalog.SkillCatalog {
+	if a == nil || a.skillsProvider == nil {
+		return skillcatalog.NewEmptyCatalog()
+	}
+	return a.skillsProvider.Current()
+}
+
+func skillsProviderForConfig(runtimeConfig Config) skillcatalog.CatalogProvider {
+	if runtimeConfig.SkillsCatalogProvider != nil {
+		return runtimeConfig.SkillsCatalogProvider
+	}
+	return skillcatalog.NewStaticCatalogProvider(runtimeConfig.SkillsCatalog)
 }
 
 func buildMemoryContext(ctx context.Context) string {

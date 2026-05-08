@@ -8,6 +8,9 @@ import (
 	"net/http"
 
 	"github.com/insmtx/SingerOS/backend/tools"
+	memorytools "github.com/insmtx/SingerOS/backend/tools/memory"
+	skillmanagetools "github.com/insmtx/SingerOS/backend/tools/skill_manage"
+	testtools "github.com/insmtx/SingerOS/backend/tools/test"
 	mcpsdk "github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 )
@@ -26,6 +29,15 @@ type Server struct {
 // NewServer creates a SingerOS MCP server with the currently public tools.
 func NewServer() *Server {
 	return NewServerWithTools(NewTools()...)
+}
+
+// NewTools returns the SingerOS tools that are currently exposed through MCP.
+func NewTools() []tools.Tool {
+	return []tools.Tool{
+		testtools.NewEchoTool(),
+		memorytools.NewTool(),
+		skillmanagetools.NewTool(),
+	}
 }
 
 // NewServerWithTools creates a SingerOS MCP server from SingerOS internal tools.

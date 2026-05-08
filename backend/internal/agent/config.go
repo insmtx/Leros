@@ -1,12 +1,13 @@
 package agent
 
 import (
+	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
 	"github.com/insmtx/SingerOS/backend/tools"
-	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
 )
 
 // Config stores runtime dependencies that are orthogonal to the agent implementation.
 type Config struct {
-	SkillsCatalog *skilltools.Catalog
-	ToolRegistry  *tools.Registry
+	SkillsCatalog         *skillcatalog.Catalog
+	SkillsCatalogProvider skillcatalog.CatalogProvider
+	ToolRegistry          *tools.Registry
 }

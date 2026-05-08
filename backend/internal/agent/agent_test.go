@@ -13,9 +13,10 @@ import (
 
 	"github.com/insmtx/SingerOS/backend/config"
 	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
+	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
 	"github.com/insmtx/SingerOS/backend/tools"
 	nodetools "github.com/insmtx/SingerOS/backend/tools/node"
-	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
+	skillusetools "github.com/insmtx/SingerOS/backend/tools/skill_use"
 	"github.com/ygpkg/yg-go/logs"
 	"go.uber.org/zap/zapcore"
 )
@@ -23,7 +24,7 @@ import (
 const defaultTestNodeContainerID = "b327e241316c2a2f62cbee986edd0e71235205f0fde5dc7a4543f5344396b351"
 
 func TestAgentBuildSystemPromptIncludesSkills(t *testing.T) {
-	catalog, err := skilltools.NewCatalog(fstest.MapFS{
+	catalog, err := skillcatalog.NewCatalog(fstest.MapFS{
 		"code-review/SKILL.md": {
 			Data: []byte(`---
 name: code-review
@@ -40,8 +41,8 @@ Always inspect diffs first.`),
 	}
 
 	agent := &Agent{
-		systemPrompt:  "Base runtime prompt.",
-		skillsCatalog: catalog,
+		systemPrompt:   "Base runtime prompt.",
+		skillsProvider: skillcatalog.NewStaticCatalogProvider(catalog),
 	}
 
 	prompt, err := agent.buildSystemPrompt(&RequestContext{
@@ -213,7 +214,7 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 	}
 
 	registry := tools.NewRegistry()
-	if err := skilltools.Register(registry, catalog); err != nil {
+	if err := skillusetools.Register(registry, catalog); err != nil {
 		t.Fatalf("register skill tools: %v", err)
 	}
 	if err := nodetools.Register(registry); err != nil {
@@ -255,7 +256,7 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 		Runtime: RuntimeOptions{MaxStep: 20},
 		Capability: CapabilityContext{
 			AllowedTools: []string{
-				skilltools.ToolNameSkillUse,
+				skillusetools.ToolNameSkillUse,
 				nodetools.ToolNameNodeShell,
 			},
 		},
@@ -292,7 +293,7 @@ func realModelNodeContainerID() string {
 	return defaultTestNodeContainerID
 }
 
-func newBundledRuntimeSkillsCatalog(t *testing.T) (*skilltools.Catalog, string) {
+func newBundledRuntimeSkillsCatalog(t *testing.T) (*skillcatalog.Catalog, string) {
 	t.Helper()
 
 	_, currentFile, _, ok := goruntime.Caller(0)
@@ -301,7 +302,7 @@ func newBundledRuntimeSkillsCatalog(t *testing.T) (*skilltools.Catalog, string) 
 	}
 
 	skillsDir := filepath.Join(filepath.Dir(currentFile), "..", "skills")
-	catalog, err := skilltools.NewCatalog(os.DirFS(skillsDir))
+	catalog, err := skillcatalog.NewCatalog(os.DirFS(skillsDir))
 	if err != nil {
 		t.Fatalf("load bundled skills catalog from %s: %v", skillsDir, err)
 	}

@@ -11,13 +11,17 @@ import (
 	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/internal/agent"
 	"github.com/insmtx/SingerOS/backend/internal/agent/externalcli"
+	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
+	skillruntime "github.com/insmtx/SingerOS/backend/internal/skill/runtime"
+	skillstore "github.com/insmtx/SingerOS/backend/internal/skill/store"
 	"github.com/insmtx/SingerOS/backend/internal/worker/client"
 	singerMCP "github.com/insmtx/SingerOS/backend/mcp"
 	"github.com/insmtx/SingerOS/backend/runtime/engines"
 	"github.com/insmtx/SingerOS/backend/runtime/engines/builtin"
 	"github.com/insmtx/SingerOS/backend/tools"
 	memorytools "github.com/insmtx/SingerOS/backend/tools/memory"
-	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
+	skillmanagetools "github.com/insmtx/SingerOS/backend/tools/skill_manage"
+	skillusetools "github.com/insmtx/SingerOS/backend/tools/skill_use"
 	"github.com/spf13/cobra"
 	ygconfig "github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/logs"
@@ -155,29 +159,40 @@ func mcpURLFromAddr(addr string) string {
 }
 
 func buildRuntimeConfig() (agent.Config, error) {
-	catalog, skillDir, err := skilltools.LoadDefaultCatalog()
+	catalogProvider, err := skillcatalog.NewFileCatalogProvider(context.Background())
 	if err != nil {
 		return agent.Config{}, fmt.Errorf("load skills: %w", err)
 	}
 
-	logs.Infof("Loaded %d skills from %s for runtime", len(catalog.List()), skillDir)
+	logs.Infof("Loaded %d skills from %s for runtime", len(catalogProvider.Current().List()), catalogProvider.LoadedDirs())
 
-	toolRegistry, err := buildTooling(catalog)
+	toolRegistry, err := buildTooling(catalogProvider)
 	if err != nil {
 		return agent.Config{}, err
 	}
 
 	return agent.Config{
-		SkillsCatalog: catalog,
-		ToolRegistry:  toolRegistry,
+		SkillsCatalogProvider: catalogProvider,
+		ToolRegistry:          toolRegistry,
 	}, nil
 }
 
-func buildTooling(catalog *skilltools.Catalog) (*tools.Registry, error) {
+func buildTooling(catalogProvider *skillcatalog.FileCatalogProvider) (*tools.Registry, error) {
 	registry := tools.NewRegistry()
 
-	if err := skilltools.Register(registry, catalog); err != nil {
+	if err := skillusetools.RegisterWithProvider(registry, catalogProvider); err != nil {
 		return nil, fmt.Errorf("register skill use tool: %w", err)
+	}
+	store, err := skillstore.NewSkillStore("")
+	if err != nil {
+		return nil, fmt.Errorf("new skill store: %w", err)
+	}
+	manager, err := skillruntime.NewManager(store, skillruntime.NewPostProcessor(store.RootDir(), catalogProvider))
+	if err != nil {
+		return nil, fmt.Errorf("new skill manager: %w", err)
+	}
+	if err := skillmanagetools.RegisterWithManager(registry, manager); err != nil {
+		return nil, fmt.Errorf("register skill manage tool: %w", err)
 	}
 	if err := memorytools.Register(registry); err != nil {
 		return nil, fmt.Errorf("register memory tool: %w", err)
