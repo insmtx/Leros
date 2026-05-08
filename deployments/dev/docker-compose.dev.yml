@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  postgresql:
+    image: registry.yygu.cn/library/postgres:17.9
+    container_name: singer-dev-postgresql
+    environment:
+      POSTGRES_DB: singer_dev_db
+      POSTGRES_USER: singer_dev_user
+      POSTGRES_PASSWORD: singer_dev_password
+    volumes:
+      - dev_postgres_data:/var/lib/postgresql/data
+      - ../env/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready -U singer_dev_user -d singer_dev_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - singer-dev-network
+
+  nats:
+    image: registry.yygu.cn/library/nats:2.12.7
+    container_name: singer-dev-nats
+    command: ["--jetstream"]
+    ports:
+      - "4223:4222"
+      - "8223:8222"
+    volumes:
+      - dev_nats_data:/data
+    healthcheck:
+      test: ["CMD", "/nats-server", "--help"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - singer-dev-network
+
+  redis:
+    image: registry.yygu.cn/library/redis:8.2
+    container_name: singer-dev-redis
+    environment:
+      - REDIS_PASSWORD=redis_dev_password
+    ports:
+      - "6380:6379"
+    volumes:
+      - dev_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_dev_password", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - singer-dev-network
+
+volumes:
+  dev_postgres_data:
+  dev_nats_data:
+  dev_redis_data:
+
+networks:
+  singer-dev-network:
+    driver: bridge
