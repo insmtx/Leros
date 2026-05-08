@@ -17,13 +17,6 @@ if ! docker ps --format '{{.Names}}' | grep -q "singer-dev-postgresql"; then
     exit 1
 fi
 
-CONFIG_FILE="$SCRIPT_DIR/server.config.yaml"
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo -e "${YELLOW}Warning: server.config.yaml not found. Creating from template...${NC}"
-    cp "$SCRIPT_DIR/server.config.example.yaml" "$CONFIG_FILE"
-    echo -e "${YELLOW}Please edit server.config.yaml and set your configuration.${NC}"
-fi
-
 if [[ "$@" == *"--build"* ]]; then
     echo -e "${BLUE}Building Docker image...${NC}"
     cd "$ROOT_DIR"
