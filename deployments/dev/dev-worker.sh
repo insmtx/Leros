@@ -13,8 +13,15 @@ echo -e "${BLUE}Starting SingerOS Dev Worker...${NC}"
 
 if ! docker ps --format '{{.Names}}' | grep -q "singer-dev-postgresql"; then
     echo -e "${RED}Error: Infrastructure not running. Start it first with:${NC}"
-    echo "  ./dev-start.sh --infra-only"
+    echo "  docker-compose -f docker-compose.dev.yml up -d"
     exit 1
+fi
+
+CONFIG_FILE="$SCRIPT_DIR/worker.config.yaml"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo -e "${YELLOW}Warning: worker.config.yaml not found. Creating from template...${NC}"
+    cp "$SCRIPT_DIR/worker.config.example.yaml" "$CONFIG_FILE"
+    echo -e "${YELLOW}Please edit worker.config.yaml and set your configuration.${NC}"
 fi
 
 if [[ "$@" == *"--build"* ]]; then
@@ -34,7 +41,7 @@ docker run -d \
     -e DATABASE_URL=postgres://singer_dev_user:singer_dev_password@singer-dev-postgresql:5432/singer_dev_db \
     -e NATS_URL=nats://singer-dev-nats:4222 \
     -e REDIS_URL=redis://:redis_dev_password@singer-dev-redis:6379 \
-    -v "$SCRIPT_DIR/config.yaml:/app/config.yaml" \
+    -v "$SCRIPT_DIR/worker.config.yaml:/app/config.yaml" \
     localhost/dev_singer:latest \
     worker --config /app/config.yaml
 
