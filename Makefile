@@ -63,3 +63,33 @@ swagger:
 
 swagger-clean:
 	rm -rf docs/swagger
+
+# Development environment commands
+.PHONY: dev-setup dev-start dev-stop dev-restart dev-logs dev-status dev-server dev-worker dev-frontend
+
+dev-setup:
+	cd deployments/dev && ./dev-setup.sh
+
+dev-start:
+	cd deployments/dev && ./dev-start.sh
+
+dev-stop:
+	cd deployments/dev && ./dev-stop.sh
+
+dev-restart:
+	cd deployments/dev && ./dev-restart.sh
+
+dev-logs:
+	cd deployments/dev && ./dev-logs.sh
+
+dev-status:
+	cd deployments/dev && ./dev-status.sh
+
+dev-server:
+	cd deployments/dev && ./dev-server.sh
+
+dev-worker:
+	cd deployments/dev && ./dev-worker.sh
+
+dev-frontend:
+	cd deployments/dev && ./dev-frontend.sh

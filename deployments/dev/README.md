@@ -92,7 +92,8 @@ Each component supports `--build` flag to rebuild before starting.
 ## Configuration Files
 
 - `.env.example` - Environment variables template (copy to `.env`)
-- `config.example.yaml` - Application config template (copy to `config.yaml`)
+- `server.config.example.yaml` - Server config template (copy to `server.config.yaml`)
+- `worker.config.example.yaml` - Worker config template (copy to `worker.config.yaml`)
 
 ## Architecture
 
