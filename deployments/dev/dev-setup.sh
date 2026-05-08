@@ -32,7 +32,6 @@ if [ ! -f "$SCRIPT_DIR/.env" ]; then
     echo -e "${YELLOW}Creating .env file from template...${NC}"
     cp "$SCRIPT_DIR/.env.example" "$SCRIPT_DIR/.env"
     echo -e "${GREEN}.env file created${NC}"
-    echo -e "${YELLOW}Please edit .env and set your LLM_API_KEY${NC}"
 else
     echo -e "${GREEN}.env file already exists${NC}"
 fi
@@ -54,78 +53,33 @@ else
 fi
 
 echo ""
+echo -e "${BLUE}Starting infrastructure services...${NC}"
+cd "$SCRIPT_DIR"
+docker-compose -f docker-compose.dev.yml up -d postgresql nats redis
 
-# Build Docker image if requested
-BUILD=false
-START_SERVICES=false
+echo -e "${YELLOW}Waiting for services to be healthy...${NC}"
+sleep 5
 
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        --build) BUILD=true ;;
-        --start) START_SERVICES=true ;;
-        --help) 
-            echo "Usage: $0 [OPTIONS]"
-            echo ""
-            echo "Options:"
-            echo "  --build    Build Docker image from source"
-            echo "  --start    Start services after setup"
-            exit 0
-            ;;
-        *) 
-            echo "Unknown parameter: $1"
-            exit 1
-            ;;
-    esac
-    shift
+for service in postgresql nats redis; do
+    echo -n "Checking $service... "
+    for i in {1..30}; do
+        status=$(docker inspect --format='{{.State.Health.Status}}' singer-dev-$service 2>/dev/null || echo "starting")
+        if [ "$status" = "healthy" ]; then
+            echo -e "${GREEN}healthy${NC}"
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            echo -e "${RED}timeout${NC}"
+        fi
+        sleep 2
+    done
 done
 
-if [ "$BUILD" = true ]; then
-    echo -e "${BLUE}Building Docker image...${NC}"
-    cd "$SCRIPT_DIR/../.."
-    make docker-build
-    docker tag registry.yygu.cn/insmtx/SingerOS:latest localhost/dev_singer:latest
-    echo -e "${GREEN}Docker image built successfully${NC}"
-    cd "$SCRIPT_DIR"
-else
-    echo -e "${BLUE}Pulling Docker images...${NC}"
-    cd "$SCRIPT_DIR"
-    docker-compose -f docker-compose.dev.yml pull
-fi
-
 echo ""
-echo -e "${GREEN}Setup complete!${NC}"
+echo -e "${GREEN}Dev environment setup complete!${NC}"
 echo ""
-
-if [ "$START_SERVICES" = true ]; then
-    echo -e "${BLUE}Starting infrastructure services...${NC}"
-    docker-compose -f docker-compose.dev.yml up -d postgresql nats redis
-
-    echo -e "${YELLOW}Waiting for services to be healthy...${NC}"
-    sleep 5
-
-    for service in postgresql nats redis; do
-        echo -n "Checking $service... "
-        for i in {1..30}; do
-            status=$(docker inspect --format='{{.State.Health.Status}}' singer-dev-$service 2>/dev/null || echo "starting")
-            if [ "$status" = "healthy" ]; then
-                echo -e "${GREEN}healthy${NC}"
-                break
-            fi
-            if [ $i -eq 30 ]; then
-                echo -e "${RED}timeout${NC}"
-            fi
-            sleep 2
-        done
-    done
-
-    echo ""
-    echo -e "${GREEN}Infrastructure services started!${NC}"
-    echo ""
-else
-    echo -e "${BLUE}Next steps:${NC}"
-    echo "  1. Edit .env file and set your LLM_API_KEY"
-    echo "  2. Edit server.config.yaml and worker.config.yaml with your GitHub app credentials (if needed)"
-    echo "  3. Start infrastructure: docker-compose -f docker-compose.dev.yml up -d"
-    echo "  4. Start server: ./dev-server.sh"
-    echo "  5. Start worker: ./dev-worker.sh"
-fi
+echo -e "${BLUE}Next steps:${NC}"
+echo "  1. Edit .env file and set your LLM_API_KEY"
+echo "  2. Edit server.config.yaml and worker.config.yaml with your GitHub app credentials (if needed)"
+echo "  3. Start server: ./dev-server.sh"
+echo "  4. Start worker: ./dev-worker.sh"
