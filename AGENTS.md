@@ -12,6 +12,7 @@
 - `make run-detached` - 以分离模式（后台）启动 docker-compose 服务
 - `make stop` - 停止 docker-compose 服务
 - `make logs` - 查看 docker-compose 服务日志
+- `make swagger` - 生成 Swagger API 文档（输出到 `docs/swagger/docs.go`）
 
 ### 测试命令
 - `go test ./...` - 运行项目中所有测试
@@ -109,7 +110,9 @@ import (
   - `/backend/types` - 核心领域类型（DigitalAssistant，Event 等）
 - `/bundles` - 构建输出目录（生成；已忽略 git）
 - `/deployments/build/Dockerfile` - 容器构建配置
+- `/deployments/dev/` - 开发环境配置和脚本
 - `/docs` - 文档文件
+  - `/docs/swagger/` - Swagger API 文档（唯一生成位置）
 - `/frontend` - 前端应用
 
 ## 贡献说明
@@ -131,6 +134,22 @@ import (
 - `GITHUB_WEBHOOK_TROUBLESHOOTING.md` - GitHub Webhook 签名验证问题排查
 - `PR_EVENT_FLOW.md` - GitHub PR 事件处理流程验证清单
 - `TROUBLESHOOTING.md` - 常见问题故障排除指南
+
+## Swagger API 文档
+
+Swagger 文档生成到 `docs/swagger/` 目录：
+
+```bash
+# 生成 Swagger 文档
+make swagger
+
+# 生成的文件位置
+docs/swagger/docs.go        # Go 代码（用于 Gin 集成）
+docs/swagger/swagger.json   # JSON 格式文档
+docs/swagger/swagger.yaml   # YAML 格式文档
+```
+
+**注意：** Swagger 文档只保留在 `docs/swagger/` 目录，`docs/` 根目录不再生成重复文件。
 
 ## 核心组件和架构
 

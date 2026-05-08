@@ -63,3 +63,17 @@ swagger:
 
 swagger-clean:
 	rm -rf docs/swagger
+
+.PHONY: dev-setup dev-server dev-worker dev-frontend
+
+dev-setup:
+	cd deployments/dev && ./dev-setup.sh
+
+dev-server:
+	cd deployments/dev && ./dev-server.sh
+
+dev-worker:
+	cd deployments/dev && ./dev-worker.sh
+
+dev-frontend:
+	cd deployments/dev && ./dev-frontend.sh
