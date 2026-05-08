@@ -36,22 +36,6 @@ else
     echo -e "${GREEN}.env file already exists${NC}"
 fi
 
-if [ ! -f "$SCRIPT_DIR/server.config.yaml" ]; then
-    echo -e "${YELLOW}Creating server.config.yaml from template...${NC}"
-    cp "$SCRIPT_DIR/server.config.example.yaml" "$SCRIPT_DIR/server.config.yaml"
-    echo -e "${GREEN}server.config.yaml created${NC}"
-else
-    echo -e "${GREEN}server.config.yaml already exists${NC}"
-fi
-
-if [ ! -f "$SCRIPT_DIR/worker.config.yaml" ]; then
-    echo -e "${YELLOW}Creating worker.config.yaml from template...${NC}"
-    cp "$SCRIPT_DIR/worker.config.example.yaml" "$SCRIPT_DIR/worker.config.yaml"
-    echo -e "${GREEN}worker.config.yaml created${NC}"
-else
-    echo -e "${GREEN}worker.config.yaml already exists${NC}"
-fi
-
 echo ""
 echo -e "${BLUE}Starting infrastructure services...${NC}"
 cd "$SCRIPT_DIR"
