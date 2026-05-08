@@ -1,9 +1,5 @@
-# SingerOS Development Configuration - Server
-# Copy this file to server.config.yaml and update values
+# SingerOS Development Configuration - Worker
 
-server:
-  port: 8080
-  
 database:
   url: "postgres://singer_dev_user:singer_dev_password@singer-dev-postgresql:5432/singer_dev_db?sslmode=disable"
   debug: true
@@ -17,24 +13,15 @@ redis:
 
 log:
   level: debug
-  
+
 github:
   app_id: 
   client_id: ""
   client_secret: ""
-  private_key: |
-    -----BEGIN RSA PRIVATE KEY-----
-    # Your development private key here
-    -----END RSA PRIVATE KEY-----
+  private_key: ""
   webhook_secret: ""
   base_url: ""
 
-# Skill proxy settings
-skill_proxy:
-  enabled: true
-  port: 8081
-  
-# LLM configuration
 llm:
   baseUrl: "https://api.yygu.cn/v3/llm.chat/"
   apiKey: "${LLM_API_KEY}"
