@@ -7,7 +7,7 @@ import (
 	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
 )
 
-// Runner is the runtime execution boundary for one digital employee run.
+// Runner 是数字员工单次运行的执行边界。
 type Runner interface {
 	// Run 执行一次数字员工运行，请求中可携带 EventSink 用于流式事件输出。
 	Run(ctx context.Context, req *RequestContext) (*RunResult, error)
@@ -59,6 +59,9 @@ type RequestContext struct {
 
 	// Metadata 存放调用方透传的扩展信息
 	Metadata map[string]any `json:"metadata,omitempty"`
+
+	// SystemPrompt 是生命周期层构建后的最终系统提示词，不参与 JSON 序列化。
+	SystemPrompt string `json:"-"`
 
 	// EventSink 接收运行过程中的流式事件，不参与 JSON 序列化。
 	EventSink RunEventSink `json:"-"`

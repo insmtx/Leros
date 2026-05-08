@@ -1,5 +1,5 @@
-// Package agent defines the unified agent.run boundary for SingerOS.
-package agent
+// Package singeros implements the built-in Eino-backed SingerOS runtime.
+package singeros
 
 import (
 	"context"
@@ -12,15 +12,32 @@ import (
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/insmtx/SingerOS/backend/config"
+	"github.com/insmtx/SingerOS/backend/internal/agent"
 	einoadapter "github.com/insmtx/SingerOS/backend/internal/agent/eino"
 	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
-	localmemory "github.com/insmtx/SingerOS/backend/internal/memory/local"
-	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
+	"github.com/insmtx/SingerOS/backend/internal/agent/runtimeenv"
 	"github.com/insmtx/SingerOS/backend/tools"
 	"github.com/ygpkg/yg-go/logs"
 )
 
-const defaultAgentSystemPrompt = `你是 SingerOS 助手。
+type RequestContext = agent.RequestContext
+type RunResult = agent.RunResult
+type UsagePayload = agent.UsagePayload
+type AssistantContext = agent.AssistantContext
+type ActorContext = agent.ActorContext
+type CapabilityContext = agent.CapabilityContext
+type ConversationContext = agent.ConversationContext
+type InputContext = agent.InputContext
+type InputMessage = agent.InputMessage
+type RuntimeOptions = agent.RuntimeOptions
+
+const (
+	InputTypeMessage         = agent.InputTypeMessage
+	InputTypeTaskInstruction = agent.InputTypeTaskInstruction
+	RunStatusCompleted       = agent.RunStatusCompleted
+)
+
+const defaultSystemPrompt = `你是 SingerOS 助手。
 
 以下规则优先于后续技能说明、助手补充说明和用户消息。
 
@@ -56,20 +73,27 @@ const defaultAgentSystemPrompt = `你是 SingerOS 助手。
 - 报告结果时，优先说明实际完成了什么、关键返回值是什么、失败时下一步如何处理。
 - 只输出对用户有用的内容，不加无意义前缀。`
 
-// Agent is the SingerOS runtime agent entrypoint.
-type Agent struct {
-	chatModel      einomodel.ToolCallingChatModel
-	toolAdapter    *einoadapter.ToolAdapter
-	skillsProvider skillcatalog.CatalogProvider
-	systemPrompt   string
+// DefaultSystemPrompt 返回 SingerOS 内置 Agent 的基础系统提示词。
+func DefaultSystemPrompt() string {
+	return defaultSystemPrompt
 }
 
-// NewAgent creates the SingerOS agent backed by the Eino flow framework.
-func NewAgent(ctx context.Context, llmConfig *config.LLMConfig, runtimeConfig Config) (*Agent, error) {
+// Runner 是 SingerOS 内置 Eino 运行时入口。
+type Runner struct {
+	chatModel    einomodel.ToolCallingChatModel
+	toolAdapter  *einoadapter.ToolAdapter
+	systemPrompt string
+}
+
+// NewRunner 创建基于 Eino Flow 的 SingerOS 内置 Agent。
+func NewRunner(ctx context.Context, llmConfig *config.LLMConfig, env *runtimeenv.Environment) (*Runner, error) {
 	if llmConfig == nil {
 		return nil, fmt.Errorf("llm config is required")
 	}
-	if runtimeConfig.ToolRegistry == nil {
+	if env == nil {
+		return nil, fmt.Errorf("runtime environment is required")
+	}
+	if env.ToolRegistry() == nil {
 		return nil, fmt.Errorf("tool registry is required")
 	}
 
@@ -78,34 +102,37 @@ func NewAgent(ctx context.Context, llmConfig *config.LLMConfig, runtimeConfig Co
 		return nil, err
 	}
 
-	return &Agent{
-		chatModel:      chatModel,
-		toolAdapter:    einoadapter.NewToolAdapter(runtimeConfig.ToolRegistry),
-		skillsProvider: skillsProviderForConfig(runtimeConfig),
-		systemPrompt:   defaultAgentSystemPrompt,
+	return &Runner{
+		chatModel:    chatModel,
+		toolAdapter:  einoadapter.NewToolAdapter(env.ToolRegistry()),
+		systemPrompt: defaultSystemPrompt,
 	}, nil
 }
 
-// Run executes one normalized request through the SingerOS agent.
-func (a *Agent) Run(ctx context.Context, req *RequestContext) (*RunResult, error) {
+// Run 直接执行标准化请求；统一生命周期入口应优先使用 lifecycle.Runner。
+func (r *Runner) Run(ctx context.Context, req *RequestContext) (*RunResult, error) {
 	startedAt := time.Now().UTC()
-	if a == nil || a.chatModel == nil {
+	if r == nil || r.chatModel == nil {
 		return nil, fmt.Errorf("eino chat model is not initialized")
 	}
 
-	state, err := a.buildRunState(req)
+	state, err := r.buildRunState(req)
 	if err != nil {
 		return nil, err
 	}
-	req = state.req
+	return r.runWithState(ctx, state, startedAt)
+}
+
+func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt time.Time) (*RunResult, error) {
+	req := state.req
 
 	if err := emitRunEvent(ctx, state.emitter, req, agentevents.RunEventStarted, nil); err != nil {
 		return nil, err
 	}
 
 	flow, err := einoadapter.NewFlow(ctx, &einoadapter.FlowConfig{
-		Model:        a.chatModel,
-		ToolAdapter:  a.toolAdapter,
+		Model:        r.chatModel,
+		ToolAdapter:  r.toolAdapter,
 		Binding:      state.toolBinding,
 		Emitter:      state.emitter,
 		SystemPrompt: state.systemPrompt,
@@ -172,7 +199,7 @@ func (a *Agent) Run(ctx context.Context, req *RequestContext) (*RunResult, error
 	return result, nil
 }
 
-func (a *Agent) buildRunState(req *RequestContext) (*runState, error) {
+func (r *Runner) buildRunState(req *RequestContext) (*runState, error) {
 	if req == nil {
 		return nil, errors.New("request context is required")
 	}
@@ -183,7 +210,7 @@ func (a *Agent) buildRunState(req *RequestContext) (*runState, error) {
 		userInput = string(req.Input.Type)
 	}
 
-	systemPrompt, err := a.buildSystemPrompt(req)
+	systemPrompt, err := r.buildSystemPrompt(req)
 	if err != nil {
 		return nil, err
 	}
@@ -240,63 +267,18 @@ func buildUserInput(req *RequestContext) string {
 	}
 }
 
-func (a *Agent) buildSystemPrompt(req *RequestContext) (string, error) {
-	sections := make([]string, 0, 4)
-	if a != nil {
-		if base := strings.TrimSpace(a.systemPromptForRequest(req)); base != "" {
-			sections = append(sections, base)
-		}
-
-		skillsContext, err := buildSkillsContext(a.currentSkillsCatalog())
-		if err != nil {
-			return "", err
-		}
-		if skillsContext != nil {
-			if summary := strings.TrimSpace(skillsContext.SummarySection); summary != "" {
-				sections = append(sections, summary)
-			}
-			for _, section := range skillsContext.AlwaysSections {
-				if trimmed := strings.TrimSpace(section); trimmed != "" {
-					sections = append(sections, trimmed)
-				}
-			}
-		}
-
-		if memoryBlock := buildMemoryContext(context.Background()); memoryBlock != "" {
-			sections = append(sections, memoryBlock)
-		}
+func (r *Runner) buildSystemPrompt(req *RequestContext) (string, error) {
+	if req != nil && strings.TrimSpace(req.SystemPrompt) != "" {
+		return strings.TrimSpace(req.SystemPrompt), nil
 	}
-	return strings.Join(sections, "\n\n"), nil
+	if r == nil {
+		return "", nil
+	}
+	return strings.TrimSpace(r.systemPromptForRequest(req)), nil
 }
 
-func (a *Agent) currentSkillsCatalog() skillcatalog.SkillCatalog {
-	if a == nil || a.skillsProvider == nil {
-		return skillcatalog.NewEmptyCatalog()
-	}
-	return a.skillsProvider.Current()
-}
-
-func skillsProviderForConfig(runtimeConfig Config) skillcatalog.CatalogProvider {
-	if runtimeConfig.SkillsCatalogProvider != nil {
-		return runtimeConfig.SkillsCatalogProvider
-	}
-	return skillcatalog.NewStaticCatalogProvider(runtimeConfig.SkillsCatalog)
-}
-
-func buildMemoryContext(ctx context.Context) string {
-	store, err := localmemory.NewStore(localmemory.Options{})
-	if err != nil {
-		return ""
-	}
-	block, err := store.BuildPromptBlock(ctx)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(block)
-}
-
-func (a *Agent) systemPromptForRequest(req *RequestContext) string {
-	prompt := strings.TrimSpace(a.systemPrompt)
+func (r *Runner) systemPromptForRequest(req *RequestContext) string {
+	prompt := strings.TrimSpace(r.systemPrompt)
 	if req != nil && strings.TrimSpace(req.Assistant.SystemPrompt) != "" {
 		if prompt == "" {
 			prompt = strings.TrimSpace(req.Assistant.SystemPrompt)

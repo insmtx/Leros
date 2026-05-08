@@ -10,13 +10,7 @@ import (
 
 	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/internal/agent"
-	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
-	skillruntime "github.com/insmtx/SingerOS/backend/internal/skill/runtime"
-	skillstore "github.com/insmtx/SingerOS/backend/internal/skill/store"
-	"github.com/insmtx/SingerOS/backend/tools"
-	memorytools "github.com/insmtx/SingerOS/backend/tools/memory"
-	skillmanagetools "github.com/insmtx/SingerOS/backend/tools/skill_manage"
-	skillusetools "github.com/insmtx/SingerOS/backend/tools/skill_use"
+	agentruntime "github.com/insmtx/SingerOS/backend/internal/agent/runtime"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -117,47 +111,14 @@ func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) (agent.AgentRun
 		return nil, fmt.Errorf("llm config is required")
 	}
 
-	catalogProvider, err := loadSkillsCatalogProvider(cfg.SkillsDir)
+	runtimeService, err := agentruntime.NewService(ctx, agentruntime.Options{
+		LLMConfig:    cfg.LLMConfig,
+		ToolsEnabled: cfg.ToolsEnabled,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("load skills catalog: %w", err)
+		return nil, fmt.Errorf("create runtime service: %w", err)
 	}
-
-	toolRegistry := tools.NewRegistry()
-
-	if cfg.ToolsEnabled {
-		if err := skillusetools.RegisterWithProvider(toolRegistry, catalogProvider); err != nil {
-			logs.Errorf("register tools: %v", err)
-			return nil, fmt.Errorf("register tools: %w", err)
-		}
-		store, err := skillstore.NewSkillStore("")
-		if err != nil {
-			return nil, fmt.Errorf("new skill store: %w", err)
-		}
-		manager, err := skillruntime.NewManager(store, skillruntime.NewPostProcessor(store.RootDir(), catalogProvider))
-		if err != nil {
-			return nil, fmt.Errorf("new skill manager: %w", err)
-		}
-		if err := skillmanagetools.RegisterWithManager(toolRegistry, manager); err != nil {
-			logs.Errorf("register skill manage tools: %v", err)
-			return nil, fmt.Errorf("register skill manage tools: %w", err)
-		}
-		if err := memorytools.Register(toolRegistry); err != nil {
-			logs.Errorf("register memory tools: %v", err)
-			return nil, fmt.Errorf("register memory tools: %w", err)
-		}
-	}
-
-	agentConfig := agent.Config{
-		SkillsCatalogProvider: catalogProvider,
-		ToolRegistry:          toolRegistry,
-	}
-
-	agentInstance, err := agent.NewAgent(ctx, cfg.LLMConfig, agentConfig)
-	if err != nil {
-		return nil, fmt.Errorf("create agent: %w", err)
-	}
-
-	return agentInstance, nil
+	return runtimeService, nil
 }
 
 func (w *WorkerClient) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {
@@ -222,12 +183,4 @@ func (w *WorkerClient) GetStartedAt() time.Time {
 
 func (w *WorkerClient) GetStatus() string {
 	return w.status
-}
-
-func loadSkillsCatalogProvider(skillsDir string) (*skillcatalog.FileCatalogProvider, error) {
-	if skillsDir == "" {
-		return skillcatalog.NewFileCatalogProvider(context.Background())
-	}
-
-	return skillcatalog.NewFileCatalogProvider(context.Background())
 }
