@@ -4,14 +4,14 @@ server:
   port: 8080
   
 database:
-  url: "postgres://singer_dev_user:singer_dev_password@singer-dev-postgresql:5432/singer_dev_db?sslmode=disable"
+  url: "postgres://singer_dev_user:singer_dev_password@localhost:5433/singer_dev_db?sslmode=disable"
   debug: true
 
 nats:
-  url: "nats://singer-dev-nats:4222/"
+  url: "nats://localhost:4222/"
 
 redis:
-  addr: "singer-dev-redis:6379"
+  addr: "localhost:6379"
   password: "redis_dev_password"
 
 log:

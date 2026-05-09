@@ -19,7 +19,10 @@ type LLMConfig struct {
 
 // Config 是 SingerOS 的主配置结构，包含所有子系统的配置
 type Config struct {
-	ServerAddr   string           `yaml:"server_addr,omitempty"` // 服务器地址
+	Server struct {
+		Port string    `yaml:"port,omitempty"` // 服务器端口
+		JWT  JWTConfig `yaml:"jwt,omitempty"`  // JWT 认证配置
+	} `yaml:"server,omitempty"` // 服务器地址
 	Github       *GithubAppConfig `yaml:"github,omitempty"`
 	Gitlab       *GitlabAppConfig `yaml:"gitlab,omitempty"`
 	NATS         *NATSConfig      `yaml:"nats,omitempty"`
@@ -27,6 +30,11 @@ type Config struct {
 	LLM          *LLMConfig       `yaml:"llm,omitempty"`
 	Scheduler    *SchedulerConfig `yaml:"scheduler,omitempty"`
 	Organization *OrgConfig       `yaml:"organization,omitempty"`
+}
+
+// JWTConfig JWT 认证配置
+type JWTConfig struct {
+	Secret string `yaml:"secret,omitempty"` // JWT 签名密钥
 }
 
 // OrgConfig is the organization configuration structure

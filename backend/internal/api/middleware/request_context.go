@@ -19,9 +19,21 @@ func Logger(whitelist ...string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		caller, trace := auth.FromContext(ctx)
 
-		logs.SetContextFields(ctx, constants.CtxKeyRequestID, trace.RequestID,
-			constants.CtxKeyTraceID, trace.TraceID,
-			constants.CtxKeyUin, caller.Uin,
+		// Provide default values if caller or trace are nil
+		requestID := ""
+		traceID := ""
+		uin := uint(0)
+		if trace != nil {
+			requestID = trace.RequestID
+			traceID = trace.TraceID
+		}
+		if caller != nil {
+			uin = caller.Uin
+		}
+
+		logs.SetContextFields(ctx, constants.CtxKeyRequestID, requestID,
+			"traceid", traceID,
+			constants.CtxKeyUin, uin,
 		)
 		currReq := ctx.FullPath()
 		for _, whitelistItem := range whitelist {
@@ -49,7 +61,7 @@ func Logger(whitelist ...string) gin.HandlerFunc {
 				"clientip", runtime.GetRealIP(ctx.Request),
 				"respsize", ctx.Writer.Size(),
 				"referer", ctx.Request.Referer(),
-				"uin", ctx.GetUint(constants.CtxKeyUin),
+				"uin", uin,
 			)
 		} else {
 			code := ctx.GetInt(constants.CtxKeyCode)
@@ -61,7 +73,7 @@ func Logger(whitelist ...string) gin.HandlerFunc {
 				"clientip", runtime.GetRealIP(ctx.Request),
 				"respsize", ctx.Writer.Size(),
 				"referer", ctx.Request.Referer(),
-				"uin", ctx.GetUint(constants.CtxKeyUin),
+				"uin", uin,
 			)
 		}
 	}

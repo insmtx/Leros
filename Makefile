@@ -1,7 +1,10 @@
 PROJECT := singeros
 REGISTRY ?= registry.yygu.cn/insmtx/
 
-.PHONY: docker-build-singer docker-push docker-release docker-run
+.PHONY: build docker-build docker-push docker-compose-up docker-compose-down run run-foreground run-detached stop logs swagger swagger-clean dev-setup dev-server dev-worker dev-frontend
+
+build:
+	go build -v -o ./bundles/singer ./backend/cmd/singer/
 
 docker-build:
 	docker build -t $(REGISTRY)$(PROJECT)-singer:latest -f deployments/build/Dockerfile.singer .
@@ -69,8 +72,8 @@ swagger-clean:
 dev-setup:
 	cd deployments/dev && ./dev-setup.sh
 
-dev-server:
-	cd deployments/dev && ./dev-server.sh
+dev-server: build
+	./bundles/singer server --config deployments/dev/server.config.yaml
 
 dev-worker:
 	cd deployments/dev && ./dev-worker.sh

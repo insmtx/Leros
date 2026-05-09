@@ -1,11 +1,30 @@
 package auth
 
-import "context"
+import (
+	"context"
 
-// Caller 定义了一个执行身份，包含用户 ID、租户 ID 和角色信息。
+	"github.com/gin-gonic/gin"
+)
+
+// AuthState 认证状态
+type AuthState int
+
+const (
+	AuthStateNil    AuthState = 0 // 未提供 token
+	AuthStateSucc   AuthState = 1 // 认证成功
+	AuthStateFailed AuthState = 2 // 认证失败
+)
+
+const (
+	ctxKeyCaller = "caller"
+	ctxKeyTrace  = "trace"
+)
+
+// Caller 定义了一个执行身份，包含用户 ID、租户 ID 和认证状态。
 type Caller struct {
 	Uin   uint
 	OrgID uint
+	State AuthState
 }
 
 // Trace 定义了一个跟踪信息结构体，用于在请求链路中传递跟踪标识符，帮助进行分布式追踪和日志关联。
@@ -25,14 +44,38 @@ type IdentityContext struct {
 
 // WithContext 携带 Caller 和 Trace 信息的上下文对象。
 func WithContext(ctx context.Context, caller *Caller, trace *Trace) context.Context {
-	ctx = context.WithValue(ctx, "caller", caller)
-	ctx = context.WithValue(ctx, "trace", trace)
+	ctx = context.WithValue(ctx, ctxKeyCaller, caller)
+	ctx = context.WithValue(ctx, ctxKeyTrace, trace)
 	return ctx
+}
+
+// WithGinContext 携带 Caller 和 Trace 信息到 gin.Context 中。
+func WithGinContext(ctx *gin.Context, caller *Caller, trace *Trace) {
+	ctx.Set(ctxKeyCaller, caller)
+	ctx.Set(ctxKeyTrace, trace)
 }
 
 // FromContext 从上下文中提取 Caller 和 Trace 信息。
 func FromContext(ctx context.Context) (*Caller, *Trace) {
-	caller, _ := ctx.Value("caller").(*Caller)
-	trace, _ := ctx.Value("trace").(*Trace)
+	caller, _ := ctx.Value(ctxKeyCaller).(*Caller)
+	trace, _ := ctx.Value(ctxKeyTrace).(*Trace)
+	return caller, trace
+}
+
+// FromGinContext 从 gin.Context 中提取 Caller 和 Trace 信息。
+func FromGinContext(ctx *gin.Context) (*Caller, *Trace) {
+	callerVal, callerExists := ctx.Get(ctxKeyCaller)
+	traceVal, traceExists := ctx.Get(ctxKeyTrace)
+
+	var caller *Caller
+	var trace *Trace
+
+	if callerExists {
+		caller, _ = callerVal.(*Caller)
+	}
+	if traceExists {
+		trace, _ = traceVal.(*Trace)
+	}
+
 	return caller, trace
 }
