@@ -9,6 +9,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/insmtx/SingerOS/backend/internal/api/auth"
 	"github.com/insmtx/SingerOS/backend/internal/api/contract"
 	"github.com/insmtx/SingerOS/backend/internal/api/dto"
 	"github.com/insmtx/SingerOS/backend/internal/infra/db"
@@ -370,7 +371,14 @@ func toJSONString(v interface{}) string {
 }
 
 func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID string, lastSequence int64, sink events.Sink) error {
-	topic := dm.Topic().Org(s.orgID).Session(sessionID).Message().Stream().Build()
+	// 优先从 Context 的 Caller 中获取 OrgID
+	caller, _ := auth.FromContext(ctx)
+	orgID := s.orgID
+	if caller != nil && caller.OrgID != 0 {
+		orgID = fmt.Sprintf("%d", caller.OrgID)
+	}
+
+	topic := dm.Topic().Org(orgID).Session(sessionID).Message().Stream().Build()
 	return s.subscriber.Subscribe(ctx, topic, func(event any) {
 		switch msg := event.(type) {
 		case dm.MessageStreamMessage:
