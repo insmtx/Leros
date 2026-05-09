@@ -5,6 +5,7 @@ import { Button } from "@singeros/ui/components/ui/button";
 import { ScrollArea } from "@singeros/ui/components/ui/scroll-area";
 import { cn } from "@singeros/ui/lib/utils";
 import { Plus, Search, Trash2 } from "lucide-react";
+import { useEffect } from "react";
 
 export function ConversationListPanel() {
 	const {
@@ -16,9 +17,14 @@ export function ConversationListPanel() {
 		createConversation,
 		deleteConversation,
 		setConversationSearchQuery,
+		fetchConversations,
 	} = useLayoutStore((s) => s);
 
-	const { loadConversationMessages } = useChatStore((s) => s);
+	const { setActiveSession, loadConversationMessages } = useChatStore((s) => s);
+
+	useEffect(() => {
+		fetchConversations();
+	}, [fetchConversations]);
 
 	const filteredConversations = conversationSearchQuery
 		? conversations.filter((c) =>
@@ -26,14 +32,24 @@ export function ConversationListPanel() {
 			)
 		: conversations;
 
-	const handleConversationClick = (id: string) => {
+	const handleConversationClick = (id: string, sessionDbId: number) => {
 		switchConversation(id);
-		loadConversationMessages(id);
+		setActiveSession(sessionDbId, id);
+		loadConversationMessages(sessionDbId);
 	};
 
-	const handleCreateConversation = () => {
-		const id = createConversation("remote-1", "新会话");
-		handleConversationClick(id);
+	const handleCreateConversation = async () => {
+		const newId = await createConversation("新会话");
+		if (newId) {
+			const conv = conversations.find((c) => c.id === newId);
+			if (conv) {
+				handleConversationClick(conv.id, conv.sessionDbId);
+			}
+		}
+	};
+
+	const handleDeleteConversation = async (id: string) => {
+		await deleteConversation(id);
 	};
 
 	if (!conversationListOpen) return null;
@@ -67,23 +83,16 @@ export function ConversationListPanel() {
 			<ScrollArea className="flex-1">
 				<div className="px-3 pb-2">
 					{filteredConversations.map((conv) => (
-						<div
+						<button
 							key={conv.id}
-							role="button"
-							tabIndex={0}
+							type="button"
 							className={cn(
 								"group relative flex items-center rounded-md px-2 py-1.5 text-sm cursor-pointer transition-colors w-full text-left",
 								activeConversationId === conv.id
 									? "bg-blue-50 text-blue-700"
 									: "text-slate-600 hover:bg-slate-50",
 							)}
-							onClick={() => handleConversationClick(conv.id)}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" || e.key === " ") {
-									e.preventDefault();
-									handleConversationClick(conv.id);
-								}
-							}}
+							onClick={() => handleConversationClick(conv.id, conv.sessionDbId)}
 						>
 							<span className="truncate flex-1">{conv.title}</span>
 							<Button
@@ -92,12 +101,12 @@ export function ConversationListPanel() {
 								className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-500"
 								onClick={(e) => {
 									e.stopPropagation();
-									deleteConversation(conv.id);
+									handleDeleteConversation(conv.id);
 								}}
 							>
 								<Trash2 className="size-3" />
 							</Button>
-						</div>
+						</button>
 					))}
 				</div>
 			</ScrollArea>

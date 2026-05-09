@@ -1,7 +1,18 @@
-import { mockMessages, mockModelOptions, mockStreamContent } from "../mocks/chatMocks";
-import { mockStreamResponse } from "../mocks/streamSimulator";
+import { FetchSSEClient } from "@singeros/ui/lib/fetch-sse";
+import { API_BASE_URL } from "../api/config";
+import { sessionApi } from "../api/sessionApi";
+import type { BackendMessage, BackendToolCall, SSEMessageEvent } from "../api/types";
+import { mockModelOptions } from "../mocks/chatMocks";
 import type { SliceCreator } from "../types";
-import type { Attachment, Message, ModelOption, ToolCallStatus } from "../types/chat";
+import type {
+	Attachment,
+	Message,
+	MessageRole,
+	MessageStatus,
+	ModelOption,
+	ToolCall,
+	ToolCallStatus,
+} from "../types/chat";
 import { flattenActions } from "../utils";
 
 export type ChatState = {
@@ -16,6 +27,8 @@ export type ChatState = {
 	inputFocused: boolean;
 	selectedModel: string;
 	modelOptions: ModelOption[];
+	activeSessionDbId: number | null;
+	activeSessionId: string | null;
 
 	tokenUsage: { total: number; currentSession: number };
 };
@@ -35,8 +48,10 @@ const _initialState: ChatState = {
 	inputFocused: false,
 	selectedModel: "gpt-4",
 	modelOptions: mockModelOptions,
+	activeSessionDbId: null,
+	activeSessionId: null,
 
-	tokenUsage: { total: 239500, currentSession: 12500 },
+	tokenUsage: { total: 0, currentSession: 0 },
 };
 
 type SetState = (
@@ -44,15 +59,56 @@ type SetState = (
 	replace?: boolean,
 ) => void;
 
-export const createChatSlice = (set: SetState, get: () => ChatStore, _api?: unknown) =>
-	new ChatActionImpl(set, get, _api);
+function mapBackendMessage(msg: BackendMessage): Message {
+	const toolCalls: ToolCall[] | undefined = msg.tool_calls?.map((tc: BackendToolCall) => ({
+		id: tc.id,
+		name: tc.name,
+		arguments: tc.arguments ?? {},
+		status: (tc.status as ToolCallStatus) ?? "pending",
+		result: tc.result,
+		duration: tc.duration,
+	}));
+
+	return {
+		id: String(msg.id),
+		conversationId: msg.conversation_id,
+		role: msg.role as MessageRole,
+		content: msg.content ?? "",
+		status: (msg.status as MessageStatus) ?? "complete",
+		timestamp: msg.timestamp ?? new Date(msg.created_at).getTime(),
+		toolCalls,
+		thinking: msg.thinking,
+		metadata: msg.metadata
+			? {
+					model: msg.metadata.model,
+					tokens: msg.metadata.tokens,
+					latency: msg.metadata.latency,
+				}
+			: undefined,
+	};
+}
+
+function mapToolCalls(tcList?: BackendToolCall[]): ToolCall[] | undefined {
+	if (!tcList) return undefined;
+	return tcList.map((tc) => ({
+		id: tc.id,
+		name: tc.name,
+		arguments: tc.arguments ?? {},
+		status: tc.status as ToolCallStatus,
+		result: tc.result,
+		duration: tc.duration,
+	}));
+}
+
+export const createChatSlice = (set: SetState, get: () => ChatStore) =>
+	new ChatActionImpl(set, get);
 
 export class ChatActionImpl {
 	readonly #set: SetState;
 	readonly #get: () => ChatStore;
+	#sseClient: FetchSSEClient | null = null;
 
-	constructor(set: SetState, get: () => ChatStore, _api?: unknown) {
-		void _api;
+	constructor(set: SetState, get: () => ChatStore) {
 		this.#set = set;
 		this.#get = get;
 	}
@@ -61,15 +117,33 @@ export class ChatActionImpl {
 		this.#set((state) => chatReducer(state, action));
 	};
 
-	sendMessage = (content: string, attachments?: Attachment[]) => {
+	setActiveSession = (sessionDbId: number, sessionId: string) => {
+		this.#set({ activeSessionDbId: sessionDbId, activeSessionId: sessionId });
+	};
+
+	sendMessage = async (content: string, attachments?: Attachment[]) => {
 		if (!content.trim() && !attachments?.length) return;
 
-		const now = Date.now();
-		const conversationId = "conv-1";
+		const state = this.#get();
+		const { activeSessionDbId, activeSessionId } = state;
+		if (!activeSessionDbId || !activeSessionId) return;
 
+		try {
+			await sessionApi.addMessage({
+				session_id: activeSessionDbId,
+				role: "user",
+				content,
+				message_type: "text",
+			});
+		} catch (err) {
+			console.error("sendMessage addMessage error:", err);
+			return;
+		}
+
+		const now = Date.now();
 		const userMsg: Message = {
 			id: `msg-user-${now}`,
-			conversationId,
+			conversationId: activeSessionId,
 			role: "user",
 			content,
 			status: "complete",
@@ -78,7 +152,7 @@ export class ChatActionImpl {
 
 		const assistantMsg: Message = {
 			id: `msg-assistant-${now}`,
-			conversationId,
+			conversationId: activeSessionId,
 			role: "assistant",
 			content: "",
 			status: "streaming",
@@ -92,50 +166,109 @@ export class ChatActionImpl {
 			isGenerating: true,
 			inputText: "",
 			inputAttachments: [],
-			tokenUsage: {
-				total: this.#get().tokenUsage.total + Math.floor(Math.random() * 200 + 100),
-				currentSession:
-					this.#get().tokenUsage.currentSession + Math.floor(Math.random() * 200 + 100),
-			},
 		});
 
-		this.internal_startStream(assistantMsg.id);
+		this.#startSSE(activeSessionId, assistantMsg.id);
 	};
 
-	internal_startStream = (messageId: string) => {
-		const { cancel } = mockStreamResponse({
-			content: mockStreamContent,
-			chunkSize: 3,
-			chunkDelay: 30,
-			onChunk: (chunk) => {
-				const state = this.#get();
-				const msg = state.messagesMap[messageId];
-				if (!msg) return;
-				this.#dispatchChat({
-					type: "updateMessage",
-					id: messageId,
-					value: { ...msg, content: msg.content + chunk },
-				});
-			},
-			onComplete: () => {
-				this.#set({
-					streamingMessageId: null,
-					isGenerating: false,
-					streamCancelRef: null,
-				});
-				const state = this.#get();
-				const msg = state.messagesMap[messageId];
-				if (msg) {
-					this.#dispatchChat({
-						type: "updateMessage",
-						id: messageId,
-						value: { ...msg, status: "complete" },
-					});
+	#startSSE = (sessionId: string, assistantMsgId: string) => {
+		if (this.#sseClient) {
+			this.#sseClient.close();
+			this.#sseClient = null;
+		}
+
+		const url = `${API_BASE_URL}/SessionEvents`;
+		const client = new FetchSSEClient(url, {
+			method: "POST",
+			body: { session_id: sessionId },
+			onMessage: (event) => {
+				try {
+					const data = JSON.parse(event.data) as SSEMessageEvent;
+
+					if (data.chunk) {
+						const msg = this.#get().messagesMap[assistantMsgId];
+						if (msg) {
+							this.#dispatchChat({
+								type: "updateMessage",
+								id: assistantMsgId,
+								value: { ...msg, content: msg.content + data.chunk },
+							});
+						}
+					} else if (data.content) {
+						const msg = this.#get().messagesMap[assistantMsgId];
+						if (msg) {
+							this.#dispatchChat({
+								type: "updateMessage",
+								id: assistantMsgId,
+								value: { ...msg, content: data.content },
+							});
+						}
+					}
+
+					if (data.status === "complete" || data.status === "error") {
+						const msg = this.#get().messagesMap[assistantMsgId];
+						if (msg) {
+							this.#dispatchChat({
+								type: "updateMessage",
+								id: assistantMsgId,
+								value: {
+									...msg,
+									status: data.status as MessageStatus,
+									thinking: data.thinking ?? msg.thinking,
+									toolCalls: mapToolCalls(data.tool_calls),
+									metadata: data.metadata
+										? {
+												model: data.metadata.model,
+												tokens: data.metadata.tokens,
+												latency: data.metadata.latency,
+											}
+										: msg.metadata,
+								},
+							});
+						}
+						this.#finishStream();
+						this.#sseClient?.close();
+						this.#sseClient = null;
+					}
+
+					if (data.tool_calls) {
+						const msg = this.#get().messagesMap[assistantMsgId];
+						if (msg) {
+							this.#dispatchChat({
+								type: "updateMessage",
+								id: assistantMsgId,
+								value: { ...msg, toolCalls: mapToolCalls(data.tool_calls) },
+							});
+						}
+					}
+				} catch {
+					const msg = this.#get().messagesMap[assistantMsgId];
+					if (msg && event.data) {
+						this.#dispatchChat({
+							type: "updateMessage",
+							id: assistantMsgId,
+							value: { ...msg, content: msg.content + event.data },
+						});
+					}
 				}
+			},
+			onError: (err) => {
+				console.error("SSE error:", err);
+				this.#finishStream();
 			},
 		});
 
-		this.#set({ streamCancelRef: cancel });
+		this.#set({ streamCancelRef: () => client.close() });
+		client.connect();
+		this.#sseClient = client;
+	};
+
+	#finishStream = () => {
+		this.#set({
+			streamingMessageId: null,
+			isGenerating: false,
+			streamCancelRef: null,
+		});
 	};
 
 	cancelGeneration = () => {
@@ -152,31 +285,32 @@ export class ChatActionImpl {
 				});
 			}
 		}
-		this.#set({
-			streamingMessageId: null,
-			isGenerating: false,
-			streamCancelRef: null,
-		});
+		if (this.#sseClient) {
+			this.#sseClient.close();
+			this.#sseClient = null;
+		}
+		this.#finishStream();
 	};
 
-	loadConversationMessages = (conversationId: string) => {
-		const msgs = mockMessages[conversationId];
-		if (!msgs) {
-			this.#set({ messagesMap: {}, messageIds: [] });
-			return;
-		}
+	loadConversationMessages = async (sessionDbId: number) => {
+		try {
+			const res = await sessionApi.getMessages(sessionDbId, 1, 100);
+			const items = res.data.data?.items ?? [];
+			const messages = items.map(mapBackendMessage);
 
-		const maps: Record<string, Message> = {};
-		const ids: string[] = [];
-		for (const m of msgs) {
-			if (m.status === "streaming") {
-				continue;
+			const maps: Record<string, Message> = {};
+			const ids: string[] = [];
+			for (const m of messages) {
+				if (m.status === "streaming") continue;
+				maps[m.id] = m;
+				ids.push(m.id);
 			}
-			maps[m.id] = m;
-			ids.push(m.id);
-		}
 
-		this.#set({ messagesMap: maps, messageIds: ids });
+			this.#set({ messagesMap: maps, messageIds: ids });
+		} catch (err) {
+			console.error("loadConversationMessages error:", err);
+			this.#set({ messagesMap: {}, messageIds: [] });
+		}
 	};
 
 	setInputText = (text: string) => {
@@ -216,10 +350,13 @@ export class ChatActionImpl {
 		this.#set({ selectedModel: modelId });
 	};
 
-	resendMessage = (messageId: string) => {
+	resendMessage = async (messageId: string) => {
 		const state = this.#get();
 		const oldMsg = state.messagesMap[messageId];
 		if (!oldMsg || oldMsg.role !== "assistant") return;
+
+		const { activeSessionId } = state;
+		if (!activeSessionId) return;
 
 		const now = Date.now();
 		const newMsg: Message = {
@@ -235,13 +372,27 @@ export class ChatActionImpl {
 		this.#set({
 			streamingMessageId: newMsg.id,
 			isGenerating: true,
-			tokenUsage: {
-				total: state.tokenUsage.total + Math.floor(Math.random() * 150 + 80),
-				currentSession: state.tokenUsage.currentSession + Math.floor(Math.random() * 150 + 80),
-			},
 		});
 
-		this.internal_startStream(newMsg.id);
+		this.#startSSE(activeSessionId, newMsg.id);
+	};
+
+	deleteMessage = async (messageId: number) => {
+		try {
+			await sessionApi.deleteMessage(messageId);
+			this.#dispatchChat({ type: "removeMessage", id: String(messageId) });
+		} catch (err) {
+			console.error("deleteMessage error:", err);
+		}
+	};
+
+	clearMessages = async (sessionDbId: number) => {
+		try {
+			await sessionApi.clearMessages(sessionDbId);
+			this.#set({ messagesMap: {}, messageIds: [] });
+		} catch (err) {
+			console.error("clearMessages error:", err);
+		}
 	};
 }
 
@@ -319,5 +470,5 @@ function chatReducer(state: ChatState, action: ChatActionType): ChatState {
 
 export const chatSlice: SliceCreator<ChatStore> = (...params) => ({
 	..._initialState,
-	...flattenActions<ChatAction>([createChatSlice(params[0] as SetState, params[1], params[2])]),
+	...flattenActions<ChatAction>([createChatSlice(params[0] as SetState, params[1])]),
 });
