@@ -20,6 +20,7 @@
     "./lib/request": "./lib/request.ts",
     "./lib/sse": "./lib/sse.ts",
     "./lib/websocket": "./lib/websocket.ts",
+    "./lib/fetch-sse": "./lib/fetch-sse.ts",
     "./styles/tokens.css": "./styles/tokens.css",
     "./styles/base.css": "./styles/base.css"
   },

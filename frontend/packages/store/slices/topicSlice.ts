@@ -87,6 +87,7 @@ export class TopicActionImpl {
 		this.#set({ topicsInit: true });
 
 		try {
+			this.#set({ topicsInit: true });
 		} catch (error) {
 			this.#set({ topicsInit: false });
 			throw error;
