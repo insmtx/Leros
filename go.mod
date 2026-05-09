@@ -15,7 +15,7 @@ require (
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.8.12
-	github.com/ygpkg/yg-go v1.23.55
+	github.com/ygpkg/yg-go v1.23.60
 	go.uber.org/zap v1.27.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/sqlite v1.5.6

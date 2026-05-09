@@ -66,12 +66,12 @@ var serverCmd = &cobra.Command{
 		r := api.SetupRouter(*cfg, publisher, db)
 
 		srv := &http.Server{
-			Addr:    cfg.ServerAddr,
+			Addr:    fmt.Sprintf(":%s", cfg.Server.Port),
 			Handler: r,
 		}
 
 		logs.Info("Starting SingerOS backend service...")
-		logs.Infof("Listening on %s", cfg.ServerAddr)
+		logs.Infof("Listening on %s", srv.Addr)
 
 		go func() {
 			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

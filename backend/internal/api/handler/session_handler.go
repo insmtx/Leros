@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/insmtx/SingerOS/backend/internal/api/contract"
 	"github.com/insmtx/SingerOS/backend/internal/api/dto"
 	"github.com/insmtx/SingerOS/backend/runtime/events"
@@ -37,21 +38,30 @@ func RegisterSessionRoutes(r gin.IRouter, service contract.SessionService) {
 	h.RegisterRoutes(r)
 }
 
-type CreateSessionRequest struct {
-	contract.CreateSessionRequest
-}
-
+// @Summary 创建会话
+// @Description 创建一个新的会话实例
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body contract.CreateSessionRequest true "创建会话请求"
+// @Success 200 {object} dto.BaseResponse "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /CreateSession [post]
 func (h *SessionHandler) CreateSession(ctx *gin.Context) {
 	var req contract.CreateSessionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
 		return
 	}
+
 	result, err := h.service.CreateSession(ctx, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
+		handleSessionServiceError(ctx, err)
 		return
 	}
+
 	ctx.JSON(http.StatusOK, dto.Success(result))
 }
 
@@ -60,29 +70,44 @@ type GetSessionRequest struct {
 	SessionID *string `json:"session_id,omitempty"`
 }
 
+// @Summary 获取会话详情
+// @Description 根据ID或SessionID获取会话详情
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body GetSessionRequest true "获取会话请求"
+// @Success 200 {object} dto.BaseResponse "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /GetSession [post]
 func (h *SessionHandler) GetSession(ctx *gin.Context) {
 	var req GetSessionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
 		return
 	}
-	var id uint
-	var sessionID string
-	if req.ID != nil {
-		id = *req.ID
-	}
-	if req.SessionID != nil {
-		sessionID = *req.SessionID
-	}
-	result, err := h.service.GetSession(ctx, id, sessionID)
-	if err != nil {
-		if err.Error() == "session not found" {
-			ctx.JSON(http.StatusNotFound, dto.Error(dto.CodeNotFound, err.Error()))
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
+
+	if req.ID == nil && req.SessionID == nil {
+		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, "id or session_id is required"))
 		return
 	}
+
+	var result interface{}
+	var err error
+
+	if req.ID != nil {
+		result, err = h.service.GetSession(ctx, *req.ID, "")
+	} else {
+		result, err = h.service.GetSession(ctx, 0, *req.SessionID)
+	}
+
+	if err != nil {
+		handleSessionServiceError(ctx, err)
+		return
+	}
+
 	ctx.JSON(http.StatusOK, dto.Success(result))
 }
 
@@ -91,21 +116,31 @@ type UpdateSessionRequest struct {
 	contract.UpdateSessionRequest
 }
 
+// @Summary 更新会话
+// @Description 更新会话基本信息
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body UpdateSessionRequest true "更新会话请求"
+// @Success 200 {object} dto.BaseResponse "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /UpdateSession [post]
 func (h *SessionHandler) UpdateSession(ctx *gin.Context) {
 	var req UpdateSessionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
 		return
 	}
+
 	result, err := h.service.UpdateSession(ctx, req.ID, &req.UpdateSessionRequest)
 	if err != nil {
-		if err.Error() == "session not found" {
-			ctx.JSON(http.StatusNotFound, dto.Error(dto.CodeNotFound, err.Error()))
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
+		handleSessionServiceError(ctx, err)
 		return
 	}
+
 	ctx.JSON(http.StatusOK, dto.Success(result))
 }
 
@@ -113,53 +148,84 @@ type DeleteSessionRequest struct {
 	ID uint `json:"id" binding:"required"`
 }
 
+// @Summary 删除会话
+// @Description 根据ID删除会话
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body DeleteSessionRequest true "删除会话请求"
+// @Success 200 {object} dto.BaseResponse "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /DeleteSession [post]
 func (h *SessionHandler) DeleteSession(ctx *gin.Context) {
 	var req DeleteSessionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
 		return
 	}
+
 	err := h.service.DeleteSession(ctx, req.ID)
 	if err != nil {
-		if err.Error() == "session not found" {
-			ctx.JSON(http.StatusNotFound, dto.Error(dto.CodeNotFound, err.Error()))
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
+		handleSessionServiceError(ctx, err)
 		return
 	}
+
 	ctx.JSON(http.StatusOK, dto.Success(nil))
 }
 
-type ListSessionsRequest struct {
-	contract.ListSessionsRequest
-}
-
+// @Summary 查询会话列表
+// @Description 分页查询会话列表
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body contract.ListSessionsRequest true "查询列表请求"
+// @Success 200 {object} dto.BaseResponse "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /ListSessions [post]
 func (h *SessionHandler) ListSessions(ctx *gin.Context) {
 	var req contract.ListSessionsRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
 		return
 	}
+
 	result, err := h.service.ListSessions(ctx, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
+		handleSessionServiceError(ctx, err)
 		return
 	}
+
 	ctx.JSON(http.StatusOK, dto.Success(result))
 }
 
 type SessionEventsRequest struct {
-	SessionID    string `json:"session_id"`
+	SessionID    string `json:"session_id" binding:"required"`
 	LastSequence int64  `json:"last_sequence,omitempty"`
 }
 
+// @Summary 订阅会话事件流
+// @Description 通过SSE订阅会话的事件流
+// @Tags Session
+// @Accept json
+// @Produce text/event-stream
+// @Param body body SessionEventsRequest true "订阅事件请求"
+// @Success 200 {string} string "SSE事件流"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /SessionEvents [post]
 func (h *SessionHandler) SessionEvents(ctx *gin.Context) {
 	var req SessionEventsRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
 		return
 	}
+
 	ctx.Header("Content-Type", "text/event-stream")
 	ctx.Header("Cache-Control", "no-cache")
 	ctx.Header("Connection", "keep-alive")
@@ -196,21 +262,31 @@ type AddMessageRequest struct {
 	contract.AddMessageRequest
 }
 
+// @Summary 添加会话消息
+// @Description 向指定会话添加一条消息
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body AddMessageRequest true "添加消息请求"
+// @Success 200 {object} dto.BaseResponse "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /AddMessage [post]
 func (h *SessionHandler) AddMessage(ctx *gin.Context) {
 	var req AddMessageRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
 		return
 	}
+
 	result, err := h.service.AddMessage(ctx, req.SessionID, &req.AddMessageRequest)
 	if err != nil {
-		if err.Error() == "session not found" {
-			ctx.JSON(http.StatusNotFound, dto.Error(dto.CodeNotFound, err.Error()))
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
+		handleSessionServiceError(ctx, err)
 		return
 	}
+
 	ctx.JSON(http.StatusOK, dto.Success(result))
 }
 
@@ -220,12 +296,25 @@ type GetSessionMessagesRequest struct {
 	PerPage   int  `json:"per_page,omitempty"`
 }
 
+// @Summary 获取会话消息列表
+// @Description 分页获取指定会话的消息列表
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body GetSessionMessagesRequest true "获取消息列表请求"
+// @Success 200 {object} dto.BaseResponse "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /GetSessionMessages [post]
 func (h *SessionHandler) GetSessionMessages(ctx *gin.Context) {
 	var req GetSessionMessagesRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
 		return
 	}
+
 	page := req.Page
 	if page == 0 {
 		page = 1
@@ -234,15 +323,13 @@ func (h *SessionHandler) GetSessionMessages(ctx *gin.Context) {
 	if perPage == 0 {
 		perPage = 20
 	}
+
 	result, err := h.service.GetSessionMessages(ctx, req.SessionID, page, perPage)
 	if err != nil {
-		if err.Error() == "session not found" {
-			ctx.JSON(http.StatusNotFound, dto.Error(dto.CodeNotFound, err.Error()))
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
+		handleSessionServiceError(ctx, err)
 		return
 	}
+
 	ctx.JSON(http.StatusOK, dto.Success(result))
 }
 
@@ -250,21 +337,31 @@ type DeleteMessageRequest struct {
 	MessageID uint `json:"message_id" binding:"required"`
 }
 
+// @Summary 删除会话消息
+// @Description 根据ID删除会话消息
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body DeleteMessageRequest true "删除消息请求"
+// @Success 200 {object} dto.BaseResponse "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /DeleteMessage [post]
 func (h *SessionHandler) DeleteMessage(ctx *gin.Context) {
 	var req DeleteMessageRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
 		return
 	}
+
 	err := h.service.DeleteMessage(ctx, req.MessageID)
 	if err != nil {
-		if err.Error() == "message not found" {
-			ctx.JSON(http.StatusNotFound, dto.Error(dto.CodeNotFound, err.Error()))
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
+		handleSessionServiceError(ctx, err)
 		return
 	}
+
 	ctx.JSON(http.StatusOK, dto.Success(nil))
 }
 
@@ -272,20 +369,46 @@ type ClearSessionMessagesRequest struct {
 	SessionID uint `json:"session_id" binding:"required"`
 }
 
+// @Summary 清空会话消息
+// @Description 清空指定会话的所有消息
+// @Tags Session
+// @Accept json
+// @Produce json
+// @Param body body ClearSessionMessagesRequest true "清空消息请求"
+// @Success 200 {object} dto.BaseResponse "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /ClearSessionMessages [post]
 func (h *SessionHandler) ClearSessionMessages(ctx *gin.Context) {
 	var req ClearSessionMessagesRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
 		return
 	}
+
 	err := h.service.ClearSessionMessages(ctx, req.SessionID)
 	if err != nil {
-		if err.Error() == "session not found" {
-			ctx.JSON(http.StatusNotFound, dto.Error(dto.CodeNotFound, err.Error()))
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
+		handleSessionServiceError(ctx, err)
 		return
 	}
+
 	ctx.JSON(http.StatusOK, dto.Success(nil))
+}
+
+func handleSessionServiceError(ctx *gin.Context, err error) {
+	if err.Error() == "user not authenticated or org not set" {
+		ctx.JSON(http.StatusUnauthorized, dto.Error(dto.CodeInternalError, err.Error()))
+		return
+	}
+	if err.Error() == "permission denied" {
+		ctx.JSON(http.StatusForbidden, dto.Error(dto.CodeInternalError, err.Error()))
+		return
+	}
+	if err.Error() == "session not found" || err.Error() == "message not found" {
+		ctx.JSON(http.StatusNotFound, dto.Error(dto.CodeNotFound, err.Error()))
+		return
+	}
+	ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
 }

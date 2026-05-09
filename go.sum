@@ -359,6 +359,8 @@ github.com/yargevad/filepathx v1.0.0 h1:SYcT+N3tYGi+NvazubCNlvgIPbzAk7i7y2dwg3I5
 github.com/yargevad/filepathx v1.0.0/go.mod h1:BprfX/gpYNJHJfc35GjRRpVcwWXS89gGulUIU5tK3tA=
 github.com/ygpkg/yg-go v1.23.55 h1:8gOFg8E0voBIxzhPLc0JQOz0zdIiapKDX7EjZMmaS8A=
 github.com/ygpkg/yg-go v1.23.55/go.mod h1:NI+lQ1j+4u/S5BMJq1crWaDyUcV8LmEzNC5/ZbujI8E=
+github.com/ygpkg/yg-go v1.23.60 h1:5bbcjKyTieqn7ABf6HFGY9YbgF4vGpRZtBcijWdyKkQ=
+github.com/ygpkg/yg-go v1.23.60/go.mod h1:7K8Z6e6Kkhl+xlRgT3+N7x39Tj+/QlJduDcCINUInrU=
 github.com/yosida95/uritemplate/v3 v3.0.2 h1:Ed3Oyj9yrmi9087+NczuL5BwkIc4wvTb5zIM+UJPGz4=
 github.com/yosida95/uritemplate/v3 v3.0.2/go.mod h1:ILOh0sOhIJR3+L/8afwt/kE++YT040gmv5BQTMR2HP4=
 github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d/go.mod h1:rHwXgn7JulP+udvsHwJoVG1YGAP6VLg4y9I5dyZdqmA=

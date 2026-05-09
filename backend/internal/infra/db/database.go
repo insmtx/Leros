@@ -41,6 +41,11 @@ func InitDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
+	// 初始化默认组织
+	if err := InitDefaultOrg(db); err != nil {
+		return nil, fmt.Errorf("failed to init default org: %w", err)
+	}
+
 	logs.Info("Database connection initialized successfully")
 	return db, nil
 }
@@ -58,6 +63,8 @@ func runMigrations(db *gorm.DB) error {
 		&types.SkillExecutionLog{},
 		&types.Session{},
 		&types.SessionMessage{},
+		&types.Organization{},
+		&types.UserOrg{},
 	}
 
 	if err := dbtools.InitModel(db, models...); err != nil {
@@ -66,6 +73,41 @@ func runMigrations(db *gorm.DB) error {
 
 	logs.Info("Database migrations completed")
 	return nil
+}
+
+// InitDefaultOrg 初始化默认组织数据（仅在数据为空时执行）
+func InitDefaultOrg(db *gorm.DB) error {
+	var count int64
+	db.Model(&types.Organization{}).Count(&count)
+	if count > 0 {
+		return nil
+	}
+
+	defaultOrg := &types.Organization{
+		Code:   "default_org",
+		Name:   "默认组织",
+		Type:   "company",
+		Status: "active",
+	}
+	return db.Create(defaultOrg).Error
+}
+
+// InitDefaultUserOrg 初始化默认用户组织关联（用于开发环境）
+// uin: 关联ID（JWT中的Uin），userID: 用户ID，orgID: 组织ID
+func InitDefaultUserOrg(db *gorm.DB, uin uint, userID uint, orgID uint) error {
+	var count int64
+	db.Model(&types.UserOrg{}).Count(&count)
+	if count > 0 {
+		return nil
+	}
+
+	userOrg := &types.UserOrg{
+		Uin:       uin,
+		UserID:    userID,
+		OrgID:     orgID,
+		IsDefault: true,
+	}
+	return db.Create(userOrg).Error
 }
 
 // GetDB 获取默认的数据库实例
