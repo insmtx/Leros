@@ -2,6 +2,8 @@ package contract
 
 import "context"
 
+import "github.com/insmtx/SingerOS/backend/runtime/events"
+
 // SessionService 定义会话服务接口
 type SessionService interface {
 	// Session CRUD
@@ -22,4 +24,7 @@ type SessionService interface {
 	GetSessionMessages(ctx context.Context, sessionID uint, page, perPage int) (*MessageList, error)
 	DeleteMessage(ctx context.Context, messageID uint) error
 	ClearSessionMessages(ctx context.Context, sessionID uint) error
+
+	// Event streaming
+	StreamSessionEvents(ctx context.Context, sessionID string, lastSequence int64, sink events.Sink) error
 }

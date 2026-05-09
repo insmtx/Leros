@@ -18,15 +18,13 @@ nats:
 database:
   url: "postgres://username:password@localhost/dbname"  # Database Connection URL
   debug: false                                       # Enable SQL Logging
-
-# NEW: LLM Provider configuration for ReAct Agent integration
-llm:
-  provider: "openai"                     # LLM Provider: openai, claude, etc
-  api_key: "${OPENAI_API_KEY}"          # Secure API Key (use env var in production)
-  model: "gpt-4-turbo"                  # Preferred model for ReAct Agent
-  base_url: "https://api.openai.com/v1" # Custom endpoint (optional)
+  
+# Organization configuration
+organization:
+  id: "default_org"                                  # Default Organization ID
 
 # External CLI engine preference. SingerOS auto-detects claude and codex from PATH.
+
 cli:
   default: "claude"
 

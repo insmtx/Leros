@@ -229,58 +229,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/DeleteSession": {
-            "post": {
-                "description": "根据ID删除会话",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Session"
-                ],
-                "summary": "删除会话",
-                "parameters": [
-                    {
-                        "description": "删除会话请求",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/backend_internal_api_handler.DeleteSessionRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "成功响应",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "请求参数错误",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "资源不存在",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "内部服务器错误",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/GetDigitalAssistant": {
             "post": {
                 "description": "根据ID或Code获取数字助手详情",
@@ -478,6 +426,52 @@ const docTemplate = `{
                         "description": "成功响应",
                         "schema": {
                             "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/SessionEvents": {
+            "post": {
+                "description": "通过 SSE 实时接收指定会话的事件更新",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "监听会话事件流",
+                "parameters": [
+                    {
+                        "description": "监听请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.SessionEventsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "事件流",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.SessionEvent"
                         }
                     },
                     "400": {
@@ -752,17 +746,6 @@ const docTemplate = `{
                 }
             }
         },
-        "backend_internal_api_handler.DeleteSessionRequest": {
-            "type": "object",
-            "required": [
-                "id"
-            ],
-            "properties": {
-                "id": {
-                    "type": "integer"
-                }
-            }
-        },
         "backend_internal_api_handler.GetDigitalAssistantRequest": {
             "type": "object",
             "properties": {
@@ -778,6 +761,17 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "id": {
+                    "type": "integer"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_api_handler.SessionEventsRequest": {
+            "type": "object",
+            "properties": {
+                "last_sequence": {
                     "type": "integer"
                 },
                 "session_id": {
@@ -1177,6 +1171,48 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "github_com_insmtx_SingerOS_backend_internal_api_dto.SessionEvent": {
+            "type": "object",
+            "properties": {
+                "payload": {},
+                "sequence": {
+                    "type": "integer"
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "description": "Unix timestamp in milliseconds",
+                    "type": "integer"
+                },
+                "type": {
+                    "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.SessionEventType"
+                }
+            }
+        },
+        "github_com_insmtx_SingerOS_backend_internal_api_dto.SessionEventType": {
+            "type": "string",
+            "enum": [
+                "message.delta",
+                "message.complete",
+                "run.started",
+                "run.completed",
+                "run.failed",
+                "tool_call.started",
+                "tool_call.delta",
+                "tool_call.result"
+            ],
+            "x-enum-varnames": [
+                "SessionEventTypeMessageDelta",
+                "SessionEventTypeMessageComplete",
+                "SessionEventTypeRunStarted",
+                "SessionEventTypeRunCompleted",
+                "SessionEventTypeRunFailed",
+                "SessionEventTypeToolCallStarted",
+                "SessionEventTypeToolCallDelta",
+                "SessionEventTypeToolCallResult"
+            ]
         },
         "github_com_insmtx_SingerOS_backend_types.SessionMetadata": {
             "type": "object",
