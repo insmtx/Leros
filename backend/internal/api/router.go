@@ -35,7 +35,7 @@ import (
 func SetupRouter(cfg config.Config, publisher eventbus.Publisher, db *gorm.DB) *gin.Engine {
 	r := gin.New()
 	r.Use(ygmiddleware.CORS())
-	r.Use(middleware.CallerMiddleware(cfg.Server.JWT.Secret))
+	r.Use(middleware.CallerMiddleware(cfg.Server.JWT.Secret, db))
 	r.Use(middleware.Logger(".Ping", "metrics"))
 	r.Use(ygmiddleware.Recovery())
 	v1 := r.Group("/v1")

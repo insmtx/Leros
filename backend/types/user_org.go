@@ -6,7 +6,9 @@ import "gorm.io/gorm"
 const TableNameUserOrg = "user_orgs"
 
 // UserOrg 表示用户与组织的关联关系
-// 该表是多对多关系的中间表，每个关联记录有唯一的 uin
+//
+// 该表是多对多关系的中间表，用于关联用户和组织。
+// 每个用户可以关联多个组织，其中一个可以标记为默认组织。
 type UserOrg struct {
 	gorm.Model
 	Uin       uint `gorm:"column:uin;type:bigint;unique_index;not null"` // 关联ID，JWT中的Uin

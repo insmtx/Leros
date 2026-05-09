@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -8,10 +9,38 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	localauth "github.com/insmtx/SingerOS/backend/internal/api/auth"
+	"github.com/insmtx/SingerOS/backend/internal/infra/db"
+	"github.com/insmtx/SingerOS/backend/types"
 	ygauth "github.com/ygpkg/yg-go/apis/runtime/auth"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 const testJWTSecret = "test-secret-key"
+
+func setupTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("failed to open test database: %v", err)
+	}
+	if err := database.AutoMigrate(&types.UserOrg{}); err != nil {
+		t.Fatalf("failed to migrate test database: %v", err)
+	}
+	return database
+}
+
+func setupTestUserOrg(t *testing.T, database *gorm.DB, uin uint, orgID uint) {
+	t.Helper()
+	userOrg := &types.UserOrg{
+		Uin:      uin,
+		OrgID:    orgID,
+		IsDefault: true,
+	}
+	if err := db.CreateUserOrg(context.Background(), database, userOrg); err != nil {
+		t.Fatalf("failed to create user org: %v", err)
+	}
+}
 
 func generateTestJWT(uin uint, issuer string) (string, error) {
 	claims := &ygauth.UserClaims{
@@ -31,10 +60,11 @@ func setupTestContext() (*gin.Context, *httptest.ResponseRecorder) {
 }
 
 func TestCallerMiddleware_NoAuthHeader(t *testing.T) {
+	database := setupTestDB(t)
 	ctx, _ := setupTestContext()
 	ctx.Request = httptest.NewRequest("GET", "/", nil)
 
-	middleware := CallerMiddleware(testJWTSecret)
+	middleware := CallerMiddleware(testJWTSecret, database)
 	middleware(ctx)
 
 	caller, _ := localauth.FromGinContext(ctx)
@@ -50,12 +80,13 @@ func TestCallerMiddleware_NoAuthHeader(t *testing.T) {
 }
 
 func TestCallerMiddleware_EmptyAuthHeader(t *testing.T) {
+	database := setupTestDB(t)
 	ctx, _ := setupTestContext()
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "")
 	ctx.Request = req
 
-	middleware := CallerMiddleware(testJWTSecret)
+	middleware := CallerMiddleware(testJWTSecret, database)
 	middleware(ctx)
 
 	caller, _ := localauth.FromGinContext(ctx)
@@ -68,12 +99,13 @@ func TestCallerMiddleware_EmptyAuthHeader(t *testing.T) {
 }
 
 func TestCallerMiddleware_InvalidToken(t *testing.T) {
+	database := setupTestDB(t)
 	ctx, _ := setupTestContext()
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer invalid-token")
 	ctx.Request = req
 
-	middleware := CallerMiddleware(testJWTSecret)
+	middleware := CallerMiddleware(testJWTSecret, database)
 	middleware(ctx)
 
 	caller, _ := localauth.FromGinContext(ctx)
@@ -87,6 +119,10 @@ func TestCallerMiddleware_InvalidToken(t *testing.T) {
 
 func TestCallerMiddleware_ValidToken(t *testing.T) {
 	testUin := uint(12345)
+	testOrgID := uint(1)
+	database := setupTestDB(t)
+	setupTestUserOrg(t, database, testUin, testOrgID)
+
 	token, err := generateTestJWT(testUin, "test-issuer")
 	if err != nil {
 		t.Fatalf("failed to generate token: %v", err)
@@ -97,7 +133,7 @@ func TestCallerMiddleware_ValidToken(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	ctx.Request = req
 
-	middleware := CallerMiddleware(testJWTSecret)
+	middleware := CallerMiddleware(testJWTSecret, database)
 	middleware(ctx)
 
 	caller, _ := localauth.FromGinContext(ctx)
@@ -107,19 +143,23 @@ func TestCallerMiddleware_ValidToken(t *testing.T) {
 	if caller.Uin != testUin {
 		t.Errorf("expected Uin %d, got %d", testUin, caller.Uin)
 	}
+	if caller.OrgID != testOrgID {
+		t.Errorf("expected OrgID %d, got %d", testOrgID, caller.OrgID)
+	}
 	if caller.State != localauth.AuthStateSucc {
 		t.Errorf("expected State AuthStateSucc, got %v", caller.State)
 	}
 }
 
 func TestCallerMiddleware_RequestIDAndTraceID(t *testing.T) {
+	database := setupTestDB(t)
 	ctx, _ := setupTestContext()
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set(headerKeyRequestID, "test-request-id")
 	req.Header.Set(headerKeyTraceID, "test-trace-id")
 	ctx.Request = req
 
-	middleware := CallerMiddleware(testJWTSecret)
+	middleware := CallerMiddleware(testJWTSecret, database)
 	middleware(ctx)
 
 	_, trace := localauth.FromGinContext(ctx)
@@ -135,10 +175,11 @@ func TestCallerMiddleware_RequestIDAndTraceID(t *testing.T) {
 }
 
 func TestCallerMiddleware_AutoGenerateRequestID(t *testing.T) {
+	database := setupTestDB(t)
 	ctx, _ := setupTestContext()
 	ctx.Request = httptest.NewRequest("GET", "/", nil)
 
-	middleware := CallerMiddleware(testJWTSecret)
+	middleware := CallerMiddleware(testJWTSecret, database)
 	middleware(ctx)
 
 	_, trace := localauth.FromGinContext(ctx)
@@ -192,6 +233,7 @@ func TestExtractTokenFromHeader(t *testing.T) {
 }
 
 func TestCallerMiddleware_WrongSecret(t *testing.T) {
+	database := setupTestDB(t)
 	token, _ := generateTestJWT(12345, "test-issuer")
 
 	ctx, _ := setupTestContext()
@@ -199,7 +241,7 @@ func TestCallerMiddleware_WrongSecret(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	ctx.Request = req
 
-	middleware := CallerMiddleware("wrong-secret")
+	middleware := CallerMiddleware("wrong-secret", database)
 	middleware(ctx)
 
 	caller, _ := localauth.FromGinContext(ctx)
@@ -212,6 +254,7 @@ func TestCallerMiddleware_WrongSecret(t *testing.T) {
 }
 
 func TestCallerMiddleware_ZeroUin(t *testing.T) {
+	database := setupTestDB(t)
 	token, _ := generateTestJWT(0, "test-issuer")
 
 	ctx, _ := setupTestContext()
@@ -219,7 +262,7 @@ func TestCallerMiddleware_ZeroUin(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	ctx.Request = req
 
-	middleware := CallerMiddleware(testJWTSecret)
+	middleware := CallerMiddleware(testJWTSecret, database)
 	middleware(ctx)
 
 	caller, _ := localauth.FromGinContext(ctx)
