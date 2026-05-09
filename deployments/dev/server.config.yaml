@@ -1,0 +1,36 @@
+# SingerOS Development Configuration - Server
+
+server:
+  port: 8080
+  
+database:
+  url: "postgres://singer_dev_user:singer_dev_password@singer-dev-postgresql:5432/singer_dev_db?sslmode=disable"
+  debug: true
+
+nats:
+  url: "nats://singer-dev-nats:4222/"
+
+redis:
+  addr: "singer-dev-redis:6379"
+  password: "redis_dev_password"
+
+log:
+  level: debug
+
+github:
+  app_id: 
+  client_id: ""
+  client_secret: ""
+  private_key: ""
+  webhook_secret: ""
+  base_url: ""
+
+skill_proxy:
+  enabled: true
+  port: 8081
+  
+llm:
+  baseUrl: "https://api.yygu.cn/v3/llm.chat/"
+  apiKey: "${LLM_API_KEY}"
+  model: "qwen3.6-plus"
+  temperature: 0.7

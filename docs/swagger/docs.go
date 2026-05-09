@@ -15,6 +15,58 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/ActivateSession": {
+            "post": {
+                "description": "激活已结束会话",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "激活会话",
+                "parameters": [
+                    {
+                        "description": "激活会话请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.SessionIDRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/CreateDigitalAssistant": {
             "post": {
                 "description": "创建一个新的数字助手实例",
@@ -54,6 +106,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/CreateSession": {
+            "post": {
+                "description": "创建一个新的会话实例",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "创建会话",
+                "parameters": [
+                    {
+                        "description": "创建会话请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_contract.CreateSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
                         "schema": {
                             "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
                         }
@@ -112,6 +210,58 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "权限不足",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/DeleteSession": {
+            "post": {
+                "description": "根据ID删除会话",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "删除会话",
+                "parameters": [
+                    {
+                        "description": "删除会话请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.DeleteSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
                         "schema": {
                             "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
                         }
@@ -195,6 +345,58 @@ const docTemplate = `{
                 }
             }
         },
+        "/GetSession": {
+            "post": {
+                "description": "根据ID或SessionID获取会话详情",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "获取会话详情",
+                "parameters": [
+                    {
+                        "description": "获取会话请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.GetSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/ListDigitalAssistant": {
             "post": {
                 "description": "分页查询数字助手列表",
@@ -234,6 +436,52 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ListSessions": {
+            "post": {
+                "description": "分页查询会话列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "查询会话列表",
+                "parameters": [
+                    {
+                        "description": "查询列表请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_contract.ListSessionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
                         "schema": {
                             "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
                         }
@@ -438,10 +686,73 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/UpdateSession": {
+            "post": {
+                "description": "更新会话基本信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "更新会话",
+                "parameters": [
+                    {
+                        "description": "更新会话请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.UpdateSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
         "backend_internal_api_handler.DeleteDigitalAssistantRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "backend_internal_api_handler.DeleteSessionRequest": {
             "type": "object",
             "required": [
                 "id"
@@ -458,6 +769,28 @@ const docTemplate = `{
                 "code": {
                     "type": "string"
                 },
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "backend_internal_api_handler.GetSessionRequest": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_api_handler.SessionIDRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
                 "id": {
                     "type": "integer"
                 }
@@ -512,6 +845,26 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_api_handler.UpdateSessionRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "expired_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_types.SessionMetadata"
+                },
+                "title": {
                     "type": "string"
                 }
             }
@@ -588,6 +941,38 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "owner_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_insmtx_SingerOS_backend_internal_api_contract.CreateSessionRequest": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "assistant_code": {
+                    "type": "string"
+                },
+                "assistant_id": {
+                    "type": "integer"
+                },
+                "expired_at": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_insmtx_SingerOS_backend_types.SessionMetadata"
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "user_id": {
                     "type": "integer"
                 }
             }
@@ -678,6 +1063,35 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_insmtx_SingerOS_backend_internal_api_contract.ListSessionsRequest": {
+            "type": "object",
+            "properties": {
+                "assistant_code": {
+                    "type": "string"
+                },
+                "assistant_id": {
+                    "type": "integer"
+                },
+                "keyword": {
+                    "type": "string"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "per_page": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "github_com_insmtx_SingerOS_backend_internal_api_contract.MemoryConfig": {
             "type": "object",
             "properties": {
@@ -748,6 +1162,43 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_SingerOS_backend_internal_api_dto.Response": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {},
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_SingerOS_backend_types.SessionMetadata": {
+            "type": "object",
+            "properties": {
+                "extra": {
+                    "description": "元数据 - 其他扩展字段",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "ip_address": {
+                    "description": "元数据 - IP地址",
+                    "type": "string"
+                },
+                "tags": {
+                    "description": "元数据 - 自定义标签",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "user_agent": {
+                    "description": "元数据 - 用户代理信息",
                     "type": "string"
                 }
             }
