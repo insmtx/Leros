@@ -14,27 +14,6 @@ definitions:
       id:
         type: integer
     type: object
-  backend_internal_api_handler.GetSessionRequest:
-    properties:
-      id:
-        type: integer
-      session_id:
-        type: string
-    type: object
-  backend_internal_api_handler.SessionEventsRequest:
-    properties:
-      last_sequence:
-        type: integer
-      session_id:
-        type: string
-    type: object
-  backend_internal_api_handler.SessionIDRequest:
-    properties:
-      id:
-        type: integer
-    required:
-    - id
-    type: object
   backend_internal_api_handler.UpdateDigitalAssistantConfigRequest:
     properties:
       config:
@@ -69,19 +48,6 @@ definitions:
     required:
     - id
     - status
-    type: object
-  backend_internal_api_handler.UpdateSessionRequest:
-    properties:
-      expired_at:
-        type: string
-      id:
-        type: integer
-      metadata:
-        $ref: '#/definitions/github_com_insmtx_SingerOS_backend_types.SessionMetadata'
-      title:
-        type: string
-    required:
-    - id
     type: object
   github_com_insmtx_SingerOS_backend_internal_api_contract.AssistantConfig:
     properties:
@@ -133,27 +99,6 @@ definitions:
     - name
     - org_id
     - owner_id
-    type: object
-  github_com_insmtx_SingerOS_backend_internal_api_contract.CreateSessionRequest:
-    properties:
-      assistant_code:
-        type: string
-      assistant_id:
-        type: integer
-      expired_at:
-        type: string
-      metadata:
-        $ref: '#/definitions/github_com_insmtx_SingerOS_backend_types.SessionMetadata'
-      session_id:
-        type: string
-      title:
-        type: string
-      type:
-        type: string
-      user_id:
-        type: integer
-    required:
-    - type
     type: object
   github_com_insmtx_SingerOS_backend_internal_api_contract.DigitalAssistant:
     properties:
@@ -211,25 +156,6 @@ definitions:
       status:
         type: string
     type: object
-  github_com_insmtx_SingerOS_backend_internal_api_contract.ListSessionsRequest:
-    properties:
-      assistant_code:
-        type: string
-      assistant_id:
-        type: integer
-      keyword:
-        type: string
-      page:
-        type: integer
-      per_page:
-        type: integer
-      status:
-        type: string
-      type:
-        type: string
-      user_id:
-        type: integer
-    type: object
   github_com_insmtx_SingerOS_backend_internal_api_contract.MemoryConfig:
     properties:
       type:
@@ -277,65 +203,6 @@ definitions:
       message:
         type: string
     type: object
-  github_com_insmtx_SingerOS_backend_internal_api_dto.Response:
-    properties:
-      code:
-        type: integer
-      data: {}
-      message:
-        type: string
-    type: object
-  github_com_insmtx_SingerOS_backend_internal_api_dto.SessionEvent:
-    properties:
-      payload: {}
-      sequence:
-        type: integer
-      session_id:
-        type: string
-      timestamp:
-        description: Unix timestamp in milliseconds
-        type: integer
-      type:
-        $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.SessionEventType'
-    type: object
-  github_com_insmtx_SingerOS_backend_internal_api_dto.SessionEventType:
-    enum:
-    - message.delta
-    - message.complete
-    - run.started
-    - run.completed
-    - run.failed
-    - tool_call.started
-    - tool_call.delta
-    - tool_call.result
-    type: string
-    x-enum-varnames:
-    - SessionEventTypeMessageDelta
-    - SessionEventTypeMessageComplete
-    - SessionEventTypeRunStarted
-    - SessionEventTypeRunCompleted
-    - SessionEventTypeRunFailed
-    - SessionEventTypeToolCallStarted
-    - SessionEventTypeToolCallDelta
-    - SessionEventTypeToolCallResult
-  github_com_insmtx_SingerOS_backend_types.SessionMetadata:
-    properties:
-      extra:
-        additionalProperties: true
-        description: 元数据 - 其他扩展字段
-        type: object
-      ip_address:
-        description: 元数据 - IP地址
-        type: string
-      tags:
-        description: 元数据 - 自定义标签
-        items:
-          type: string
-        type: array
-      user_agent:
-        description: 元数据 - 用户代理信息
-        type: string
-    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -343,40 +210,6 @@ info:
   title: SingerOS API
   version: "1.0"
 paths:
-  /ActivateSession:
-    post:
-      consumes:
-      - application/json
-      description: 激活已结束会话
-      parameters:
-      - description: 激活会话请求
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/backend_internal_api_handler.SessionIDRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 成功响应
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.Response'
-        "400":
-          description: 请求参数错误
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-        "404":
-          description: 资源不存在
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-        "500":
-          description: 内部服务器错误
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-      summary: 激活会话
-      tags:
-      - Session
   /CreateDigitalAssistant:
     post:
       consumes:
@@ -411,36 +244,6 @@ paths:
       summary: 创建数字助手
       tags:
       - DigitalAssistant
-  /CreateSession:
-    post:
-      consumes:
-      - application/json
-      description: 创建一个新的会话实例
-      parameters:
-      - description: 创建会话请求
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_contract.CreateSessionRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 成功响应
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.Response'
-        "400":
-          description: 请求参数错误
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-        "500":
-          description: 内部服务器错误
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-      summary: 创建会话
-      tags:
-      - Session
   /DeleteDigitalAssistant:
     post:
       consumes:
@@ -525,40 +328,6 @@ paths:
       summary: 获取数字助手详情
       tags:
       - DigitalAssistant
-  /GetSession:
-    post:
-      consumes:
-      - application/json
-      description: 根据ID或SessionID获取会话详情
-      parameters:
-      - description: 获取会话请求
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/backend_internal_api_handler.GetSessionRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 成功响应
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.Response'
-        "400":
-          description: 请求参数错误
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-        "404":
-          description: 资源不存在
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-        "500":
-          description: 内部服务器错误
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-      summary: 获取会话详情
-      tags:
-      - Session
   /ListDigitalAssistant:
     post:
       consumes:
@@ -593,66 +362,6 @@ paths:
       summary: 查询数字助手列表
       tags:
       - DigitalAssistant
-  /ListSessions:
-    post:
-      consumes:
-      - application/json
-      description: 分页查询会话列表
-      parameters:
-      - description: 查询列表请求
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_contract.ListSessionsRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 成功响应
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.Response'
-        "400":
-          description: 请求参数错误
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-        "500":
-          description: 内部服务器错误
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-      summary: 查询会话列表
-      tags:
-      - Session
-  /SessionEvents:
-    post:
-      consumes:
-      - application/json
-      description: 通过 SSE 实时接收指定会话的事件更新
-      parameters:
-      - description: 监听请求
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/backend_internal_api_handler.SessionEventsRequest'
-      produces:
-      - text/event-stream
-      responses:
-        "200":
-          description: 事件流
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.SessionEvent'
-        "400":
-          description: 请求参数错误
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-        "500":
-          description: 内部服务器错误
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-      summary: 监听会话事件流
-      tags:
-      - Session
   /UpdateDigitalAssistant:
     post:
       consumes:
@@ -779,40 +488,6 @@ paths:
       summary: 更新数字助手状态
       tags:
       - DigitalAssistant
-  /UpdateSession:
-    post:
-      consumes:
-      - application/json
-      description: 更新会话基本信息
-      parameters:
-      - description: 更新会话请求
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/backend_internal_api_handler.UpdateSessionRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 成功响应
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.Response'
-        "400":
-          description: 请求参数错误
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-        "404":
-          description: 资源不存在
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-        "500":
-          description: 内部服务器错误
-          schema:
-            $ref: '#/definitions/github_com_insmtx_SingerOS_backend_internal_api_dto.ErrorResponse'
-      summary: 更新会话
-      tags:
-      - Session
 schemes:
 - http
 - https
