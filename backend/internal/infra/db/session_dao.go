@@ -94,7 +94,7 @@ func ListSessions(ctx context.Context, db *gorm.DB, sessionType *string, status 
 		query = query.Where("status = ?", *status)
 	}
 	if userID != nil && *userID > 0 {
-		query = query.Where("user_id = ?", *userID)
+		query = query.Where("uin = ?", *userID)
 	}
 	if assistantID != nil && *assistantID > 0 {
 		query = query.Where("assistant_id = ?", *assistantID)

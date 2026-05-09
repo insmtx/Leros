@@ -17,6 +17,7 @@ import (
 	"github.com/insmtx/SingerOS/backend/pkg/dm"
 	"github.com/insmtx/SingerOS/backend/runtime/events"
 	"github.com/insmtx/SingerOS/backend/types"
+	"github.com/ygpkg/yg-go/encryptor/snowflake"
 )
 
 var _ contract.SessionService = (*sessionService)(nil)
@@ -42,7 +43,7 @@ func (s *sessionService) CreateSession(ctx context.Context, req *contract.Create
 
 	sessionID := req.SessionID
 	if sessionID == "" {
-		sessionID = fmt.Sprintf("sess_%d", time.Now().UnixNano())
+		sessionID = fmt.Sprintf("sess_%s", snowflake.GenerateIDBase58())
 	}
 
 	exists, err := db.SessionIDExists(ctx, s.db, sessionID, 0)
@@ -56,7 +57,7 @@ func (s *sessionService) CreateSession(ctx context.Context, req *contract.Create
 	session := &types.Session{
 		SessionID:     sessionID,
 		Type:          req.Type,
-		UserID:        req.UserID,
+		Uin:           req.Uin,
 		AssistantID:   req.AssistantID,
 		AssistantCode: req.AssistantCode,
 		Status:        string(types.SessionStatusActive),
@@ -144,7 +145,7 @@ func (s *sessionService) ListSessions(ctx context.Context, req *contract.ListSes
 		s.db,
 		req.Type,
 		req.Status,
-		req.UserID,
+		req.Uin,
 		req.AssistantID,
 		req.AssistantCode,
 		req.Keyword,
@@ -429,7 +430,7 @@ func convertToContractSession(session *types.Session) *contract.Session {
 		ID:            session.ID,
 		SessionID:     session.SessionID,
 		Type:          session.Type,
-		UserID:        session.UserID,
+		Uin:           session.Uin,
 		AssistantID:   session.AssistantID,
 		AssistantCode: session.AssistantCode,
 		Status:        session.Status,

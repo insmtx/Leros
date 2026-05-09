@@ -66,8 +66,8 @@ type Session struct {
 	// session - 会话类型，VARCHAR(50)，NOT NULL
 	Type string `gorm:"column:type;type:varchar(50);not null"`
 
-	// session - 关联用户ID，0表示不关联，BIGINT，DEFAULT 0
-	UserID uint `gorm:"column:user_id;type:bigint;default:0;index"`
+	// session - 关联用户UIN，0表示不关联，BIGINT，DEFAULT 0
+	Uin uint `gorm:"column:uin;type:bigint;default:0;index"`
 
 	// session - 关联数字助手ID，0表示不关联，BIGINT，DEFAULT 0
 	AssistantID uint `gorm:"column:assistant_id;type:bigint;default:0;index"`

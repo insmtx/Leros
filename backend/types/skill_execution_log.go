@@ -13,8 +13,8 @@ type SkillExecutionLog struct {
 	SkillID uint `gorm:"column:skill_id;type:integer;not null;index"`
 	// 执行会话ID
 	SessionID string `gorm:"column:session_id;type:varchar(255);index"`
-	// 用户ID
-	UserID string `gorm:"column:user_id;type:varchar(255);index"`
+	// 用户UIN
+	Uin string `gorm:"column:uin;type:varchar(255);index"`
 	// 数字助手ID
 	AssistantID string `gorm:"column:assistant_id;type:varchar(255);index"`
 	// 输入参数
