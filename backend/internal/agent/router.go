@@ -11,13 +11,13 @@ const (
 	RuntimeKindSingerOS = "singeros"
 )
 
-// RuntimeRouter dispatches normalized agent requests to a concrete runtime.
+// RuntimeRouter 根据请求选择具体 runtime。
 type RuntimeRouter struct {
 	defaultKind string
 	runners     map[string]Runner
 }
 
-// NewRuntimeRouter creates a runtime router with a default runtime kind.
+// NewRuntimeRouter 创建带默认 runtime 的路由器。
 func NewRuntimeRouter(defaultKind string) *RuntimeRouter {
 	return &RuntimeRouter{
 		defaultKind: normalizeRuntimeKind(defaultKind),
@@ -25,8 +25,11 @@ func NewRuntimeRouter(defaultKind string) *RuntimeRouter {
 	}
 }
 
-// Register adds or replaces one runtime runner.
+// Register 注册或替换一个 runtime runner。
 func (r *RuntimeRouter) Register(kind string, runner Runner) error {
+	if r == nil {
+		return fmt.Errorf("runtime router is nil")
+	}
 	kind = normalizeRuntimeKind(kind)
 	if kind == "" {
 		return fmt.Errorf("runtime kind is required")
@@ -41,7 +44,7 @@ func (r *RuntimeRouter) Register(kind string, runner Runner) error {
 	return nil
 }
 
-// SetDefault updates the fallback runtime kind.
+// SetDefault 更新默认 runtime。
 func (r *RuntimeRouter) SetDefault(kind string) {
 	if r == nil {
 		return
@@ -49,7 +52,7 @@ func (r *RuntimeRouter) SetDefault(kind string) {
 	r.defaultKind = normalizeRuntimeKind(kind)
 }
 
-// Run executes the request with the selected runtime.
+// Run 使用请求指定的 runtime 执行任务。
 func (r *RuntimeRouter) Run(ctx context.Context, req *RequestContext) (*RunResult, error) {
 	if r == nil {
 		return nil, fmt.Errorf("runtime router is nil")

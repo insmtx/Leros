@@ -8,12 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+
+	"github.com/insmtx/SingerOS/backend/pkg/singeros"
 )
 
 const (
-	// EnvSingerOSHome is the worker-local root used for SingerOS state.
-	EnvSingerOSHome = "SINGEROS_HOME"
-
 	// TargetMemory stores worker facts, environment notes, and durable lessons.
 	TargetMemory = "memory"
 	// TargetUser stores user preferences and profile facts.
@@ -104,15 +103,7 @@ func MustDefaultStore() *Store {
 
 // DefaultMemoryRoot returns $SINGEROS_HOME/memory, or ~/.singeros/memory when unset.
 func DefaultMemoryRoot() (string, error) {
-	home := strings.TrimSpace(os.Getenv(EnvSingerOSHome))
-	if home == "" {
-		userHome, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("resolve user home for %s: %w", EnvSingerOSHome, err)
-		}
-		home = filepath.Join(userHome, ".singeros")
-	}
-	return filepath.Join(home, "memory"), nil
+	return singeros.MemoryDir()
 }
 
 // RootDir returns the memory directory containing USER.md and MEMORY.md.

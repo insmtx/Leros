@@ -10,9 +10,7 @@ import (
 
 	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/internal/agent"
-	"github.com/insmtx/SingerOS/backend/tools"
-	memorytools "github.com/insmtx/SingerOS/backend/tools/memory"
-	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
+	agentruntime "github.com/insmtx/SingerOS/backend/internal/agent/runtime"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -113,35 +111,14 @@ func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) (agent.AgentRun
 		return nil, fmt.Errorf("llm config is required")
 	}
 
-	catalog, err := loadSkillsCatalog(cfg.SkillsDir)
+	runtimeService, err := agentruntime.NewService(ctx, agentruntime.Options{
+		LLMConfig:    cfg.LLMConfig,
+		ToolsEnabled: cfg.ToolsEnabled,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("load skills catalog: %w", err)
+		return nil, fmt.Errorf("create runtime service: %w", err)
 	}
-
-	toolRegistry := tools.NewRegistry()
-
-	if cfg.ToolsEnabled {
-		if err := skilltools.Register(toolRegistry, catalog); err != nil {
-			logs.Errorf("register tools: %v", err)
-			return nil, fmt.Errorf("register tools: %w", err)
-		}
-		if err := memorytools.Register(toolRegistry); err != nil {
-			logs.Errorf("register memory tools: %v", err)
-			return nil, fmt.Errorf("register memory tools: %w", err)
-		}
-	}
-
-	agentConfig := agent.Config{
-		SkillsCatalog: catalog,
-		ToolRegistry:  toolRegistry,
-	}
-
-	agentInstance, err := agent.NewAgent(ctx, cfg.LLMConfig, agentConfig)
-	if err != nil {
-		return nil, fmt.Errorf("create agent: %w", err)
-	}
-
-	return agentInstance, nil
+	return runtimeService, nil
 }
 
 func (w *WorkerClient) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {
@@ -206,16 +183,4 @@ func (w *WorkerClient) GetStartedAt() time.Time {
 
 func (w *WorkerClient) GetStatus() string {
 	return w.status
-}
-
-func loadSkillsCatalog(skillsDir string) (*skilltools.Catalog, error) {
-	if skillsDir == "" {
-		return skilltools.NewEmptyCatalog(), nil
-	}
-
-	catalog, _, err := skilltools.LoadDefaultCatalog()
-	if err != nil {
-		return nil, err
-	}
-	return catalog, nil
 }

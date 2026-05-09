@@ -15,14 +15,14 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
-// Runner executes one SingerOS agent request through an external CLI engine.
+// Runner 通过外部 Agent CLI 引擎执行 SingerOS 请求。
 type Runner struct {
 	name   string
 	engine engines.Engine
 	model  engines.ModelConfig
 }
 
-// NewRunner creates a SingerOS runner backed by one external CLI engine.
+// NewRunner 创建基于外部 CLI 引擎的 SingerOS runner。
 func NewRunner(name string, engine engines.Engine, llmConfig *config.LLMConfig) (*Runner, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -38,7 +38,7 @@ func NewRunner(name string, engine engines.Engine, llmConfig *config.LLMConfig) 
 	}, nil
 }
 
-// Run executes one normalized request through the configured CLI engine.
+// Run 直接通过外部 CLI 执行标准化请求；统一生命周期入口应优先使用 lifecycle.Runner。
 func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {
 	startedAt := time.Now().UTC()
 	if r == nil || r.engine == nil {

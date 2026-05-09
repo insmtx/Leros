@@ -1,9 +1,11 @@
-package skilltools
+package catalog
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/insmtx/SingerOS/backend/pkg/singeros"
 )
 
 func TestCatalogLoadsSkillDocuments(t *testing.T) {
@@ -108,6 +110,49 @@ func TestCatalogDerivesNameWithoutFrontmatter(t *testing.T) {
 	}
 }
 
+func TestCatalogMergeKeepsFirstDuplicateSkill(t *testing.T) {
+	firstRoot := t.TempDir()
+	secondRoot := t.TempDir()
+	writeTestSkill(t, filepath.Join(firstRoot, "review"), "review", "First description", "first body")
+	writeTestSkill(t, filepath.Join(secondRoot, "review"), "review", "Second description", "second body")
+
+	first, err := NewCatalog(os.DirFS(firstRoot))
+	if err != nil {
+		t.Fatalf("load first catalog: %v", err)
+	}
+	second, err := NewCatalog(os.DirFS(secondRoot))
+	if err != nil {
+		t.Fatalf("load second catalog: %v", err)
+	}
+
+	merged := NewEmptyCatalog()
+	merged.merge(first)
+	merged.merge(second)
+
+	entry, err := merged.Get("review")
+	if err != nil {
+		t.Fatalf("get merged skill: %v", err)
+	}
+	if entry.Manifest.Description != "First description" {
+		t.Fatalf("expected first duplicate to win, got %q", entry.Manifest.Description)
+	}
+}
+
+func TestDefaultSingerOSSkillsDirUsesSingerOSHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv(singeros.EnvHome, home)
+
+	dir, err := defaultSingerOSSkillsDir()
+	if err != nil {
+		t.Fatalf("default SingerOS skills dir: %v", err)
+	}
+
+	expected := filepath.Join(home, "skills")
+	if dir != expected {
+		t.Fatalf("expected %s, got %s", expected, dir)
+	}
+}
+
 func TestCatalogRejectsPathTraversal(t *testing.T) {
 	rootDir := t.TempDir()
 	skillDir := filepath.Join(rootDir, "safe-skill")
@@ -126,5 +171,16 @@ func TestCatalogRejectsPathTraversal(t *testing.T) {
 
 	if _, err := catalog.ReadFile("safe-skill", "../secret.txt"); err == nil {
 		t.Fatalf("expected traversal path to be rejected")
+	}
+}
+
+func writeTestSkill(t *testing.T, dir string, name string, description string, body string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("mkdir skill: %v", err)
+	}
+	content := "---\nname: " + name + "\ndescription: " + description + "\n---\n# " + name + "\n\n" + body + "\n"
+	if err := os.WriteFile(filepath.Join(dir, skillFileName), []byte(content), 0o644); err != nil {
+		t.Fatalf("write skill: %v", err)
 	}
 }

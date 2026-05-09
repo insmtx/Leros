@@ -10,14 +10,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/insmtx/SingerOS/backend/tools"
+	skillmanagetools "github.com/insmtx/SingerOS/backend/tools/skill_manage"
 	testtools "github.com/insmtx/SingerOS/backend/tools/test"
 )
 
-func TestNewServerRegistersOnlyEchoTool(t *testing.T) {
+func TestNewServerRegistersPublicTools(t *testing.T) {
 	srv := NewServer()
 
 	if srv.GetTool(testtools.ToolNameEcho) == nil {
 		t.Fatalf("expected %s to be registered", testtools.ToolNameEcho)
+	}
+	if srv.GetTool(skillmanagetools.ToolNameSkillManage) == nil {
+		t.Fatalf("expected %s to be registered", skillmanagetools.ToolNameSkillManage)
 	}
 	if srv.GetTool("node_shell") != nil {
 		t.Fatalf("node tools must not be registered in the MCP server")

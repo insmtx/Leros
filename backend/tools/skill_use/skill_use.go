@@ -1,5 +1,5 @@
-// Package skilltools provides runtime tools for discovering and loading SingerOS skills.
-package skilltools
+// Package skilluse provides the runtime tool for loading SingerOS skill documents.
+package skilluse
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
 	"github.com/insmtx/SingerOS/backend/tools"
 )
 
@@ -27,22 +28,19 @@ const (
 	maxSkillFileReadBytes     = 128 * 1024
 )
 
-// SkillCatalog is the read-only catalog surface required by SkillUseTool.
-type SkillCatalog interface {
-	List() []Summary
-	Get(name string) (*Entry, error)
-	ReadFile(name string, relativePath string) ([]byte, error)
-	ListFiles(name string, limit int) ([]string, error)
-}
-
 // SkillUseTool lets an agent query and load skills from the runtime skill catalog.
 type SkillUseTool struct {
 	tools.BaseTool
-	catalog SkillCatalog
+	provider skillcatalog.CatalogProvider
 }
 
 // NewSkillUseTool creates a catalog-backed skill use tool.
-func NewSkillUseTool(catalog SkillCatalog) *SkillUseTool {
+func NewSkillUseTool(catalog skillcatalog.SkillCatalog) *SkillUseTool {
+	return NewSkillUseToolWithProvider(skillcatalog.NewStaticCatalogProvider(catalog))
+}
+
+// NewSkillUseToolWithProvider creates a provider-backed skill use tool.
+func NewSkillUseToolWithProvider(provider skillcatalog.CatalogProvider) *SkillUseTool {
 	return &SkillUseTool{
 		BaseTool: tools.NewBaseTool(
 			ToolNameSkillUse,
@@ -71,7 +69,7 @@ func NewSkillUseTool(catalog SkillCatalog) *SkillUseTool {
 				},
 			},
 		),
-		catalog: catalog,
+		provider: provider,
 	}
 }
 
@@ -110,7 +108,11 @@ func (t *SkillUseTool) Execute(ctx context.Context, input map[string]interface{}
 	if err := t.Validate(input); err != nil {
 		return "", err
 	}
-	if t == nil || t.catalog == nil {
+	catalog, err := t.currentCatalog()
+	if err != nil {
+		return "", err
+	}
+	if catalog == nil {
 		return "", fmt.Errorf("skill catalog is required")
 	}
 
@@ -122,18 +124,25 @@ func (t *SkillUseTool) Execute(ctx context.Context, input map[string]interface{}
 
 	switch stringValue(input, "action") {
 	case actionList:
-		return tools.JSONString(t.listSkills())
+		return tools.JSONString(listSkills(catalog))
 	case actionGet:
-		return tools.JSONString(t.getSkill(stringValue(input, "name")))
+		return tools.JSONString(getSkill(catalog, stringValue(input, "name")))
 	case actionReadFile:
-		return tools.JSONString(t.readSkillFile(stringValue(input, "name"), stringValue(input, "path")))
+		return tools.JSONString(readSkillFile(catalog, stringValue(input, "name"), stringValue(input, "path")))
 	default:
 		return "", fmt.Errorf("unsupported action %q", stringValue(input, "action"))
 	}
 }
 
-func (t *SkillUseTool) listSkills() map[string]interface{} {
-	summaries := t.catalog.List()
+func (t *SkillUseTool) currentCatalog() (skillcatalog.SkillCatalog, error) {
+	if t == nil || t.provider == nil {
+		return nil, fmt.Errorf("skill catalog is required")
+	}
+	return t.provider.Current(), nil
+}
+
+func listSkills(catalog skillcatalog.SkillCatalog) map[string]interface{} {
+	summaries := catalog.List()
 	skills := make([]map[string]interface{}, 0, len(summaries))
 	for _, summary := range summaries {
 		skills = append(skills, summaryMap(summary))
@@ -146,13 +155,13 @@ func (t *SkillUseTool) listSkills() map[string]interface{} {
 	}
 }
 
-func (t *SkillUseTool) getSkill(name string) map[string]interface{} {
-	entry, err := t.findSkill(name)
+func getSkill(catalog skillcatalog.SkillCatalog, name string) map[string]interface{} {
+	entry, err := findSkill(catalog, name)
 	if err != nil {
-		return skillNotFound(name, t.catalog.List())
+		return skillNotFound(name, catalog.List())
 	}
 
-	files, err := t.catalog.ListFiles(entry.Manifest.Name, defaultSkillFileListLimit)
+	files, err := catalog.ListFiles(entry.Manifest.Name, defaultSkillFileListLimit)
 	if err != nil {
 		return map[string]interface{}{
 			"ok":      false,
@@ -194,13 +203,13 @@ func (t *SkillUseTool) getSkill(name string) map[string]interface{} {
 	}
 }
 
-func (t *SkillUseTool) readSkillFile(name string, relativePath string) map[string]interface{} {
-	entry, err := t.findSkill(name)
+func readSkillFile(catalog skillcatalog.SkillCatalog, name string, relativePath string) map[string]interface{} {
+	entry, err := findSkill(catalog, name)
 	if err != nil {
-		return skillNotFound(name, t.catalog.List())
+		return skillNotFound(name, catalog.List())
 	}
 
-	content, err := t.catalog.ReadFile(entry.Manifest.Name, relativePath)
+	content, err := catalog.ReadFile(entry.Manifest.Name, relativePath)
 	if err != nil {
 		return map[string]interface{}{
 			"ok":      false,
@@ -221,7 +230,7 @@ func (t *SkillUseTool) readSkillFile(name string, relativePath string) map[strin
 	}
 }
 
-func summaryMap(summary Summary) map[string]interface{} {
+func summaryMap(summary skillcatalog.Summary) map[string]interface{} {
 	return map[string]interface{}{
 		"name":           summary.Name,
 		"description":    summary.Description,
@@ -236,23 +245,23 @@ func summaryMap(summary Summary) map[string]interface{} {
 	}
 }
 
-func (t *SkillUseTool) findSkill(name string) (*Entry, error) {
-	entry, err := t.catalog.Get(name)
+func findSkill(catalog skillcatalog.SkillCatalog, name string) (*skillcatalog.Entry, error) {
+	entry, err := catalog.Get(name)
 	if err == nil {
 		return entry, nil
 	}
 
-	for _, summary := range t.catalog.List() {
+	for _, summary := range catalog.List() {
 		if !strings.EqualFold(summary.Name, name) {
 			continue
 		}
-		return t.catalog.Get(summary.Name)
+		return catalog.Get(summary.Name)
 	}
 
 	return nil, err
 }
 
-func formatSkillContent(entry *Entry, files []string) string {
+func formatSkillContent(entry *skillcatalog.Entry, files []string) string {
 	var builder strings.Builder
 	skillName := entry.Manifest.Name
 	baseDir := entry.Dir
@@ -300,7 +309,7 @@ func truncateFileContent(content []byte, maxBytes int) (string, bool) {
 	return string(truncated), true
 }
 
-func skillNotFound(name string, summaries []Summary) map[string]interface{} {
+func skillNotFound(name string, summaries []skillcatalog.Summary) map[string]interface{} {
 	available := make([]string, 0, len(summaries))
 	for _, summary := range summaries {
 		available = append(available, summary.Name)

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/insmtx/SingerOS/backend/pkg/singeros"
 )
 
 func TestStoreAddReplaceRemove(t *testing.T) {
@@ -74,7 +76,7 @@ func TestStoreBuildPromptBlock(t *testing.T) {
 
 func TestDefaultMemoryRootUsesSingerOSHome(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv(EnvSingerOSHome, tempDir)
+	t.Setenv(singeros.EnvHome, tempDir)
 
 	root, err := DefaultMemoryRoot()
 	if err != nil {

@@ -1,4 +1,4 @@
-package agent
+package singeros
 
 import (
 	"context"
@@ -8,45 +8,34 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"testing/fstest"
 	"time"
 
 	"github.com/insmtx/SingerOS/backend/config"
 	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
+	"github.com/insmtx/SingerOS/backend/internal/agent/runtimeenv"
+	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
 	"github.com/insmtx/SingerOS/backend/tools"
 	nodetools "github.com/insmtx/SingerOS/backend/tools/node"
-	skilltools "github.com/insmtx/SingerOS/backend/tools/skill"
+	skillusetools "github.com/insmtx/SingerOS/backend/tools/skill_use"
 	"github.com/ygpkg/yg-go/logs"
 	"go.uber.org/zap/zapcore"
 )
 
 const defaultTestNodeContainerID = "b327e241316c2a2f62cbee986edd0e71235205f0fde5dc7a4543f5344396b351"
 
-func TestAgentBuildSystemPromptIncludesSkills(t *testing.T) {
-	catalog, err := skilltools.NewCatalog(fstest.MapFS{
-		"code-review/SKILL.md": {
-			Data: []byte(`---
-name: code-review
-description: Review code.
-metadata:
-  singeros:
-    always: true
----
-Always inspect diffs first.`),
-		},
-	})
-	if err != nil {
-		t.Fatalf("new skills catalog: %v", err)
+func TestRunnerBuildSystemPromptOnlyKeepsRuntimePrompt(t *testing.T) {
+	runner := &Runner{
+		systemPrompt: "Base runtime prompt.",
 	}
 
-	agent := &Agent{
-		systemPrompt:  "Base runtime prompt.",
-		skillsCatalog: catalog,
-	}
-
-	prompt, err := agent.buildSystemPrompt(&RequestContext{
+	prompt, err := runner.buildSystemPrompt(&RequestContext{
 		Assistant: AssistantContext{
 			SystemPrompt: "Assistant-specific prompt.",
+		},
+		Conversation: ConversationContext{
+			Messages: []InputMessage{
+				{Role: "user", Content: "请记住这个项目使用 Go。"},
+			},
 		},
 	})
 	if err != nil {
@@ -56,15 +45,20 @@ Always inspect diffs first.`),
 	for _, expected := range []string{
 		"Base runtime prompt.",
 		"Assistant-specific prompt.",
-		"Available skills:",
-		"## Skill: code-review",
 	} {
 		if !strings.Contains(prompt, expected) {
 			t.Fatalf("expected prompt to contain %q, got %s", expected, prompt)
 		}
 	}
-	if strings.Contains(prompt, "Available tools:") {
-		t.Fatalf("tool summary should not be injected into system prompt: %s", prompt)
+	for _, unexpected := range []string{
+		"Available skills:",
+		"## Skill:",
+		"<session-summary>",
+		"请记住这个项目使用 Go。",
+	} {
+		if strings.Contains(prompt, unexpected) {
+			t.Fatalf("expected prompt not to contain %q, got %s", unexpected, prompt)
+		}
 	}
 }
 
@@ -79,15 +73,14 @@ func TestAgentRunRealModel(t *testing.T) {
 	ctx, cancel := realModelTestContext(t)
 	defer cancel()
 
-	registry := tools.NewRegistry()
-	agent, err := NewAgent(ctx, &config.LLMConfig{
-		Provider: "openai",
-		APIKey:   apiKey,
-		Model:    firstNonEmptyEnv("SINGEROS_LLM_MODEL"),
-		BaseURL:  firstNonEmptyEnv("SINGEROS_LLM_BASE_URL"),
-	}, Config{
-		ToolRegistry: registry,
+	env, err := runtimeenv.New(ctx, runtimeenv.Options{
+		ToolsEnabled: false,
 	})
+	if err != nil {
+		t.Fatalf("new runtime env: %v", err)
+	}
+
+	agent, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("SINGEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("SINGEROS_LLM_BASE_URL")}, env)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
@@ -139,14 +132,14 @@ func TestAgentRunNodeTool(t *testing.T) {
 		t.Fatalf("register node tools: %v", err)
 	}
 
-	agent, err := NewAgent(ctx, &config.LLMConfig{
-		Provider: "openai",
-		APIKey:   apiKey,
-		Model:    firstNonEmptyEnv("SINGEROS_LLM_MODEL"),
-		BaseURL:  firstNonEmptyEnv("SINGEROS_LLM_BASE_URL"),
-	}, Config{
-		ToolRegistry: registry,
+	env, err := runtimeenv.New(ctx, runtimeenv.Options{
+		ToolsEnabled: true,
 	})
+	if err != nil {
+		t.Fatalf("new runtime env: %v", err)
+	}
+
+	agent, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("SINGEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("SINGEROS_LLM_BASE_URL")}, env)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
@@ -213,22 +206,21 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 	}
 
 	registry := tools.NewRegistry()
-	if err := skilltools.Register(registry, catalog); err != nil {
+	if err := skillusetools.Register(registry, catalog); err != nil {
 		t.Fatalf("register skill tools: %v", err)
 	}
 	if err := nodetools.Register(registry); err != nil {
 		t.Fatalf("register node tools: %v", err)
 	}
 
-	agent, err := NewAgent(ctx, &config.LLMConfig{
-		Provider: "openai",
-		APIKey:   apiKey,
-		Model:    firstNonEmptyEnv("SINGEROS_LLM_MODEL"),
-		BaseURL:  firstNonEmptyEnv("SINGEROS_LLM_BASE_URL"),
-	}, Config{
-		SkillsCatalog: catalog,
-		ToolRegistry:  registry,
+	env, err := runtimeenv.New(ctx, runtimeenv.Options{
+		ToolsEnabled: true,
 	})
+	if err != nil {
+		t.Fatalf("new runtime env: %v", err)
+	}
+
+	agent, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("SINGEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("SINGEROS_LLM_BASE_URL")}, env)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
@@ -255,7 +247,7 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 		Runtime: RuntimeOptions{MaxStep: 20},
 		Capability: CapabilityContext{
 			AllowedTools: []string{
-				skilltools.ToolNameSkillUse,
+				skillusetools.ToolNameSkillUse,
 				nodetools.ToolNameNodeShell,
 			},
 		},
@@ -292,7 +284,7 @@ func realModelNodeContainerID() string {
 	return defaultTestNodeContainerID
 }
 
-func newBundledRuntimeSkillsCatalog(t *testing.T) (*skilltools.Catalog, string) {
+func newBundledRuntimeSkillsCatalog(t *testing.T) (*skillcatalog.Catalog, string) {
 	t.Helper()
 
 	_, currentFile, _, ok := goruntime.Caller(0)
@@ -301,7 +293,7 @@ func newBundledRuntimeSkillsCatalog(t *testing.T) (*skilltools.Catalog, string) 
 	}
 
 	skillsDir := filepath.Join(filepath.Dir(currentFile), "..", "skills")
-	catalog, err := skilltools.NewCatalog(os.DirFS(skillsDir))
+	catalog, err := skillcatalog.NewCatalog(os.DirFS(skillsDir))
 	if err != nil {
 		t.Fatalf("load bundled skills catalog from %s: %v", skillsDir, err)
 	}

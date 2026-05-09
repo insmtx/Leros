@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/insmtx/SingerOS/backend/config"
+	agentruntime "github.com/insmtx/SingerOS/backend/internal/agent/runtime"
 	"github.com/insmtx/SingerOS/backend/internal/infra/mq"
 	"github.com/insmtx/SingerOS/backend/internal/worker/taskconsumer"
 	"github.com/spf13/cobra"
@@ -61,26 +62,24 @@ func runTaskWorker(defaultRuntime string) {
 		return
 	}
 
-	runtimeConfig, err := buildRuntimeConfig()
-	if err != nil {
-		_ = bus.Close()
-		logs.Fatalf("Failed to build runtime config: %v", err)
-		return
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
-	runner, err := buildRuntimeRunner(ctx, cfg, runtimeConfig, defaultRuntime)
+	runtimeService, err := agentruntime.NewService(ctx, agentruntime.Options{
+		LLMConfig:      cfg.LLM,
+		CLIConfig:      cfg.CLI,
+		ToolsEnabled:   true,
+		DefaultRuntime: defaultRuntime,
+	})
 	if err != nil {
 		cancel()
 		_ = bus.Close()
-		logs.Fatalf("Failed to create agent runtime: %v", err)
+		logs.Fatalf("Failed to create agent runtime service: %v", err)
 		return
 	}
 
 	consumer, err := taskconsumer.New(taskconsumer.Config{
 		OrgID:    cfg.OrgID,
 		WorkerID: cfg.WorkerID,
-	}, bus, bus, runner)
+	}, bus, bus, runtimeService)
 	if err != nil {
 		cancel()
 		_ = bus.Close()

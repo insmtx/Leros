@@ -1,0 +1,250 @@
+package lifecycle
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/insmtx/SingerOS/backend/internal/agent"
+	"github.com/insmtx/SingerOS/backend/internal/agent/singeros"
+	localmemory "github.com/insmtx/SingerOS/backend/internal/memory/local"
+	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
+)
+
+// ContextBuilder 统一为内部 Agent 和外部 CLI 构建运行上下文。
+type ContextBuilder struct {
+	BaseSystemPrompt string
+	Runtime          RuntimeProvider
+}
+
+// RuntimeProvider 聚合运行时依赖供 ContextBuilder 使用。
+type RuntimeProvider interface {
+	SkillsProvider() skillcatalog.CatalogProvider
+}
+
+// NewContextBuilder 创建统一上下文构建器。
+func NewContextBuilder(cfg ContextBuilder) *ContextBuilder {
+	base := strings.TrimSpace(cfg.BaseSystemPrompt)
+	if base == "" {
+		base = singeros.DefaultSystemPrompt()
+	}
+	return &ContextBuilder{
+		BaseSystemPrompt: base,
+		Runtime:          cfg.Runtime,
+	}
+}
+
+// SkillsProvider 返回运行时上下文中的技能提供者。
+func (b *ContextBuilder) SkillsProvider() skillcatalog.CatalogProvider {
+	if b == nil || b.Runtime == nil {
+		return nil
+	}
+	return b.Runtime.SkillsProvider()
+}
+
+// Prepare 克隆请求并注入 memory、skill、session 上下文。
+func (b *ContextBuilder) Prepare(ctx context.Context, req *agent.RequestContext) (*agent.RequestContext, error) {
+	if req == nil {
+		return nil, fmt.Errorf("request context is required")
+	}
+
+	cloned := cloneRequest(req)
+	systemPrompt, err := b.BuildSystemPrompt(ctx, cloned)
+	if err != nil {
+		return nil, err
+	}
+
+	cloned.SystemPrompt = systemPrompt
+	return cloned, nil
+}
+
+// BuildSystemPrompt 生成统一系统提示词，供所有运行时复用。
+func (b *ContextBuilder) BuildSystemPrompt(ctx context.Context, req *agent.RequestContext) (string, error) {
+	sections := make([]string, 0, 6)
+	if base := strings.TrimSpace(b.basePromptForRequest(req)); base != "" {
+		sections = append(sections, base)
+	}
+	if skills := strings.TrimSpace(b.buildSkillsContext()); skills != "" {
+		sections = append(sections, skills)
+	}
+	if memory := strings.TrimSpace(buildMemoryContext(ctx)); memory != "" {
+		sections = append(sections, memory)
+	}
+	if summary := strings.TrimSpace(buildSessionSummaryContext(req)); summary != "" {
+		sections = append(sections, summary)
+	}
+	if guidance := strings.TrimSpace(learningGuidance()); guidance != "" {
+		sections = append(sections, guidance)
+	}
+	return strings.Join(sections, "\n\n"), nil
+}
+
+func (b *ContextBuilder) basePromptForRequest(req *agent.RequestContext) string {
+	prompt := strings.TrimSpace(b.BaseSystemPrompt)
+	if req != nil && strings.TrimSpace(req.Assistant.SystemPrompt) != "" {
+		if prompt == "" {
+			prompt = strings.TrimSpace(req.Assistant.SystemPrompt)
+		} else {
+			prompt += "\n\n" + strings.TrimSpace(req.Assistant.SystemPrompt)
+		}
+	}
+	return prompt
+}
+
+func (b *ContextBuilder) buildSkillsContext() string {
+	if b == nil || b.SkillsProvider() == nil {
+		return ""
+	}
+	catalog := b.SkillsProvider().Current()
+	if catalog == nil {
+		return ""
+	}
+	summaries := catalog.List()
+	if len(summaries) == 0 {
+		return ""
+	}
+
+	sections := []string{buildSkillSummarySection(summaries)}
+	for _, summary := range summaries {
+		if !summary.Always {
+			continue
+		}
+		entry, err := catalog.Get(summary.Name)
+		if err != nil {
+			continue
+		}
+		sections = append(sections, "## Skill: "+entry.Manifest.Name+"\n"+strings.TrimSpace(entry.Body))
+	}
+	return strings.Join(filterEmpty(sections), "\n\n")
+}
+
+func buildSkillSummarySection(summaries []skillcatalog.Summary) string {
+	var builder strings.Builder
+	builder.WriteString("Available skills:\n")
+	for _, summary := range summaries {
+		builder.WriteString("- ")
+		builder.WriteString(summary.Name)
+		builder.WriteString(": ")
+		builder.WriteString(summary.Description)
+		if summary.Category != "" {
+			builder.WriteString(" [category=")
+			builder.WriteString(summary.Category)
+			builder.WriteString("]")
+		}
+		if len(summary.RequiresTools) > 0 {
+			builder.WriteString(" [requires_tools=")
+			builder.WriteString(strings.Join(summary.RequiresTools, ","))
+			builder.WriteString("]")
+		}
+		builder.WriteString("\n")
+	}
+	builder.WriteString("\nLoad a skill body only when it is relevant to the current task.")
+	return strings.TrimSpace(builder.String())
+}
+
+func buildMemoryContext(ctx context.Context) string {
+	store, err := localmemory.NewStore(localmemory.Options{})
+	if err != nil {
+		return ""
+	}
+	block, err := store.BuildPromptBlock(ctx)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(block)
+}
+
+func buildSessionSummaryContext(req *agent.RequestContext) string {
+	if req == nil || len(req.Conversation.Messages) == 0 {
+		return ""
+	}
+	const maxMessages = 10
+	messages := req.Conversation.Messages
+	if len(messages) > maxMessages {
+		messages = messages[len(messages)-maxMessages:]
+	}
+
+	lines := make([]string, 0, len(messages)+2)
+	lines = append(lines, "<session-summary>")
+	lines = append(lines, "[System note: Recent conversation context, not new user input.]")
+	for _, msg := range messages {
+		content := strings.TrimSpace(msg.Content)
+		if content == "" {
+			continue
+		}
+		role := strings.TrimSpace(msg.Role)
+		if role == "" {
+			role = "user"
+		}
+		lines = append(lines, fmt.Sprintf("- %s: %s", role, truncateForPrompt(content, 500)))
+	}
+	if len(lines) == 2 {
+		return ""
+	}
+	lines = append(lines, "</session-summary>")
+	return strings.Join(lines, "\n")
+}
+
+func buildUserInput(req *agent.RequestContext) string {
+	if req == nil {
+		return ""
+	}
+	switch {
+	case strings.TrimSpace(req.Input.Text) != "":
+		return strings.TrimSpace(req.Input.Text)
+	case len(req.Input.Messages) > 0:
+		lines := make([]string, 0, len(req.Input.Messages))
+		for _, message := range req.Input.Messages {
+			if strings.TrimSpace(message.Content) == "" {
+				continue
+			}
+			role := message.Role
+			if role == "" {
+				role = "user"
+			}
+			lines = append(lines, fmt.Sprintf("%s: %s", role, message.Content))
+		}
+		return strings.Join(lines, "\n")
+	default:
+		return string(req.Input.Type)
+	}
+}
+
+func cloneRequest(req *agent.RequestContext) *agent.RequestContext {
+	if req == nil {
+		return nil
+	}
+	cloned := *req
+	cloned.Assistant.Skills = append([]string{}, req.Assistant.Skills...)
+	cloned.Assistant.Tools = append([]string{}, req.Assistant.Tools...)
+	cloned.Conversation.Messages = append([]agent.InputMessage{}, req.Conversation.Messages...)
+	cloned.Input.Messages = append([]agent.InputMessage{}, req.Input.Messages...)
+	cloned.Input.Attachments = append([]agent.Attachment{}, req.Input.Attachments...)
+	cloned.Capability.AllowedTools = append([]string{}, req.Capability.AllowedTools...)
+	if req.Metadata != nil {
+		cloned.Metadata = make(map[string]any, len(req.Metadata))
+		for key, value := range req.Metadata {
+			cloned.Metadata[key] = value
+		}
+	}
+	cloned.SystemPrompt = req.SystemPrompt
+	return &cloned
+}
+
+func filterEmpty(values []string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+func truncateForPrompt(value string, limit int) string {
+	value = strings.TrimSpace(value)
+	if limit <= 0 || len(value) <= limit {
+		return value
+	}
+	return value[:limit] + "...(truncated)"
+}
