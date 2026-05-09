@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -9,19 +10,27 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/insmtx/SingerOS/backend/internal/api/contract"
+	"github.com/insmtx/SingerOS/backend/internal/api/dto"
 	"github.com/insmtx/SingerOS/backend/internal/infra/db"
+	eventbus "github.com/insmtx/SingerOS/backend/internal/infra/mq"
+	"github.com/insmtx/SingerOS/backend/pkg/dm"
+	"github.com/insmtx/SingerOS/backend/runtime/events"
 	"github.com/insmtx/SingerOS/backend/types"
 )
 
 var _ contract.SessionService = (*sessionService)(nil)
 
 type sessionService struct {
-	db *gorm.DB
+	db         *gorm.DB
+	subscriber eventbus.Subscriber
+	orgID      string
 }
 
-func NewSessionService(db *gorm.DB) contract.SessionService {
+func NewSessionService(db *gorm.DB, subscriber eventbus.Subscriber, orgID string) contract.SessionService {
 	return &sessionService{
-		db: db,
+		db:         db,
+		subscriber: subscriber,
+		orgID:      orgID,
 	}
 }
 
@@ -353,6 +362,58 @@ func (s *sessionService) ClearSessionMessages(ctx context.Context, sessionID uin
 	session.UpdatedAt = time.Now()
 
 	return db.UpdateSession(ctx, s.db, session)
+}
+
+func toJSONString(v interface{}) string {
+	b, _ := json.Marshal(v)
+	return string(b)
+}
+
+func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID string, lastSequence int64, sink events.Sink) error {
+	topic := dm.Topic().Org(s.orgID).Session(sessionID).Message().Stream().Build()
+	return s.subscriber.Subscribe(ctx, topic, func(event any) {
+		switch msg := event.(type) {
+		case dm.MessageStreamMessage:
+			if msg.Body.Seq <= lastSequence {
+				return
+			}
+
+			se := dto.SessionEvent{
+				SessionID: msg.Route.SessionID,
+				Sequence:  msg.Body.Seq,
+				Timestamp: msg.CreatedAt.UnixMilli(),
+			}
+
+			switch msg.Body.Event {
+			case dm.StreamEventMessageDelta:
+				se.Type = dto.SessionEventTypeMessageDelta
+				se.Payload = dto.MessageDeltaPayload{
+					Role:    string(msg.Body.Payload.Role),
+					Content: msg.Body.Payload.Content,
+				}
+			case dm.StreamEventToolCallStarted:
+				se.Type = dto.SessionEventTypeToolCallStarted
+				if tc := msg.Body.Payload.ToolCall; tc != nil {
+					se.Payload = dto.ToolCallDeltaPayload{
+						ID:   tc.ID,
+						Name: tc.Name,
+					}
+				}
+			case dm.StreamEventRunStarted:
+				se.Type = dto.SessionEventTypeRunStarted
+			case dm.StreamEventRunCompleted:
+				se.Type = dto.SessionEventTypeRunCompleted
+			case dm.StreamEventRunFailed:
+				se.Type = dto.SessionEventTypeRunFailed
+			default:
+				return
+			}
+			_ = sink.Emit(ctx, &events.Event{
+				Type:    events.EventType(se.Type),
+				Content: toJSONString(se),
+			})
+		}
+	})
 }
 
 func convertToContractSession(session *types.Session) *contract.Session {

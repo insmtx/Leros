@@ -4,9 +4,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-
 	"github.com/insmtx/SingerOS/backend/internal/api/contract"
 	"github.com/insmtx/SingerOS/backend/internal/api/dto"
+	"github.com/insmtx/SingerOS/backend/runtime/events"
 )
 
 type SessionHandler struct {
@@ -29,11 +29,14 @@ func (h *SessionHandler) RegisterRoutes(r gin.IRouter) {
 	r.POST("/PauseSession", h.PauseSession)
 	r.POST("/EndSession", h.EndSession)
 	r.POST("/ResumeSession", h.ResumeSession)
+	r.POST("/SessionEvents", h.SessionEvents)
 	r.POST("/AddMessage", h.AddMessage)
 	r.POST("/GetSessionMessages", h.GetSessionMessages)
 	r.POST("/DeleteMessage", h.DeleteMessage)
-	r.POST("/ClearSessionMessages", h.ClearSessionMessages)
+	r.POST("/EndSession", h.EndSession)
+	r.POST("/ResumeSession", h.ResumeSession)
 }
+
 
 func RegisterSessionRoutes(r gin.IRouter, service contract.SessionService) {
 	h := NewSessionHandler(service)
@@ -160,13 +163,13 @@ type DeleteSessionRequest struct {
 // @Description 根据ID删除会话
 // @Tags Session
 // @Accept json
+// @Accept json
 // @Produce json
-// @Param body body DeleteSessionRequest true "删除会话请求"
+// @Param body body contract.ListSessionsRequest true "查询列表请求"
 // @Success 200 {object} dto.Response "成功响应"
 // @Failure 400 {object} dto.ErrorResponse "请求参数错误"
-// @Failure 404 {object} dto.ErrorResponse "资源不存在"
 // @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
-// @Router /DeleteSession [post]
+// @Router /ListSessions [post]
 func (h *SessionHandler) DeleteSession(ctx *gin.Context) {
 	var req DeleteSessionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -306,6 +309,59 @@ func (h *SessionHandler) ResumeSession(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, dto.Success(nil))
+}
+
+type SessionEventsRequest struct {
+	SessionID    string `json:"session_id"`
+	LastSequence int64  `json:"last_sequence,omitempty"`
+}
+
+// @Summary 监听会话事件流
+// @Description 通过 SSE 实时接收指定会话的事件更新
+// @Tags Session
+// @Accept json
+// @Produce text/event-stream
+// @Param body body SessionEventsRequest true "监听请求"
+// @Success 200 {object} dto.SessionEvent "事件流"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /SessionEvents [post]
+func (h *SessionHandler) SessionEvents(ctx *gin.Context) {
+	var req SessionEventsRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
+		return
+	}
+
+	ctx.Header("Content-Type", "text/event-stream")
+	ctx.Header("Cache-Control", "no-cache")
+	ctx.Header("Connection", "keep-alive")
+	ctx.Header("Access-Control-Allow-Origin", "*")
+
+	eventChan := make(chan *events.Event, 16)
+	sink := events.ChannelSink{C: eventChan}
+
+	go func() {
+		defer close(eventChan)
+		if err := h.service.StreamSessionEvents(ctx, req.SessionID, req.LastSequence, sink); err != nil {
+			ctx.SSEvent("error", dto.Error(dto.CodeInternalError, err.Error()))
+		}
+	}()
+
+	for {
+		select {
+		case event, ok := <-eventChan:
+			if !ok {
+				return
+			}
+			ctx.SSEvent(string(event.Type), event.Content)
+			ctx.Writer.Flush()
+		case <-ctx.Writer.CloseNotify():
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 type AddMessageRequest struct {
