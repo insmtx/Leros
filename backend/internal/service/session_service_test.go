@@ -24,7 +24,7 @@ func setupTestService(t *testing.T) contract.SessionService {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}
 
-	return NewSessionService(db)
+	return NewSessionService(db, nil, "")
 }
 
 func TestCreateSession_ValidInput(t *testing.T) {
