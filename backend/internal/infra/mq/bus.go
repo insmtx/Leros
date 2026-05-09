@@ -24,16 +24,8 @@ type Subscriber interface {
 	Subscribe(ctx context.Context, topic string, handler func(event any)) error
 }
 
-// EventBus 组合了事件发布者和订阅者，提供完整的事件总线功能
-type EventBus struct {
-	publisher  Publisher  // 事件发布者
-	subscriber Subscriber // 事件订阅者
-}
-
-// NewEventBus 创建一个新的事件总线实例
-func NewEventBus(publisher Publisher, subscriber Subscriber) *EventBus {
-	return &EventBus{
-		publisher:  publisher,
-		subscriber: subscriber,
-	}
+// EventBus 组合了发布和订阅能力，提供完整的事件总线功能
+type EventBus interface {
+	Publisher
+	Subscriber
 }
