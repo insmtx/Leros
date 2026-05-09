@@ -15,20 +15,15 @@ import (
 
 // Invoker 启动 Codex CLI 进程。
 type Invoker struct {
-	binary  string        // codex 可执行文件路径
-	baseEnv []string      // 基础环境变量
-	store   *SessionStore // 会话存储，用于恢复对话
+	binary  string   // codex 可执行文件路径
+	baseEnv []string // 基础环境变量
 }
 
 // NewInvoker 创建 Codex CLI 调用器。
-func NewInvoker(binary string, store *SessionStore, extraEnv map[string]string) *Invoker {
-	if store == nil {
-		store = NewSessionStore()
-	}
+func NewInvoker(binary string, extraEnv map[string]string) *Invoker {
 	return &Invoker{
 		binary:  binary,
 		baseEnv: engines.BuildBaseEnv(extraEnv),
-		store:   store,
 	}
 }
 
@@ -49,7 +44,7 @@ type codexItem struct {
 
 // Run 启动 Codex CLI 进程并将 stdout/stderr 直接转换为引擎事件。
 func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Process, <-chan engines.Event, error) {
-	threadID, resume := inv.resolveThread(req.SessionID, req.Resume)
+	threadID, resume := resolveThread(req.SessionID, req.Resume)
 	args := buildArgs(threadID, resume, req)
 
 	execCtx := ctx
@@ -93,7 +88,7 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Pr
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			inv.scanStdout(ctx, stdout, events, req.SessionID, !resume)
+			scanStdout(ctx, stdout, events)
 		}()
 		go func() {
 			defer wg.Done()
@@ -112,12 +107,9 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Pr
 	return proc, events, nil
 }
 
-func (inv *Invoker) scanStdout(ctx context.Context, r interface{ Read([]byte) (int, error) }, events chan<- engines.Event, sessionID string, captureSession bool) {
+func scanStdout(ctx context.Context, r interface{ Read([]byte) (int, error) }, events chan<- engines.Event) {
 	engines.ScanJSONLines(r, func(line string) bool {
-		event, threadID := parseCodexLine(line)
-		if captureSession && sessionID != "" && threadID != "" {
-			inv.store.Set(sessionID, threadID)
-		}
+		event := parseCodexLine(line)
 		if event.Type == "" {
 			return true
 		}
@@ -125,21 +117,21 @@ func (inv *Invoker) scanStdout(ctx context.Context, r interface{ Read([]byte) (i
 	})
 }
 
-func parseCodexLine(line string) (engines.Event, string) {
+func parseCodexLine(line string) engines.Event {
 	logs.Infof("Parse Codex line: %s", line)
 	line = strings.TrimSpace(line)
 	if line == "" {
-		return engines.Event{}, ""
+		return engines.Event{}
 	}
 	var event codexEvent
 	if json.Unmarshal([]byte(line), &event) != nil {
-		return engines.Event{Type: engines.EventMessageDelta, Content: line}, ""
+		return engines.Event{Type: engines.EventMessageDelta, Content: line}
 	}
 	if event.Type == "thread.started" && event.ThreadID != "" {
-		return engines.Event{}, event.ThreadID
+		return engines.Event{Type: engines.EventProviderSessionStarted, Content: event.ThreadID}
 	}
 	if event.Item == nil {
-		return engines.Event{}, ""
+		return engines.Event{}
 	}
 
 	item := event.Item
@@ -147,25 +139,25 @@ func parseCodexLine(line string) (engines.Event, string) {
 	case "agent_message":
 		text := decodeCodexText(item.Text)
 		if text == "" {
-			return engines.Event{}, ""
+			return engines.Event{}
 		}
 		eventType := engines.EventMessageDelta
 		if event.Type == "item.completed" {
 			eventType = engines.EventResult
 		}
-		return engines.Event{Type: eventType, Content: text}, ""
+		return engines.Event{Type: eventType, Content: text}
 	case "command_execution", "tool_call", "shell_command":
 		command := firstNonEmptyString(item.Command, item.CommandLine, item.Name)
 		if command != "" {
-			return engines.Event{Type: engines.EventMessageDelta, Content: "$ " + command}, ""
+			return engines.Event{Type: engines.EventMessageDelta, Content: "$ " + command}
 		}
 	case "command_output", "tool_output", "shell_output":
 		output := firstNonEmptyString(item.Output, decodeCodexText(item.Text))
 		if output != "" {
-			return engines.Event{Type: engines.EventMessageDelta, Content: truncateOutput(output, 300)}, ""
+			return engines.Event{Type: engines.EventMessageDelta, Content: truncateOutput(output, 300)}
 		}
 	}
-	return engines.Event{}, ""
+	return engines.Event{}
 }
 
 func decodeCodexText(raw json.RawMessage) string {
@@ -267,10 +259,10 @@ func firstNonEmptyString(values ...string) string {
 	return ""
 }
 
-func (inv *Invoker) resolveThread(sessionID string, resume bool) (string, bool) {
+func resolveThread(sessionID string, resume bool) (string, bool) {
 	if !resume {
 		return "", false
 	}
-	threadID, ok := inv.store.Get(sessionID)
-	return threadID, ok
+	threadID := strings.TrimSpace(sessionID)
+	return threadID, threadID != ""
 }

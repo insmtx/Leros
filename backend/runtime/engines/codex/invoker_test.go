@@ -11,18 +11,6 @@ import (
 	"github.com/insmtx/SingerOS/backend/runtime/engines"
 )
 
-func TestSessionStore(t *testing.T) {
-	store := NewSessionStore()
-	if _, ok := store.Get("session-1"); ok {
-		t.Fatal("empty store should not return a mapping")
-	}
-
-	store.Set("session-1", "thread-1")
-	if got, ok := store.Get("session-1"); !ok || got != "thread-1" {
-		t.Fatalf("got %q, %v; want thread-1, true", got, ok)
-	}
-}
-
 func TestAdapterAskCurrentTime(t *testing.T) {
 	codexPath, err := exec.LookPath("codex")
 	if err != nil {
@@ -79,22 +67,16 @@ func TestAdapterAskCurrentTime(t *testing.T) {
 }
 
 func TestParseCodexLineEmitsResult(t *testing.T) {
-	event, threadID := parseCodexLine(`{"type":"item.completed","item":{"type":"agent_message","text":"final"}}`)
-	if threadID != "" {
-		t.Fatalf("unexpected thread id: %s", threadID)
-	}
+	event := parseCodexLine(`{"type":"item.completed","item":{"type":"agent_message","text":"final"}}`)
 	if event.Type != engines.EventResult || event.Content != "final" {
 		t.Fatalf("unexpected event: %#v", event)
 	}
 }
 
 func TestParseCodexLineCapturesThread(t *testing.T) {
-	event, threadID := parseCodexLine(`{"type":"thread.started","thread_id":"thread-1"}`)
-	if event.Type != "" {
+	event := parseCodexLine(`{"type":"thread.started","thread_id":"thread-1"}`)
+	if event.Type != engines.EventProviderSessionStarted || event.Content != "thread-1" {
 		t.Fatalf("unexpected event: %#v", event)
-	}
-	if threadID != "thread-1" {
-		t.Fatalf("got thread id %q, want thread-1", threadID)
 	}
 }
 
