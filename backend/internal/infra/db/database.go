@@ -9,6 +9,7 @@ import (
 
 	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/logs"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
 	"github.com/insmtx/SingerOS/backend/config"
@@ -46,6 +47,11 @@ func InitDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to init default org: %w", err)
 	}
 
+	// 初始化开发数据（默认用户、用户组织关联）
+	if err := InitDevData(db); err != nil {
+		return nil, fmt.Errorf("failed to init dev data: %w", err)
+	}
+
 	logs.Info("Database connection initialized successfully")
 	return db, nil
 }
@@ -75,39 +81,69 @@ func runMigrations(db *gorm.DB) error {
 	return nil
 }
 
-// InitDefaultOrg 初始化默认组织数据（仅在数据为空时执行）
-func InitDefaultOrg(db *gorm.DB) error {
-	var count int64
-	db.Model(&types.Organization{}).Count(&count)
-	if count > 0 {
-		return nil
+// InitDevData 初始化开发环境数据（仅在数据为空时执行）
+// 包括：默认组织、默认用户、用户组织关联
+func InitDevData(db *gorm.DB) error {
+	// 初始化默认组织
+	var orgCount int64
+	db.Model(&types.Organization{}).Count(&orgCount)
+	if orgCount == 0 {
+		defaultOrg := &types.Organization{
+			Code:   "default_org",
+			Name:   "默认组织",
+			Type:   "company",
+			Status: "active",
+		}
+		if err := db.Create(defaultOrg).Error; err != nil {
+			return fmt.Errorf("failed to create default org: %w", err)
+		}
+		logs.Info("Default organization created")
 	}
 
-	defaultOrg := &types.Organization{
-		Code:   "default_org",
-		Name:   "默认组织",
-		Type:   "company",
-		Status: "active",
-	}
-	return db.Create(defaultOrg).Error
-}
+	// 初始化默认用户
+	var userCount int64
+	db.Model(&types.User{}).Count(&userCount)
+	if userCount == 0 {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte("Admin123456"), bcrypt.DefaultCost)
+		if err != nil {
+			return fmt.Errorf("failed to hash password: %w", err)
+		}
 
-// InitDefaultUserOrg 初始化默认用户组织关联（用于开发环境）
-// uin: 关联ID（JWT中的Uin），userID: 用户ID，orgID: 组织ID
-func InitDefaultUserOrg(db *gorm.DB, uin uint, userID uint, orgID uint) error {
-	var count int64
-	db.Model(&types.UserOrg{}).Count(&count)
-	if count > 0 {
-		return nil
+		defaultUser := &types.User{
+			GithubID:    0,
+			GithubLogin: "admin",
+			Name:        "Admin User",
+			Email:       "admin@singer.local",
+			Password:    string(hashedPassword),
+		}
+		if err := db.Create(defaultUser).Error; err != nil {
+			return fmt.Errorf("failed to create default user: %w", err)
+		}
+		logs.Info("Default user created (login: admin)")
 	}
 
-	userOrg := &types.UserOrg{
-		Uin:       uin,
-		UserID:    userID,
-		OrgID:     orgID,
-		IsDefault: true,
+	// 初始化用户组织关联
+	var userOrgCount int64
+	db.Model(&types.UserOrg{}).Count(&userOrgCount)
+	if userOrgCount == 0 {
+		var user types.User
+		var org types.Organization
+		db.Where("github_login = ?", "admin").First(&user)
+		db.Where("code = ?", "default_org").First(&org)
+
+		userOrg := &types.UserOrg{
+			Uin:       user.ID,
+			UserID:    user.ID,
+			OrgID:     org.ID,
+			IsDefault: true,
+		}
+		if err := db.Create(userOrg).Error; err != nil {
+			return fmt.Errorf("failed to create default user-org: %w", err)
+		}
+		logs.Info("Default user-org association created")
 	}
-	return db.Create(userOrg).Error
+
+	return nil
 }
 
 // GetDB 获取默认的数据库实例

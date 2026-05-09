@@ -7,8 +7,8 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
-	"github.com/ygpkg/yg-go/encryptor/snowflake"
 	ygauth "github.com/ygpkg/yg-go/apis/runtime/auth"
+	"github.com/ygpkg/yg-go/encryptor/snowflake"
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
 

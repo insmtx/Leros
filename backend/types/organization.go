@@ -3,7 +3,7 @@ package types
 import "gorm.io/gorm"
 
 // TableNameOrganization 组织表名
-const TableNameOrganization = "organizations"
+const TableNameOrganization = tablenamePrefix + "organizations"
 
 // Organization 表示系统中的组织/企业信息
 //
