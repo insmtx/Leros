@@ -125,7 +125,7 @@ webhook_secret: "my-secret-with-!@#$%^&*()"
 
 1. 在 GitHub Webhook 设置中生成一个新的 secret
 2. 更新配置文件中的 `webhook_secret`
-3. 重启 SingerOS 服务
+3. 重启 Leros 服务
 4. 在 GitHub 上测试 webhook
 
 ## 验证成功后
@@ -138,7 +138,7 @@ webhook_secret: "my-secret-with-!@#$%^&*()"
 ## 需要帮助？
 
 如果按照以上步骤仍无法解决问题，请收集以下信息：
-- SingerOS 配置文件（隐藏敏感信息）
+- Leros 配置文件（隐藏敏感信息）
 - GitHub Webhook 设置截图
 - Recent Deliveries 中的 Request/Response 详情
 - 服务器日志

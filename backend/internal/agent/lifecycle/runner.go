@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/insmtx/SingerOS/backend/internal/agent"
+	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -47,7 +47,7 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 
 	result, runErr := r.delegate.Run(ctx, prepared)
 	if err := r.AfterRunLearning(ctx, prepared, result, recorder.trace()); err != nil {
-		logs.WarnContextf(ctx, "SingerOS lifecycle learning check failed: %v", err)
+		logs.WarnContextf(ctx, "Leros lifecycle learning check failed: %v", err)
 	}
 	return result, runErr
 }

@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/insmtx/SingerOS/backend/pkg/singeros"
+	"github.com/insmtx/Leros/backend/pkg/leros"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -29,7 +29,7 @@ const skillManifestFile = "SKILL.md"
 
 var errNoSkillDirs = errors.New("no skill directories found")
 
-// SyncBuiltinSkills copies SingerOS built-in and user-managed skills into external agent skill directories.
+// SyncBuiltinSkills copies Leros built-in and user-managed skills into external agent skill directories.
 func SyncBuiltinSkills(sourceDir string, targetDirs []string) error {
 	sourceDir, err := resolveBuiltinSkillsSource(sourceDir)
 	if err != nil {
@@ -37,24 +37,24 @@ func SyncBuiltinSkills(sourceDir string, targetDirs []string) error {
 	}
 
 	sourceDirs := []string{sourceDir}
-	if userDir, err := resolveSingerOSSkillsSource(); err == nil {
+	if userDir, err := resolveLerosSkillsSource(); err == nil {
 		sourceDirs = append(sourceDirs, userDir)
 	}
 
 	return syncSkillDirs(sourceDirs, targetDirs)
 }
 
-// SyncSingerOSSkills copies all available SingerOS skills into external agent skill directories.
-func SyncSingerOSSkills(targetDirs []string) error {
-	userDir, err := defaultSingerOSSkillsDir()
+// SyncLerosSkills copies all available Leros skills into external agent skill directories.
+func SyncLerosSkills(targetDirs []string) error {
+	userDir, err := defaultLerosSkillsDir()
 	if err != nil {
 		return err
 	}
-	return SyncSingerOSSkillsFrom(userDir, targetDirs)
+	return SyncLerosSkillsFrom(userDir, targetDirs)
 }
 
-// SyncSingerOSSkillsFrom copies built-in skills and the given user skill directory into external agent skill directories.
-func SyncSingerOSSkillsFrom(userSkillDir string, targetDirs []string) error {
+// SyncLerosSkillsFrom copies built-in skills and the given user skill directory into external agent skill directories.
+func SyncLerosSkillsFrom(userSkillDir string, targetDirs []string) error {
 	sourceDirs := make([]string, 0, 2)
 	if builtinDir, err := resolveBuiltinSkillsSource(""); err == nil {
 		sourceDirs = append(sourceDirs, builtinDir)
@@ -95,7 +95,7 @@ func resolveBuiltinSkillsSource(sourceDir string) (string, error) {
 	if strings.TrimSpace(sourceDir) != "" {
 		candidates = append([]string{sourceDir}, candidates...)
 	}
-	if configured := strings.TrimSpace(os.Getenv("SINGEROS_SKILLS_DIR")); configured != "" {
+	if configured := strings.TrimSpace(os.Getenv("LEROS_SKILLS_DIR")); configured != "" {
 		candidates = append([]string{configured}, candidates...)
 	}
 
@@ -113,8 +113,8 @@ func resolveBuiltinSkillsSource(sourceDir string) (string, error) {
 	return "", fmt.Errorf("built-in skills directory not found")
 }
 
-func resolveSingerOSSkillsSource() (string, error) {
-	skillsDir, err := defaultSingerOSSkillsDir()
+func resolveLerosSkillsSource() (string, error) {
+	skillsDir, err := defaultLerosSkillsDir()
 	if err != nil {
 		return "", err
 	}
@@ -136,8 +136,8 @@ func resolveSkillSourceDir(skillsDir string) (string, error) {
 	return skillsDir, nil
 }
 
-func defaultSingerOSSkillsDir() (string, error) {
-	return singeros.SkillsDir()
+func defaultLerosSkillsDir() (string, error) {
+	return leros.SkillsDir()
 }
 
 func syncSkillDir(sourceDir string, targetDir string) error {

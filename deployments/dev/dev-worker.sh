@@ -9,7 +9,7 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}Starting SingerOS Dev Worker...${NC}"
+echo -e "${BLUE}Starting Leros Dev Worker...${NC}"
 
 if ! docker ps --format '{{.Names}}' | grep -q "singer-dev-postgresql"; then
     echo -e "${RED}Error: Infrastructure not running. Start it first with:${NC}"
@@ -21,7 +21,7 @@ if [[ "$@" == *"--build"* ]]; then
     echo -e "${BLUE}Building Docker image...${NC}"
     cd "$ROOT_DIR"
     make docker-build
-    docker tag registry.yygu.cn/insmtx/SingerOS:latest localhost/dev_singer:latest
+    docker tag registry.yygu.cn/insmtx/Leros:latest localhost/dev_singer:latest
 fi
 
 docker stop singer-dev-worker 2>/dev/null || true

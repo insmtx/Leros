@@ -5,15 +5,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/insmtx/SingerOS/backend/internal/agent"
+	"github.com/insmtx/Leros/backend/internal/agent"
 )
 
 func TestRuntimeRouterWrapsRegisteredRuntime(t *testing.T) {
 	capture := &captureRuntime{}
-	router := NewRuntimeRouter(agent.RuntimeKindSingerOS, NewContextBuilder(ContextBuilder{
+	router := NewRuntimeRouter(agent.RuntimeKindLeros, NewContextBuilder(ContextBuilder{
 		BaseSystemPrompt: "base prompt",
 	}))
-	if err := router.Register(agent.RuntimeKindSingerOS, capture); err != nil {
+	if err := router.Register(agent.RuntimeKindLeros, capture); err != nil {
 		t.Fatalf("register runner: %v", err)
 	}
 

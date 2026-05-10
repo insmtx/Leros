@@ -1,13 +1,13 @@
 # GitHub OAuth 集成
 
-此文档描述如何设置 SingerOS 项目的 GitHub OAuth 集成。
+此文档描述如何设置 Leros 项目的 GitHub OAuth 集成。
 
 ## 说明 
-SingerOS 支持通过 OAuth 实现 GitHub 用户认证，这将允许用户登录并与系统进行集成。
+Leros 支持通过 OAuth 实现 GitHub 用户认证，这将允许用户登录并与系统进行集成。
 
 ## 配置
 
-要在 SingerOS 中启用 GitHub OAuth 功能，请在配置文件中设置以下属性：
+要在 Leros 中启用 GitHub OAuth 功能，请在配置文件中设置以下属性：
 
 ```yaml
 github:
@@ -51,5 +51,5 @@ GET /github/callback
 - followers: 粉丝数
 
 ## 注意事项
-- 确保你的 GitHub OAuth 应用已正确配置，且回调 URL 与 SingerOS 服务端点匹配
+- 确保你的 GitHub OAuth 应用已正确配置，且回调 URL 与 Leros 服务端点匹配
 - OAuth 机制与 GitHub App 机制是不同的集成模式，请根据使用场景选择合适的配置

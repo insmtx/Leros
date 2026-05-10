@@ -14,7 +14,7 @@ const (
 	bearerPrefix        = "Bearer "
 
 	// TODO: Replace this fixed development token with database-backed token validation.
-	defaultAuthToken = "singeros-mcp-token"
+	defaultAuthToken = "leros-mcp-token"
 )
 
 // DefaultAuthToken returns the current MCP authorization token.

@@ -5,9 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/insmtx/SingerOS/backend/internal/api/contract"
-	"github.com/insmtx/SingerOS/backend/internal/api/dto"
-	"github.com/insmtx/SingerOS/backend/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/api/contract"
+	"github.com/insmtx/Leros/backend/internal/api/dto"
+	"github.com/insmtx/Leros/backend/runtime/events"
 )
 
 type SessionHandler struct {

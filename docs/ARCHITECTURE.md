@@ -1,4 +1,4 @@
-# SingerOS 架构设计文档
+# Leros 架构设计文档
 
 > 基于 **Event Engine + Execution Engine + Agent Runtime 三核架构** 构建的企业级 AI 操作系统
 >
@@ -476,7 +476,7 @@ Workflow Engine 专注于复杂流程编排
 
 ### 3.12 Skills 能力系统
 
-**Skill 定义：** 可复用的 AI 能力单元，是 SingerOS 的核心构建块
+**Skill 定义：** 可复用的 AI 能力单元，是 Leros 的核心构建块
 
 **接口定义：**
 
@@ -921,7 +921,7 @@ cmd/connector/            # 连接器进程（可选）
 
 ## 12. 总结
 
-### SingerOS 的本质：
+### Leros 的本质：
 
 > 一个 **事件驱动的分布式 Agent 操作系统**
 

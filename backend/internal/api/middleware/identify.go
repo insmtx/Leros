@@ -12,8 +12,8 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
 
-	localauth "github.com/insmtx/SingerOS/backend/internal/api/auth"
-	"github.com/insmtx/SingerOS/backend/internal/infra/db"
+	localauth "github.com/insmtx/Leros/backend/internal/api/auth"
+	"github.com/insmtx/Leros/backend/internal/infra/db"
 )
 
 const (

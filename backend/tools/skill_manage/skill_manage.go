@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	skillruntime "github.com/insmtx/SingerOS/backend/internal/skill/runtime"
-	skillstore "github.com/insmtx/SingerOS/backend/internal/skill/store"
-	"github.com/insmtx/SingerOS/backend/tools"
+	skillruntime "github.com/insmtx/Leros/backend/internal/skill/runtime"
+	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
+	"github.com/insmtx/Leros/backend/tools"
 )
 
 const (
@@ -38,7 +38,7 @@ type Tool struct {
 	manager *skillruntime.Manager
 }
 
-// NewTool creates skill_manage with the default SingerOS skills store.
+// NewTool creates skill_manage with the default Leros skills store.
 func NewTool() *Tool {
 	store, _ := skillstore.NewSkillStore("")
 	return NewToolWithStore(store)

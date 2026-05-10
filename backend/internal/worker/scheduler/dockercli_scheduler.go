@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/internal/worker"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/internal/worker"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -46,7 +46,7 @@ func NewDockerCLIScheduler(config *config.SchedulerConfig) worker.WorkerSchedule
 }
 
 func containerName(workerID string) string {
-	return fmt.Sprintf("singeros-worker-%s", workerID)
+	return fmt.Sprintf("leros-worker-%s", workerID)
 }
 
 func (ds *DockerCLIScheduler) execDocker(ctx context.Context, args ...string) (string, string, error) {
@@ -79,9 +79,9 @@ func (ds *DockerCLIScheduler) buildEnvVars(spec *worker.WorkerSpec) map[string]s
 	}
 
 	if ds.config.ServerAddr != "" {
-		env["SINGEROS_SERVER_ADDR"] = ds.config.ServerAddr
+		env["LEROS_SERVER_ADDR"] = ds.config.ServerAddr
 	}
-	env["SINGEROS_WORKER_ID"] = spec.ID
+	env["LEROS_WORKER_ID"] = spec.ID
 
 	return env
 }

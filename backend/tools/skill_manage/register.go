@@ -3,8 +3,8 @@ package skillmanage
 import (
 	"fmt"
 
-	skillruntime "github.com/insmtx/SingerOS/backend/internal/skill/runtime"
-	"github.com/insmtx/SingerOS/backend/tools"
+	skillruntime "github.com/insmtx/Leros/backend/internal/skill/runtime"
+	"github.com/insmtx/Leros/backend/tools"
 )
 
 // NewTools returns all skill management tools.

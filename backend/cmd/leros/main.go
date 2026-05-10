@@ -8,9 +8,9 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "singer",
-	Short: "Backend service for the SingerOS Backend",
-	Long:  `This is the backend service for the SingerOS Backend, responsible for handling API requests and business logic.`,
+	Use:   "leros",
+	Short: "Backend service for the Leros Backend",
+	Long:  `This is the backend service for the Leros Backend, responsible for handling API requests and business logic.`,
 }
 
 func main() {

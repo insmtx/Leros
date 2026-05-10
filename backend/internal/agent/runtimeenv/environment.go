@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
-	skillruntime "github.com/insmtx/SingerOS/backend/internal/skill/runtime"
-	skillstore "github.com/insmtx/SingerOS/backend/internal/skill/store"
-	"github.com/insmtx/SingerOS/backend/tools"
-	memorytools "github.com/insmtx/SingerOS/backend/tools/memory"
-	skillmanagetools "github.com/insmtx/SingerOS/backend/tools/skill_manage"
-	skillusetools "github.com/insmtx/SingerOS/backend/tools/skill_use"
+	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
+	skillruntime "github.com/insmtx/Leros/backend/internal/skill/runtime"
+	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
+	"github.com/insmtx/Leros/backend/tools"
+	memorytools "github.com/insmtx/Leros/backend/tools/memory"
+	skillmanagetools "github.com/insmtx/Leros/backend/tools/skill_manage"
+	skillusetools "github.com/insmtx/Leros/backend/tools/skill_use"
 	"github.com/ygpkg/yg-go/logs"
 )
 

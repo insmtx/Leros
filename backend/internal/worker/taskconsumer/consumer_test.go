@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/insmtx/SingerOS/backend/internal/infra/mq"
-	"github.com/insmtx/SingerOS/backend/pkg/dm"
+	"github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/pkg/dm"
 )
 
 func TestPublishWorkerTaskMessageToNATS(t *testing.T) {
-	natsURL := getenv("SINGEROS_TEST_NATS_URL", "nats://localhost:4222")
-	orgID := getenv("SINGEROS_TEST_ORG_ID", "1001")
-	workerID := getenv("SINGEROS_TEST_WORKER_ID", "worker_1")
-	sessionID := getenv("SINGEROS_TEST_SESSION_ID", "session_1")
+	natsURL := getenv("LEROS_TEST_NATS_URL", "nats://localhost:4222")
+	orgID := getenv("LEROS_TEST_ORG_ID", "1001")
+	workerID := getenv("LEROS_TEST_WORKER_ID", "worker_1")
+	sessionID := getenv("LEROS_TEST_SESSION_ID", "session_1")
 
 	bus, err := mq.NewPublisher(natsURL)
 	if err != nil {

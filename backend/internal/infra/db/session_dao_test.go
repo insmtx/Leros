@@ -8,7 +8,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/insmtx/SingerOS/backend/types"
+	"github.com/insmtx/Leros/backend/types"
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {

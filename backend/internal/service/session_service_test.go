@@ -8,10 +8,10 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/insmtx/SingerOS/backend/internal/api/auth"
-	"github.com/insmtx/SingerOS/backend/internal/api/contract"
-	"github.com/insmtx/SingerOS/backend/internal/infra/mq"
-	"github.com/insmtx/SingerOS/backend/types"
+	"github.com/insmtx/Leros/backend/internal/api/auth"
+	"github.com/insmtx/Leros/backend/internal/api/contract"
+	"github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/types"
 )
 
 func setupTestService(t *testing.T) contract.SessionService {

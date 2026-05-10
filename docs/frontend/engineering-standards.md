@@ -1,6 +1,6 @@
 # 工程规范
 
-本文档详细描述 SingerOS 前端的工程规范。
+本文档详细描述 Leros 前端的工程规范。
 
 ## Monorepo 命令
 
@@ -15,7 +15,7 @@
 | `pnpm test` | Turborepo 运行所有包测试 |
 | `pnpm lint` | Turborepo 运行所有包 Biome 检查 |
 | `pnpm clean` | 清理所有构建产物和 node_modules |
-| `pnpm ui:add` | shadcn 添加 UI 组件到 @singeros/ui |
+| `pnpm ui:add` | shadcn 添加 UI 组件到 @leros/ui |
 
 ### 子包单独命令
 
@@ -64,9 +64,9 @@ cd packages/store && pnpm lint
 ### 按需过滤执行
 
 ```bash
-turbo build --filter=@singeros/web       # 只构建 Web
-turbo dev --filter=@singeros/desktop     # 只启动 Desktop
-turbo typecheck --filter=@singeros/ui    # 只检查 UI 包
+turbo build --filter=@leros/web       # 只构建 Web
+turbo dev --filter=@leros/desktop     # 只启动 Desktop
+turbo typecheck --filter=@leros/ui    # 只检查 UI 包
 ```
 
 ## 路径别名与导入
@@ -84,20 +84,20 @@ turbo typecheck --filter=@singeros/ui    # 只检查 UI 包
 
 ```ts
 // 导入 UI 组件
-import { Button } from "@singeros/ui/components/ui/button";
-import { cn } from "@singeros/ui/lib/utils";
-import { ThemeProvider } from "@singeros/ui/components/common/theme-provider";
+import { Button } from "@leros/ui/components/ui/button";
+import { cn } from "@leros/ui/lib/utils";
+import { ThemeProvider } from "@leros/ui/components/common/theme-provider";
 
 // 导入 Store
-import { useAppStore, useChatStore } from "@singeros/store";
-import type { Message, ToolCall } from "@singeros/store/types/chat";
+import { useAppStore, useChatStore } from "@leros/store";
+import type { Message, ToolCall } from "@leros/store/types/chat";
 
 // 导入 Hooks
-import { useMobile } from "@singeros/ui/hooks/use-mobile";
-import { useSSE } from "@singeros/ui/hooks/use-sse";
+import { useMobile } from "@leros/ui/hooks/use-mobile";
+import { useSSE } from "@leros/ui/hooks/use-sse";
 ```
 
-### @singeros/ui 导出路径
+### @leros/ui 导出路径
 
 UI 包使用细粒度 `exports` 映射，确保按需加载：
 
@@ -114,7 +114,7 @@ UI 包使用细粒度 `exports` 映射，确保按需加载：
 }
 ```
 
-### @singeros/store 导出路径
+### @leros/store 导出路径
 
 ```json
 // packages/store/package.json exports
@@ -130,7 +130,7 @@ UI 包使用细粒度 `exports` 映射，确保按需加载：
 
 ### 共享配置方案
 
-通过 `@singeros/tsconfig` 包提供三套共享配置：
+通过 `@leros/tsconfig` 包提供三套共享配置：
 
 | 配置 | 文件 | 适用范围 |
 |------|------|----------|
@@ -156,27 +156,27 @@ UI 包使用细粒度 `exports` 映射，确保按需加载：
 
 ```json
 // apps/web/tsconfig.json
-{ "extends": "@singeros/tsconfig/next.json" }
+{ "extends": "@leros/tsconfig/next.json" }
 
 // packages/ui/tsconfig.json
-{ "extends": "@singeros/tsconfig/react-library.json" }
+{ "extends": "@leros/tsconfig/react-library.json" }
 
 // packages/store/tsconfig.json
-{ "extends": "@singeros/tsconfig/react-library.json" }
+{ "extends": "@leros/tsconfig/react-library.json" }
 ```
 
 ## Biome 规则
 
 ### 共享配置方案
 
-通过 `@singeros/biome` 包提供统一 lint + format 配置，根目录 `biome.json` 通过 `extends` 引用：
+通过 `@leros/biome` 包提供统一 lint + format 配置，根目录 `biome.json` 通过 `extends` 引用：
 
 ```json
 // frontend/biome.json
-{ "extends": ["@singeros/biome/biome.json"] }
+{ "extends": ["@leros/biome/biome.json"] }
 ```
 
-### @singeros/biome 规则要点
+### @leros/biome 规则要点
 
 | 类别 | 规则 | 设置 |
 |------|------|------|
@@ -248,8 +248,8 @@ Web 应用使用 PostCSS 方式：
 ```css
 /* apps/web/app/globals.css */
 @import "tailwindcss";
-@import "@singeros/ui/styles/tokens.css";
-@import "@singeros/ui/styles/base.css";
+@import "@leros/ui/styles/tokens.css";
+@import "@leros/ui/styles/base.css";
 ```
 
 Desktop 应用使用 Vite 插件方式（`@tailwindcss/vite`），在 `electron.vite.config.ts` 中配置。
@@ -275,7 +275,7 @@ Desktop 应用使用 Vite 插件方式（`@tailwindcss/vite`），在 `electron.
 
 ## 添加 UI 组件
 
-使用 shadcn CLI 向 `@singeros/ui` 包添加新组件：
+使用 shadcn CLI 向 `@leros/ui` 包添加新组件：
 
 ```bash
 pnpm ui:add
@@ -302,6 +302,6 @@ pnpm ui:add
 | 构建编排 | 单项目 Vite | Turborepo 多包拓扑 |
 | 格式化缩进 | 空格 (2) | tab (2 width) |
 | 引号风格 | 单引号 | 双引号 |
-| TS 配置 | 单 `tsconfig.json` | `@singeros/tsconfig` 共享三套 |
-| Biome 配置 | 单 `biome.json` | `@singeros/biome` 共享配置 |
+| TS 配置 | 单 `tsconfig.json` | `@leros/tsconfig` 共享三套 |
+| Biome 配置 | 单 `biome.json` | `@leros/biome` 共享配置 |
 | 依赖版本 | 各包独立 | `catalog` 统一 |

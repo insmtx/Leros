@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
+	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
 )
 
 func TestSkillUseToolListAndGet(t *testing.T) {
@@ -223,7 +223,7 @@ name: github-pr-review
 description: Review GitHub pull requests.
 version: 0.1.0
 metadata:
-  singeros:
+  leros:
     category: github
     tags: [github, pr, review]
     always: true

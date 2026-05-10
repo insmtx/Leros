@@ -1,5 +1,5 @@
-import { ThemeProvider } from "@singeros/ui/components/common/theme-provider";
-import { Toaster } from "@singeros/ui/components/ui/sonner";
+import { ThemeProvider } from "@leros/ui/components/common/theme-provider";
+import { Toaster } from "@leros/ui/components/ui/sonner";
 import { BrowserRouter } from "react-router-dom";
 import { AppRoutes } from "./routes";
 

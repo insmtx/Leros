@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/internal/worker"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/internal/worker"
 	"github.com/ygpkg/yg-go/logs"
 )
 

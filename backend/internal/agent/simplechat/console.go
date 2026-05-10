@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/insmtx/SingerOS/backend/internal/agent"
+	"github.com/insmtx/Leros/backend/internal/agent"
 )
 
 type ConsoleSink struct{}

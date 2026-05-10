@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	"github.com/insmtx/SingerOS/backend/internal/agent/simplechat"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	"github.com/insmtx/Leros/backend/internal/agent/simplechat"
 )
 
 func TestLoadFromEnv(t *testing.T) {

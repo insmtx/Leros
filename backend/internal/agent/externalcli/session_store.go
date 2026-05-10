@@ -19,7 +19,7 @@ type ProviderSessionKey struct {
 	AssistantID       string
 }
 
-// ProviderSessionBinding maps a SingerOS session to a provider-native CLI session.
+// ProviderSessionBinding maps a Leros session to a provider-native CLI session.
 type ProviderSessionBinding struct {
 	InternalSessionID string
 	Provider          string

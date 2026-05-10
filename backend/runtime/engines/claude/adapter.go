@@ -1,10 +1,10 @@
-// Package claude 将 Claude Code 适配到 SingerOS 外部 CLI 引擎接口。
+// Package claude 将 Claude Code 适配到 Leros 外部 CLI 引擎接口。
 package claude
 
 import (
 	"context"
 
-	"github.com/insmtx/SingerOS/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/runtime/engines"
 )
 
 // Adapter 通过 Claude Code 执行提示。

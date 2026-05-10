@@ -1,4 +1,4 @@
-// Package memory exposes SingerOS built-in memory as a runtime tool.
+// Package memory exposes Leros built-in memory as a runtime tool.
 package memory
 
 import (
@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	localmemory "github.com/insmtx/SingerOS/backend/internal/memory/local"
-	"github.com/insmtx/SingerOS/backend/tools"
+	localmemory "github.com/insmtx/Leros/backend/internal/memory/local"
+	"github.com/insmtx/Leros/backend/tools"
 )
 
 const (

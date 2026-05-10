@@ -8,9 +8,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	agentruntime "github.com/insmtx/SingerOS/backend/internal/agent/runtime"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	agentruntime "github.com/insmtx/Leros/backend/internal/agent/runtime"
 	"github.com/ygpkg/yg-go/logs"
 )
 

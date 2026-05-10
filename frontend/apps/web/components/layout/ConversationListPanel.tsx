@@ -1,9 +1,9 @@
 "use client";
 
-import { useChatStore, useLayoutStore } from "@singeros/store";
-import { Button } from "@singeros/ui/components/ui/button";
-import { ScrollArea } from "@singeros/ui/components/ui/scroll-area";
-import { cn } from "@singeros/ui/lib/utils";
+import { useChatStore, useLayoutStore } from "@leros/store";
+import { Button } from "@leros/ui/components/ui/button";
+import { ScrollArea } from "@leros/ui/components/ui/scroll-area";
+import { cn } from "@leros/ui/lib/utils";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { useEffect } from "react";
 

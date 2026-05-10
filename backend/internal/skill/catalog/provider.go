@@ -24,7 +24,7 @@ type CatalogReloader interface {
 	Reload(ctx context.Context) error
 }
 
-// FileCatalogProvider 从默认文件来源加载 SingerOS Skill。
+// FileCatalogProvider 从默认文件来源加载 Leros Skill。
 type FileCatalogProvider struct {
 	mu      sync.RWMutex
 	catalog SkillCatalog
@@ -83,7 +83,7 @@ func (p *FileCatalogProvider) LoadedDirs() string {
 	return p.dirs
 }
 
-// Reload 从默认 SingerOS Skill 目录重新加载 Catalog。
+// Reload 从默认 Leros Skill 目录重新加载 Catalog。
 func (p *FileCatalogProvider) Reload(ctx context.Context) error {
 	if p == nil {
 		return fmt.Errorf("catalog provider is nil")

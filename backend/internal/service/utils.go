@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/insmtx/SingerOS/backend/internal/api/auth"
+	"github.com/insmtx/Leros/backend/internal/api/auth"
 )
 
 func getOrgIDFromContext(ctx context.Context) (uint, error) {

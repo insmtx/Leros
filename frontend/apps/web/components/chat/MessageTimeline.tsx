@@ -1,7 +1,7 @@
 "use client";
 
-import { useChatStore } from "@singeros/store";
-import type { Message } from "@singeros/store/types/chat";
+import { useChatStore } from "@leros/store";
+import type { Message } from "@leros/store/types/chat";
 import { useEffect, useRef } from "react";
 import { AIMessageBubble } from "./AIMessageBubble";
 import { TypingIndicator } from "./TypingIndicator";

@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/insmtx/SingerOS/backend/types"
+	"github.com/insmtx/Leros/backend/types"
 )
 
 // GetUserOrgByUin 根据UIN获取用户组织

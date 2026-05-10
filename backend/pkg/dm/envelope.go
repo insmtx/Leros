@@ -1,4 +1,4 @@
-// Package dm 定义 SingerOS 服务之间共享的领域消息协议。
+// Package dm 定义 Leros 服务之间共享的领域消息协议。
 package dm
 
 import "time"

@@ -1,4 +1,4 @@
-# SingerOS Development Configuration - Worker
+# Leros Development Configuration - Worker
 
 database:
   url: "postgres://singer_dev_user:singer_dev_password@singer-dev-postgresql:5432/singer_dev_db?sslmode=disable"

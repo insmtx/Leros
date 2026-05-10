@@ -1,4 +1,4 @@
-package singeros
+package leros
 
 import (
 	"context"
@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/insmtx/SingerOS/backend/config"
-	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
-	"github.com/insmtx/SingerOS/backend/internal/agent/runtimeenv"
-	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
-	"github.com/insmtx/SingerOS/backend/tools"
-	nodetools "github.com/insmtx/SingerOS/backend/tools/node"
-	skillusetools "github.com/insmtx/SingerOS/backend/tools/skill_use"
+	"github.com/insmtx/Leros/backend/config"
+	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/internal/agent/runtimeenv"
+	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
+	"github.com/insmtx/Leros/backend/tools"
+	nodetools "github.com/insmtx/Leros/backend/tools/node"
+	skillusetools "github.com/insmtx/Leros/backend/tools/skill_use"
 	"github.com/ygpkg/yg-go/logs"
 	"go.uber.org/zap/zapcore"
 )
@@ -65,9 +65,9 @@ func TestRunnerBuildSystemPromptOnlyKeepsRuntimePrompt(t *testing.T) {
 func TestAgentRunRealModel(t *testing.T) {
 	logs.SetLevel(zapcore.DebugLevel)
 
-	apiKey := firstNonEmptyEnv("SINGEROS_LLM_API_KEY")
+	apiKey := firstNonEmptyEnv("LEROS_LLM_API_KEY")
 	if apiKey == "" {
-		t.Skip("set SINGEROS_LLM_API_KEY to run the real model agent test")
+		t.Skip("set LEROS_LLM_API_KEY to run the real model agent test")
 	}
 
 	ctx, cancel := realModelTestContext(t)
@@ -80,7 +80,7 @@ func TestAgentRunRealModel(t *testing.T) {
 		t.Fatalf("new runtime env: %v", err)
 	}
 
-	agent, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("SINGEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("SINGEROS_LLM_BASE_URL")}, env)
+	agent, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, env)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestAgentRunRealModel(t *testing.T) {
 		},
 		Input: InputContext{
 			Type: InputTypeMessage,
-			Text: "Reply with exactly this text: SingerOS agent runtime ok",
+			Text: "Reply with exactly this text: Leros agent runtime ok",
 		},
 		Runtime:   RuntimeOptions{MaxStep: 2},
 		EventSink: agentevents.NewLogSink(),
@@ -110,7 +110,7 @@ func TestAgentRunRealModel(t *testing.T) {
 	if strings.TrimSpace(result.Message) == "" {
 		t.Fatalf("expected non-empty model response")
 	}
-	if !strings.Contains(result.Message, "SingerOS agent runtime ok") {
+	if !strings.Contains(result.Message, "Leros agent runtime ok") {
 		t.Fatalf("unexpected model response: %s", result.Message)
 	}
 }
@@ -118,9 +118,9 @@ func TestAgentRunRealModel(t *testing.T) {
 func TestAgentRunNodeTool(t *testing.T) {
 	logs.SetLevel(zapcore.DebugLevel)
 
-	apiKey := firstNonEmptyEnv("SINGEROS_LLM_API_KEY")
+	apiKey := firstNonEmptyEnv("LEROS_LLM_API_KEY")
 	if apiKey == "" {
-		t.Skip("set SINGEROS_LLM_API_KEY to run the real model agent tool-call test")
+		t.Skip("set LEROS_LLM_API_KEY to run the real model agent tool-call test")
 	}
 
 	ctx, cancel := realModelTestContext(t)
@@ -139,7 +139,7 @@ func TestAgentRunNodeTool(t *testing.T) {
 		t.Fatalf("new runtime env: %v", err)
 	}
 
-	agent, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("SINGEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("SINGEROS_LLM_BASE_URL")}, env)
+	agent, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, env)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
@@ -191,9 +191,9 @@ func TestAgentRunNodeTool(t *testing.T) {
 func TestAgentRunWeatherSkillQuery(t *testing.T) {
 	logs.SetLevel(zapcore.DebugLevel)
 
-	apiKey := firstNonEmptyEnv("SINGEROS_LLM_API_KEY")
+	apiKey := firstNonEmptyEnv("LEROS_LLM_API_KEY")
 	if apiKey == "" {
-		t.Skip("set SINGEROS_LLM_API_KEY to run the real model agent weather skill test")
+		t.Skip("set LEROS_LLM_API_KEY to run the real model agent weather skill test")
 	}
 
 	ctx, cancel := realModelTestContext(t)
@@ -220,7 +220,7 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 		t.Fatalf("new runtime env: %v", err)
 	}
 
-	agent, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("SINGEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("SINGEROS_LLM_BASE_URL")}, env)
+	agent, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, env)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
@@ -278,7 +278,7 @@ func firstNonEmptyEnv(keys ...string) string {
 }
 
 func realModelNodeContainerID() string {
-	if containerID := firstNonEmptyEnv("SINGEROS_TEST_NODE_CONTAINER_ID"); containerID != "" {
+	if containerID := firstNonEmptyEnv("LEROS_TEST_NODE_CONTAINER_ID"); containerID != "" {
 		return containerID
 	}
 	return defaultTestNodeContainerID
@@ -304,7 +304,7 @@ func newBundledRuntimeSkillsCatalog(t *testing.T) (*skillcatalog.Catalog, string
 func realModelTestContext(t *testing.T) (context.Context, context.CancelFunc) {
 	t.Helper()
 
-	timeoutValue := strings.TrimSpace(os.Getenv("SINGEROS_TEST_TIMEOUT"))
+	timeoutValue := strings.TrimSpace(os.Getenv("LEROS_TEST_TIMEOUT"))
 	if timeoutValue == "" {
 		timeoutValue = "3m"
 	}
@@ -314,7 +314,7 @@ func realModelTestContext(t *testing.T) (context.Context, context.CancelFunc) {
 
 	timeout, err := time.ParseDuration(timeoutValue)
 	if err != nil {
-		t.Fatalf("parse SINGEROS_TEST_TIMEOUT: %v", err)
+		t.Fatalf("parse LEROS_TEST_TIMEOUT: %v", err)
 	}
 	return context.WithTimeout(context.Background(), timeout)
 }

@@ -1,4 +1,4 @@
-// db 包提供 SingerOS 的数据库初始化和管理功能
+// db 包提供 Leros 的数据库初始化和管理功能
 //
 // 该包负责数据库连接的初始化、表结构的自动迁移，
 // 以及提供获取数据库实例的方法。
@@ -12,8 +12,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/types"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/types"
 )
 
 // dbName 是数据库名称常量

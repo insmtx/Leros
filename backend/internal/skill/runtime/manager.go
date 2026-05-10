@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	skillstore "github.com/insmtx/SingerOS/backend/internal/skill/store"
+	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
 )
 
 // Manager 执行 Skill 变更，并调度非阻塞的运行时后处理。

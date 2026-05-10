@@ -27,7 +27,7 @@ export const mockMessages: Record<string, Message[]> = {
 				{
 					id: "tc-1",
 					name: "github_review",
-					arguments: { repo: "insmtx/SingerOS", pr_number: 42 },
+					arguments: { repo: "insmtx/Leros", pr_number: 42 },
 					status: "running",
 				},
 			],
@@ -65,7 +65,7 @@ export const mockMessages: Record<string, Message[]> = {
 				{
 					id: "tc-1",
 					name: "github_review",
-					arguments: { repo: "insmtx/SingerOS", pr_number: 42 },
+					arguments: { repo: "insmtx/Leros", pr_number: 42 },
 					status: "success",
 					result: { issues_found: 3, approved: false },
 					duration: 800,

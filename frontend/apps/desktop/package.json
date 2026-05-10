@@ -1,5 +1,5 @@
 {
-  "name": "@singeros/desktop",
+  "name": "@leros/desktop",
   "version": "0.1.0",
   "private": true,
   "main": "./out/main/index.js",
@@ -17,8 +17,8 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
-    "@singeros/ui": "workspace:*",
-    "@singeros/store": "workspace:*",
+    "@leros/ui": "workspace:*",
+    "@leros/store": "workspace:*",
     "react-router-dom": "^7.6.0",
     "react": "catalog:",
     "react-dom": "catalog:",
@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^2.0.0",
-    "@singeros/tsconfig": "workspace:*",
+    "@leros/tsconfig": "workspace:*",
     "@tailwindcss/vite": "^4",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",

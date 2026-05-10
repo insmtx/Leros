@@ -10,9 +10,9 @@ import (
 )
 
 const mcpRegisterTimeout = 10 * time.Second
-const singerOSMCPTokenEnvVar = "SINGEROS_MCP_TOKEN"
+const singerOSMCPTokenEnvVar = "LEROS_MCP_TOKEN"
 
-// MCPServerConfig describes the SingerOS MCP endpoint registered with an external CLI client.
+// MCPServerConfig describes the Leros MCP endpoint registered with an external CLI client.
 type MCPServerConfig struct {
 	Name        string
 	URL         string
@@ -23,15 +23,15 @@ type MCPServerConfig struct {
 func NormalizeMCPServerConfig(cfg MCPServerConfig) MCPServerConfig {
 	cfg.Name = strings.TrimSpace(cfg.Name)
 	if cfg.Name == "" {
-		cfg.Name = "singeros"
+		cfg.Name = "leros"
 	}
 	cfg.URL = strings.TrimSpace(cfg.URL)
 	cfg.BearerToken = strings.TrimSpace(cfg.BearerToken)
 	return cfg
 }
 
-// SingerOSMCPTokenEnvVar returns the env var name used for CLI MCP bearer token registration.
-func SingerOSMCPTokenEnvVar() string {
+// LerosMCPTokenEnvVar returns the env var name used for CLI MCP bearer token registration.
+func LerosMCPTokenEnvVar() string {
 	return singerOSMCPTokenEnvVar
 }
 

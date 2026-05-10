@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/insmtx/SingerOS/backend/tools"
+	"github.com/insmtx/Leros/backend/tools"
 )
 
 // NodeShellTool executes shell commands in a node container.

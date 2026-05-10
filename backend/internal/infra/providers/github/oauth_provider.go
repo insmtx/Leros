@@ -12,8 +12,8 @@ import (
 	"time"
 
 	gogithub "github.com/google/go-github/v78/github"
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/internal/api/auth"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/internal/api/auth"
 )
 
 const (

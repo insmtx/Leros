@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme } from "@singeros/ui/components/common/theme-provider";
+import { useTheme } from "@leros/ui/components/common/theme-provider";
 import { AlertOctagon, AlertTriangle, CircleCheck, Info, Loader } from "lucide-react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 

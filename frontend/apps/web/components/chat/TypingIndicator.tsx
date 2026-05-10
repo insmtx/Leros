@@ -1,6 +1,6 @@
 "use client";
 
-import { Avatar, AvatarFallback } from "@singeros/ui/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@leros/ui/components/ui/avatar";
 
 export function TypingIndicator() {
 	return (

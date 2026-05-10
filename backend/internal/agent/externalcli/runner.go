@@ -1,4 +1,4 @@
-// Package externalcli adapts external agent CLIs to the SingerOS agent.Runner boundary.
+// Package externalcli adapts external agent CLIs to the Leros agent.Runner boundary.
 package externalcli
 
 import (
@@ -9,14 +9,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
-	"github.com/insmtx/SingerOS/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/runtime/engines"
 	"github.com/ygpkg/yg-go/logs"
 )
 
-// Runner 通过外部 Agent CLI 引擎执行 SingerOS 请求。
+// Runner 通过外部 Agent CLI 引擎执行 Leros 请求。
 type Runner struct {
 	name         string
 	engine       engines.Engine
@@ -24,7 +24,7 @@ type Runner struct {
 	sessionStore ProviderSessionStore
 }
 
-// NewRunner 创建基于外部 CLI 引擎的 SingerOS runner。
+// NewRunner 创建基于外部 CLI 引擎的 Leros runner。
 func NewRunner(name string, engine engines.Engine, llmConfig *config.LLMConfig) (*Runner, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {

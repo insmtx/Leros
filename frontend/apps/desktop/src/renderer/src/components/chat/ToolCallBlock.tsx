@@ -1,8 +1,8 @@
 "use client";
 
-import type { ToolCall } from "@singeros/store/types/chat";
-import { Button } from "@singeros/ui/components/ui/button";
-import { cn } from "@singeros/ui/lib/utils";
+import type { ToolCall } from "@leros/store/types/chat";
+import { Button } from "@leros/ui/components/ui/button";
+import { cn } from "@leros/ui/lib/utils";
 import { Check, ChevronDown, ChevronRight, Loader2, X } from "lucide-react";
 import { useState } from "react";
 

@@ -1,6 +1,6 @@
-# SingerOS 前端架构文档
+# Leros 前端架构文档
 
-本文档是 SingerOS 前端架构的主索引文档，详细文档请查阅子文档。
+本文档是 Leros 前端架构的主索引文档，详细文档请查阅子文档。
 
 ## 技术栈概览
 
@@ -36,13 +36,13 @@
 ```
 frontend/
 ├── apps/                          # 应用入口
-│   ├── web/                       # @singeros/web — Next.js Web 应用
+│   ├── web/                       # @leros/web — Next.js Web 应用
 │   │   ├── app/                   # App Router 页面 (layout + page + globals.css)
 │   │   ├── components/            # Web 业务组件 (chat/input/layout)
 │   │   ├── next.config.ts         # transpilePackages 配置
 │   │   └── tsconfig.json
 │   │
-│   └── desktop/                   # @singeros/desktop — Electron 桌面应用
+│   └── desktop/                   # @leros/desktop — Electron 桌面应用
 │   │   ├── src/
 │   │   │   ├── main/              # Electron 主进程
 │   │   │   ├── preload/           # Preload 脚本
@@ -52,14 +52,14 @@ frontend/
 │   │   └── tsconfig.web.json / tsconfig.node.json
 │   │
 ├── packages/                      # 共享包
-│   ├── ui/                        # @singeros/ui — UI 组件库 + Hooks + 工具库
+│   ├── ui/                        # @leros/ui — UI 组件库 + Hooks + 工具库
 │   │   ├── components/            # ui/ (54 原语) + common/ (theme-provider)
 │   │   ├── hooks/                 # use-mobile, use-sse, use-websocket
 │   │   ├── lib/                   # request, sse, websocket, utils
 │   │   ├── styles/                # tokens.css, base.css (设计系统)
 │   │   └── package.json           # 细粒度 exports 路径映射
 │   │
-│   ├── store/                     # @singeros/store — Zustand 状态管理
+│   ├── store/                     # @leros/store — Zustand 状态管理
 │   │   ├── appStore.ts            # 合并 layoutSlice + topicSlice + chatSlice
 │   │   ├── slices/                # layout / topic / chat 状态切片
 │   │   ├── types/                 # api.ts, chat.ts 领域类型
@@ -67,18 +67,18 @@ frontend/
 │   │   ├── utils/                 # flattenActions, format
 │   │   └── package.json           # 导出路径映射 (含子路径类型导出)
 │   │
-│   ├── tsconfig/                  # @singeros/tsconfig — 共享 TS 配置
+│   ├── tsconfig/                  # @leros/tsconfig — 共享 TS 配置
 │   │   ├── base.json              # strict, ESNext, bundler
 │   │   ├── next.json              # Next.js 专用
 │   │   └── react-library.json     # React 库专用
 │   │
-│   ├── biome/                     # @singeros/biome — 共享 lint 配置
+│   ├── biome/                     # @leros/biome — 共享 lint 配置
 │   │   └── biome.json             # recommended + 自定义规则
 │   │
 ├── pnpm-workspace.yaml            # 工作空间 + catalog 版本锁定
 ├── turbo.json                     # Turborepo 任务 (build/dev/typecheck/test/lint)
 ├── package.json                   # monorepo 根脚本
-├── biome.json                     # extends @singeros/biome
+├── biome.json                     # extends @leros/biome
 ├── .npmrc                         # shamefully-hoist + no-strict-peer
 └── .gitignore
 ```
@@ -88,11 +88,11 @@ frontend/
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                Apps (双端应用)                             │
-│  @singeros/web (Next.js)    @singeros/desktop (Electron) │
+│  @leros/web (Next.js)    @leros/desktop (Electron) │
 ├──────────────────────────────────────────────────────────┤
 │              Packages (共享层)                              │
-│  @singeros/ui (组件+Hooks+工具库)   @singeros/store (状态) │
-│  @singeros/tsconfig (TS配置)  @singeros/biome (Lint配置)   │
+│  @leros/ui (组件+Hooks+工具库)   @leros/store (状态) │
+│  @leros/tsconfig (TS配置)  @leros/biome (Lint配置)   │
 ├──────────────────────────────────────────────────────────┤
 │               App 组件 (各端业务)                           │
 │  chat (气泡+时间轴) · input (输入框) · layout (Shell布局)  │
@@ -114,7 +114,7 @@ frontend/
 
 ## 双端架构差异
 
-| 维度 | Web (@singeros/web) | Desktop (@singeros/desktop) |
+| 维度 | Web (@leros/web) | Desktop (@leros/desktop) |
 |------|---------------------|----------------------------|
 | 框架 | Next.js 16 (App Router) | Electron 39 + React SPA |
 | 路由 | `app/` 目录约定 | react-router-dom BrowserRouter |
@@ -132,7 +132,7 @@ Web 应用需显式配置 `transpilePackages` 以正确引用 workspace 包：
 ```ts
 // apps/web/next.config.ts
 const nextConfig: NextConfig = {
-  transpilePackages: ["@singeros/ui", "@singeros/store"],
+  transpilePackages: ["@leros/ui", "@leros/store"],
 };
 ```
 

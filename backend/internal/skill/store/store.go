@@ -1,4 +1,4 @@
-// Package store 将用户管理的 Skill 持久化到 SingerOS home 目录下。
+// Package store 将用户管理的 Skill 持久化到 Leros home 目录下。
 package store
 
 import (
@@ -11,7 +11,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/insmtx/SingerOS/backend/pkg/singeros"
+	"github.com/insmtx/Leros/backend/pkg/leros"
 	"gopkg.in/yaml.v3"
 )
 
@@ -77,12 +77,12 @@ type RemoveFileRequest struct {
 	FilePath string
 }
 
-// DefaultSkillRoot 返回 $SINGEROS_HOME/skills，未设置时返回 ~/.singeros/skills。
+// DefaultSkillRoot 返回 $LEROS_HOME/skills，未设置时返回 ~/.leros/skills。
 func DefaultSkillRoot() (string, error) {
-	return singeros.SkillsDir()
+	return leros.SkillsDir()
 }
 
-// NewSkillStore 创建以 rootDir 为根目录的 SkillStore；rootDir 为空时使用默认 SingerOS skills 根目录。
+// NewSkillStore 创建以 rootDir 为根目录的 SkillStore；rootDir 为空时使用默认 Leros skills 根目录。
 func NewSkillStore(rootDir string) (*SkillStore, error) {
 	rootDir = strings.TrimSpace(rootDir)
 	if rootDir == "" {

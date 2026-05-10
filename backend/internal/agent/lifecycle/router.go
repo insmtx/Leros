@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/insmtx/SingerOS/backend/internal/agent"
+	"github.com/insmtx/Leros/backend/internal/agent"
 )
 
 // RuntimeRouter 在注册 runtime 时统一套用 Agent 生命周期。

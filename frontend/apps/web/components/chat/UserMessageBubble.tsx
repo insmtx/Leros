@@ -1,8 +1,8 @@
 "use client";
 
-import { formatTime } from "@singeros/store";
-import type { Message } from "@singeros/store/types/chat";
-import { Button } from "@singeros/ui/components/ui/button";
+import { formatTime } from "@leros/store";
+import type { Message } from "@leros/store/types/chat";
+import { Button } from "@leros/ui/components/ui/button";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
