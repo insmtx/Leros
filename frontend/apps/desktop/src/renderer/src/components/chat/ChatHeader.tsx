@@ -1,8 +1,8 @@
 "use client";
 
-import { useChatStore, useLayoutStore } from "@singeros/store";
-import { Avatar, AvatarFallback } from "@singeros/ui/components/ui/avatar";
-import { Button } from "@singeros/ui/components/ui/button";
+import { useChatStore, useLayoutStore } from "@leros/store";
+import { Avatar, AvatarFallback } from "@leros/ui/components/ui/avatar";
+import { Button } from "@leros/ui/components/ui/button";
 import { Ellipsis, FileText, Plus, Search, Settings, Share2 } from "lucide-react";
 
 export function ChatHeader() {

@@ -8,9 +8,9 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
-	localauth "github.com/insmtx/SingerOS/backend/internal/api/auth"
-	"github.com/insmtx/SingerOS/backend/internal/infra/db"
-	"github.com/insmtx/SingerOS/backend/types"
+	localauth "github.com/insmtx/Leros/backend/internal/api/auth"
+	"github.com/insmtx/Leros/backend/internal/infra/db"
+	"github.com/insmtx/Leros/backend/types"
 	ygauth "github.com/ygpkg/yg-go/apis/runtime/auth"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

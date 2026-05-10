@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	"github.com/insmtx/SingerOS/backend/internal/agent/singeros"
-	localmemory "github.com/insmtx/SingerOS/backend/internal/memory/local"
-	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	"github.com/insmtx/Leros/backend/internal/agent/leros"
+	localmemory "github.com/insmtx/Leros/backend/internal/memory/local"
+	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
 )
 
 // ContextBuilder 统一为内部 Agent 和外部 CLI 构建运行上下文。
@@ -26,7 +26,7 @@ type RuntimeProvider interface {
 func NewContextBuilder(cfg ContextBuilder) *ContextBuilder {
 	base := strings.TrimSpace(cfg.BaseSystemPrompt)
 	if base == "" {
-		base = singeros.DefaultSystemPrompt()
+		base = leros.DefaultSystemPrompt()
 	}
 	return &ContextBuilder{
 		BaseSystemPrompt: base,

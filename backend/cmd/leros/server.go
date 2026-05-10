@@ -1,6 +1,6 @@
-// @title SingerOS API
+// @title Leros API
 // @version 1.0
-// @description SingerOS 数字助手平台 API，提供数字助手管理、技能调用、事件处理等功能
+// @description Leros 数字助手平台 API，提供数字助手管理、技能调用、事件处理等功能
 // @host localhost:8080
 // @BasePath /v1
 // @schemes http https
@@ -10,10 +10,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/internal/api"
-	infradb "github.com/insmtx/SingerOS/backend/internal/infra/db"
-	"github.com/insmtx/SingerOS/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/internal/api"
+	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
+	"github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/spf13/cobra"
 	ygconfig "github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/lifecycle"
@@ -27,7 +27,7 @@ var (
 
 var serverCmd = &cobra.Command{
 	Use:   "server",
-	Short: "Start the SingerOS backend HTTP server",
+	Short: "Start the Leros backend HTTP server",
 	Long:  `Start the HTTP server that handles API requests and publishes external events.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg, err := loadConfig(serverConfigPath)
@@ -70,7 +70,7 @@ var serverCmd = &cobra.Command{
 			Handler: r,
 		}
 
-		logs.Info("Starting SingerOS backend service...")
+		logs.Info("Starting Leros backend service...")
 		logs.Infof("Listening on %s", srv.Addr)
 
 		go func() {

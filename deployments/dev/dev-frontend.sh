@@ -9,7 +9,7 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}Starting SingerOS Dev Frontend...${NC}"
+echo -e "${BLUE}Starting Leros Dev Frontend...${NC}"
 
 if [ ! -d "$ROOT_DIR/frontend" ]; then
     echo -e "${RED}Error: Frontend directory not found at: $ROOT_DIR/frontend${NC}"

@@ -27,13 +27,13 @@ func (m *Manifest) Normalize(defaultName string) {
 	}
 }
 
-// ManifestMetadata 存储 SingerOS 专用的元数据扩展。
+// ManifestMetadata 存储 Leros 专用的元数据扩展。
 type ManifestMetadata struct {
-	SingerOS SingerOSMetadata `yaml:"singeros,omitempty"`
+	Leros LerosMetadata `yaml:"leros,omitempty"`
 }
 
-// SingerOSMetadata 存储运行时使用的第一组 Skill 路由提示。
-type SingerOSMetadata struct {
+// LerosMetadata 存储运行时使用的第一组 Skill 路由提示。
+type LerosMetadata struct {
 	Category      string   `yaml:"category,omitempty"`
 	Tags          []string `yaml:"tags,omitempty"`
 	Always        bool     `yaml:"always,omitempty"`
@@ -65,10 +65,10 @@ func (e *Entry) Summary() Summary {
 		Name:          e.Manifest.Name,
 		Description:   e.Manifest.Description,
 		Version:       e.Manifest.Version,
-		Category:      e.Manifest.Metadata.SingerOS.Category,
-		Tags:          e.Manifest.Metadata.SingerOS.Tags,
-		Always:        e.Manifest.Metadata.SingerOS.Always,
-		RequiresTools: e.Manifest.Metadata.SingerOS.RequiresTools,
+		Category:      e.Manifest.Metadata.Leros.Category,
+		Tags:          e.Manifest.Metadata.Leros.Tags,
+		Always:        e.Manifest.Metadata.Leros.Always,
+		RequiresTools: e.Manifest.Metadata.Leros.RequiresTools,
 	}
 }
 

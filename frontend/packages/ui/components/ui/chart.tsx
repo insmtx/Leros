@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@singeros/ui/lib/utils";
+import { cn } from "@leros/ui/lib/utils";
 import * as React from "react";
 import * as RechartsPrimitive from "recharts";
 

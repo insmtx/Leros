@@ -6,7 +6,7 @@ import (
 	"context"
 	"time"
 
-	runtimeevents "github.com/insmtx/SingerOS/backend/runtime/events"
+	runtimeevents "github.com/insmtx/Leros/backend/runtime/events"
 )
 
 const (

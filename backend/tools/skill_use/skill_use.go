@@ -1,4 +1,4 @@
-// Package skilluse provides the runtime tool for loading SingerOS skill documents.
+// Package skilluse provides the runtime tool for loading Leros skill documents.
 package skilluse
 
 import (
@@ -8,8 +8,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
-	"github.com/insmtx/SingerOS/backend/tools"
+	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
+	"github.com/insmtx/Leros/backend/tools"
 )
 
 const (
@@ -187,10 +187,10 @@ func getSkill(catalog skillcatalog.SkillCatalog, name string) map[string]interfa
 			"name":           entry.Manifest.Name,
 			"description":    entry.Manifest.Description,
 			"version":        entry.Manifest.Version,
-			"category":       entry.Manifest.Metadata.SingerOS.Category,
-			"tags":           entry.Manifest.Metadata.SingerOS.Tags,
-			"always":         entry.Manifest.Metadata.SingerOS.Always,
-			"requires_tools": entry.Manifest.Metadata.SingerOS.RequiresTools,
+			"category":       entry.Manifest.Metadata.Leros.Category,
+			"tags":           entry.Manifest.Metadata.Leros.Tags,
+			"always":         entry.Manifest.Metadata.Leros.Always,
+			"requires_tools": entry.Manifest.Metadata.Leros.RequiresTools,
 			"dir":            entry.Dir,
 			"path":           entry.Path,
 			"scope":          "catalog",

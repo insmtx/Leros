@@ -1,5 +1,5 @@
-// Package singeros provides shared SingerOS filesystem conventions.
-package singeros
+// Package leros provides shared Leros filesystem conventions.
+package leros
 
 import (
 	"fmt"
@@ -9,14 +9,14 @@ import (
 )
 
 const (
-	// EnvHome is the worker-local root used for SingerOS state.
-	EnvHome = "SINGEROS_HOME"
+	// EnvHome is the worker-local root used for Leros state.
+	EnvHome = "LEROS_HOME"
 
 	// DefaultHomeDirName is the fallback directory under the current user's home.
-	DefaultHomeDirName = ".singeros"
+	DefaultHomeDirName = ".leros"
 )
 
-// HomeDir returns $SINGEROS_HOME, or ~/.singeros when unset.
+// HomeDir returns $LEROS_HOME, or ~/.leros when unset.
 func HomeDir() (string, error) {
 	home := strings.TrimSpace(os.Getenv(EnvHome))
 	if home == "" {
@@ -37,7 +37,7 @@ func HomeDir() (string, error) {
 	return absolute, nil
 }
 
-// JoinHome joins path elements under the SingerOS home directory.
+// JoinHome joins path elements under the Leros home directory.
 func JoinHome(elem ...string) (string, error) {
 	home, err := HomeDir()
 	if err != nil {
@@ -47,12 +47,12 @@ func JoinHome(elem ...string) (string, error) {
 	return filepath.Join(parts...), nil
 }
 
-// SkillsDir returns the default SingerOS skills directory.
+// SkillsDir returns the default Leros skills directory.
 func SkillsDir() (string, error) {
 	return JoinHome("skills")
 }
 
-// MemoryDir returns the default SingerOS memory directory.
+// MemoryDir returns the default Leros memory directory.
 func MemoryDir() (string, error) {
 	return JoinHome("memory")
 }

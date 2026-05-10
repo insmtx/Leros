@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/insmtx/SingerOS/backend/config"
-	agentruntime "github.com/insmtx/SingerOS/backend/internal/agent/runtime"
-	"github.com/insmtx/SingerOS/backend/internal/infra/mq"
-	"github.com/insmtx/SingerOS/backend/internal/worker/taskconsumer"
+	"github.com/insmtx/Leros/backend/config"
+	agentruntime "github.com/insmtx/Leros/backend/internal/agent/runtime"
+	"github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/internal/worker/taskconsumer"
 	"github.com/spf13/cobra"
 	"github.com/ygpkg/yg-go/lifecycle"
 	"github.com/ygpkg/yg-go/logs"
@@ -19,7 +19,7 @@ var claudeWorkerCmd = &cobra.Command{
 	Use:     "agent-worker",
 	Aliases: []string{"claude-worker"},
 	Short:   "Start a standalone task worker backed by available agent runtimes",
-	Long:    `Start a standalone SingerOS worker that subscribes to org.{org_id}.worker.{worker_id}.task and executes agent.run tasks through the configured default agent runtime.`,
+	Long:    `Start a standalone Leros worker that subscribes to org.{org_id}.worker.{worker_id}.task and executes agent.run tasks through the configured default agent runtime.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		runTaskWorker(workerDefaultRuntime)
 	},
@@ -30,7 +30,7 @@ func init() {
 	claudeWorkerCmd.Flags().StringVar(&workerServerAddr, "server-addr", "127.0.0.1:8080", "Server address for WebSocket connection")
 	claudeWorkerCmd.Flags().StringVar(&workerListenAddr, "listen-addr", ":8081", "Worker MCP server listen address for runtime bootstrap")
 	claudeWorkerCmd.Flags().StringVar(&workerWorkerID, "worker-id", "", "Worker ID for configuration retrieval")
-	claudeWorkerCmd.Flags().StringVar(&workerDefaultRuntime, "default-runtime", "", "Default agent runtime kind, for example singeros, claude, or codex")
+	claudeWorkerCmd.Flags().StringVar(&workerDefaultRuntime, "default-runtime", "", "Default agent runtime kind, for example leros, claude, or codex")
 	rootCmd.AddCommand(claudeWorkerCmd)
 }
 

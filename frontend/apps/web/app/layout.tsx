@@ -1,6 +1,6 @@
-import { ThemeProvider } from "@singeros/ui/components/common/theme-provider";
-import { Toaster } from "@singeros/ui/components/ui/sonner";
-import { cn } from "@singeros/ui/lib/utils";
+import { ThemeProvider } from "@leros/ui/components/common/theme-provider";
+import { Toaster } from "@leros/ui/components/ui/sonner";
+import { cn } from "@leros/ui/lib/utils";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -11,7 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-	title: "SingerOS",
+	title: "Leros",
 	description: "AI OS for Software Engineering",
 };
 

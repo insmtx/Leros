@@ -1,4 +1,4 @@
-# SingerOS Development Configuration - Server
+# Leros Development Configuration - Server
 
 server:
   port: 8080

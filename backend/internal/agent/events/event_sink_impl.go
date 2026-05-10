@@ -1,6 +1,6 @@
 package events
 
-import runtimeevents "github.com/insmtx/SingerOS/backend/runtime/events"
+import runtimeevents "github.com/insmtx/Leros/backend/runtime/events"
 
 // SinkFunc adapts a function into an EventSink.
 type SinkFunc = runtimeevents.SinkFunc

@@ -1,4 +1,4 @@
-// Package local implements SingerOS built-in file-backed memory.
+// Package local implements Leros built-in file-backed memory.
 package local
 
 import (
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/insmtx/SingerOS/backend/pkg/singeros"
+	"github.com/insmtx/Leros/backend/pkg/leros"
 )
 
 const (
@@ -101,9 +101,9 @@ func MustDefaultStore() *Store {
 	return store
 }
 
-// DefaultMemoryRoot returns $SINGEROS_HOME/memory, or ~/.singeros/memory when unset.
+// DefaultMemoryRoot returns $LEROS_HOME/memory, or ~/.leros/memory when unset.
 func DefaultMemoryRoot() (string, error) {
-	return singeros.MemoryDir()
+	return leros.MemoryDir()
 }
 
 // RootDir returns the memory directory containing USER.md and MEMORY.md.

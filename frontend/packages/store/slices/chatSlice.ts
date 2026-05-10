@@ -1,4 +1,4 @@
-import { FetchSSEClient } from "@singeros/ui/lib/fetch-sse";
+import { FetchSSEClient } from "@leros/ui/lib/fetch-sse";
 import { API_BASE_URL } from "../api/config";
 import { sessionApi } from "../api/sessionApi";
 import type { BackendMessage, BackendToolCall, SSEMessageEvent } from "../api/types";

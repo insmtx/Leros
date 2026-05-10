@@ -1,5 +1,5 @@
 {
-  "extends": "@singeros/tsconfig/react-library.json",
+  "extends": "@leros/tsconfig/react-library.json",
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {

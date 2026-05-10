@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	// RuntimeKindSingerOS is the built-in SingerOS agent runtime.
-	RuntimeKindSingerOS = "singeros"
+	// RuntimeKindLeros is the built-in Leros agent runtime.
+	RuntimeKindLeros = "leros"
 )
 
 // RuntimeRouter 根据请求选择具体 runtime。

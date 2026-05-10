@@ -8,8 +8,8 @@ import (
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
-	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
-	"github.com/insmtx/SingerOS/backend/tools"
+	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/tools"
 )
 
 func TestFlowGenerate(t *testing.T) {
@@ -32,7 +32,7 @@ func TestFlowGenerate(t *testing.T) {
 		Model:        model,
 		ToolAdapter:  adapter,
 		Binding:      ToolBinding{ToolContext: tools.ToolContext{UserID: "u1"}},
-		SystemPrompt: "You are SingerOS.\n\nAvailable skills:\n- github-pr-review: Review pull requests.",
+		SystemPrompt: "You are Leros.\n\nAvailable skills:\n- github-pr-review: Review pull requests.",
 	})
 	if err != nil {
 		t.Fatalf("new flow: %v", err)
@@ -59,7 +59,7 @@ func TestFlowGenerate(t *testing.T) {
 		if strings.Contains(call[0].Content, "Available tools:") {
 			t.Fatalf("tool summary should not be injected into system prompt: %s", call[0].Content)
 		}
-		if strings.Contains(call[0].Content, "You are SingerOS.") && strings.Contains(call[0].Content, "Available skills:") {
+		if strings.Contains(call[0].Content, "You are Leros.") && strings.Contains(call[0].Content, "Available skills:") {
 			foundSystemPrompt = true
 			break
 		}

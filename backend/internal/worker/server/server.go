@@ -9,8 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	infradb "github.com/insmtx/SingerOS/backend/internal/infra/db"
-	"github.com/insmtx/SingerOS/backend/internal/worker"
+	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
+	"github.com/insmtx/Leros/backend/internal/worker"
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
 )
@@ -98,7 +98,7 @@ func (s *WorkerManager) handleWorkerWebSocket(c *gin.Context) {
 	welcomeMsg := map[string]interface{}{
 		"type": "welcome",
 		"payload": map[string]interface{}{
-			"message":   "Connected to SingerOS worker server",
+			"message":   "Connected to Leros worker server",
 			"worker_id": workerID,
 		},
 	}

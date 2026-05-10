@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
-	eventbus "github.com/insmtx/SingerOS/backend/internal/infra/mq"
-	"github.com/insmtx/SingerOS/backend/pkg/dm"
+	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/pkg/dm"
 	"github.com/ygpkg/yg-go/logs"
 )
 

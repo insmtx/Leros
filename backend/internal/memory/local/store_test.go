@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/insmtx/SingerOS/backend/pkg/singeros"
+	"github.com/insmtx/Leros/backend/pkg/leros"
 )
 
 func TestStoreAddReplaceRemove(t *testing.T) {
@@ -53,7 +53,7 @@ func TestStoreBuildPromptBlock(t *testing.T) {
 	if _, err := store.Add(context.Background(), TargetUser, "用户偏好中文回复"); err != nil {
 		t.Fatalf("add user: %v", err)
 	}
-	if _, err := store.Add(context.Background(), TargetMemory, "SingerOS 提交信息使用中文约定式提交"); err != nil {
+	if _, err := store.Add(context.Background(), TargetMemory, "Leros 提交信息使用中文约定式提交"); err != nil {
 		t.Fatalf("add memory: %v", err)
 	}
 
@@ -66,7 +66,7 @@ func TestStoreBuildPromptBlock(t *testing.T) {
 		"User Memory:",
 		"Worker Memory:",
 		"用户偏好中文回复",
-		"SingerOS 提交信息使用中文约定式提交",
+		"Leros 提交信息使用中文约定式提交",
 	} {
 		if !strings.Contains(block, expected) {
 			t.Fatalf("expected prompt block to contain %q, got %s", expected, block)
@@ -74,9 +74,9 @@ func TestStoreBuildPromptBlock(t *testing.T) {
 	}
 }
 
-func TestDefaultMemoryRootUsesSingerOSHome(t *testing.T) {
+func TestDefaultMemoryRootUsesLerosHome(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv(singeros.EnvHome, tempDir)
+	t.Setenv(leros.EnvHome, tempDir)
 
 	root, err := DefaultMemoryRoot()
 	if err != nil {

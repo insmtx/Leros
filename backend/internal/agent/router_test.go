@@ -10,21 +10,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
-	"github.com/insmtx/SingerOS/backend/internal/agent/externalcli"
-	"github.com/insmtx/SingerOS/backend/runtime/engines"
-	"github.com/insmtx/SingerOS/backend/runtime/engines/claude"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/internal/agent/externalcli"
+	"github.com/insmtx/Leros/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/runtime/engines/claude"
 )
 
 func TestRuntimeRouterUsesRequestedRuntime(t *testing.T) {
-	router := agent.NewRuntimeRouter(agent.RuntimeKindSingerOS)
+	router := agent.NewRuntimeRouter(agent.RuntimeKindLeros)
 	singerRunner := &testRunner{message: "singer"}
 	codexRunner := &testRunner{message: "codex"}
 
-	if err := router.Register(agent.RuntimeKindSingerOS, singerRunner); err != nil {
-		t.Fatalf("register singeros: %v", err)
+	if err := router.Register(agent.RuntimeKindLeros, singerRunner); err != nil {
+		t.Fatalf("register leros: %v", err)
 	}
 	if err := router.Register("codex", codexRunner); err != nil {
 		t.Fatalf("register codex: %v", err)
@@ -42,8 +42,8 @@ func TestRuntimeRouterUsesRequestedRuntime(t *testing.T) {
 }
 
 func TestRuntimeRouterUsesDefaultRuntime(t *testing.T) {
-	router := agent.NewRuntimeRouter(agent.RuntimeKindSingerOS)
-	if err := router.Register(agent.RuntimeKindSingerOS, &testRunner{message: "default"}); err != nil {
+	router := agent.NewRuntimeRouter(agent.RuntimeKindLeros)
+	if err := router.Register(agent.RuntimeKindLeros, &testRunner{message: "default"}); err != nil {
 		t.Fatalf("register default: %v", err)
 	}
 
@@ -69,7 +69,7 @@ func (r *testRunner) Run(_ context.Context, req *agent.RequestContext) (*agent.R
 	}, nil
 }
 
-func TestRuntimeRouterClaudeRunnerCallsSingerOSEchoTool(t *testing.T) {
+func TestRuntimeRouterClaudeRunnerCallsLerosEchoTool(t *testing.T) {
 	claudePath, err := exec.LookPath("claude")
 	if err != nil {
 		t.Skipf("claude CLI not found in PATH: %v", err)
@@ -113,7 +113,7 @@ func TestRuntimeRouterClaudeRunnerCallsSingerOSEchoTool(t *testing.T) {
 		},
 		Input: agent.InputContext{
 			Type: agent.InputTypeTaskInstruction,
-			Text: `必须调用已配置的 SingerOS MCP 工具 singeros_echo，参数 message 使用 "hello from claude runner"。
+			Text: `必须调用已配置的 Leros MCP 工具 leros_echo，参数 message 使用 "hello from claude runner"。
 调用完成后，在最终答案中原样返回工具结果 JSON，并说明你已经完成工具调用。`,
 		},
 		Runtime: agent.RuntimeOptions{
@@ -139,7 +139,7 @@ func TestRuntimeRouterClaudeRunnerCallsSingerOSEchoTool(t *testing.T) {
 	if !strings.Contains(result.Message, "hello from claude runner") {
 		t.Fatalf("expected final result to include echo message, got %q", result.Message)
 	}
-	if !strings.Contains(result.Message, "SingerOS") {
+	if !strings.Contains(result.Message, "Leros") {
 		t.Fatalf("expected final result to include echo server name, got %q", result.Message)
 	}
 }
@@ -148,10 +148,10 @@ func loadRealLLMConfig(t *testing.T) *config.LLMConfig {
 	t.Helper()
 
 	llmConfig := &config.LLMConfig{
-		Provider: strings.TrimSpace(os.Getenv("SINGEROS_LLM_PROVIDER")),
-		APIKey:   strings.TrimSpace(os.Getenv("SINGEROS_LLM_API_KEY")),
-		Model:    strings.TrimSpace(os.Getenv("SINGEROS_LLM_MODEL")),
-		BaseURL:  strings.TrimSpace(os.Getenv("SINGEROS_LLM_BASE_URL")),
+		Provider: strings.TrimSpace(os.Getenv("LEROS_LLM_PROVIDER")),
+		APIKey:   strings.TrimSpace(os.Getenv("LEROS_LLM_API_KEY")),
+		Model:    strings.TrimSpace(os.Getenv("LEROS_LLM_MODEL")),
+		BaseURL:  strings.TrimSpace(os.Getenv("LEROS_LLM_BASE_URL")),
 	}
 	if llmConfig.APIKey == "" {
 		llmConfig.APIKey = strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))

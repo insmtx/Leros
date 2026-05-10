@@ -1,6 +1,6 @@
-# SingerOS 代码助手架构设计
+# Leros 代码助手架构设计
 
-本文档描述 SingerOS 中代码助手（CodeAssistantDigitalAssistant）相关的业务架构设计。
+本文档描述 Leros 中代码助手（CodeAssistantDigitalAssistant）相关的业务架构设计。
 
 ## 1. CodeAssistantDigitalAssistant
 

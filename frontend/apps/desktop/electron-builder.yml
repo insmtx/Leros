@@ -1,5 +1,5 @@
-appId: com.singeros.desktop
-productName: SingerOSDesktop
+appId: com.leros.desktop
+productName: LerosDesktop
 directories:
   buildResources: build
 files:

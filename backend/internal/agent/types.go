@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
+	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
 )
 
 // Runner 是数字员工单次运行的执行边界。
@@ -90,7 +90,7 @@ type AssistantContext struct {
 
 // ActorContext describes the human or system actor that initiated the run.
 type ActorContext struct {
-	// UserID 是 SingerOS 内部用户或调用主体标识。
+	// UserID 是 Leros 内部用户或调用主体标识。
 	UserID string `json:"user_id"`
 
 	// DisplayName 是调用主体的展示名称。
@@ -159,7 +159,7 @@ type Attachment struct {
 
 // RuntimeOptions controls runtime execution behavior.
 type RuntimeOptions struct {
-	// Kind 是本次运行选择的 runtime，例如 singeros、codex、claude。
+	// Kind 是本次运行选择的 runtime，例如 leros、codex、claude。
 	Kind string `json:"kind,omitempty"`
 
 	// WorkDir ： runtime 执行时使用的工作目录

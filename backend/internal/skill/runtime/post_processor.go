@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
-	skillstore "github.com/insmtx/SingerOS/backend/internal/skill/store"
-	"github.com/insmtx/SingerOS/backend/runtime/engines"
+	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
+	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
+	"github.com/insmtx/Leros/backend/runtime/engines"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -53,13 +53,13 @@ func (p *PostProcessor) run(action string) {
 		return
 	}
 	if p.sourceDir != "" {
-		if err := engines.SyncSingerOSSkillsFrom(p.sourceDir, nil); err != nil {
-			logs.Warnf("Sync SingerOS skills after %s failed: %v", action, err)
+		if err := engines.SyncLerosSkillsFrom(p.sourceDir, nil); err != nil {
+			logs.Warnf("Sync Leros skills after %s failed: %v", action, err)
 		}
 	}
 	if p.catalog != nil {
 		if err := p.catalog.Reload(context.Background()); err != nil {
-			logs.Warnf("Reload SingerOS skill catalog after %s failed: %v", action, err)
+			logs.Warnf("Reload Leros skill catalog after %s failed: %v", action, err)
 		}
 	}
 }

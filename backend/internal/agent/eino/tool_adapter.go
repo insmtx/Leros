@@ -9,13 +9,13 @@ import (
 
 	einotool "github.com/cloudwego/eino/components/tool"
 	einoschema "github.com/cloudwego/eino/schema"
-	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
-	"github.com/insmtx/SingerOS/backend/tools"
+	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/tools"
 )
 
 // ToolDefinition is the local bridge shape exported to an Eino integration layer.
 //
-// It intentionally mirrors only the fields we need from SingerOS tools so the
+// It intentionally mirrors only the fields we need from Leros tools so the
 // actual cloudwego/eino binding can be added later without changing registry
 // or runtime packages again.
 type ToolDefinition struct {
@@ -37,7 +37,7 @@ type ToolCallResult struct {
 	Output string
 }
 
-// ToolAdapter bridges SingerOS tool registry to an Eino-facing API.
+// ToolAdapter bridges Leros tool registry to an Eino-facing API.
 type ToolAdapter struct {
 	registry *tools.Registry
 }

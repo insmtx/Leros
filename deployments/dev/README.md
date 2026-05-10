@@ -1,6 +1,6 @@
-# SingerOS Development Environment
+# Leros Development Environment
 
-Docker Compose-based development environment for SingerOS with offset ports and independent component management.
+Docker Compose-based development environment for Leros with offset ports and independent component management.
 
 ## Quick Start
 

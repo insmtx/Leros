@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/insmtx/SingerOS/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/runtime/engines"
 )
 
 func TestAdapterAskCurrentTime(t *testing.T) {
@@ -16,9 +16,9 @@ func TestAdapterAskCurrentTime(t *testing.T) {
 	if err != nil {
 		t.Skip("codex CLI not found in PATH")
 	}
-	apiKey := firstNonEmptyEnv("SINGEROS_LLM_API_KEY")
+	apiKey := firstNonEmptyEnv("LEROS_LLM_API_KEY")
 	if apiKey == "" {
-		t.Skip("set SINGEROS_LLM_API_KEY to run the real codex adapter test")
+		t.Skip("set LEROS_LLM_API_KEY to run the real codex adapter test")
 	}
 
 	workDir, err := os.Getwd()
@@ -35,8 +35,8 @@ func TestAdapterAskCurrentTime(t *testing.T) {
 		Model: engines.ModelConfig{
 			Provider: "openai",
 			APIKey:   apiKey,
-			Model:    firstNonEmptyEnv("SINGEROS_LLM_MODEL"),
-			BaseURL:  firstNonEmptyEnv("SINGEROS_LLM_BASE_URL"),
+			Model:    firstNonEmptyEnv("LEROS_LLM_MODEL"),
+			BaseURL:  firstNonEmptyEnv("LEROS_LLM_BASE_URL"),
 		},
 		Timeout: 2 * time.Minute,
 	})

@@ -1,20 +1,20 @@
-PROJECT := singeros
+PROJECT := leros
 REGISTRY ?= registry.yygu.cn/insmtx/
 
 .PHONY: build docker-build docker-push docker-compose-up docker-compose-down run run-foreground run-detached stop logs swagger swagger-clean dev-setup dev-server dev-worker dev-frontend
 
 build:
-	go build -v -o ./bundles/singer ./backend/cmd/singer/
+	go build -v -o ./bundles/leros ./backend/cmd/leros/
 
 docker-build:
-	docker build -t $(REGISTRY)$(PROJECT)-singer:latest -f deployments/build/Dockerfile.singer .
+	docker build -t $(REGISTRY)$(PROJECT)-leros:latest -f deployments/build/Dockerfile.leros .
 
 docker-push: docker-build
 	docker push $(REGISTRY)$(PROJECT)-singer:latest
 
-docker-run-singer:
-	-docker rm -f $(PROJECT)-singer-dev
-	docker run -d --name $(PROJECT)-singer-dev -p 8080:8080 $(REGISTRY)$(PROJECT)-singer:latest
+docker-run-leros:
+	-docker rm -f $(PROJECT)-leros-dev
+	docker run -d --name $(PROJECT)-leros-dev -p 8080:8080 $(REGISTRY)$(PROJECT)-leros:latest
 
 docker-compose-up: docker-build
 	docker tag $(REGISTRY)$(PROJECT)-singer:latest localhost/env_singer:latest
@@ -61,7 +61,7 @@ logs:
 .PHONY: swagger swagger-clean
 
 swagger:
-	swag init --parseDependency --generalInfo backend/cmd/singer/server.go --output docs/swagger --exclude example
+	cd backend/cmd/leros && swag init --parseDependency --generalInfo server.go --output ../../../docs/swagger --exclude example
 	sed -i '/LeftDelim/d; /RightDelim/d' docs/swagger/docs.go
 
 swagger-clean:
@@ -73,7 +73,7 @@ dev-setup:
 	cd deployments/dev && ./dev-setup.sh
 
 dev-server: build
-	./bundles/singer server --config deployments/dev/server.config.yaml
+	./bundles/leros server --config deployments/dev/server.config.yaml
 
 dev-worker:
 	cd deployments/dev && ./dev-worker.sh

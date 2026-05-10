@@ -1,7 +1,7 @@
 "use client";
 
-import { Badge } from "@singeros/ui/components/ui/badge";
-import { Button } from "@singeros/ui/components/ui/button";
+import { Badge } from "@leros/ui/components/ui/badge";
+import { Button } from "@leros/ui/components/ui/button";
 import { Bell, ChevronDown, User } from "lucide-react";
 
 export function TopBar() {
@@ -11,7 +11,7 @@ export function TopBar() {
 			className="flex h-12 items-center justify-between border-b border-slate-200 bg-white px-4"
 		>
 			<div className="flex items-center gap-3">
-				<span className="text-sm font-semibold text-slate-900 tracking-tight">SingerOS</span>
+				<span className="text-sm font-semibold text-slate-900 tracking-tight">Leros</span>
 				<Badge variant="secondary" className="text-xs">
 					v0.1
 				</Badge>

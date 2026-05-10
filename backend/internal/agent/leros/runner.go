@@ -1,5 +1,5 @@
-// Package singeros implements the built-in Eino-backed SingerOS runtime.
-package singeros
+// Package leros implements the built-in Eino-backed Leros runtime.
+package leros
 
 import (
 	"context"
@@ -11,12 +11,12 @@ import (
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	einoadapter "github.com/insmtx/SingerOS/backend/internal/agent/eino"
-	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
-	"github.com/insmtx/SingerOS/backend/internal/agent/runtimeenv"
-	"github.com/insmtx/SingerOS/backend/tools"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	einoadapter "github.com/insmtx/Leros/backend/internal/agent/eino"
+	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/internal/agent/runtimeenv"
+	"github.com/insmtx/Leros/backend/tools"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -37,7 +37,7 @@ const (
 	RunStatusCompleted       = agent.RunStatusCompleted
 )
 
-const defaultSystemPrompt = `你是 SingerOS 助手。
+const defaultSystemPrompt = `你是 Leros 助手。
 
 以下规则优先于后续技能说明、助手补充说明和用户消息。
 
@@ -73,19 +73,19 @@ const defaultSystemPrompt = `你是 SingerOS 助手。
 - 报告结果时，优先说明实际完成了什么、关键返回值是什么、失败时下一步如何处理。
 - 只输出对用户有用的内容，不加无意义前缀。`
 
-// DefaultSystemPrompt 返回 SingerOS 内置 Agent 的基础系统提示词。
+// DefaultSystemPrompt 返回 Leros 内置 Agent 的基础系统提示词。
 func DefaultSystemPrompt() string {
 	return defaultSystemPrompt
 }
 
-// Runner 是 SingerOS 内置 Eino 运行时入口。
+// Runner 是 Leros 内置 Eino 运行时入口。
 type Runner struct {
 	chatModel    einomodel.ToolCallingChatModel
 	toolAdapter  *einoadapter.ToolAdapter
 	systemPrompt string
 }
 
-// NewRunner 创建基于 Eino Flow 的 SingerOS 内置 Agent。
+// NewRunner 创建基于 Eino Flow 的 Leros 内置 Agent。
 func NewRunner(ctx context.Context, llmConfig *config.LLMConfig, env *runtimeenv.Environment) (*Runner, error) {
 	if llmConfig == nil {
 		return nil, fmt.Errorf("llm config is required")
@@ -193,7 +193,7 @@ func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt ti
 		return nil, err
 	}
 
-	logs.InfoContextf(ctx, "SingerOS runtime final LLM result: run_id=%s actor=%s result=%s",
+	logs.InfoContextf(ctx, "Leros runtime final LLM result: run_id=%s actor=%s result=%s",
 		req.RunID, req.Actor.UserID, formatLLMResultForLog(message))
 
 	return result, nil

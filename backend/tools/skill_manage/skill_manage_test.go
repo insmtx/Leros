@@ -6,14 +6,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	skillstore "github.com/insmtx/SingerOS/backend/internal/skill/store"
-	"github.com/insmtx/SingerOS/backend/pkg/singeros"
+	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
+	"github.com/insmtx/Leros/backend/pkg/leros"
 )
 
 func TestToolExecuteCreate(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv(singeros.EnvHome, filepath.Join(home, ".singeros"))
+	t.Setenv(leros.EnvHome, filepath.Join(home, ".leros"))
 
 	store, err := skillstore.NewSkillStore(t.TempDir())
 	if err != nil {

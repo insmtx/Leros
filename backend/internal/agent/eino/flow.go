@@ -12,10 +12,10 @@ import (
 	"github.com/cloudwego/eino/compose"
 	einoreact "github.com/cloudwego/eino/flow/agent/react"
 	einoschema "github.com/cloudwego/eino/schema"
-	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
+	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
 )
 
-// Flow wraps the Eino agent loop used by the SingerOS runtime agent.
+// Flow wraps the Eino agent loop used by the Leros runtime agent.
 type Flow struct {
 	agent *einoreact.Agent
 }
@@ -30,7 +30,7 @@ type FlowConfig struct {
 	MaxStep      int
 }
 
-// NewFlow creates a runnable Eino flow backed by SingerOS tool/runtime layers.
+// NewFlow creates a runnable Eino flow backed by Leros tool/runtime layers.
 func NewFlow(ctx context.Context, cfg *FlowConfig) (*Flow, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("flow config is required")

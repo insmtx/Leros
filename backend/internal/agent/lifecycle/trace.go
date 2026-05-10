@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
 )
 
 // RunTrace 记录一次运行中与自我学习判断相关的事实。

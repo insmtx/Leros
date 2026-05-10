@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	"github.com/insmtx/SingerOS/backend/internal/agent/externalcli"
-	"github.com/insmtx/SingerOS/backend/internal/agent/lifecycle"
-	"github.com/insmtx/SingerOS/backend/internal/agent/runtimeenv"
-	"github.com/insmtx/SingerOS/backend/internal/agent/singeros"
-	"github.com/insmtx/SingerOS/backend/runtime/engines/builtin"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	"github.com/insmtx/Leros/backend/internal/agent/externalcli"
+	"github.com/insmtx/Leros/backend/internal/agent/lifecycle"
+	"github.com/insmtx/Leros/backend/internal/agent/runtimeenv"
+	"github.com/insmtx/Leros/backend/internal/agent/leros"
+	"github.com/insmtx/Leros/backend/runtime/engines/builtin"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -64,10 +64,10 @@ func (s *Service) Environment() *runtimeenv.Environment {
 
 func (s *Service) buildRouter(ctx context.Context, opts Options) (agent.Runner, error) {
 	lifecycleBuilder := lifecycle.NewContextBuilder(lifecycle.ContextBuilder{
-		BaseSystemPrompt: singeros.DefaultSystemPrompt(),
+		BaseSystemPrompt: leros.DefaultSystemPrompt(),
 		Runtime:          s.env,
 	})
-	router := lifecycle.NewRuntimeRouter(agent.RuntimeKindSingerOS, lifecycleBuilder, s.env)
+	router := lifecycle.NewRuntimeRouter(agent.RuntimeKindLeros, lifecycleBuilder, s.env)
 
 	registered := 0
 	registeredKinds := make(map[string]struct{})
@@ -76,18 +76,18 @@ func (s *Service) buildRouter(ctx context.Context, opts Options) (agent.Runner, 
 	if opts.LLMConfig != nil && opts.LLMConfig.APIKey != "" {
 		switch opts.LLMConfig.Provider {
 		case "", "openai":
-			logs.Info("Registering SingerOS agent runtime")
-			singerRunner, err := singeros.NewRunner(ctx, opts.LLMConfig, s.env)
+			logs.Info("Registering Leros agent runtime")
+			singerRunner, err := leros.NewRunner(ctx, opts.LLMConfig, s.env)
 			if err != nil {
 				return nil, err
 			}
-			if err := router.Register(agent.RuntimeKindSingerOS, singerRunner); err != nil {
+			if err := router.Register(agent.RuntimeKindLeros, singerRunner); err != nil {
 				return nil, err
 			}
 			registered++
-			registeredKinds[agent.RuntimeKindSingerOS] = struct{}{}
+			registeredKinds[agent.RuntimeKindLeros] = struct{}{}
 		default:
-			logs.Warnf("Skipping SingerOS agent runtime for unsupported Eino chat model provider: %s", opts.LLMConfig.Provider)
+			logs.Warnf("Skipping Leros agent runtime for unsupported Eino chat model provider: %s", opts.LLMConfig.Provider)
 		}
 	}
 
@@ -121,7 +121,7 @@ func (s *Service) buildRouter(ctx context.Context, opts Options) (agent.Runner, 
 
 	selectedDefault := s.selectDefaultRuntime(opts.DefaultRuntime, opts, cliNames)
 	if selectedDefault == "" {
-		selectedDefault = agent.RuntimeKindSingerOS
+		selectedDefault = agent.RuntimeKindLeros
 	}
 	normalizedDefault := strings.ToLower(strings.TrimSpace(selectedDefault))
 	if _, ok := registeredKinds[normalizedDefault]; !ok {
@@ -142,7 +142,7 @@ func (s *Service) selectDefaultRuntime(defaultRuntime string, opts Options, cliN
 		return opts.CLIConfig.Default
 	}
 	if opts.LLMConfig != nil && opts.LLMConfig.APIKey != "" {
-		return agent.RuntimeKindSingerOS
+		return agent.RuntimeKindLeros
 	}
 	if len(cliNames) > 0 {
 		return cliNames[0]

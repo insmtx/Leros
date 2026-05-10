@@ -1,4 +1,4 @@
-// api 包提供 SingerOS 的 HTTP API 层
+// api 包提供 Leros 的 HTTP API 层
 //
 // 该包负责设置和管理 HTTP 路由，处理外部 API 请求，
 // 并注册各种渠道的连接器。
@@ -6,25 +6,25 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/insmtx/SingerOS/backend/config"
-	auth "github.com/insmtx/SingerOS/backend/internal/api/auth"
-	"github.com/insmtx/SingerOS/backend/internal/api/connectors/github"
-	"github.com/insmtx/SingerOS/backend/internal/api/connectors/gitlab"
-	"github.com/insmtx/SingerOS/backend/internal/api/handler"
-	"github.com/insmtx/SingerOS/backend/internal/api/middleware"
-	eventbus "github.com/insmtx/SingerOS/backend/internal/infra/mq"
-	githubprovider "github.com/insmtx/SingerOS/backend/internal/infra/providers/github"
-	"github.com/insmtx/SingerOS/backend/internal/infra/websocket"
-	"github.com/insmtx/SingerOS/backend/internal/service"
-	"github.com/insmtx/SingerOS/backend/internal/worker/scheduler"
-	workerserver "github.com/insmtx/SingerOS/backend/internal/worker/server"
-	singerMCP "github.com/insmtx/SingerOS/backend/mcp"
+	"github.com/insmtx/Leros/backend/config"
+	auth "github.com/insmtx/Leros/backend/internal/api/auth"
+	"github.com/insmtx/Leros/backend/internal/api/connectors/github"
+	"github.com/insmtx/Leros/backend/internal/api/connectors/gitlab"
+	"github.com/insmtx/Leros/backend/internal/api/handler"
+	"github.com/insmtx/Leros/backend/internal/api/middleware"
+	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
+	githubprovider "github.com/insmtx/Leros/backend/internal/infra/providers/github"
+	"github.com/insmtx/Leros/backend/internal/infra/websocket"
+	"github.com/insmtx/Leros/backend/internal/service"
+	"github.com/insmtx/Leros/backend/internal/worker/scheduler"
+	workerserver "github.com/insmtx/Leros/backend/internal/worker/server"
+	singerMCP "github.com/insmtx/Leros/backend/mcp"
 	ygmiddleware "github.com/ygpkg/yg-go/apis/runtime/middleware"
 	"github.com/ygpkg/yg-go/logs"
 
 	"gorm.io/gorm"
 
-	_ "github.com/insmtx/SingerOS/docs/swagger" // Swagger 文档生成的导入
+	_ "github.com/insmtx/Leros/docs/swagger" // Swagger 文档生成的导入
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )

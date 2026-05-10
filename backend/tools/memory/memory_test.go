@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	localmemory "github.com/insmtx/SingerOS/backend/internal/memory/local"
+	localmemory "github.com/insmtx/Leros/backend/internal/memory/local"
 )
 
 func TestToolExecuteAdd(t *testing.T) {

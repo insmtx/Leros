@@ -6,8 +6,8 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
 )
 
 type mockRuntimeProvider struct {
@@ -25,7 +25,7 @@ func TestContextBuilderBuildSystemPromptIncludesSkillsAndSession(t *testing.T) {
 name: code-review
 description: Review code.
 metadata:
-  singeros:
+  leros:
     always: true
 ---
 Always inspect diffs first.`),

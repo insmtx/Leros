@@ -1,11 +1,11 @@
-package singeros
+package leros
 
 import (
 	"path/filepath"
 	"testing"
 )
 
-func TestHomeDirUsesSingerOSHome(t *testing.T) {
+func TestHomeDirUsesLerosHome(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv(EnvHome, root)
 
@@ -23,7 +23,7 @@ func TestHomeDirUsesSingerOSHome(t *testing.T) {
 	}
 }
 
-func TestHomeDirDefaultsToUserSingerOSDir(t *testing.T) {
+func TestHomeDirDefaultsToUserLerosDir(t *testing.T) {
 	userHome := t.TempDir()
 	t.Setenv(EnvHome, "")
 	t.Setenv("HOME", userHome)

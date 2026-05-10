@@ -26,7 +26,7 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 function ThemeProvider({
 	children,
 	defaultTheme = "system",
-	storageKey = "singeros-ui-theme",
+	storageKey = "leros-ui-theme",
 	...props
 }: ThemeProviderProps) {
 	const [theme, setTheme] = useState<Theme>(() => {

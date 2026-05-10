@@ -1,7 +1,7 @@
-// eventengine 包提供 SingerOS 的事件引擎功能
+// eventengine 包提供 Leros 的事件引擎功能
 //
 // 事件引擎负责从事件总线订阅事件，并根据事件类型分发到相应的处理器进行处理。
-// 是 SingerOS 事件驱动架构的核心组件。
+// 是 Leros 事件驱动架构的核心组件。
 package eventengine
 
 import (
@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	eventbus "github.com/insmtx/SingerOS/backend/internal/infra/mq"
-	interactionevent "github.com/insmtx/SingerOS/backend/pkg/event"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
+	interactionevent "github.com/insmtx/Leros/backend/pkg/event"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -162,7 +162,7 @@ func buildInteractionEventInput(event *interactionevent.Event) string {
 	contextMap := mapFromAny(event.Context)
 	payloadMap := mapFromAny(event.Payload)
 	sections := []string{
-		"You are handling an external event inside SingerOS.",
+		"You are handling an external event inside Leros.",
 		buildInteractionEventEnvelope(event),
 		buildInteractionEventTask(event.EventType),
 	}

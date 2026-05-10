@@ -1,9 +1,9 @@
 "use client";
 
-import { formatTime, useChatStore } from "@singeros/store";
-import type { Message } from "@singeros/store/types/chat";
-import { Avatar, AvatarFallback } from "@singeros/ui/components/ui/avatar";
-import { Button } from "@singeros/ui/components/ui/button";
+import { formatTime, useChatStore } from "@leros/store";
+import type { Message } from "@leros/store/types/chat";
+import { Avatar, AvatarFallback } from "@leros/ui/components/ui/avatar";
+import { Button } from "@leros/ui/components/ui/button";
 import { Check, Copy, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import Markdown from "react-markdown";

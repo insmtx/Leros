@@ -6,14 +6,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/insmtx/SingerOS/backend/pkg/singeros"
+	"github.com/insmtx/Leros/backend/pkg/leros"
 )
 
-func TestSyncBuiltinSkillsAlsoSyncsSingerOSUserSkills(t *testing.T) {
+func TestSyncBuiltinSkillsAlsoSyncsLerosUserSkills(t *testing.T) {
 	builtinRoot := t.TempDir()
 	targetRoot := t.TempDir()
 	singerOSHome := t.TempDir()
-	t.Setenv(singeros.EnvHome, singerOSHome)
+	t.Setenv(leros.EnvHome, singerOSHome)
 
 	writeSyncTestSkill(t, filepath.Join(builtinRoot, "review-flow"), "review-flow", "builtin body")
 	writeSyncTestSkill(t, filepath.Join(singerOSHome, "skills", "review-flow"), "review-flow", "user body")
@@ -31,10 +31,10 @@ func TestSyncBuiltinSkillsAlsoSyncsSingerOSUserSkills(t *testing.T) {
 	}
 }
 
-func TestSyncSingerOSSkillsNoopsWhenNoSourcesExist(t *testing.T) {
-	t.Setenv(singeros.EnvHome, filepath.Join(t.TempDir(), "missing"))
+func TestSyncLerosSkillsNoopsWhenNoSourcesExist(t *testing.T) {
+	t.Setenv(leros.EnvHome, filepath.Join(t.TempDir(), "missing"))
 
-	if err := SyncSingerOSSkills([]string{t.TempDir()}); err != nil {
+	if err := SyncLerosSkills([]string{t.TempDir()}); err != nil {
 		t.Fatalf("sync missing sources should no-op: %v", err)
 	}
 }
