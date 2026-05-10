@@ -1317,7 +1317,7 @@
                 "type": {
                     "type": "string"
                 },
-                "user_id": {
+                "uin": {
                     "type": "integer"
                 }
             }
@@ -1432,7 +1432,7 @@
                 "type": {
                     "type": "string"
                 },
-                "user_id": {
+                "uin": {
                     "type": "integer"
                 }
             }

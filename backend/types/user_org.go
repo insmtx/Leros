@@ -3,7 +3,7 @@ package types
 import "gorm.io/gorm"
 
 // TableNameUserOrg 用户组织关联表名
-const TableNameUserOrg = "user_orgs"
+const TableNameUserOrg = tablenamePrefix + "user_orgs"
 
 // UserOrg 表示用户与组织的关联关系
 //

@@ -33,7 +33,7 @@ func TestCreateSession(t *testing.T) {
 	session := &types.Session{
 		SessionID: "test_session_1",
 		Type:      string(types.SessionTypeUserChat),
-		UserID:    1,
+		Uin:       1,
 		Title:     "Test Session",
 	}
 
@@ -83,7 +83,7 @@ func TestGetSessionByID(t *testing.T) {
 	session := &types.Session{
 		SessionID: "get_by_id_test",
 		Type:      string(types.SessionTypeUserChat),
-		UserID:    1,
+		Uin:       1,
 		Title:     "Get By ID Test",
 	}
 

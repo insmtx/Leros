@@ -1319,7 +1319,7 @@ const docTemplate = `{
                 "type": {
                     "type": "string"
                 },
-                "user_id": {
+                "uin": {
                     "type": "integer"
                 }
             }
@@ -1434,7 +1434,7 @@ const docTemplate = `{
                 "type": {
                     "type": "string"
                 },
-                "user_id": {
+                "uin": {
                     "type": "integer"
                 }
             }

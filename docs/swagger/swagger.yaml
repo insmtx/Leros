@@ -206,7 +206,7 @@ definitions:
         type: string
       type:
         type: string
-      user_id:
+      uin:
         type: integer
     required:
     - type
@@ -283,7 +283,7 @@ definitions:
         type: string
       type:
         type: string
-      user_id:
+      uin:
         type: integer
     type: object
   github_com_insmtx_SingerOS_backend_internal_api_contract.MemoryConfig:

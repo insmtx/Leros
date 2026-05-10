@@ -10,7 +10,7 @@ import (
 type CreateSessionRequest struct {
 	SessionID     string                       `json:"session_id,omitempty"`
 	Type          string                       `json:"type" binding:"required"`
-	UserID        uint                         `json:"user_id,omitempty"`
+	Uin           uint                         `json:"uin,omitempty"`
 	AssistantID   uint                         `json:"assistant_id,omitempty"`
 	AssistantCode string                       `json:"assistant_code,omitempty"`
 	Title         string                       `json:"title,omitempty"`
@@ -29,7 +29,7 @@ type UpdateSessionRequest struct {
 type ListSessionsRequest struct {
 	Type          *string `form:"type,omitempty"`
 	Status        *string `form:"status,omitempty"`
-	UserID        *uint   `form:"user_id,omitempty"`
+	Uin           *uint   `form:"uin,omitempty"`
 	AssistantID   *uint   `form:"assistant_id,omitempty"`
 	AssistantCode *string `form:"assistant_code,omitempty"`
 	Keyword       *string `form:"keyword,omitempty"`
@@ -54,7 +54,7 @@ type Session struct {
 	ID            uint                      `json:"id"`
 	SessionID     string                    `json:"session_id"`
 	Type          string                    `json:"type"`
-	UserID        uint                      `json:"user_id"`
+	Uin           uint                      `json:"uin"`
 	AssistantID   uint                      `json:"assistant_id"`
 	AssistantCode string                    `json:"assistant_code"`
 	Status        string                    `json:"status"`
