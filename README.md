@@ -2,7 +2,7 @@
 
 ## Enterprise Digital Workforce Operating System
 
-> Build, orchestrate and govern AI-powered digital employees for enterprise.
+> Build, orchestrate and govern AI-powered digital assistants for enterprise.
 
 ---
 
@@ -19,7 +19,7 @@ Leros is:
 
 Leros enables organizations to:
 
-* Design AI-powered digital employees
+* Design AI-powered digital assistants
 * Orchestrate multi-agent workflows
 * Govern skills, models, and permissions
 * Run intelligent task execution pipelines
@@ -71,7 +71,7 @@ Leros is designed for:
 
 ### Enterprise Internal Digital Transformation
 
-* Digital employees for operations
+* Digital assistants for operations
 * Intelligent approval systems
 * Automated reporting
 * Cross-system workflow automation
@@ -176,13 +176,13 @@ Leros is NOT:
 
 Leros treats AI agents as:
 
-> First-class digital employees with governance, accountability, and operational boundaries.
+> First-class digital assistants with governance, accountability, and operational boundaries.
 
 We believe the future enterprise stack will include:
 
 * Human employees
 * Software systems
-* Digital employees (AI Agents)
+* Digital assistants (AI Agents)
 
 Leros is designed to operate the third category.
 
