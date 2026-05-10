@@ -17,7 +17,7 @@ func NewAdapter(binary string, extraEnv map[string]string) *Adapter {
 	if binary == "" {
 		binary = "codex"
 	}
-	return &Adapter{invoker: NewInvoker(binary, NewSessionStore(), extraEnv)}
+	return &Adapter{invoker: NewInvoker(binary, extraEnv)}
 }
 
 // Prepare 执行 Codex 工作区设置（当前为空实现）。

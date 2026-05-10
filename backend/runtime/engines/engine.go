@@ -19,6 +19,8 @@ const (
 const (
 	// EventStarted indicates that the external process has started.
 	EventStarted = runtimeevents.EventStarted
+	// EventProviderSessionStarted indicates that the provider created or exposed a native session ID.
+	EventProviderSessionStarted runtimeevents.EventType = "provider_session.started"
 	// EventMessageDelta indicates human-readable CLI output that can be streamed to callers.
 	EventMessageDelta = runtimeevents.EventMessageDelta
 	// EventResult indicates the final assistant result emitted by the CLI.
@@ -51,8 +53,8 @@ type ModelConfig struct {
 // RunRequest 包含执行一次外部 CLI 运行所需的全部输入。
 type RunRequest struct {
 	ExecutionID string        // 执行唯一标识
-	SessionID   string        // 会话 ID，用于恢复对话
-	Resume      bool          // 是否恢复之前的会话
+	SessionID   string        // provider 原生会话 ID，由上层 runtime 适配层解析
+	Resume      bool          // 是否恢复 provider 原生会话
 	WorkDir     string        // 工作目录
 	Prompt      string        // 输入提示
 	Model       ModelConfig   // 模型配置

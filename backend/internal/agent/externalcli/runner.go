@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/insmtx/SingerOS/backend/config"
 	"github.com/insmtx/SingerOS/backend/internal/agent"
 	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
@@ -17,9 +18,10 @@ import (
 
 // Runner 通过外部 Agent CLI 引擎执行 SingerOS 请求。
 type Runner struct {
-	name   string
-	engine engines.Engine
-	model  engines.ModelConfig
+	name         string
+	engine       engines.Engine
+	model        engines.ModelConfig
+	sessionStore ProviderSessionStore
 }
 
 // NewRunner 创建基于外部 CLI 引擎的 SingerOS runner。
@@ -32,9 +34,10 @@ func NewRunner(name string, engine engines.Engine, llmConfig *config.LLMConfig) 
 		return nil, fmt.Errorf("runtime %q engine is nil", name)
 	}
 	return &Runner{
-		name:   name,
-		engine: engine,
-		model:  modelFromConfig(llmConfig),
+		name:         name,
+		engine:       engine,
+		model:        modelFromConfig(llmConfig),
+		sessionStore: DefaultProviderSessionStore(),
 	}, nil
 }
 
@@ -62,8 +65,11 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 		return r.failedResult(ctx, emitter, req, startedAt, err, failureMetadata(workDir)), err
 	}
 
+	sessionPlan := r.resolveProviderSession(ctx, req, workDir)
 	handle, err := r.engine.Run(ctx, engines.RunRequest{
 		ExecutionID: req.RunID,
+		SessionID:   sessionPlan.ProviderSessionID,
+		Resume:      sessionPlan.Resume,
 		WorkDir:     workDir,
 		Prompt:      buildPrompt(req),
 		Model:       modelForRequest(req, r.model),
@@ -76,21 +82,26 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 		logs.InfoContextf(ctx, "External runtime %s started with pid %d", r.name, handle.Process.PID())
 	}
 
-	message, err := consumeEvents(ctx, emitter, handle)
+	consumeResult, err := consumeEvents(ctx, emitter, handle)
 	if err != nil {
+		r.markProviderSessionFailed(ctx, sessionPlan, err)
 		return r.failedResult(ctx, emitter, req, startedAt, err, failureMetadata(workDir)), err
 	}
+	r.persistProviderSession(ctx, sessionPlan, consumeResult.ProviderSessionID)
 
 	result := &agent.RunResult{
 		RunID:       req.RunID,
 		TraceID:     req.TraceID,
 		Status:      agent.RunStatusCompleted,
-		Message:     strings.TrimSpace(message),
+		Message:     strings.TrimSpace(consumeResult.Message),
 		StartedAt:   startedAt,
 		CompletedAt: time.Now().UTC(),
 		Metadata: map[string]any{
-			"runtime":  r.name,
-			"work_dir": workDir,
+			"runtime":     r.name,
+			"work_dir":    workDir,
+			"resume":      sessionPlan.Resume,
+			"session_id":  sessionPlan.InternalSessionID,
+			"provider_id": firstNonEmptyString(sessionPlan.ProviderSessionID, consumeResult.ProviderSessionID),
 		},
 	}
 	_ = emitter.Emit(ctx, &agentevents.RunEvent{
@@ -100,16 +111,26 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 	return result, nil
 }
 
-func consumeEvents(ctx context.Context, emitter *agentevents.Emitter, handle *engines.RunHandle) (string, error) {
+type consumeResult struct {
+	Message           string
+	ProviderSessionID string
+}
+
+func consumeEvents(ctx context.Context, emitter *agentevents.Emitter, handle *engines.RunHandle) (consumeResult, error) {
 	if handle == nil || handle.Events == nil {
-		return "", nil
+		return consumeResult{}, nil
 	}
 	var result strings.Builder
 	resultSeen := false
+	consumed := consumeResult{}
 	for event := range handle.Events {
 		switch event.Type {
 		case engines.EventStarted:
 			continue
+		case engines.EventProviderSessionStarted:
+			if strings.TrimSpace(event.Content) != "" {
+				consumed.ProviderSessionID = strings.TrimSpace(event.Content)
+			}
 		case engines.EventResult:
 			if strings.TrimSpace(event.Content) != "" {
 				result.Reset()
@@ -117,12 +138,15 @@ func consumeEvents(ctx context.Context, emitter *agentevents.Emitter, handle *en
 				resultSeen = true
 			}
 		case engines.EventDone:
-			return result.String(), nil
+			consumed.Message = result.String()
+			return consumed, nil
 		case engines.EventError:
 			if strings.TrimSpace(event.Content) == "" {
-				return result.String(), fmt.Errorf("external runtime failed")
+				consumed.Message = result.String()
+				return consumed, fmt.Errorf("external runtime failed")
 			}
-			return result.String(), fmt.Errorf("%s", event.Content)
+			consumed.Message = result.String()
+			return consumed, fmt.Errorf("%s", event.Content)
 		case engines.EventMessageDelta:
 			if strings.TrimSpace(event.Content) != "" {
 				_ = emitter.Emit(ctx, &agentevents.RunEvent{
@@ -141,7 +165,121 @@ func consumeEvents(ctx context.Context, emitter *agentevents.Emitter, handle *en
 			}
 		}
 	}
-	return result.String(), nil
+	consumed.Message = result.String()
+	return consumed, nil
+}
+
+type providerSessionPlan struct {
+	InternalSessionID string
+	ProviderSessionID string
+	Resume            bool
+	Key               ProviderSessionKey
+}
+
+func (r *Runner) resolveProviderSession(ctx context.Context, req *agent.RequestContext, workDir string) providerSessionPlan {
+	internalSessionID := internalSessionIDFromRequest(req)
+	plan := providerSessionPlan{
+		InternalSessionID: internalSessionID,
+		Key: ProviderSessionKey{
+			InternalSessionID: internalSessionID,
+			Provider:          r.name,
+			WorkDir:           workDir,
+			AssistantID:       req.Assistant.ID,
+		},
+	}
+	if internalSessionID == "" || r.sessionStore == nil {
+		return plan
+	}
+	binding, err := r.sessionStore.Get(ctx, plan.Key)
+	if err != nil {
+		logs.WarnContextf(ctx, "Resolve provider session failed: provider=%s session=%s error=%v", r.name, internalSessionID, err)
+		return plan
+	}
+	if binding != nil && strings.TrimSpace(binding.ProviderSessionID) != "" && binding.Status != providerSessionStatusFailed {
+		plan.ProviderSessionID = strings.TrimSpace(binding.ProviderSessionID)
+		plan.Resume = true
+		return plan
+	}
+	if canPreallocateProviderSessionID(r.name) {
+		plan.ProviderSessionID = uuid.NewString()
+	}
+	return plan
+}
+
+func (r *Runner) persistProviderSession(ctx context.Context, plan providerSessionPlan, observedProviderSessionID string) {
+	if r.sessionStore == nil || plan.InternalSessionID == "" {
+		return
+	}
+	providerSessionID := firstNonEmptyString(observedProviderSessionID, plan.ProviderSessionID)
+	if providerSessionID == "" {
+		return
+	}
+	if plan.Resume && providerSessionID == plan.ProviderSessionID {
+		return
+	}
+	if err := r.sessionStore.Upsert(ctx, &ProviderSessionBinding{
+		InternalSessionID: plan.InternalSessionID,
+		Provider:          plan.Key.Provider,
+		ProviderSessionID: providerSessionID,
+		WorkDir:           plan.Key.WorkDir,
+		AssistantID:       plan.Key.AssistantID,
+		Status:            providerSessionStatusActive,
+	}); err != nil {
+		logs.WarnContextf(ctx, "Store provider session failed: provider=%s session=%s provider_session=%s error=%v", plan.Key.Provider, plan.InternalSessionID, providerSessionID, err)
+	}
+}
+
+func (r *Runner) markProviderSessionFailed(ctx context.Context, plan providerSessionPlan, runErr error) {
+	if r.sessionStore == nil || plan.InternalSessionID == "" || plan.ProviderSessionID == "" || runErr == nil {
+		return
+	}
+	if err := r.sessionStore.MarkFailed(ctx, plan.Key, runErr.Error()); err != nil {
+		logs.WarnContextf(ctx, "Mark provider session failed: provider=%s session=%s error=%v", plan.Key.Provider, plan.InternalSessionID, err)
+	}
+}
+
+func internalSessionIDFromRequest(req *agent.RequestContext) string {
+	if req == nil {
+		return ""
+	}
+	if strings.TrimSpace(req.Conversation.ID) != "" {
+		return strings.TrimSpace(req.Conversation.ID)
+	}
+	if value := metadataString(req.Metadata, "session_id"); value != "" {
+		return value
+	}
+	return metadataString(req.Metadata, "sessionId")
+}
+
+func metadataString(metadata map[string]any, key string) string {
+	if len(metadata) == 0 {
+		return ""
+	}
+	value, ok := metadata[key]
+	if !ok {
+		return ""
+	}
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case fmt.Stringer:
+		return strings.TrimSpace(typed.String())
+	default:
+		return strings.TrimSpace(fmt.Sprint(typed))
+	}
+}
+
+func canPreallocateProviderSessionID(provider string) bool {
+	return strings.EqualFold(provider, engines.EngineClaude)
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func (r *Runner) failedResult(ctx context.Context, emitter *agentevents.Emitter, req *agent.RequestContext, startedAt time.Time, err error, metadata map[string]any) *agent.RunResult {
