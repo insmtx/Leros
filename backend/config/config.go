@@ -23,23 +23,17 @@ type Config struct {
 		Port string    `yaml:"port,omitempty"` // 服务器端口
 		JWT  JWTConfig `yaml:"jwt,omitempty"`  // JWT 认证配置
 	} `yaml:"server,omitempty"` // 服务器地址
-	Github       *GithubAppConfig `yaml:"github,omitempty"`
-	Gitlab       *GitlabAppConfig `yaml:"gitlab,omitempty"`
-	NATS         *NATSConfig      `yaml:"nats,omitempty"`
-	Database     *DatabaseConfig  `yaml:"database,omitempty"`
-	LLM          *LLMConfig       `yaml:"llm,omitempty"`
-	Scheduler    *SchedulerConfig `yaml:"scheduler,omitempty"`
-	Organization *OrgConfig       `yaml:"organization,omitempty"`
+	Github    *GithubAppConfig `yaml:"github,omitempty"`
+	Gitlab    *GitlabAppConfig `yaml:"gitlab,omitempty"`
+	NATS      *NATSConfig      `yaml:"nats,omitempty"`
+	Database  *DatabaseConfig  `yaml:"database,omitempty"`
+	LLM       *LLMConfig       `yaml:"llm,omitempty"`
+	Scheduler *SchedulerConfig `yaml:"scheduler,omitempty"`
 }
 
 // JWTConfig JWT 认证配置
 type JWTConfig struct {
 	Secret string `yaml:"secret,omitempty"` // JWT 签名密钥
-}
-
-// OrgConfig is the organization configuration structure
-type OrgConfig struct {
-	ID string `yaml:"id,omitempty"`
 }
 
 // DatabaseConfig 是数据库的配置结构

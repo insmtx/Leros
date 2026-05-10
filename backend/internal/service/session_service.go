@@ -18,6 +18,7 @@ import (
 	"github.com/insmtx/SingerOS/backend/runtime/events"
 	"github.com/insmtx/SingerOS/backend/types"
 	"github.com/ygpkg/yg-go/encryptor/snowflake"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 var _ contract.SessionService = (*sessionService)(nil)
@@ -25,20 +26,28 @@ var _ contract.SessionService = (*sessionService)(nil)
 type sessionService struct {
 	db         *gorm.DB
 	subscriber eventbus.Subscriber
-	orgID      string
 }
 
-func NewSessionService(db *gorm.DB, subscriber eventbus.Subscriber, orgID string) contract.SessionService {
+func NewSessionService(db *gorm.DB, subscriber eventbus.Subscriber) contract.SessionService {
 	return &sessionService{
 		db:         db,
 		subscriber: subscriber,
-		orgID:      orgID,
 	}
 }
 
 func (s *sessionService) CreateSession(ctx context.Context, req *contract.CreateSessionRequest) (*contract.Session, error) {
 	if req.Type == "" {
 		return nil, errors.New("type is required")
+	}
+
+	caller, _ := auth.FromContext(ctx)
+	if caller != nil {
+		if caller.Uin == 0 {
+			return nil, errors.New("user not authenticated or org not set")
+		}
+		req.Uin = caller.Uin
+	} else if req.Uin == 0 {
+		return nil, errors.New("uin is required when caller is not available")
 	}
 
 	sessionID := req.SessionID
@@ -372,13 +381,12 @@ func toJSONString(v interface{}) string {
 }
 
 func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID string, lastSequence int64, sink events.Sink) error {
-	// 优先从 Context 的 Caller 中获取 OrgID
 	caller, _ := auth.FromContext(ctx)
-	orgID := s.orgID
-	if caller != nil && caller.OrgID != 0 {
-		orgID = fmt.Sprintf("%d", caller.OrgID)
+	if caller == nil || caller.OrgID == 0 {
+		return errors.New("user not authenticated or org not set")
 	}
 
+	orgID := fmt.Sprintf("%d", caller.OrgID)
 	topic := dm.Topic().Org(orgID).Session(sessionID).Message().Stream().Build()
 	return s.subscriber.Subscribe(ctx, topic, func(event any) {
 		switch msg := event.(type) {
@@ -415,6 +423,7 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 			case dm.StreamEventRunFailed:
 				se.Type = dto.SessionEventTypeRunFailed
 			default:
+				logs.Warnf("unknown stream event type: %v", msg.Body.Event)
 				return
 			}
 			_ = sink.Emit(ctx, &events.Event{
