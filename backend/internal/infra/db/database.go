@@ -42,12 +42,7 @@ func InitDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	// 初始化默认组织
-	if err := InitDefaultOrg(db); err != nil {
-		return nil, fmt.Errorf("failed to init default org: %w", err)
-	}
-
-	// 初始化开发数据（默认用户、用户组织关联）
+	// 初始化开发数据（默认组织、用户、用户组织关联）
 	if err := InitDevData(db); err != nil {
 		return nil, fmt.Errorf("failed to init dev data: %w", err)
 	}
@@ -128,8 +123,12 @@ func InitDevData(db *gorm.DB) error {
 	if userOrgCount == 0 {
 		var user types.User
 		var org types.Organization
-		db.Where("github_login = ?", "admin").First(&user)
-		db.Where("code = ?", "default_org").First(&org)
+		if err := db.Where("github_login = ?", "admin").First(&user).Error; err != nil {
+			return fmt.Errorf("failed to find default user: %w", err)
+		}
+		if err := db.Where("code = ?", "default_org").First(&org).Error; err != nil {
+			return fmt.Errorf("failed to find default org: %w", err)
+		}
 
 		userOrg := &types.UserOrg{
 			Uin:       user.ID,
@@ -140,7 +139,7 @@ func InitDevData(db *gorm.DB) error {
 		if err := db.Create(userOrg).Error; err != nil {
 			return fmt.Errorf("failed to create default user-org: %w", err)
 		}
-		logs.Info("Default user-org association created")
+		logs.Infof("Default user-org association created (uin=%d, user_id=%d, org_id=%d)", userOrg.Uin, userOrg.UserID, userOrg.OrgID)
 	}
 
 	return nil

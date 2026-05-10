@@ -66,18 +66,14 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		workerScheduler := scheduler.NewProcessScheduler(cfg.Scheduler)
 
 		workerManager := workerserver.NewServer(workerScheduler, db)
-		workerManager.RegisterRoutes(v1)
+		workerManager.RegisterRoutes(r)
 		logs.Info("Worker server routes registered successfully")
 
 		digitalAssistantService := service.NewDigitalAssistantService(db, workerScheduler)
 		handler.RegisterDigitalAssistantRoutes(v1, digitalAssistantService)
 		logs.Info("Digital assistant routes registered successfully")
 
-		orgID := "default_org"
-		if cfg.Organization != nil && cfg.Organization.ID != "" {
-			orgID = cfg.Organization.ID
-		}
-		sessionService := service.NewSessionService(db, eventbus, orgID)
+		sessionService := service.NewSessionService(db, eventbus)
 		handler.RegisterSessionRoutes(v1, sessionService)
 		logs.Info("Session routes registered successfully")
 	}
