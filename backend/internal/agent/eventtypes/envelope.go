@@ -1,5 +1,5 @@
 // Package eventtypes defines domain message protocols for Leros services.
-// 
+//
 // This package contains message structures used for inter-service communication
 // via message queues (NATS JetStream). It separates message protocol definitions
 // from topic construction utilities (which remain in backend/pkg/dm).
