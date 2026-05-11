@@ -75,7 +75,7 @@ func ResumeSession(ctx context.Context, db *gorm.DB, id uint) error {
 func ExpireSessions(ctx context.Context, db *gorm.DB) error {
 	now := time.Now()
 	return db.WithContext(ctx).Model(&types.Session{}).
-		Where("status = ? AND expired_at IS NOT NULL AND expired_at <= ?", 
+		Where("status = ? AND expired_at IS NOT NULL AND expired_at <= ?",
 			string(types.SessionStatusActive), now).
 		Update("status", string(types.SessionStatusExpired)).Error
 }

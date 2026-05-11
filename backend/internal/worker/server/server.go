@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	infradb "github.com/insmtx/SingerOS/backend/internal/infra/db"
-	"github.com/insmtx/SingerOS/backend/internal/worker"
-	"github.com/insmtx/SingerOS/backend/internal/worker/wsproto"
+	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
+	"github.com/insmtx/Leros/backend/internal/worker"
+	"github.com/insmtx/Leros/backend/internal/worker/wsproto"
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
 )
@@ -95,14 +95,6 @@ func (s *WorkerManager) handleWorkerWebSocket(c *gin.Context) {
 
 	logs.Infof("Worker %s registered", workerID)
 
-<<<<<<< HEAD
-	welcomeMsg := map[string]interface{}{
-		"type": "welcome",
-		"payload": map[string]interface{}{
-			"message":   "Connected to Leros worker server",
-			"worker_id": workerID,
-		},
-=======
 	welcomeMsg, err := wsproto.NewPayload(wsproto.MsgTypeWelcome, wsproto.WelcomePayload{
 		Message:  "Connected to SingerOS worker server",
 		WorkerID: workerID,
@@ -110,7 +102,6 @@ func (s *WorkerManager) handleWorkerWebSocket(c *gin.Context) {
 	if err != nil {
 		logs.Errorf("Failed to create welcome payload: %v", err)
 		return
->>>>>>> eca7fe2 (refactor(worker): 使用类型安全的WebSocket消息结构体)
 	}
 	if err := w.SendWSMessage(welcomeMsg); err != nil {
 		logs.Errorf("Failed to send welcome message: %v", err)

@@ -33,8 +33,8 @@ func setupTestDB(t *testing.T) *gorm.DB {
 func setupTestUserOrg(t *testing.T, database *gorm.DB, uin uint, orgID uint) {
 	t.Helper()
 	userOrg := &types.UserOrg{
-		Uin:      uin,
-		OrgID:    orgID,
+		Uin:       uin,
+		OrgID:     orgID,
 		IsDefault: true,
 	}
 	if err := db.CreateUserOrg(context.Background(), database, userOrg); err != nil {

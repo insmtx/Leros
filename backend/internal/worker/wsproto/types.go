@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/insmtx/SingerOS/backend/types"
+	"github.com/insmtx/Leros/backend/types"
 )
 
 // WebSocket Message Type Constants
@@ -16,11 +16,11 @@ const (
 	MsgTypeWorkerStatus   = "worker_status"
 
 	// Server -> Client
-	MsgTypeWelcome         = "welcome"
-	MsgTypeHeartbeatAck    = "heartbeat_ack"
-	MsgTypeConfigResponse  = "configResponse"
-	MsgTypeShutdown        = "shutdown"
-	MsgTypeConfigUpdate    = "config_update"
+	MsgTypeWelcome        = "welcome"
+	MsgTypeHeartbeatAck   = "heartbeat_ack"
+	MsgTypeConfigResponse = "configResponse"
+	MsgTypeShutdown       = "shutdown"
+	MsgTypeConfigUpdate   = "config_update"
 )
 
 // WSMessage defines the standard WebSocket message structure

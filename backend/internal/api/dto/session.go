@@ -27,13 +27,13 @@ type MessageDeltaPayload struct {
 }
 
 type MessageCompletePayload struct {
-	ID       string                 `json:"id"`
-	Role     string                 `json:"role"`
-	Content  string                 `json:"content"`
-	Status   string                 `json:"status"`
+	ID        string                 `json:"id"`
+	Role      string                 `json:"role"`
+	Content   string                 `json:"content"`
+	Status    string                 `json:"status"`
 	ToolCalls []ToolCallResponse     `json:"tool_calls,omitempty"`
-	Thinking string                 `json:"thinking,omitempty"`
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Thinking  string                 `json:"thinking,omitempty"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
 type RunStatusPayload struct {

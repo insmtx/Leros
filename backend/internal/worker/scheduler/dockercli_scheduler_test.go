@@ -129,10 +129,10 @@ func TestBuildEnvVars(t *testing.T) {
 	env := scheduler.buildEnvVars(spec)
 
 	expected := map[string]string{
-		"APP_ENV":              "production",
-		"LOG_LEVEL":            "info",
-		"COMMON_KEY":           "worker_override",
-		"WORKER_KEY":           "worker_value",
+		"APP_ENV":           "production",
+		"LOG_LEVEL":         "info",
+		"COMMON_KEY":        "worker_override",
+		"WORKER_KEY":        "worker_value",
 		"LEROS_SERVER_ADDR": "localhost:8080",
 		"LEROS_WORKER_ID":   "worker-123",
 	}

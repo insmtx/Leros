@@ -502,8 +502,8 @@ func TestListSessions_FilterByType(t *testing.T) {
 
 	typeFilter := string(types.SessionTypeUserChat)
 	listReq := &contract.ListSessionsRequest{
-		Type: &typeFilter,
-		Page: 1,
+		Type:    &typeFilter,
+		Page:    1,
 		PerPage: 20,
 	}
 
@@ -545,8 +545,8 @@ func TestListSessions_FilterByStatus(t *testing.T) {
 
 	statusFilter := string(types.SessionStatusActive)
 	listReq := &contract.ListSessionsRequest{
-		Status: &statusFilter,
-		Page: 1,
+		Status:  &statusFilter,
+		Page:    1,
 		PerPage: 20,
 	}
 
