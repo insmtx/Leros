@@ -30,6 +30,12 @@ var workerCmd = &cobra.Command{
 	Use:   "worker",
 	Short: "Start the Leros background worker",
 	Long:  `Start the background worker service for processing asynchronous tasks and events.`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if workerWorkerID == "" {
+			return fmt.Errorf("worker-id is required")
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
 
@@ -46,11 +52,11 @@ var workerCmd = &cobra.Command{
 }
 
 func init() {
-	workerCmd.Flags().StringVar(&workerConfigPath, "config", "", "Configuration file path")
-	workerCmd.Flags().StringVar(&workerServerAddr, "server-addr", "127.0.0.1:8080", "Server address for WebSocket connection")
-	workerCmd.Flags().StringVar(&workerListenAddr, "listen-addr", ":8081", "Worker MCP server listen address for runtime bootstrap")
-	workerCmd.Flags().StringVar(&workerWorkerID, "worker-id", "", "Worker ID for configuration retrieval")
-	workerCmd.Flags().StringVar(&workerDefaultRuntime, "default-runtime", "", "Default agent runtime kind, for example leros, claude, or codex")
+	// workerCmd.PersistentFlags().StringVar(&workerConfigPath, "config", "", "Configuration file path")
+	workerCmd.PersistentFlags().StringVar(&workerServerAddr, "server-addr", "127.0.0.1:8080", "Server address for WebSocket connection")
+	workerCmd.PersistentFlags().StringVar(&workerListenAddr, "listen-addr", ":8081", "Worker MCP server listen address for runtime bootstrap")
+	workerCmd.PersistentFlags().StringVar(&workerWorkerID, "worker-id", "", "Worker ID for configuration retrieval")
+	workerCmd.PersistentFlags().StringVar(&workerDefaultRuntime, "default-runtime", "", "Default agent runtime kind, for example singeros, claude, or codex")
 	rootCmd.AddCommand(workerCmd)
 }
 

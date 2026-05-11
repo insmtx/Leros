@@ -75,8 +75,8 @@ dev-setup:
 dev-server: build
 	./bundles/leros server --config deployments/dev/server.config.yaml
 
-dev-worker:
-	cd deployments/dev && ./dev-worker.sh
+dev-worker: build
+	./bundles/singer worker --worker-id dev-worker-1
 
 dev-frontend:
 	cd deployments/dev && ./dev-frontend.sh
