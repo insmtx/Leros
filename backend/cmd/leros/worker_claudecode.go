@@ -26,11 +26,6 @@ var claudeWorkerCmd = &cobra.Command{
 }
 
 func init() {
-	claudeWorkerCmd.Flags().StringVar(&workerConfigPath, "config", "", "Configuration file path")
-	claudeWorkerCmd.Flags().StringVar(&workerServerAddr, "server-addr", "127.0.0.1:8080", "Server address for WebSocket connection")
-	claudeWorkerCmd.Flags().StringVar(&workerListenAddr, "listen-addr", ":8081", "Worker MCP server listen address for runtime bootstrap")
-	claudeWorkerCmd.Flags().StringVar(&workerWorkerID, "worker-id", "", "Worker ID for configuration retrieval")
-	claudeWorkerCmd.Flags().StringVar(&workerDefaultRuntime, "default-runtime", "", "Default agent runtime kind, for example leros, claude, or codex")
 	rootCmd.AddCommand(claudeWorkerCmd)
 }
 

@@ -6,5 +6,3 @@ import (
 
 type Worker = client.WorkerClient
 type WorkerConfig = client.WorkerConfig
-
-var NewWorker = client.NewWorker

@@ -1,24 +1,30 @@
 package server
 
 import (
+	"encoding/json"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/insmtx/SingerOS/backend/internal/worker/wsproto"
 )
 
 type WorkerConnection struct {
 	ID         string
 	Conn       *websocket.Conn
-	Send       chan map[string]interface{}
+	Send       chan *wsproto.WSMessage
 	Status     string
 	Registered time.Time
 	LastSeen   time.Time
 	mu         sync.RWMutex
 }
 
-func (wc *WorkerConnection) SendJSON(msg map[string]interface{}) error {
+func (wc *WorkerConnection) SendWSMessage(msg *wsproto.WSMessage) error {
 	wc.mu.RLock()
 	defer wc.mu.RUnlock()
-	return wc.Conn.WriteJSON(msg)
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	return wc.Conn.WriteMessage(websocket.TextMessage, data)
 }
