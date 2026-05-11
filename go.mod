@@ -22,8 +22,6 @@ require (
 	gorm.io/gorm v1.30.1
 )
 
-replace github.com/insmtx/Leros/proto => ./gen/github.com/insmtx/Leros/proto
-
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/ClickHouse/ch-go v0.61.5 // indirect
