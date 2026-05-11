@@ -9,6 +9,7 @@ import (
 
 	"github.com/insmtx/Leros/backend/internal/agent"
 	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/internal/agent/eventtypes"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/pkg/dm"
 	"github.com/ygpkg/yg-go/logs"
@@ -77,7 +78,7 @@ func (c *Consumer) handleEvent(ctx context.Context, event any) error {
 	if err := c.validateRoute(msg); err != nil {
 		return err
 	}
-	if msg.Body.TaskType != dm.TaskTypeAgentRun {
+	if msg.Body.TaskType != eventtypes.TaskTypeAgentRun {
 		return fmt.Errorf("unsupported worker task type %q", msg.Body.TaskType)
 	}
 
@@ -114,8 +115,8 @@ func (c *Consumer) handleEvent(ctx context.Context, event any) error {
 	return nil
 }
 
-func decodeWorkerTask(event any) (dm.WorkerTaskMessage, error) {
-	var msg dm.WorkerTaskMessage
+func decodeWorkerTask(event any) (eventtypes.WorkerTaskMessage, error) {
+	var msg eventtypes.WorkerTaskMessage
 	body, err := json.Marshal(event)
 	if err != nil {
 		return msg, fmt.Errorf("marshal worker task: %w", err)
@@ -123,13 +124,13 @@ func decodeWorkerTask(event any) (dm.WorkerTaskMessage, error) {
 	if err := json.Unmarshal(body, &msg); err != nil {
 		return msg, fmt.Errorf("unmarshal worker task: %w", err)
 	}
-	if msg.Type != "" && msg.Type != dm.MessageTypeWorkerTask {
+	if msg.Type != "" && msg.Type != eventtypes.MessageTypeWorkerTask {
 		return msg, fmt.Errorf("unexpected worker task message type %q", msg.Type)
 	}
 	return msg, nil
 }
 
-func (c *Consumer) validateRoute(msg dm.WorkerTaskMessage) error {
+func (c *Consumer) validateRoute(msg eventtypes.WorkerTaskMessage) error {
 	if strings.TrimSpace(msg.Route.OrgID) != "" && msg.Route.OrgID != c.cfg.OrgID {
 		return fmt.Errorf("task org_id %q does not match worker org_id %q", msg.Route.OrgID, c.cfg.OrgID)
 	}
@@ -140,7 +141,7 @@ func (c *Consumer) validateRoute(msg dm.WorkerTaskMessage) error {
 }
 
 // RequestFromWorkerTask converts the domain message protocol into the agent runtime boundary.
-func RequestFromWorkerTask(msg dm.WorkerTaskMessage) *agent.RequestContext {
+func RequestFromWorkerTask(msg eventtypes.WorkerTaskMessage) *agent.RequestContext {
 	return &agent.RequestContext{
 		RunID:   firstNonEmpty(msg.Trace.RunID, msg.Trace.TaskID, msg.ID),
 		TraceID: msg.Trace.TraceID,
@@ -188,7 +189,7 @@ func RequestFromWorkerTask(msg dm.WorkerTaskMessage) *agent.RequestContext {
 	}
 }
 
-func inputMessagesFromTask(messages []dm.ChatMessage) []agent.InputMessage {
+func inputMessagesFromTask(messages []eventtypes.ChatMessage) []agent.InputMessage {
 	if len(messages) == 0 {
 		return nil
 	}
@@ -202,7 +203,7 @@ func inputMessagesFromTask(messages []dm.ChatMessage) []agent.InputMessage {
 	return result
 }
 
-func attachmentsFromTask(attachments []dm.Attachment) []agent.Attachment {
+func attachmentsFromTask(attachments []eventtypes.Attachment) []agent.Attachment {
 	if len(attachments) == 0 {
 		return nil
 	}
