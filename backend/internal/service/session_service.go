@@ -12,6 +12,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/api/auth"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/api/dto"
+	"github.com/insmtx/Leros/backend/internal/agent/eventtypes"
 	"github.com/insmtx/Leros/backend/internal/infra/db"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/pkg/dm"
@@ -337,22 +338,25 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID uint, req *co
 		}
 	}
 
-	if session.AllocatedAssistantID > 0 && s.publisher != nil && orgID > 0 {
-		topic := dm.Topic().Org(fmt.Sprintf("%d", orgID)).Add("assistant", fmt.Sprintf("%d", session.AllocatedAssistantID)).Message().Build()
-
-		messagePayload := map[string]interface{}{
-			"session_id":   session.SessionID,
-			"role":         message.Role,
-			"content":      message.Content,
-			"message_type": message.MessageType,
-			"sequence":     message.Sequence,
-			"timestamp":    message.Timestamp,
-		}
-
-		if err := s.publisher.Publish(ctx, topic, messagePayload); err != nil {
-			logs.ErrorContextf(ctx, "Failed to publish message to assistant %d: %v", session.AllocatedAssistantID, err)
-		}
+	topic, err := dm.WorkerTaskTopic(orgID, session.AllocatedAssistantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct worker task topic: %w", err)
 	}
+
+	messagePayload := map[string]interface{}{
+		"session_id":   session.SessionID,
+		"role":         message.Role,
+		"content":      message.Content,
+		"message_type": message.MessageType,
+		"sequence":     message.Sequence,
+		"timestamp":    message.Timestamp,
+	}
+
+	if err := s.publisher.Publish(ctx, topic, messagePayload); err != nil {
+		logs.ErrorContextf(ctx, "Failed to publish message to assistant %d: %v", session.AllocatedAssistantID, err)
+		return nil, fmt.Errorf("failed to publish message to assistant: %w", err)
+	}
+	logs.DebugContextf(ctx, "Published message to topic %s: %v", topic, messagePayload)
 
 	return convertToContractSessionMessage(message), nil
 }
@@ -430,11 +434,13 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 		return errors.New("user not authenticated or org not set")
 	}
 
-	orgID := fmt.Sprintf("%d", caller.OrgID)
-	topic := dm.Topic().Org(orgID).Session(sessionID).Message().Stream().Build()
+	topic, err := dm.SessionResultStreamTopic(caller.OrgID, sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to construct session result stream topic: %w", err)
+	}
 	return s.subscriber.Subscribe(ctx, topic, func(event any) {
 		switch msg := event.(type) {
-		case dm.MessageStreamMessage:
+		case eventtypes.MessageStreamMessage:
 			if msg.Body.Seq <= lastSequence {
 				return
 			}
@@ -446,13 +452,13 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 			}
 
 			switch msg.Body.Event {
-			case dm.StreamEventMessageDelta:
+			case eventtypes.StreamEventMessageDelta:
 				se.Type = dto.SessionEventTypeMessageDelta
 				se.Payload = dto.MessageDeltaPayload{
 					Role:    string(msg.Body.Payload.Role),
 					Content: msg.Body.Payload.Content,
 				}
-			case dm.StreamEventToolCallStarted:
+			case eventtypes.StreamEventToolCallStarted:
 				se.Type = dto.SessionEventTypeToolCallStarted
 				if tc := msg.Body.Payload.ToolCall; tc != nil {
 					se.Payload = dto.ToolCallDeltaPayload{
@@ -460,11 +466,11 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 						Name: tc.Name,
 					}
 				}
-			case dm.StreamEventRunStarted:
+			case eventtypes.StreamEventRunStarted:
 				se.Type = dto.SessionEventTypeRunStarted
-			case dm.StreamEventRunCompleted:
+			case eventtypes.StreamEventRunCompleted:
 				se.Type = dto.SessionEventTypeRunCompleted
-			case dm.StreamEventRunFailed:
+			case eventtypes.StreamEventRunFailed:
 				se.Type = dto.SessionEventTypeRunFailed
 			default:
 				logs.Warnf("unknown stream event type: %v", msg.Body.Event)
