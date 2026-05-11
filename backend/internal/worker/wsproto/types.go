@@ -63,7 +63,7 @@ type HeartbeatPayload struct {
 
 // GetConfigPayload defines the payload for config request (Client -> Server)
 type GetConfigPayload struct {
-	WorkerID string `json:"worker_id"`
+	WorkerID uint `json:"worker_id"`
 }
 
 // WorkerStatusPayload defines the payload for worker status update (Client -> Server)
@@ -97,8 +97,8 @@ type ShutdownPayload struct {
 
 // ConfigUpdatePayload defines the payload for config update notification (Server -> Client)
 type ConfigUpdatePayload struct {
-	AssistantCode string `json:"assistant_code"`
-	Version       int    `json:"version"`
+	WorkerID uint `json:"worker_id"`
+	Version  int  `json:"version"`
 }
 
 // NewPayload creates a new WSMessage with the given type and payload

@@ -233,12 +233,12 @@ func (s *WorkerManager) handleGetConfig(w *WorkerConnection, msg *wsproto.WSMess
 		return
 	}
 
-	assistantCode := reqPayload.WorkerID
+	workerID := reqPayload.WorkerID
 
-	if assistantCode == "" {
+	if workerID == 0 {
 		resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
 			Config: nil,
-			Error:  "assistant_code is required",
+			Error:  "worker_id is required",
 		})
 		select {
 		case w.Send <- resp:
@@ -261,9 +261,9 @@ func (s *WorkerManager) handleGetConfig(w *WorkerConnection, msg *wsproto.WSMess
 		return
 	}
 
-	da, err := infradb.GetDigitalAssistantByCode(context.Background(), s.db, assistantCode)
+	da, err := infradb.GetDigitalAssistantByID(context.Background(), s.db, workerID)
 	if err != nil {
-		logs.Errorf("Failed to get digital assistant %s: %v", assistantCode, err)
+		logs.Errorf("Failed to get digital assistant %d: %v", workerID, err)
 		resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
 			Config: nil,
 			Error:  err.Error(),
@@ -277,7 +277,7 @@ func (s *WorkerManager) handleGetConfig(w *WorkerConnection, msg *wsproto.WSMess
 	}
 
 	if da == nil {
-		logs.Warnf("Digital assistant %s not found", assistantCode)
+		logs.Warnf("Digital assistant %d not found", workerID)
 		resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
 			Config: nil,
 			Error:  "digital assistant not found",
@@ -296,7 +296,7 @@ func (s *WorkerManager) handleGetConfig(w *WorkerConnection, msg *wsproto.WSMess
 	})
 	select {
 	case w.Send <- resp:
-		logs.Infof("Config sent to worker %s for assistant %s", w.ID, assistantCode)
+		logs.Infof("Config sent to worker %s for assistant ID %d", w.ID, workerID)
 	default:
 		logs.Warnf("Config response dropped for worker %s", w.ID)
 	}

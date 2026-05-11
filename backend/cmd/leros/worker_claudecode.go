@@ -108,8 +108,8 @@ func validateTaskWorkerConfig(cfg *config.WorkerConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("config is required")
 	}
-	if strings.TrimSpace(cfg.AssistantCode) == "" {
-		return fmt.Errorf("worker.assistant_code is required")
+	if strings.TrimSpace(cfg.WorkerID) == "" {
+		return fmt.Errorf("worker.worker_id is required")
 	}
 	return nil
 }

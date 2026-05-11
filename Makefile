@@ -7,17 +7,17 @@ build:
 	go build -v -o ./bundles/leros ./backend/cmd/leros/
 
 docker-build:
-	docker build -t $(REGISTRY)$(PROJECT)-leros:latest -f deployments/build/Dockerfile.leros .
+	docker build -t $(REGISTRY)$(PROJECT):latest -f deployments/build/Dockerfile.leros .
 
 docker-push: docker-build
-	docker push $(REGISTRY)$(PROJECT)-singer:latest
+	docker push $(REGISTRY)$(PROJECT):latest
 
 docker-run-leros:
 	-docker rm -f $(PROJECT)-leros-dev
-	docker run -d --name $(PROJECT)-leros-dev -p 8080:8080 $(REGISTRY)$(PROJECT)-leros:latest
+	docker run -d --name $(PROJECT)-leros-dev -p 8080:8080 $(REGISTRY)$(PROJECT):latest
 
 docker-compose-up: docker-build
-	docker tag $(REGISTRY)$(PROJECT)-singer:latest localhost/env_singer:latest
+	docker tag $(REGISTRY)$(PROJECT):latest localhost/env_$(PROJECT):latest
 	docker-compose -f deployments/env/docker-compose.yml up -d
 
 docker-compose-down:
@@ -76,7 +76,7 @@ dev-server: build
 	./bundles/leros server --config deployments/dev/server.config.yaml
 
 dev-worker: build
-	./bundles/singer worker --worker-id dev-worker-1
+	./bundles/leros worker --worker-id dev-worker-1
 
 dev-frontend:
 	cd deployments/dev && ./dev-frontend.sh

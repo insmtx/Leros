@@ -14,7 +14,7 @@ import (
 
 type WSClient struct {
 	conn          *websocket.Conn
-	workerID      string
+	workerID      uint
 	serverAddr    string
 	send          chan *wsproto.WSMessage
 	ctx           context.Context
@@ -24,7 +24,7 @@ type WSClient struct {
 
 type WSClientOption func(*WSClient)
 
-func WithWorkerID(workerID string) WSClientOption {
+func WithWorkerID(workerID uint) WSClientOption {
 	return func(c *WSClient) {
 		c.workerID = workerID
 	}
@@ -36,7 +36,7 @@ func WithOnConfigReady(handler func(map[string]interface{})) WSClientOption {
 	}
 }
 
-func NewWSClient(serverAddr, workerID string, opts ...WSClientOption) *WSClient {
+func NewWSClient(serverAddr string, workerID uint, opts ...WSClientOption) *WSClient {
 	ctx, cancel := context.WithCancel(context.Background())
 	c := &WSClient{
 		workerID:   workerID,
@@ -65,7 +65,7 @@ func (c *WSClient) Connect(ctx context.Context) error {
 	logs.Infof("Connected to server successfully")
 
 	registerMsg, err := wsproto.NewPayload(wsproto.MsgTypeWorkerRegister, wsproto.RegisterPayload{
-		WorkerID:  c.workerID,
+		WorkerID:  fmt.Sprintf("worker_%d", c.workerID),
 		Timestamp: time.Now().Unix(),
 	})
 	if err != nil {
@@ -138,7 +138,7 @@ func (c *WSClient) handleMessage(msg *wsproto.WSMessage) {
 	switch msg.Type {
 	case wsproto.MsgTypeWelcome:
 		logs.Infof("Received welcome from server")
-		if c.workerID != "" {
+		if c.workerID != 0 {
 			c.requestConfig()
 		}
 	case wsproto.MsgTypeConfigResponse:
@@ -162,7 +162,7 @@ func (c *WSClient) requestConfig() {
 	if err := c.sendWSMessage(reqMsg); err != nil {
 		logs.Errorf("Failed to request config: %v", err)
 	} else {
-		logs.Infof("Requested config for worker %s", c.workerID)
+		logs.Infof("Requested config for worker %d", c.workerID)
 	}
 }
 

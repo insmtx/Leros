@@ -37,22 +37,22 @@ var workerCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		ctx := cmd.Context()
+		// ctx := cmd.Context()
 
-		worker, err := createWorker(ctx)
-		if err != nil {
-			logs.Fatalf("Failed to create worker: %v", err)
-			return
-		}
+		// worker, err := createWorker(ctx)
+		// if err != nil {
+		// 	logs.Fatalf("Failed to create worker: %v", err)
+		// 	return
+		// }
 
-		if err := worker.Start(ctx); err != nil {
-			logs.Fatalf("Failed to start worker: %v", err)
-		}
+		// if err := worker.Start(ctx); err != nil {
+		// 	logs.Fatalf("Failed to start worker: %v", err)
+		// }
 	},
 }
 
 func init() {
-	// workerCmd.PersistentFlags().StringVar(&workerConfigPath, "config", "", "Configuration file path")
+	workerCmd.PersistentFlags().StringVar(&workerConfigPath, "config", "", "Configuration file path")
 	workerCmd.PersistentFlags().StringVar(&workerServerAddr, "server-addr", "127.0.0.1:8080", "Server address for WebSocket connection")
 	workerCmd.PersistentFlags().StringVar(&workerListenAddr, "listen-addr", ":8081", "Worker MCP server listen address for runtime bootstrap")
 	workerCmd.PersistentFlags().StringVar(&workerWorkerID, "worker-id", "", "Worker ID for configuration retrieval")
