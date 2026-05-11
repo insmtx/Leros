@@ -8,14 +8,12 @@ import (
 
 // CreateSessionRequest 创建会话请求
 type CreateSessionRequest struct {
-	SessionID     string                 `json:"session_id,omitempty"`
-	Type          string                 `json:"type" binding:"required"`
-	Uin           uint                   `json:"uin,omitempty"`
-	AssistantID   uint                   `json:"assistant_id,omitempty"`
-	AssistantCode string                 `json:"assistant_code,omitempty"`
-	Title         string                 `json:"title,omitempty"`
-	Metadata      *types.SessionMetadata `json:"metadata,omitempty"`
-	ExpiredAt     *time.Time             `json:"expired_at,omitempty"`
+	SessionID   string                 `json:"session_id,omitempty"`
+	Type        string                 `json:"type" binding:"required"`
+	AssistantID uint                   `json:"assistant_id,omitempty"`
+	Title       string                 `json:"title,omitempty"`
+	Metadata    *types.SessionMetadata `json:"metadata,omitempty"`
+	ExpiredAt   *time.Time             `json:"expired_at,omitempty"`
 }
 
 // UpdateSessionRequest 更新会话请求
@@ -29,7 +27,6 @@ type UpdateSessionRequest struct {
 type ListSessionsRequest struct {
 	Type          *string `form:"type,omitempty"`
 	Status        *string `form:"status,omitempty"`
-	Uin           *uint   `form:"uin,omitempty"`
 	AssistantID   *uint   `form:"assistant_id,omitempty"`
 	AssistantCode *string `form:"assistant_code,omitempty"`
 	Keyword       *string `form:"keyword,omitempty"`
@@ -51,20 +48,22 @@ type AddMessageRequest struct {
 
 // Session 会话响应结构（对应前端的 Conversation）
 type Session struct {
-	ID            uint                   `json:"id"`
-	SessionID     string                 `json:"session_id"`
-	Type          string                 `json:"type"`
-	Uin           uint                   `json:"uin"`
-	AssistantID   uint                   `json:"assistant_id"`
-	AssistantCode string                 `json:"assistant_code"`
-	Status        string                 `json:"status"`
-	Title         string                 `json:"title"`
-	Metadata      *types.SessionMetadata `json:"metadata,omitempty"`
-	MessageCount  int                    `json:"message_count"`
-	LastMessageAt *time.Time             `json:"last_message_at,omitempty"`
-	ExpiredAt     *time.Time             `json:"expired_at,omitempty"`
-	CreatedAt     time.Time              `json:"created_at"`
-	UpdatedAt     time.Time              `json:"updated_at"`
+	ID                   uint                   `json:"id"`
+	SessionID            string                 `json:"session_id"`
+	Type                 string                 `json:"type"`
+	Uin                  uint                   `json:"uin"`
+	OrgID                uint                   `json:"org_id"`
+	AssistantID          uint                   `json:"assistant_id"`
+	AllocatedAssistantID uint                   `json:"allocated_assistant_id"`
+	AssistantCode        string                 `json:"assistant_code"`
+	Status               string                 `json:"status"`
+	Title                string                 `json:"title"`
+	Metadata             *types.SessionMetadata `json:"metadata,omitempty"`
+	MessageCount         int                    `json:"message_count"`
+	LastMessageAt        *time.Time             `json:"last_message_at,omitempty"`
+	ExpiredAt            *time.Time             `json:"expired_at,omitempty"`
+	CreatedAt            time.Time              `json:"created_at"`
+	UpdatedAt            time.Time              `json:"updated_at"`
 }
 
 // SessionMessage 消息响应结构（对齐前端 Message 模型）

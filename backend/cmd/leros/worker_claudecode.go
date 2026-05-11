@@ -16,17 +16,16 @@ import (
 )
 
 var claudeWorkerCmd = &cobra.Command{
-	Use:     "agent-worker",
-	Aliases: []string{"claude-worker"},
-	Short:   "Start a standalone task worker backed by available agent runtimes",
-	Long:    `Start a standalone Leros worker that subscribes to org.{org_id}.worker.{worker_id}.task and executes agent.run tasks through the configured default agent runtime.`,
+	Use:   "claude-worker",
+	Short: "Start a standalone task worker backed by available agent runtimes",
+	Long:  `Start a standalone Leros worker that subscribes to org.{org_id}.worker.{worker_id}.task and executes agent.run tasks through the configured default agent runtime.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		runTaskWorker(workerDefaultRuntime)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(claudeWorkerCmd)
+	workerCmd.AddCommand(claudeWorkerCmd)
 }
 
 func runTaskWorker(defaultRuntime string) {

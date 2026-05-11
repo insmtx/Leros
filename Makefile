@@ -73,10 +73,10 @@ dev-setup:
 	cd deployments/dev && ./dev-setup.sh
 
 dev-server: build
-	./bundles/leros server --config deployments/dev/server.config.yaml
+	LEROS_DEV=true ./bundles/leros server --config deployments/dev/server.config.yaml
 
 dev-worker: build
-	./bundles/leros worker --worker-id dev-worker-1
+	LEROS_DEV=true ./bundles/leros worker --worker-id 1 --config ./deployments/dev/worker.config.yaml
 
 dev-frontend:
 	cd deployments/dev && ./dev-frontend.sh

@@ -125,8 +125,6 @@ type PolicyConfig struct {
 // CreateDigitalAssistantRequest 创建数字助手请求
 type CreateDigitalAssistantRequest struct {
 	Code        string          `json:"code" binding:"required"`
-	OrgID       uint            `json:"org_id" binding:"required"`
-	OwnerID     uint            `json:"owner_id" binding:"required"`
 	Name        string          `json:"name" binding:"required"`
 	Description string          `json:"description"`
 	Avatar      string          `json:"avatar"`
@@ -148,8 +146,6 @@ type UpdateDigitalAssistantStatusRequest struct {
 
 // ListDigitalAssistantRequest 查询数字助手列表请求
 type ListDigitalAssistantRequest struct {
-	OrgID   *uint   `form:"org_id,omitempty"`
-	OwnerID *uint   `form:"owner_id,omitempty"`
 	Status  *string `form:"status,omitempty"`
 	Keyword *string `form:"keyword,omitempty"`
 	Page    int     `form:"page,default=1"`

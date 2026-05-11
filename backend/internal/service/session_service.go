@@ -26,12 +26,16 @@ var _ contract.SessionService = (*sessionService)(nil)
 type sessionService struct {
 	db         *gorm.DB
 	subscriber eventbus.Subscriber
+	publisher  eventbus.Publisher
+	inferrer   AssistantInferrer
 }
 
-func NewSessionService(db *gorm.DB, subscriber eventbus.Subscriber) contract.SessionService {
+func NewSessionService(db *gorm.DB, subscriber eventbus.Subscriber, publisher eventbus.Publisher, inferrer AssistantInferrer) contract.SessionService {
 	return &sessionService{
 		db:         db,
 		subscriber: subscriber,
+		publisher:  publisher,
+		inferrer:   inferrer,
 	}
 }
 
@@ -41,13 +45,8 @@ func (s *sessionService) CreateSession(ctx context.Context, req *contract.Create
 	}
 
 	caller, _ := auth.FromContext(ctx)
-	if caller != nil {
-		if caller.Uin == 0 {
-			return nil, errors.New("user not authenticated or org not set")
-		}
-		req.Uin = caller.Uin
-	} else if req.Uin == 0 {
-		return nil, errors.New("uin is required when caller is not available")
+	if caller == nil || caller.Uin == 0 || caller.OrgID == 0 {
+		return nil, errors.New("user not authenticated or org not set")
 	}
 
 	sessionID := req.SessionID
@@ -64,15 +63,16 @@ func (s *sessionService) CreateSession(ctx context.Context, req *contract.Create
 	}
 
 	session := &types.Session{
-		SessionID:     sessionID,
-		Type:          req.Type,
-		Uin:           req.Uin,
-		AssistantID:   req.AssistantID,
-		AssistantCode: req.AssistantCode,
-		Status:        string(types.SessionStatusActive),
-		Title:         req.Title,
-		MessageCount:  0,
-		ExpiredAt:     req.ExpiredAt,
+		SessionID:            sessionID,
+		Type:                 req.Type,
+		Uin:                  caller.Uin,
+		OrgID:                caller.OrgID,
+		AssistantID:          req.AssistantID,
+		AllocatedAssistantID: req.AssistantID,
+		Status:               string(types.SessionStatusActive),
+		Title:                req.Title,
+		MessageCount:         0,
+		ExpiredAt:            req.ExpiredAt,
 	}
 
 	if req.Metadata != nil {
@@ -149,12 +149,22 @@ func (s *sessionService) DeleteSession(ctx context.Context, id uint) error {
 }
 
 func (s *sessionService) ListSessions(ctx context.Context, req *contract.ListSessionsRequest) (*contract.SessionList, error) {
+	caller, _ := auth.FromContext(ctx)
+
+	var uin *uint
+	var orgID *uint
+	if caller != nil && caller.Uin > 0 {
+		uin = &caller.Uin
+		orgID = &caller.OrgID
+	}
+
 	sessions, total, err := db.ListSessions(
 		ctx,
 		s.db,
 		req.Type,
 		req.Status,
-		req.Uin,
+		uin,
+		orgID,
 		req.AssistantID,
 		req.AssistantCode,
 		req.Keyword,
@@ -310,6 +320,40 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID uint, req *co
 		return nil, err
 	}
 
+	caller, _ := auth.FromContext(ctx)
+	orgID := session.OrgID
+	if orgID == 0 && caller != nil {
+		orgID = caller.OrgID
+	}
+
+	if session.AssistantID == 0 && session.AllocatedAssistantID == 0 && s.inferrer != nil {
+		assignedAssistantID := s.inferrer.InferAssignedAssistantID(ctx, orgID, session.Type)
+		if assignedAssistantID > 0 {
+			session.AllocatedAssistantID = assignedAssistantID
+			session.UpdatedAt = time.Now()
+			if err := db.UpdateSession(ctx, s.db, session); err != nil {
+				return nil, fmt.Errorf("failed to update allocated_assistant_id: %w", err)
+			}
+		}
+	}
+
+	if session.AllocatedAssistantID > 0 && s.publisher != nil && orgID > 0 {
+		topic := dm.Topic().Org(fmt.Sprintf("%d", orgID)).Add("assistant", fmt.Sprintf("%d", session.AllocatedAssistantID)).Message().Build()
+
+		messagePayload := map[string]interface{}{
+			"session_id":   session.SessionID,
+			"role":         message.Role,
+			"content":      message.Content,
+			"message_type": message.MessageType,
+			"sequence":     message.Sequence,
+			"timestamp":    message.Timestamp,
+		}
+
+		if err := s.publisher.Publish(ctx, topic, messagePayload); err != nil {
+			logs.ErrorContextf(ctx, "Failed to publish message to assistant %d: %v", session.AllocatedAssistantID, err)
+		}
+	}
+
 	return convertToContractSessionMessage(message), nil
 }
 
@@ -436,17 +480,18 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 
 func convertToContractSession(session *types.Session) *contract.Session {
 	result := &contract.Session{
-		ID:            session.ID,
-		SessionID:     session.SessionID,
-		Type:          session.Type,
-		Uin:           session.Uin,
-		AssistantID:   session.AssistantID,
-		AssistantCode: session.AssistantCode,
-		Status:        session.Status,
-		Title:         session.Title,
-		MessageCount:  session.MessageCount,
-		CreatedAt:     session.CreatedAt,
-		UpdatedAt:     session.UpdatedAt,
+		ID:                   session.ID,
+		SessionID:            session.SessionID,
+		Type:                 session.Type,
+		Uin:                  session.Uin,
+		OrgID:                session.OrgID,
+		AssistantID:          session.AssistantID,
+		AllocatedAssistantID: session.AllocatedAssistantID,
+		Status:               session.Status,
+		Title:                session.Title,
+		MessageCount:         session.MessageCount,
+		CreatedAt:            session.CreatedAt,
+		UpdatedAt:            session.UpdatedAt,
 	}
 
 	if session.Metadata.Tags != nil || session.Metadata.Extra != nil || session.Metadata.UserAgent != "" || session.Metadata.IPAddress != "" {

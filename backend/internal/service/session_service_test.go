@@ -14,9 +14,8 @@ import (
 	"github.com/insmtx/Leros/backend/types"
 )
 
-func setupTestService(t *testing.T) contract.SessionService {
+func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to open test database: %v", err)
@@ -26,22 +25,19 @@ func setupTestService(t *testing.T) contract.SessionService {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}
 
-	return NewSessionService(db, nil)
+	return db
+}
+
+func setupTestService(t *testing.T) contract.SessionService {
+	t.Helper()
+	db := setupTestDB(t)
+	return NewSessionService(db, nil, nil, nil)
 }
 
 func setupTestServiceWithSubscriber(t *testing.T, subscriber mq.Subscriber) contract.SessionService {
 	t.Helper()
-
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to open test database: %v", err)
-	}
-
-	if err := db.AutoMigrate(&types.Session{}, &types.SessionMessage{}); err != nil {
-		t.Fatalf("failed to migrate test database: %v", err)
-	}
-
-	return NewSessionService(db, subscriber)
+	db := setupTestDB(t)
+	return NewSessionService(db, subscriber, nil, nil)
 }
 
 func setupTestContextWithoutCaller(t *testing.T) context.Context {
@@ -655,8 +651,8 @@ func TestCreateSession_MissingCaller(t *testing.T) {
 		t.Error("expected error when caller is not authenticated")
 	}
 
-	if err.Error() != "uin is required when caller is not available" {
-		t.Errorf("expected 'uin is required when caller is not available' error, got %s", err.Error())
+	if err.Error() != "user not authenticated or org not set" {
+		t.Errorf("expected 'user not authenticated or org not set' error, got %s", err.Error())
 	}
 }
 

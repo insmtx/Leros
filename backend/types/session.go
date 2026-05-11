@@ -69,11 +69,14 @@ type Session struct {
 	// session - 关联用户UIN，0表示不关联，BIGINT，DEFAULT 0
 	Uin uint `gorm:"column:uin;type:bigint;default:0;index"`
 
+	// session - 所属组织ID，0表示未设置，INTEGER，NOT NULL，DEFAULT 0
+	OrgID uint `gorm:"column:org_id;type:integer;default:0;not null;index"`
+
 	// session - 关联数字助手ID，0表示不关联，BIGINT，DEFAULT 0
 	AssistantID uint `gorm:"column:assistant_id;type:bigint;default:0;index"`
 
-	// session - 关联数字助手Code，空字符串表示不关联，VARCHAR(255)，DEFAULT ''
-	AssistantCode string `gorm:"column:assistant_code;type:varchar(255);default:'';index"`
+	// session - 分配的数字员工ID，0表示未分配，BIGINT，DEFAULT 0
+	AllocatedAssistantID uint `gorm:"column:allocated_assistant_id;type:bigint;default:0;index"`
 
 	// session - 会话状态，VARCHAR(50)，NOT NULL，DEFAULT 'active'
 	Status string `gorm:"column:status;type:varchar(50);not null;default:'active'"`
