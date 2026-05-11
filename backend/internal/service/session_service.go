@@ -343,20 +343,45 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID uint, req *co
 		return nil, fmt.Errorf("failed to construct worker task topic: %w", err)
 	}
 
-	messagePayload := map[string]interface{}{
-		"session_id":   session.SessionID,
-		"role":         message.Role,
-		"content":      message.Content,
-		"message_type": message.MessageType,
-		"sequence":     message.Sequence,
-		"timestamp":    message.Timestamp,
+	messagePayload := eventtypes.WorkerTaskMessage{
+		ID:        fmt.Sprintf("msg_%d_%d", session.ID, message.Sequence),
+		Type:      eventtypes.MessageTypeWorkerTask,
+		CreatedAt: time.Now().UTC(),
+		Trace: eventtypes.TraceContext{
+			TraceID:   session.SessionID,
+			RequestID: fmt.Sprintf("req_%d", message.ID),
+			TaskID:    fmt.Sprintf("task_%d", message.ID),
+		},
+		Route: eventtypes.RouteContext{
+			OrgID:     fmt.Sprintf("%d", orgID),
+			SessionID: session.SessionID,
+			WorkerID:  fmt.Sprintf("%d", session.AllocatedAssistantID),
+		},
+		Body: eventtypes.WorkerTaskBody{
+			TaskType: eventtypes.TaskTypeAgentRun,
+			Actor: eventtypes.ActorContext{
+				UserID:      fmt.Sprintf("%d", session.Uin),
+				DisplayName: "",
+				Channel:     "session",
+			},
+			Input: eventtypes.TaskInput{
+				Type: eventtypes.InputTypeMessage,
+				Text: message.Content,
+			},
+		},
+		Metadata: map[string]any{
+			"session_id":   session.SessionID,
+			"message_type": message.MessageType,
+			"sequence":     message.Sequence,
+			"timestamp":    message.Timestamp,
+		},
 	}
 
 	if err := s.publisher.Publish(ctx, topic, messagePayload); err != nil {
 		logs.ErrorContextf(ctx, "Failed to publish message to assistant %d: %v", session.AllocatedAssistantID, err)
 		return nil, fmt.Errorf("failed to publish message to assistant: %w", err)
 	}
-	logs.DebugContextf(ctx, "Published message to topic %s: %v", topic, messagePayload)
+	logs.DebugContextf(ctx, "Published message to topic %s: session_id=%s sequence=%d", topic, session.SessionID, message.Sequence)
 
 	return convertToContractSessionMessage(message), nil
 }
