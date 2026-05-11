@@ -1,19 +1,23 @@
-// Package dm 定义 Leros 服务之间共享的领域消息协议。
-package dm
+// Package eventtypes defines domain message protocols for Leros services.
+//
+// This package contains message structures used for inter-service communication
+// via message queues (NATS JetStream). It separates message protocol definitions
+// from topic construction utilities (which remain in backend/pkg/dm).
+package eventtypes
 
 import "time"
 
-// MessageType 表示领域消息的顶层类型。
+// MessageType represents the top-level type of domain messages.
 type MessageType string
 
 const (
-	// MessageTypeWorkerTask 表示 Server 发送给 Worker 的任务消息。
+	// MessageTypeWorkerTask represents task messages from Server to Worker.
 	MessageTypeWorkerTask MessageType = "worker.task"
-	// MessageTypeStream 表示 Worker 发送给 Server 并转发到 UI 的流式消息。
+	// MessageTypeStream represents stream messages from Worker to Server (forwarded to UI).
 	MessageTypeStream MessageType = "message.stream"
 )
 
-// TraceContext 承载跨 UI、Server、Worker 和 Runtime 的链路追踪标识。
+// TraceContext carries distributed tracing identifiers across UI, Server, Worker, and Runtime.
 type TraceContext struct {
 	TraceID   string `json:"trace_id"`
 	RequestID string `json:"request_id,omitempty"`
@@ -22,14 +26,14 @@ type TraceContext struct {
 	ParentID  string `json:"parent_id,omitempty"`
 }
 
-// RouteContext 承载消息投递和租户隔离所需的路由信息。
+// RouteContext carries routing information for message delivery and tenant isolation.
 type RouteContext struct {
 	OrgID     string `json:"org_id"`
 	SessionID string `json:"session_id,omitempty"`
 	WorkerID  string `json:"worker_id,omitempty"`
 }
 
-// Envelope 是 MQ topic 上使用的通用领域消息信封。
+// Envelope is the generic domain message envelope used on MQ topics.
 type Envelope[T any] struct {
 	ID        string      `json:"id"`
 	Type      MessageType `json:"type"`

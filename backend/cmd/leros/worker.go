@@ -14,7 +14,6 @@ import (
 	"github.com/insmtx/Leros/backend/runtime/engines"
 	"github.com/insmtx/Leros/backend/runtime/engines/builtin"
 	"github.com/spf13/cobra"
-	ygconfig "github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -37,6 +36,7 @@ var workerCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
+		runTaskWorker(workerDefaultRuntime)
 		// ctx := cmd.Context()
 
 		// worker, err := createWorker(ctx)
@@ -77,7 +77,7 @@ func createWorker(ctx context.Context) (*client.WorkerClient, error) {
 func loadWorkerConfig() (*config.WorkerConfig, error) {
 	cfg := &config.WorkerConfig{}
 	if workerConfigPath != "" {
-		err := ygconfig.LoadYamlLocalFile(workerConfigPath, cfg)
+		err := LoadYamlLocalFile(workerConfigPath, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load config from %s: %w", workerConfigPath, err)
 		}

@@ -9,15 +9,16 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/api"
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/spf13/cobra"
-	ygconfig "github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/lifecycle"
 	"github.com/ygpkg/yg-go/logs"
+	"gopkg.in/yaml.v2"
 	"gorm.io/gorm"
 )
 
@@ -102,7 +103,7 @@ func loadConfig(configPath string) (*config.Config, error) {
 	var cfg config.Config
 
 	if configPath != "" {
-		err := ygconfig.LoadYamlLocalFile(configPath, &cfg)
+		err := LoadYamlLocalFile(configPath, &cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load config from %s: %v", configPath, err)
 		}
@@ -111,7 +112,7 @@ func loadConfig(configPath string) (*config.Config, error) {
 
 		err := fmt.Errorf("config file not found in any location")
 		for _, path := range pathsToTry {
-			if err = ygconfig.LoadYamlLocalFile(path, &cfg); err == nil {
+			if err = LoadYamlLocalFile(path, &cfg); err == nil {
 				logs.Infof("Loaded config from: %s", path)
 				break
 			}
@@ -124,4 +125,23 @@ func loadConfig(configPath string) (*config.Config, error) {
 
 	logs.Info("Configuration loaded successfully")
 	return &cfg, nil
+}
+
+// LoadYamlLocalFile .
+func LoadYamlLocalFile(file string, cfg interface{}) error {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		fmt.Printf("[config] laod %s failed, %s\n", file, err)
+		return err
+	}
+
+	data = []byte(os.ExpandEnv(string(data)))
+
+	err = yaml.Unmarshal(data, cfg)
+	if err != nil {
+		fmt.Printf("[config] decode %s failed, %s\n", file, err)
+		return err
+	}
+
+	return nil
 }

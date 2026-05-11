@@ -73,7 +73,8 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		handler.RegisterDigitalAssistantRoutes(v1, digitalAssistantService)
 		logs.Info("Digital assistant routes registered successfully")
 
-		sessionService := service.NewSessionService(db, eventbus)
+		inferrer := service.NewDefaultAssistantInferrer(1)
+		sessionService := service.NewSessionService(db, eventbus, eventbus, inferrer)
 		handler.RegisterSessionRoutes(v1, sessionService)
 		logs.Info("Session routes registered successfully")
 	}

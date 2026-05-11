@@ -1,4 +1,4 @@
-package dm
+package eventtypes
 
 import (
 	"encoding/json"
@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// TestWorkerTaskMessageJSONShape verifies the JSON structure of WorkerTaskMessage.
+// It ensures that trace and route fields are properly nested (not flattened to top level)
+// and that the execution field is correctly named (not "target").
 func TestWorkerTaskMessageJSONShape(t *testing.T) {
 	message := WorkerTaskMessage{
 		ID:        "msg_1",
@@ -24,6 +27,11 @@ func TestWorkerTaskMessageJSONShape(t *testing.T) {
 		},
 		Body: WorkerTaskBody{
 			TaskType: TaskTypeAgentRun,
+			Actor: ActorContext{
+				UserID:      "user_test",
+				DisplayName: "Test User",
+				Channel:     "test",
+			},
 			Execution: ExecutionTarget{
 				AssistantID: "assistant_1",
 				AgentID:     "agent_1",
@@ -45,24 +53,35 @@ func TestWorkerTaskMessageJSONShape(t *testing.T) {
 		t.Fatalf("unmarshal message: %v", err)
 	}
 
+	// Verify trace is nested, not at top level
 	if _, ok := got["task_id"]; ok {
 		t.Fatalf("task_id should live under trace, got top-level field in %s", body)
 	}
 	if _, ok := got["org_id"]; ok {
 		t.Fatalf("org_id should live under route, got top-level field in %s", body)
 	}
+
+	// Verify message type
 	if got["type"] != string(MessageTypeWorkerTask) {
 		t.Fatalf("unexpected message type: %#v", got["type"])
 	}
+
+	// Verify trace object exists
 	if _, ok := got["trace"].(map[string]any); !ok {
 		t.Fatalf("expected trace object in %s", body)
 	}
+
+	// Verify route object exists
 	if _, ok := got["route"].(map[string]any); !ok {
 		t.Fatalf("expected route object in %s", body)
 	}
+
+	// Verify body object exists
 	if _, ok := got["body"].(map[string]any); !ok {
 		t.Fatalf("expected body object in %s", body)
 	}
+
+	// Verify execution field is named correctly (not "target")
 	bodyObject := got["body"].(map[string]any)
 	if _, ok := bodyObject["target"]; ok {
 		t.Fatalf("target should be named execution in %s", body)
@@ -72,6 +91,8 @@ func TestWorkerTaskMessageJSONShape(t *testing.T) {
 	}
 }
 
+// TestMessageStreamMessageJSONShape verifies the JSON structure of MessageStreamMessage.
+// It ensures the message type and stream event type are correctly serialized.
 func TestMessageStreamMessageJSONShape(t *testing.T) {
 	message := MessageStreamMessage{
 		ID:   "evt_1",
@@ -110,12 +131,18 @@ func TestMessageStreamMessageJSONShape(t *testing.T) {
 	if err := json.Unmarshal(body, &got); err != nil {
 		t.Fatalf("unmarshal message: %v", err)
 	}
+
+	// Verify message type
 	if got.Type != MessageTypeStream {
 		t.Fatalf("got type %q, want %q", got.Type, MessageTypeStream)
 	}
+
+	// Verify stream event type
 	if got.Body.Event != StreamEventMessageDelta {
 		t.Fatalf("got event %q, want %q", got.Body.Event, StreamEventMessageDelta)
 	}
+
+	// Verify sequence number
 	if got.Body.Seq != 1 {
 		t.Fatalf("got seq %d, want 1", got.Body.Seq)
 	}
