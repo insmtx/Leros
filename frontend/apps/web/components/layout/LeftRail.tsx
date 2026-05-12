@@ -18,7 +18,7 @@ import {
 	MessageSquare,
 	Network,
 	Paintbrush,
-	Plus,
+	
 	Settings,
 	Star,
 	Terminal,
@@ -60,25 +60,7 @@ export function LeftRail() {
 				leftRailCollapsed ? "w-[52px]" : "w-[260px]",
 			)}
 		>
-			<div className="flex h-12 items-center justify-between border-b border-slate-200 px-4">
-				{!leftRailCollapsed && (
-					<h2 className="text-sm font-medium tracking-wide uppercase text-slate-600">导航</h2>
-				)}
-				<button
-					type="button"
-					onClick={toggleLeftRail}
-					className={cn(
-						"flex items-center justify-center rounded-md p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors",
-						leftRailCollapsed ? "mx-auto" : "ml-auto",
-					)}
-				>
-					{leftRailCollapsed ? (
-						<ChevronRight className="size-4" />
-					) : (
-						<ChevronLeft className="size-4" />
-					)}
-				</button>
-			</div>
+			
 
 			<ScrollArea className="flex-1">
 				<div className="p-1.5">
@@ -142,14 +124,23 @@ export function LeftRail() {
 				</div>
 			</ScrollArea>
 
-			{!leftRailCollapsed && (
-				<div className="border-t border-slate-200 p-2">
-					<Button variant="ghost" size="sm" className="w-full justify-start text-slate-500">
-						<Plus className="size-4 mr-1.5" />
-						新建会话
-					</Button>
-				</div>
-			)}
+			<div className="border-t border-slate-200 p-2">
+				<Button
+					variant="ghost"
+					size="sm"
+					className={cn("w-full justify-start text-slate-500 hover:text-slate-700", leftRailCollapsed && "justify-center")}
+					onClick={toggleLeftRail}
+				>
+					{leftRailCollapsed ? (
+						<ChevronRight className="size-4" />
+					) : (
+						<>
+							<ChevronLeft className="size-4 mr-1.5" />
+							收起侧栏
+						</>
+					)}
+				</Button>
+			</div>
 		</div>
 	);
 }

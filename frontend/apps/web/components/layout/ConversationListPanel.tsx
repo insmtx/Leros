@@ -59,7 +59,7 @@ export function ConversationListPanel() {
 			data-slot="conversation-list-panel"
 			className="flex h-full w-[260px] flex-col border-r border-slate-200 bg-white transition-all duration-300"
 		>
-			<div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2.5">
+			<div className="flex items-center gap-2 border-b border-slate-200 h-12 px-3">
 				<div className="relative flex-1">
 					<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
 					<input
@@ -81,7 +81,7 @@ export function ConversationListPanel() {
 			</div>
 
 			<ScrollArea className="flex-1">
-				<div className="px-3 pb-2">
+				<div className="px-3 pt-2 pb-2">
 					{filteredConversations.map((conv) => (
 						<button
 							key={conv.id}
