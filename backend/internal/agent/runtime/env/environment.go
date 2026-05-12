@@ -1,4 +1,4 @@
-package runtimeenv
+package env
 
 import (
 	"context"

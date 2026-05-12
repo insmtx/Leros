@@ -15,7 +15,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/agent"
 	einoadapter "github.com/insmtx/Leros/backend/internal/agent/eino"
 	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
-	"github.com/insmtx/Leros/backend/internal/agent/runtimeenv"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/env"
 	"github.com/insmtx/Leros/backend/tools"
 	"github.com/ygpkg/yg-go/logs"
 )
@@ -86,7 +86,7 @@ type Runner struct {
 }
 
 // NewRunner 创建基于 Eino Flow 的 Leros 内置 Agent。
-func NewRunner(ctx context.Context, llmConfig *config.LLMConfig, env *runtimeenv.Environment) (*Runner, error) {
+func NewRunner(ctx context.Context, llmConfig *config.LLMConfig, env *env.Environment) (*Runner, error) {
 	if llmConfig == nil {
 		return nil, fmt.Errorf("llm config is required")
 	}

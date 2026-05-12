@@ -12,7 +12,7 @@ import (
 
 	"github.com/insmtx/Leros/backend/config"
 	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
-	"github.com/insmtx/Leros/backend/internal/agent/runtimeenv"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/env"
 	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
 	"github.com/insmtx/Leros/backend/tools"
 	nodetools "github.com/insmtx/Leros/backend/tools/node"
@@ -73,7 +73,7 @@ func TestAgentRunRealModel(t *testing.T) {
 	ctx, cancel := realModelTestContext(t)
 	defer cancel()
 
-	env, err := runtimeenv.New(ctx, runtimeenv.Options{
+	env, err := env.New(ctx, env.Options{
 		ToolsEnabled: false,
 	})
 	if err != nil {
@@ -132,7 +132,7 @@ func TestAgentRunNodeTool(t *testing.T) {
 		t.Fatalf("register node tools: %v", err)
 	}
 
-	env, err := runtimeenv.New(ctx, runtimeenv.Options{
+	env, err := env.New(ctx, env.Options{
 		ToolsEnabled: true,
 	})
 	if err != nil {
@@ -213,7 +213,7 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 		t.Fatalf("register node tools: %v", err)
 	}
 
-	env, err := runtimeenv.New(ctx, runtimeenv.Options{
+	env, err := env.New(ctx, env.Options{
 		ToolsEnabled: true,
 	})
 	if err != nil {
