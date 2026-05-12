@@ -6,10 +6,10 @@ import (
 
 	einoopenai "github.com/cloudwego/eino-ext/components/model/openai"
 	einomodel "github.com/cloudwego/eino/components/model"
-	"github.com/insmtx/SingerOS/backend/config"
+	"github.com/insmtx/Leros/backend/config"
 )
 
-// NewOpenAIChatModel creates a real Eino ToolCallingChatModel from SingerOS LLM config.
+// NewOpenAIChatModel creates a real Eino ToolCallingChatModel from Leros LLM config.
 func NewOpenAIChatModel(ctx context.Context, cfg *config.LLMConfig) (einomodel.ToolCallingChatModel, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("llm config is required")

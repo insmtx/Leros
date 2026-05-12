@@ -1,4 +1,4 @@
-# SingerOS 后端架构设计文档
+# Leros 后端架构设计文档
 
 > 面向 AI OS 的 Golang 包结构指南
 >
@@ -6,7 +6,7 @@
 
 ## 1. 概述
 
-本文档提供 SingerOS 后端的 **Golang 包结构设计**，与 `ARCHITECTURE.md` 配合使用。
+本文档提供 Leros 后端的 **Golang 包结构设计**，与 `ARCHITECTURE.md` 配合使用。
 
 - `ARCHITECTURE.md` - 高层架构设计、模块划分、执行链路
 - `ARCHITECTURE_BACKEND.md` - **本文档** - Go 包结构、目录组织
@@ -17,7 +17,7 @@
 
 > **Contract-driven Service Architecture**
 
-SingerOS 采用**契约驱动的服务架构**，而不是：
+Leros 采用**契约驱动的服务架构**，而不是：
 
 - ❌ Clean Architecture
 - ❌ DDD
@@ -429,7 +429,7 @@ func NewEventModule(db *db.Client) contract.EventService {
 
 - `event/` - Event 定义（对外共享）
 - `dm/` - Domain Messaging
-- `client/` - SingerOS SDK
+- `client/` - Leros SDK
 - `types/` - 公开类型
 
 #### `pkg/dm` - 领域消息协议
@@ -798,7 +798,7 @@ Database
 
 ## 9. 总结
 
-SingerOS 后端应该从：
+Leros 后端应该从：
 
 ```
 MVC / service-based

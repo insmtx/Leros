@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	interactionevent "github.com/insmtx/SingerOS/backend/pkg/event"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	interactionevent "github.com/insmtx/Leros/backend/pkg/event"
 )
 
 // 测试Orchestrator是否可以初始化并注册默认处理器

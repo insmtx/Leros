@@ -1,7 +1,7 @@
 "use client";
 
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { cn } from "@singeros/ui/lib/utils";
+import { cn } from "@leros/ui/lib/utils";
 import { XIcon } from "lucide-react";
 import type * as React from "react";
 import { Button } from "./button";

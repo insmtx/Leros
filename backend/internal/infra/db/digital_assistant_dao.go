@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/insmtx/SingerOS/backend/types"
+	"github.com/insmtx/Leros/backend/types"
 )
 
 // CreateDigitalAssistant 创建数字助手

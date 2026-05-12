@@ -1,10 +1,10 @@
-// Package codex 将 Codex CLI 适配到 SingerOS 外部 CLI 引擎接口。
+// Package codex 将 Codex CLI 适配到 Leros 外部 CLI 引擎接口。
 package codex
 
 import (
 	"context"
 
-	"github.com/insmtx/SingerOS/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/runtime/engines"
 )
 
 // Adapter 通过 Codex CLI 执行提示。
@@ -33,7 +33,7 @@ func (a *Adapter) RegisterMCP(ctx context.Context, cfg engines.MCPServerConfig) 
 	args := []string{"mcp", "add", cfg.Name, "--url", cfg.URL}
 	env := []string(nil)
 	if cfg.BearerToken != "" {
-		tokenEnvVar := engines.SingerOSMCPTokenEnvVar()
+		tokenEnvVar := engines.LerosMCPTokenEnvVar()
 		args = append(args, "--bearer-token-env-var", tokenEnvVar)
 		env = append(env, tokenEnvVar+"="+cfg.BearerToken)
 	}

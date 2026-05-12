@@ -7,7 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/insmtx/SingerOS/backend/types"
+	"github.com/insmtx/Leros/backend/types"
 )
 
 // CreateSession 创建会话
@@ -75,13 +75,13 @@ func ResumeSession(ctx context.Context, db *gorm.DB, id uint) error {
 func ExpireSessions(ctx context.Context, db *gorm.DB) error {
 	now := time.Now()
 	return db.WithContext(ctx).Model(&types.Session{}).
-		Where("status = ? AND expired_at IS NOT NULL AND expired_at <= ?", 
+		Where("status = ? AND expired_at IS NOT NULL AND expired_at <= ?",
 			string(types.SessionStatusActive), now).
 		Update("status", string(types.SessionStatusExpired)).Error
 }
 
 // ListSessions 分页查询会话列表
-func ListSessions(ctx context.Context, db *gorm.DB, sessionType *string, status *string, userID *uint, assistantID *uint, assistantCode *string, keyword *string, page, perPage int) ([]*types.Session, int64, error) {
+func ListSessions(ctx context.Context, db *gorm.DB, sessionType *string, status *string, userID *uint, orgID *uint, assistantID *uint, assistantCode *string, keyword *string, page, perPage int) ([]*types.Session, int64, error) {
 	var entities []*types.Session
 	var total int64
 
@@ -94,7 +94,10 @@ func ListSessions(ctx context.Context, db *gorm.DB, sessionType *string, status 
 		query = query.Where("status = ?", *status)
 	}
 	if userID != nil && *userID > 0 {
-		query = query.Where("user_id = ?", *userID)
+		query = query.Where("uin = ?", *userID)
+	}
+	if orgID != nil && *orgID > 0 {
+		query = query.Where("org_id = ?", *orgID)
 	}
 	if assistantID != nil && *assistantID > 0 {
 		query = query.Where("assistant_id = ?", *assistantID)
@@ -142,4 +145,9 @@ func IncrementMessageCount(ctx context.Context, db *gorm.DB, id uint) error {
 // UpdateLastMessageAt 更新会话最后消息时间
 func UpdateLastMessageAt(ctx context.Context, db *gorm.DB, id uint, lastMessageAt time.Time) error {
 	return db.WithContext(ctx).Model(&types.Session{}).Where("id = ?", id).Update("last_message_at", lastMessageAt).Error
+}
+
+// UpdateAllocatedAssistantID 更新会话分配的数字员工 ID
+func UpdateAllocatedAssistantID(ctx context.Context, db *gorm.DB, id uint, allocatedAssistantID uint) error {
+	return db.WithContext(ctx).Model(&types.Session{}).Where("id = ?", id).Update("allocated_assistant_id", allocatedAssistantID).Error
 }

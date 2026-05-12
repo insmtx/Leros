@@ -1,9 +1,9 @@
 "use client";
 
-import { useChatStore } from "@singeros/store";
-import type { Attachment } from "@singeros/store/types/chat";
-import { Button } from "@singeros/ui/components/ui/button";
-import { cn } from "@singeros/ui/lib/utils";
+import { useChatStore } from "@leros/store";
+import type { Attachment } from "@leros/store/types/chat";
+import { Button } from "@leros/ui/components/ui/button";
+import { cn } from "@leros/ui/lib/utils";
 import { AtSign, ChevronDown, CircleStop, Paperclip, SendHorizonal, X } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 

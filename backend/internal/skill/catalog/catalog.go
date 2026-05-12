@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/insmtx/SingerOS/backend/pkg/singeros"
+	"github.com/insmtx/Leros/backend/pkg/leros"
 )
 
 const skillFileName = "SKILL.md"
@@ -26,7 +26,7 @@ type Catalog struct {
 	entries map[string]*Entry
 }
 
-// LoadDefaultCatalog 从默认 SingerOS Skill 目录加载 Skill。
+// LoadDefaultCatalog 从默认 Leros Skill 目录加载 Skill。
 func LoadDefaultCatalog() (*Catalog, string, error) {
 	candidates := defaultSkillDirCandidates()
 
@@ -61,14 +61,14 @@ func LoadDefaultCatalog() (*Catalog, string, error) {
 
 func defaultSkillDirCandidates() []string {
 	candidates := append([]string{}, defaultSkillDirs...)
-	if userDir, err := defaultSingerOSSkillsDir(); err == nil {
+	if userDir, err := defaultLerosSkillsDir(); err == nil {
 		candidates = append([]string{userDir}, candidates...)
 	}
 	return candidates
 }
 
-func defaultSingerOSSkillsDir() (string, error) {
-	skillsDir, err := singeros.SkillsDir()
+func defaultLerosSkillsDir() (string, error) {
+	skillsDir, err := leros.SkillsDir()
 	if err != nil {
 		return "", err
 	}

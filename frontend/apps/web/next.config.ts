@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-	transpilePackages: ["@singeros/ui", "@singeros/store"],
+	transpilePackages: ["@leros/ui", "@leros/store"],
 	allowedDevOrigins: ["172.16.0.160"],
 };
 

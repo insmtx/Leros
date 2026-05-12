@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
 )
 
 const (

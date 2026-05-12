@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	"github.com/insmtx/SingerOS/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	"github.com/insmtx/Leros/backend/runtime/engines"
 )
 
 func TestRunnerAdaptsEngineResult(t *testing.T) {

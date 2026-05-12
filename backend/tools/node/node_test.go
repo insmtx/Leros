@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/insmtx/SingerOS/backend/tools"
+	"github.com/insmtx/Leros/backend/tools"
 )
 
 type fakeNodeExecutor struct {

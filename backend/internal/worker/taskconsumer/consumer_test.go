@@ -9,15 +9,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/insmtx/SingerOS/backend/internal/infra/mq"
-	"github.com/insmtx/SingerOS/backend/pkg/dm"
+	"github.com/insmtx/Leros/backend/internal/agent/eventtypes"
+	"github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/pkg/dm"
 )
 
 func TestPublishWorkerTaskMessageToNATS(t *testing.T) {
-	natsURL := getenv("SINGEROS_TEST_NATS_URL", "nats://localhost:4222")
-	orgID := getenv("SINGEROS_TEST_ORG_ID", "1001")
-	workerID := getenv("SINGEROS_TEST_WORKER_ID", "worker_1")
-	sessionID := getenv("SINGEROS_TEST_SESSION_ID", "session_1")
+	natsURL := getenv("LEROS_TEST_NATS_URL", "nats://localhost:4222")
+	orgID := getenv("LEROS_TEST_ORG_ID", "1001")
+	workerID := getenv("LEROS_TEST_WORKER_ID", "worker_1")
+	sessionID := getenv("LEROS_TEST_SESSION_ID", "session_1")
 
 	bus, err := mq.NewPublisher(natsURL)
 	if err != nil {
@@ -32,38 +33,38 @@ func TestPublishWorkerTaskMessageToNATS(t *testing.T) {
 	taskID := randomTestID(t, "task")
 	runID := randomTestID(t, "run")
 
-	msg := dm.WorkerTaskMessage{
+	msg := eventtypes.WorkerTaskMessage{
 		ID:        messageID,
-		Type:      dm.MessageTypeWorkerTask,
+		Type:      eventtypes.MessageTypeWorkerTask,
 		CreatedAt: time.Now().UTC(),
-		Trace: dm.TraceContext{
+		Trace: eventtypes.TraceContext{
 			TraceID:   traceID,
 			RequestID: requestID,
 			TaskID:    taskID,
 			RunID:     runID,
 		},
-		Route: dm.RouteContext{
+		Route: eventtypes.RouteContext{
 			OrgID:     orgID,
 			SessionID: sessionID,
 			WorkerID:  workerID,
 		},
-		Body: dm.WorkerTaskBody{
-			TaskType: dm.TaskTypeAgentRun,
-			Actor: dm.ActorContext{
+		Body: eventtypes.WorkerTaskBody{
+			TaskType: eventtypes.TaskTypeAgentRun,
+			Actor: eventtypes.ActorContext{
 				UserID:      "user_test",
 				DisplayName: "Test User",
 				Channel:     "go_test",
 			},
-			Execution: dm.ExecutionTarget{
+			Execution: eventtypes.ExecutionTarget{
 				AssistantID: "assistant_test",
 				AgentID:     "agent_test",
 				Tools:       []string{},
 			},
-			Input: dm.TaskInput{
-				Type: dm.InputTypeTaskInstruction,
+			Input: eventtypes.TaskInput{
+				Type: eventtypes.InputTypeTaskInstruction,
 				Text: "这是一条来自 go test 的真实 NATS worker.task 调试消息，请回复确认 worker 已收到。",
 			},
-			Runtime: dm.RuntimeOptions{
+			Runtime: eventtypes.RuntimeOptions{
 				Kind:    "claude",
 				WorkDir: ".",
 			},

@@ -3,25 +3,25 @@ version: '3.8'
 services:
   postgresql:
     image: registry.yygu.cn/library/postgres:17.9
-    container_name: singer-postgresql
+    container_name: leros-postgresql
     environment:
-      POSTGRES_DB: singer_db
-      POSTGRES_USER: singer_user
-      POSTGRES_PASSWORD: singer_password
+      POSTGRES_DB: leros_db
+      POSTGRES_USER: leros_user
+      POSTGRES_PASSWORD: leros_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD", "pg_isready -U singer_user -d singer_db"]
+      test: ["CMD", "pg_isready -U leros_user -d leros_db"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   nats:
     image: registry.yygu.cn/library/nats:2.12.7
-    container_name: singer-nats
+    container_name: leros-nats
     command: ["--jetstream"]
     environment: []
     ports:
@@ -38,7 +38,7 @@ services:
 
   redis:
     image: registry.yygu.cn/library/redis:8.2
-    container_name: singer-redis
+    container_name: leros-redis
     environment:
       - REDIS_PASSWORD=redis_password
     ports:
@@ -51,9 +51,9 @@ services:
       timeout: 3s
       retries: 3
 
-  singer:
-    image: localhost/env_singer:latest
-    container_name: singer-app
+  leros:
+    image: localhost/env_leros:latest
+    container_name: leros-app
     ports:
       - "8080:8080"
     depends_on:
@@ -64,7 +64,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgres://singer_user:singer_password@postgresql:5432/singer_db
+      - DATABASE_URL=postgres://leros_user:leros_password@postgresql:5432/leros_db
       - NATS_URL=nats://nats:4222
       - REDIS_URL=redis://:redis_password@redis:6379
       - GIN_MODE=release
@@ -74,8 +74,8 @@ services:
     restart: unless-stopped
 
   worker:
-    image: localhost/env_singer:latest
-    container_name: singer-worker
+    image: localhost/env_leros:latest
+    container_name: leros-worker
     depends_on:
       postgresql:
         condition: service_healthy
@@ -84,7 +84,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgres://singer_user:singer_password@postgresql:5432/singer_db
+      - DATABASE_URL=postgres://leros_user:leros_password@postgresql:5432/leros_db
       - NATS_URL=nats://nats:4222
       - REDIS_URL=redis://:redis_password@redis:6379
     volumes:

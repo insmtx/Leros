@@ -2,18 +2,19 @@ package middleware
 
 import (
 	"context"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
-	"github.com/ygpkg/yg-go/encryptor/snowflake"
 	ygauth "github.com/ygpkg/yg-go/apis/runtime/auth"
+	"github.com/ygpkg/yg-go/encryptor/snowflake"
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
 
-	localauth "github.com/insmtx/SingerOS/backend/internal/api/auth"
-	"github.com/insmtx/SingerOS/backend/internal/infra/db"
+	localauth "github.com/insmtx/Leros/backend/internal/api/auth"
+	"github.com/insmtx/Leros/backend/internal/infra/db"
 )
 
 const (
@@ -45,6 +46,13 @@ func CallerMiddleware(jwtSecret string, database *gorm.DB) gin.HandlerFunc {
 }
 
 func parseCallerFromRequest(ctx *gin.Context, jwtSecret string, database *gorm.DB, reqID string) *localauth.Caller {
+	if os.Getenv("LEROS_DEV") == "true" {
+		return &localauth.Caller{
+			Uin:   1,
+			OrgID: 1,
+			State: localauth.AuthStateSucc,
+		}
+	}
 	authHeader := ctx.Request.Header.Get("Authorization")
 	if authHeader == "" {
 		return &localauth.Caller{

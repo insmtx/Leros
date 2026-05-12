@@ -3,8 +3,8 @@ package builtin
 import (
 	"testing"
 
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/runtime/engines"
 )
 
 func TestNewRegistryFromConfigDetectsInstalledEngines(t *testing.T) {

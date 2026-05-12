@@ -1,6 +1,6 @@
 # Orchestrator
 
-Orchestrator 是 SingerOS 的核心组件之一，负责消费由各种连接器（如 GitHub）发布的事件，并执行相应的业务逻辑。
+Orchestrator 是 Leros 的核心组件之一，负责消费由各种连接器（如 GitHub）发布的事件，并执行相应的业务逻辑。
 
 ## 功能特性
 
@@ -16,7 +16,7 @@ Orchestrator 是 SingerOS 的核心组件之一，负责消费由各种连接器
 
 ## 如何使用
 
-Orchestrator 在 SingerOS 后台服务启动时同时启动，并自动订阅配置好的事件主题。
+Orchestrator 在 Leros 后台服务启动时同时启动，并自动订阅配置好的事件主题。
 
 ## 架构原理
 

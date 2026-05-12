@@ -9,7 +9,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}SingerOS Dev Environment Setup${NC}"
+echo -e "${BLUE}Leros Dev Environment Setup${NC}"
 echo ""
 
 echo -e "${BLUE}Checking prerequisites...${NC}"

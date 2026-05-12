@@ -1,9 +1,9 @@
 "use client";
 
-import { useLayoutStore } from "@singeros/store";
-import { Button } from "@singeros/ui/components/ui/button";
-import { ScrollArea } from "@singeros/ui/components/ui/scroll-area";
-import { cn } from "@singeros/ui/lib/utils";
+import { useLayoutStore } from "@leros/store";
+import { Button } from "@leros/ui/components/ui/button";
+import { ScrollArea } from "@leros/ui/components/ui/scroll-area";
+import { cn } from "@leros/ui/lib/utils";
 import { Bolt, File, FileText, ImageIcon, Inbox, Upload } from "lucide-react";
 
 type QuickAction = {

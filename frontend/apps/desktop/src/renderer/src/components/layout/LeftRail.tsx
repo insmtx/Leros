@@ -1,10 +1,10 @@
 "use client";
 
-import type { NavItem } from "@singeros/store";
-import { useLayoutStore } from "@singeros/store";
-import { Button } from "@singeros/ui/components/ui/button";
-import { ScrollArea } from "@singeros/ui/components/ui/scroll-area";
-import { cn } from "@singeros/ui/lib/utils";
+import type { NavItem } from "@leros/store";
+import { useLayoutStore } from "@leros/store";
+import { Button } from "@leros/ui/components/ui/button";
+import { ScrollArea } from "@leros/ui/components/ui/scroll-area";
+import { cn } from "@leros/ui/lib/utils";
 import {
 	BookOpen,
 	Bot,

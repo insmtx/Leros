@@ -8,13 +8,15 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/ygpkg/yg-go/logs"
+
+	"github.com/insmtx/Leros/backend/internal/worker/wsproto"
 )
 
 type WSClient struct {
 	conn          *websocket.Conn
-	workerID      string
+	workerID      uint
 	serverAddr    string
-	send          chan map[string]interface{}
+	send          chan *wsproto.WSMessage
 	ctx           context.Context
 	cancel        context.CancelFunc
 	onConfigReady func(config map[string]interface{})
@@ -22,7 +24,7 @@ type WSClient struct {
 
 type WSClientOption func(*WSClient)
 
-func WithWorkerID(workerID string) WSClientOption {
+func WithWorkerID(workerID uint) WSClientOption {
 	return func(c *WSClient) {
 		c.workerID = workerID
 	}
@@ -34,12 +36,12 @@ func WithOnConfigReady(handler func(map[string]interface{})) WSClientOption {
 	}
 }
 
-func NewWSClient(serverAddr, workerID string, opts ...WSClientOption) *WSClient {
+func NewWSClient(serverAddr string, workerID uint, opts ...WSClientOption) *WSClient {
 	ctx, cancel := context.WithCancel(context.Background())
 	c := &WSClient{
 		workerID:   workerID,
 		serverAddr: serverAddr,
-		send:       make(chan map[string]interface{}, 256),
+		send:       make(chan *wsproto.WSMessage, 256),
 		ctx:        ctx,
 		cancel:     cancel,
 	}
@@ -62,15 +64,15 @@ func (c *WSClient) Connect(ctx context.Context) error {
 	c.conn = conn
 	logs.Infof("Connected to server successfully")
 
-	registerMsg := map[string]interface{}{
-		"type": "worker_register",
-		"payload": map[string]interface{}{
-			"worker_id": c.workerID,
-			"timestamp": time.Now().Unix(),
-		},
+	registerMsg, err := wsproto.NewPayload(wsproto.MsgTypeWorkerRegister, wsproto.RegisterPayload{
+		WorkerID:  fmt.Sprintf("worker_%d", c.workerID),
+		Timestamp: time.Now().Unix(),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create registration payload: %w", err)
 	}
 
-	if err := c.sendJSON(registerMsg); err != nil {
+	if err := c.sendWSMessage(registerMsg); err != nil {
 		return fmt.Errorf("failed to send registration: %w", err)
 	}
 
@@ -100,13 +102,13 @@ func (c *WSClient) readLoop(ctx context.Context) {
 				return
 			}
 
-			var msg map[string]interface{}
+			var msg wsproto.WSMessage
 			if err := json.Unmarshal(message, &msg); err != nil {
 				logs.Errorf("Failed to unmarshal message: %v", err)
 				continue
 			}
 
-			c.handleMessage(msg)
+			c.handleMessage(&msg)
 		}
 	}
 }
@@ -124,7 +126,7 @@ func (c *WSClient) writeLoop(ctx context.Context) {
 			if !ok {
 				return
 			}
-			if err := c.sendJSON(msg); err != nil {
+			if err := c.sendWSMessage(msg); err != nil {
 				logs.Errorf("Failed to send message: %v", err)
 				return
 			}
@@ -132,64 +134,67 @@ func (c *WSClient) writeLoop(ctx context.Context) {
 	}
 }
 
-func (c *WSClient) handleMessage(msg map[string]interface{}) {
-	msgType, _ := msg["type"].(string)
-	switch msgType {
-	case "welcome":
+func (c *WSClient) handleMessage(msg *wsproto.WSMessage) {
+	switch msg.Type {
+	case wsproto.MsgTypeWelcome:
 		logs.Infof("Received welcome from server")
-		if c.workerID != "" {
+		if c.workerID != 0 {
 			c.requestConfig()
 		}
-	case "configResponse":
+	case wsproto.MsgTypeConfigResponse:
 		c.handleConfigResponse(msg)
-	case "config_update":
+	case wsproto.MsgTypeConfigUpdate:
 		logs.Infof("Received config update")
 	default:
-		logs.Debugf("Received message: %s", msgType)
+		logs.Debugf("Received message: %s", msg.Type)
 	}
 }
 
 func (c *WSClient) requestConfig() {
-	reqMsg := map[string]interface{}{
-		"type": "getConfig",
-		"payload": map[string]interface{}{
-			"worker_id": c.workerID,
-		},
+	reqMsg, err := wsproto.NewPayload(wsproto.MsgTypeGetConfig, wsproto.GetConfigPayload{
+		WorkerID: c.workerID,
+	})
+	if err != nil {
+		logs.Errorf("Failed to create config request payload: %v", err)
+		return
 	}
-	if err := c.sendJSON(reqMsg); err != nil {
+
+	if err := c.sendWSMessage(reqMsg); err != nil {
 		logs.Errorf("Failed to request config: %v", err)
 	} else {
-		logs.Infof("Requested config for worker %s", c.workerID)
+		logs.Infof("Requested config for worker %d", c.workerID)
 	}
 }
 
-func (c *WSClient) handleConfigResponse(msg map[string]interface{}) {
-	payload, ok := msg["payload"].(map[string]interface{})
-	if !ok {
-		logs.Errorf("Invalid configResponse payload")
+func (c *WSClient) handleConfigResponse(msg *wsproto.WSMessage) {
+	var payload wsproto.ConfigResponsePayload
+	if err := msg.GetPayload(&payload); err != nil {
+		logs.Errorf("Failed to unmarshal config response payload: %v", err)
 		return
 	}
 
-	if errMsg, ok := payload["error"].(string); ok && errMsg != "" {
-		logs.Errorf("Config response error: %s", errMsg)
+	if payload.Error != "" {
+		logs.Errorf("Config response error: %s", payload.Error)
 		return
 	}
 
-	config, ok := payload["config"].(map[string]interface{})
-	if !ok {
+	if payload.Config == nil {
 		logs.Errorf("Config not found in response")
 		return
 	}
 
 	if c.onConfigReady != nil {
-		c.onConfigReady(config)
+		configMap := make(map[string]interface{})
+		bytes, _ := json.Marshal(payload.Config)
+		json.Unmarshal(bytes, &configMap)
+		c.onConfigReady(configMap)
 		logs.Info("Config processed successfully")
 	} else {
 		logs.Warn("No config handler registered")
 	}
 }
 
-func (c *WSClient) sendJSON(msg map[string]interface{}) error {
+func (c *WSClient) sendWSMessage(msg *wsproto.WSMessage) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
 		return err

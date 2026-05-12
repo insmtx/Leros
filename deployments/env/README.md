@@ -1,6 +1,6 @@
-# SingerOS Development Environment
+# Leros Development Environment
 
-Docker Compose setup for SingerOS development environment.
+Docker Compose setup for Leros development environment.
 
 ## Services
 
@@ -34,7 +34,7 @@ docker-compose logs -f
 
 ## Ports
 
-- `8080`: SingerOS API server
+- `8080`: Leros API server
 - `5432`: PostgreSQL server
 - `4222`: NATS server (Client)
 - `8222`: NATS Monitoring

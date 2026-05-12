@@ -1,4 +1,4 @@
-// api 包提供 SingerOS 的 HTTP API 层
+// api 包提供 Leros 的 HTTP API 层
 //
 // 该包负责设置和管理 HTTP 路由，处理外部 API 请求，
 // 并注册各种渠道的连接器。
@@ -6,24 +6,25 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/insmtx/SingerOS/backend/config"
-	auth "github.com/insmtx/SingerOS/backend/internal/api/auth"
-	"github.com/insmtx/SingerOS/backend/internal/api/connectors/github"
-	"github.com/insmtx/SingerOS/backend/internal/api/connectors/gitlab"
-	"github.com/insmtx/SingerOS/backend/internal/api/handler"
-	"github.com/insmtx/SingerOS/backend/internal/api/middleware"
-	eventbus "github.com/insmtx/SingerOS/backend/internal/infra/mq"
-	githubprovider "github.com/insmtx/SingerOS/backend/internal/infra/providers/github"
-	"github.com/insmtx/SingerOS/backend/internal/infra/websocket"
-	"github.com/insmtx/SingerOS/backend/internal/service"
-	"github.com/insmtx/SingerOS/backend/internal/worker/scheduler"
-	workerserver "github.com/insmtx/SingerOS/backend/internal/worker/server"
-	singerMCP "github.com/insmtx/SingerOS/backend/mcp"
+	"github.com/insmtx/Leros/backend/config"
+	auth "github.com/insmtx/Leros/backend/internal/api/auth"
+	"github.com/insmtx/Leros/backend/internal/api/connectors/github"
+	"github.com/insmtx/Leros/backend/internal/api/connectors/gitlab"
+	"github.com/insmtx/Leros/backend/internal/api/handler"
+	"github.com/insmtx/Leros/backend/internal/api/middleware"
+	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
+	githubprovider "github.com/insmtx/Leros/backend/internal/infra/providers/github"
+	"github.com/insmtx/Leros/backend/internal/infra/websocket"
+	"github.com/insmtx/Leros/backend/internal/service"
+	"github.com/insmtx/Leros/backend/internal/worker/scheduler"
+	workerserver "github.com/insmtx/Leros/backend/internal/worker/server"
+	singerMCP "github.com/insmtx/Leros/backend/mcp"
 	ygmiddleware "github.com/ygpkg/yg-go/apis/runtime/middleware"
 	"github.com/ygpkg/yg-go/logs"
+
 	"gorm.io/gorm"
 
-	_ "github.com/insmtx/SingerOS/docs/swagger" // Swagger 文档生成的导入
+	_ "github.com/insmtx/Leros/docs/swagger" // Swagger 文档生成的导入
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -32,7 +33,7 @@ import (
 //
 // 根据配置初始化并注册 GitHub、GitLab 等渠道连接器，
 // 同时设置客户端 WebSocket 连接器，并将所有连接器的路由注册到 HTTP 服务器。
-func SetupRouter(cfg config.Config, publisher eventbus.Publisher, db *gorm.DB) *gin.Engine {
+func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gin.Engine {
 	r := gin.New()
 	r.Use(ygmiddleware.CORS())
 	r.Use(middleware.CallerMiddleware(cfg.Server.JWT.Secret, db))
@@ -43,7 +44,7 @@ func SetupRouter(cfg config.Config, publisher eventbus.Publisher, db *gorm.DB) *
 		if cfg.Github != nil {
 			logs.Info("Setting up GitHub connector")
 			authService := initThirdPartyAuthService(&cfg)
-			github.RegisterGitHubRoutes(v1, *cfg.Github, publisher, db, authService)
+			github.RegisterGitHubRoutes(v1, *cfg.Github, eventbus, db, authService)
 			logs.Info("GitHub connector registered successfully")
 		} else {
 			logs.Debug("No GitHub configuration provided, skipping GitHub connector setup")
@@ -51,32 +52,29 @@ func SetupRouter(cfg config.Config, publisher eventbus.Publisher, db *gorm.DB) *
 
 		if cfg.Gitlab != nil {
 			logs.Info("Setting up GitLab connector")
-			gitlab.RegisterGitLabRoutes(v1, *cfg.Gitlab, publisher)
+			gitlab.RegisterGitLabRoutes(v1, *cfg.Gitlab, eventbus)
 			logs.Info("GitLab connector registered successfully")
 		} else {
 			logs.Debug("No GitLab configuration provided, skipping GitLab connector setup")
 		}
 	}
 	{
-		websocket.RegisterWebSocketRoutes(v1, publisher)
+		websocket.RegisterWebSocketRoutes(v1, eventbus)
 		logs.Info("WebSocket connector registered successfully")
 	}
 	{
 		workerScheduler := scheduler.NewProcessScheduler(cfg.Scheduler)
 
 		workerManager := workerserver.NewServer(workerScheduler, db)
-		workerManager.RegisterRoutes(v1)
+		workerManager.RegisterRoutes(r)
 		logs.Info("Worker server routes registered successfully")
 
 		digitalAssistantService := service.NewDigitalAssistantService(db, workerScheduler)
 		handler.RegisterDigitalAssistantRoutes(v1, digitalAssistantService)
 		logs.Info("Digital assistant routes registered successfully")
 
-		orgID := "default_org"
-		if cfg.Organization != nil && cfg.Organization.ID != "" {
-			orgID = cfg.Organization.ID
-		}
-		sessionService := service.NewSessionService(db, nil, orgID)
+		inferrer := service.NewDefaultAssistantInferrer(1)
+		sessionService := service.NewSessionService(db, eventbus, eventbus, inferrer)
 		handler.RegisterSessionRoutes(v1, sessionService)
 		logs.Info("Session routes registered successfully")
 	}

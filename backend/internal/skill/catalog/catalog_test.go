@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/insmtx/SingerOS/backend/pkg/singeros"
+	"github.com/insmtx/Leros/backend/pkg/leros"
 )
 
 func TestCatalogLoadsSkillDocuments(t *testing.T) {
@@ -19,10 +19,10 @@ func TestCatalogLoadsSkillDocuments(t *testing.T) {
 
 	skillDocument := `---
 name: github-pr-review
-description: Review GitHub pull requests with SingerOS conventions.
+description: Review GitHub pull requests with Leros conventions.
 version: 1.0.0
 metadata:
-  singeros:
+  leros:
     category: github
     tags: [github, pr, review]
     always: true
@@ -61,8 +61,8 @@ Review steps here.
 	if err != nil {
 		t.Fatalf("get skill failed: %v", err)
 	}
-	if entry.Manifest.Metadata.SingerOS.Category != "github" {
-		t.Fatalf("expected category github, got %s", entry.Manifest.Metadata.SingerOS.Category)
+	if entry.Manifest.Metadata.Leros.Category != "github" {
+		t.Fatalf("expected category github, got %s", entry.Manifest.Metadata.Leros.Category)
 	}
 	if entry.Body == "" {
 		t.Fatalf("expected non-empty skill body")
@@ -138,13 +138,13 @@ func TestCatalogMergeKeepsFirstDuplicateSkill(t *testing.T) {
 	}
 }
 
-func TestDefaultSingerOSSkillsDirUsesSingerOSHome(t *testing.T) {
+func TestDefaultLerosSkillsDirUsesLerosHome(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv(singeros.EnvHome, home)
+	t.Setenv(leros.EnvHome, home)
 
-	dir, err := defaultSingerOSSkillsDir()
+	dir, err := defaultLerosSkillsDir()
 	if err != nil {
-		t.Fatalf("default SingerOS skills dir: %v", err)
+		t.Fatalf("default Leros skills dir: %v", err)
 	}
 
 	expected := filepath.Join(home, "skills")

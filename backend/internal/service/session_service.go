@@ -9,14 +9,17 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/insmtx/SingerOS/backend/internal/api/auth"
-	"github.com/insmtx/SingerOS/backend/internal/api/contract"
-	"github.com/insmtx/SingerOS/backend/internal/api/dto"
-	"github.com/insmtx/SingerOS/backend/internal/infra/db"
-	eventbus "github.com/insmtx/SingerOS/backend/internal/infra/mq"
-	"github.com/insmtx/SingerOS/backend/pkg/dm"
-	"github.com/insmtx/SingerOS/backend/runtime/events"
-	"github.com/insmtx/SingerOS/backend/types"
+	"github.com/insmtx/Leros/backend/internal/agent/eventtypes"
+	"github.com/insmtx/Leros/backend/internal/api/auth"
+	"github.com/insmtx/Leros/backend/internal/api/contract"
+	"github.com/insmtx/Leros/backend/internal/api/dto"
+	"github.com/insmtx/Leros/backend/internal/infra/db"
+	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/pkg/dm"
+	"github.com/insmtx/Leros/backend/runtime/events"
+	"github.com/insmtx/Leros/backend/types"
+	"github.com/ygpkg/yg-go/encryptor/snowflake"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 var _ contract.SessionService = (*sessionService)(nil)
@@ -24,14 +27,16 @@ var _ contract.SessionService = (*sessionService)(nil)
 type sessionService struct {
 	db         *gorm.DB
 	subscriber eventbus.Subscriber
-	orgID      string
+	publisher  eventbus.Publisher
+	inferrer   AssistantInferrer
 }
 
-func NewSessionService(db *gorm.DB, subscriber eventbus.Subscriber, orgID string) contract.SessionService {
+func NewSessionService(db *gorm.DB, subscriber eventbus.Subscriber, publisher eventbus.Publisher, inferrer AssistantInferrer) contract.SessionService {
 	return &sessionService{
 		db:         db,
 		subscriber: subscriber,
-		orgID:      orgID,
+		publisher:  publisher,
+		inferrer:   inferrer,
 	}
 }
 
@@ -40,9 +45,14 @@ func (s *sessionService) CreateSession(ctx context.Context, req *contract.Create
 		return nil, errors.New("type is required")
 	}
 
+	caller, _ := auth.FromContext(ctx)
+	if caller == nil || caller.Uin == 0 || caller.OrgID == 0 {
+		return nil, errors.New("user not authenticated or org not set")
+	}
+
 	sessionID := req.SessionID
 	if sessionID == "" {
-		sessionID = fmt.Sprintf("sess_%d", time.Now().UnixNano())
+		sessionID = fmt.Sprintf("sess_%s", snowflake.GenerateIDBase58())
 	}
 
 	exists, err := db.SessionIDExists(ctx, s.db, sessionID, 0)
@@ -54,15 +64,16 @@ func (s *sessionService) CreateSession(ctx context.Context, req *contract.Create
 	}
 
 	session := &types.Session{
-		SessionID:     sessionID,
-		Type:          req.Type,
-		UserID:        req.UserID,
-		AssistantID:   req.AssistantID,
-		AssistantCode: req.AssistantCode,
-		Status:        string(types.SessionStatusActive),
-		Title:         req.Title,
-		MessageCount:  0,
-		ExpiredAt:     req.ExpiredAt,
+		SessionID:            sessionID,
+		Type:                 req.Type,
+		Uin:                  caller.Uin,
+		OrgID:                caller.OrgID,
+		AssistantID:          req.AssistantID,
+		AllocatedAssistantID: req.AssistantID,
+		Status:               string(types.SessionStatusActive),
+		Title:                req.Title,
+		MessageCount:         0,
+		ExpiredAt:            req.ExpiredAt,
 	}
 
 	if req.Metadata != nil {
@@ -139,12 +150,22 @@ func (s *sessionService) DeleteSession(ctx context.Context, id uint) error {
 }
 
 func (s *sessionService) ListSessions(ctx context.Context, req *contract.ListSessionsRequest) (*contract.SessionList, error) {
+	caller, _ := auth.FromContext(ctx)
+
+	var uin *uint
+	var orgID *uint
+	if caller != nil && caller.Uin > 0 {
+		uin = &caller.Uin
+		orgID = &caller.OrgID
+	}
+
 	sessions, total, err := db.ListSessions(
 		ctx,
 		s.db,
 		req.Type,
 		req.Status,
-		req.UserID,
+		uin,
+		orgID,
 		req.AssistantID,
 		req.AssistantCode,
 		req.Keyword,
@@ -300,6 +321,68 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID uint, req *co
 		return nil, err
 	}
 
+	caller, _ := auth.FromContext(ctx)
+	orgID := session.OrgID
+	if orgID == 0 && caller != nil {
+		orgID = caller.OrgID
+	}
+
+	if session.AssistantID == 0 && session.AllocatedAssistantID == 0 && s.inferrer != nil {
+		assignedAssistantID := s.inferrer.InferAssignedAssistantID(ctx, orgID, session.Type)
+		if assignedAssistantID > 0 {
+			session.AllocatedAssistantID = assignedAssistantID
+			session.UpdatedAt = time.Now()
+			if err := db.UpdateSession(ctx, s.db, session); err != nil {
+				return nil, fmt.Errorf("failed to update allocated_assistant_id: %w", err)
+			}
+		}
+	}
+
+	topic, err := dm.WorkerTaskTopic(orgID, session.AllocatedAssistantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct worker task topic: %w", err)
+	}
+
+	messagePayload := eventtypes.WorkerTaskMessage{
+		ID:        fmt.Sprintf("msg_%d_%d", session.ID, message.Sequence),
+		Type:      eventtypes.MessageTypeWorkerTask,
+		CreatedAt: time.Now().UTC(),
+		Trace: eventtypes.TraceContext{
+			TraceID:   session.SessionID,
+			RequestID: fmt.Sprintf("req_%d", message.ID),
+			TaskID:    fmt.Sprintf("task_%d", message.ID),
+		},
+		Route: eventtypes.RouteContext{
+			OrgID:     fmt.Sprintf("%d", orgID),
+			SessionID: session.SessionID,
+			WorkerID:  fmt.Sprintf("%d", session.AllocatedAssistantID),
+		},
+		Body: eventtypes.WorkerTaskBody{
+			TaskType: eventtypes.TaskTypeAgentRun,
+			Actor: eventtypes.ActorContext{
+				UserID:      fmt.Sprintf("%d", session.Uin),
+				DisplayName: "",
+				Channel:     "session",
+			},
+			Input: eventtypes.TaskInput{
+				Type: eventtypes.InputTypeMessage,
+				Text: message.Content,
+			},
+		},
+		Metadata: map[string]any{
+			"session_id":   session.SessionID,
+			"message_type": message.MessageType,
+			"sequence":     message.Sequence,
+			"timestamp":    message.Timestamp,
+		},
+	}
+
+	if err := s.publisher.Publish(ctx, topic, messagePayload); err != nil {
+		logs.ErrorContextf(ctx, "Failed to publish message to assistant %d: %v", session.AllocatedAssistantID, err)
+		return nil, fmt.Errorf("failed to publish message to assistant: %w", err)
+	}
+	logs.DebugContextf(ctx, "Published message to topic %s: session_id=%s sequence=%d", topic, session.SessionID, message.Sequence)
+
 	return convertToContractSessionMessage(message), nil
 }
 
@@ -371,17 +454,18 @@ func toJSONString(v interface{}) string {
 }
 
 func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID string, lastSequence int64, sink events.Sink) error {
-	// 优先从 Context 的 Caller 中获取 OrgID
 	caller, _ := auth.FromContext(ctx)
-	orgID := s.orgID
-	if caller != nil && caller.OrgID != 0 {
-		orgID = fmt.Sprintf("%d", caller.OrgID)
+	if caller == nil || caller.OrgID == 0 {
+		return errors.New("user not authenticated or org not set")
 	}
 
-	topic := dm.Topic().Org(orgID).Session(sessionID).Message().Stream().Build()
+	topic, err := dm.SessionResultStreamTopic(caller.OrgID, sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to construct session result stream topic: %w", err)
+	}
 	return s.subscriber.Subscribe(ctx, topic, func(event any) {
 		switch msg := event.(type) {
-		case dm.MessageStreamMessage:
+		case eventtypes.MessageStreamMessage:
 			if msg.Body.Seq <= lastSequence {
 				return
 			}
@@ -393,13 +477,13 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 			}
 
 			switch msg.Body.Event {
-			case dm.StreamEventMessageDelta:
+			case eventtypes.StreamEventMessageDelta:
 				se.Type = dto.SessionEventTypeMessageDelta
 				se.Payload = dto.MessageDeltaPayload{
 					Role:    string(msg.Body.Payload.Role),
 					Content: msg.Body.Payload.Content,
 				}
-			case dm.StreamEventToolCallStarted:
+			case eventtypes.StreamEventToolCallStarted:
 				se.Type = dto.SessionEventTypeToolCallStarted
 				if tc := msg.Body.Payload.ToolCall; tc != nil {
 					se.Payload = dto.ToolCallDeltaPayload{
@@ -407,13 +491,14 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 						Name: tc.Name,
 					}
 				}
-			case dm.StreamEventRunStarted:
+			case eventtypes.StreamEventRunStarted:
 				se.Type = dto.SessionEventTypeRunStarted
-			case dm.StreamEventRunCompleted:
+			case eventtypes.StreamEventRunCompleted:
 				se.Type = dto.SessionEventTypeRunCompleted
-			case dm.StreamEventRunFailed:
+			case eventtypes.StreamEventRunFailed:
 				se.Type = dto.SessionEventTypeRunFailed
 			default:
+				logs.Warnf("unknown stream event type: %v", msg.Body.Event)
 				return
 			}
 			_ = sink.Emit(ctx, &events.Event{
@@ -426,17 +511,18 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 
 func convertToContractSession(session *types.Session) *contract.Session {
 	result := &contract.Session{
-		ID:            session.ID,
-		SessionID:     session.SessionID,
-		Type:          session.Type,
-		UserID:        session.UserID,
-		AssistantID:   session.AssistantID,
-		AssistantCode: session.AssistantCode,
-		Status:        session.Status,
-		Title:         session.Title,
-		MessageCount:  session.MessageCount,
-		CreatedAt:     session.CreatedAt,
-		UpdatedAt:     session.UpdatedAt,
+		ID:                   session.ID,
+		SessionID:            session.SessionID,
+		Type:                 session.Type,
+		Uin:                  session.Uin,
+		OrgID:                session.OrgID,
+		AssistantID:          session.AssistantID,
+		AllocatedAssistantID: session.AllocatedAssistantID,
+		Status:               session.Status,
+		Title:                session.Title,
+		MessageCount:         session.MessageCount,
+		CreatedAt:            session.CreatedAt,
+		UpdatedAt:            session.UpdatedAt,
 	}
 
 	if session.Metadata.Tags != nil || session.Metadata.Extra != nil || session.Metadata.UserAgent != "" || session.Metadata.IPAddress != "" {

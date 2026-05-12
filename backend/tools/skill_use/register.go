@@ -3,8 +3,8 @@ package skilluse
 import (
 	"fmt"
 
-	skillcatalog "github.com/insmtx/SingerOS/backend/internal/skill/catalog"
-	"github.com/insmtx/SingerOS/backend/tools"
+	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
+	"github.com/insmtx/Leros/backend/tools"
 )
 
 // NewTools returns all skill catalog tools for registration.

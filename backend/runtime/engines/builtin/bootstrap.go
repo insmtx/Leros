@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/runtime/engines"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -17,7 +17,7 @@ type BootstrapOptions struct {
 	MCP             engines.MCPServerConfig
 }
 
-// BootstrapCLIEngines discovers built-in CLIs, syncs skills, and registers SingerOS MCP.
+// BootstrapCLIEngines discovers built-in CLIs, syncs skills, and registers Leros MCP.
 func BootstrapCLIEngines(ctx context.Context, cfg *config.CLIEnginesConfig, opts BootstrapOptions) (*config.CLIEnginesConfig, error) {
 	if cfg == nil {
 		cfg = &config.CLIEnginesConfig{}
@@ -95,10 +95,10 @@ func registerMCPForAvailableCLI(ctx context.Context, available []engines.CLITool
 		}
 		if err := engine.RegisterMCP(ctx, cfg); err != nil {
 			registerErr = errors.Join(registerErr, fmt.Errorf("%s: %w", status.Name, err))
-			logs.Warnf("Failed to register SingerOS MCP server for %s: %v", status.Name, err)
+			logs.Warnf("Failed to register Leros MCP server for %s: %v", status.Name, err)
 			continue
 		}
-		logs.Infof("Registered SingerOS MCP server for %s", status.Name)
+		logs.Infof("Registered Leros MCP server for %s", status.Name)
 	}
 	return registerErr
 }

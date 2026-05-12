@@ -3,7 +3,7 @@ package memory
 import (
 	"fmt"
 
-	"github.com/insmtx/SingerOS/backend/tools"
+	"github.com/insmtx/Leros/backend/tools"
 )
 
 // NewTools returns all built-in memory tools.

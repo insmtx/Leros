@@ -1,4 +1,4 @@
-// types 包提供 SingerOS 的核心数据类型定义
+// types 包提供 Leros 的核心数据类型定义
 //
 // 该包定义了数字助手、事件、用户、技能等核心领域模型，
 // 以及相关的常量和数据库表名定义。
@@ -19,6 +19,7 @@ type User struct {
 	gorm.Model
 	GithubID    int64  `gorm:"column:github_id;type:bigint;unique_index"`                   // GitHub 用户 ID
 	GithubLogin string `gorm:"column:github_login;type:varchar(255);not null;unique_index"` // GitHub 登录名
+	Password    string `gorm:"column:password;type:varchar(255)"`                           // 密码（本地认证用）
 	Name        string `gorm:"column:name;type:varchar(255)"`                               // 用户姓名
 	Email       string `gorm:"column:email;type:varchar(255)"`                              // 用户邮箱
 	AvatarURL   string `gorm:"column:avatar_url;type:varchar(500)"`                         // 头像 URL

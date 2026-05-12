@@ -1,41 +1,41 @@
-package dm
+package eventtypes
 
-// TaskType 表示请求 Worker 执行的任务类型。
+// TaskType represents the type of task requested for Worker execution.
 type TaskType string
 
 const (
-	// TaskTypeAgentRun 表示请求 Worker 执行一次 Agent 运行。
+	// TaskTypeAgentRun requests the Worker to execute an Agent run.
 	TaskTypeAgentRun TaskType = "agent.run"
 )
 
-// InputType 表示任务输入的主要形态。
+// InputType represents the primary form of task input.
 type InputType string
 
 const (
-	// InputTypeMessage 表示普通对话消息输入。
+	// InputTypeMessage represents normal conversation message input.
 	InputTypeMessage InputType = "message"
-	// InputTypeTaskInstruction 表示直接任务指令输入。
+	// InputTypeTaskInstruction represents direct task instruction input.
 	InputTypeTaskInstruction InputType = "task_instruction"
 )
 
-// MessageRole 表示对话或流式消息的产生者角色。
+// MessageRole represents the producer role in conversations or stream messages.
 type MessageRole string
 
 const (
-	// MessageRoleUser 表示人类用户或外部用户消息。
+	// MessageRoleUser represents human user or external user messages.
 	MessageRoleUser MessageRole = "user"
-	// MessageRoleAssistant 表示助手消息。
+	// MessageRoleAssistant represents assistant messages.
 	MessageRoleAssistant MessageRole = "assistant"
-	// MessageRoleSystem 表示系统消息。
+	// MessageRoleSystem represents system messages.
 	MessageRoleSystem MessageRole = "system"
-	// MessageRoleTool 表示工具结果消息。
+	// MessageRoleTool represents tool result messages.
 	MessageRoleTool MessageRole = "tool"
 )
 
-// WorkerTaskMessage 是 Server 发送给 Worker 的任务消息协议。
+// WorkerTaskMessage is the task message protocol from Server to Worker.
 type WorkerTaskMessage = Envelope[WorkerTaskBody]
 
-// WorkerTaskBody 是 Server 发送给 Worker 的任务消息载荷。
+// WorkerTaskBody is the payload of task messages from Server to Worker.
 type WorkerTaskBody struct {
 	TaskType TaskType `json:"task_type"`
 
@@ -47,7 +47,7 @@ type WorkerTaskBody struct {
 	Policy  TaskPolicy     `json:"policy,omitempty"`
 }
 
-// ActorContext 描述任务发起方身份。
+// ActorContext describes the identity of the task initiator.
 type ActorContext struct {
 	UserID      string `json:"user_id,omitempty"`
 	DisplayName string `json:"display_name,omitempty"`
@@ -56,7 +56,7 @@ type ActorContext struct {
 	AccountID   string `json:"account_id,omitempty"`
 }
 
-// ExecutionTarget 描述本次任务选择的执行目标和能力范围。
+// ExecutionTarget describes the execution target and capability scope for this task.
 type ExecutionTarget struct {
 	AssistantID string   `json:"assistant_id,omitempty"`
 	AgentID     string   `json:"agent_id,omitempty"`
@@ -64,7 +64,7 @@ type ExecutionTarget struct {
 	Tools       []string `json:"tools,omitempty"`
 }
 
-// TaskInput 是 Worker Runtime 消费的标准化任务输入。
+// TaskInput is the standardized task input consumed by Worker Runtime.
 type TaskInput struct {
 	Type        InputType      `json:"type"`
 	Text        string         `json:"text,omitempty"`
@@ -73,13 +73,13 @@ type TaskInput struct {
 	Metadata    map[string]any `json:"metadata,omitempty"`
 }
 
-// ChatMessage 是紧凑的对话消息快照。
+// ChatMessage is a compact conversation message snapshot.
 type ChatMessage struct {
 	Role    MessageRole `json:"role"`
 	Content string      `json:"content"`
 }
 
-// Attachment 描述任务输入中可用的附件。
+// Attachment describes an attachment available in task input.
 type Attachment struct {
 	ID       string `json:"id,omitempty"`
 	Name     string `json:"name,omitempty"`
@@ -87,14 +87,14 @@ type Attachment struct {
 	URL      string `json:"url,omitempty"`
 }
 
-// RuntimeOptions 控制 Worker Runtime 的执行参数。
+// RuntimeOptions controls the execution parameters for Worker Runtime.
 type RuntimeOptions struct {
 	Kind    string `json:"kind,omitempty"`
 	WorkDir string `json:"work_dir,omitempty"`
 	MaxStep int    `json:"max_step,omitempty"`
 }
 
-// TaskPolicy 承载 Worker 任务需要遵守的策略开关。
+// TaskPolicy carries the policy switches that Worker tasks must follow.
 type TaskPolicy struct {
 	RequireApproval bool `json:"require_approval,omitempty"`
 }

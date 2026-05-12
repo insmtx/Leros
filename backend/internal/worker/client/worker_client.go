@@ -8,15 +8,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	agentruntime "github.com/insmtx/SingerOS/backend/internal/agent/runtime"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	agentruntime "github.com/insmtx/Leros/backend/internal/agent/runtime"
 	"github.com/ygpkg/yg-go/logs"
 )
 
 type WorkerClient struct {
 	runtime   agent.AgentRuntime
 	config    *WorkerConfig
+	daID      uint
 	workerID  string
 	startedAt time.Time
 	status    string
@@ -29,6 +30,7 @@ type WorkerConfig struct {
 	SkillsDir    string
 	ToolsEnabled bool
 	ServerAddr   string
+	DigitalAssistantID uint
 	WorkerID     string
 }
 
@@ -37,18 +39,22 @@ func NewWorker(ctx context.Context, cfg *WorkerConfig) (*WorkerClient, error) {
 		return nil, fmt.Errorf("worker config is required")
 	}
 
-	workerID := fmt.Sprintf("worker_%d", time.Now().UnixNano())
+	workerIDStr := cfg.WorkerID
+	if workerIDStr == "" {
+		workerIDStr = fmt.Sprintf("worker_%d", cfg.DigitalAssistantID)
+	}
 
 	w := &WorkerClient{
 		config:    cfg,
-		workerID:  workerID,
+		daID:      cfg.DigitalAssistantID,
+		workerID:  workerIDStr,
 		startedAt: time.Now(),
 		status:    "initialized",
 	}
 
 	if cfg.ServerAddr != "" {
-		w.wsClient = NewWSClient(cfg.ServerAddr, workerID,
-			WithWorkerID(workerID),
+		w.wsClient = NewWSClient(cfg.ServerAddr, cfg.DigitalAssistantID,
+			WithWorkerID(cfg.DigitalAssistantID),
 			WithOnConfigReady(func(assistantConfig map[string]interface{}) {
 				w.handleAssistantConfig(ctx, assistantConfig)
 			}),

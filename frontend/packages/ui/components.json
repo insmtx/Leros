@@ -12,10 +12,10 @@
   },
   "iconLibrary": "lucide",
   "aliases": {
-    "components": "@singeros/ui/components",
-    "ui": "@singeros/ui/components/ui",
-    "hooks": "@singeros/ui/hooks",
-    "lib": "@singeros/ui/lib",
-    "utils": "@singeros/ui/lib/utils"
+    "components": "@leros/ui/components",
+    "ui": "@leros/ui/components/ui",
+    "hooks": "@leros/ui/hooks",
+    "lib": "@leros/ui/lib",
+    "utils": "@leros/ui/lib/utils"
   }
 }

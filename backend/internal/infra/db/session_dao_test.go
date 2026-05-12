@@ -8,7 +8,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/insmtx/SingerOS/backend/types"
+	"github.com/insmtx/Leros/backend/types"
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {
@@ -33,7 +33,7 @@ func TestCreateSession(t *testing.T) {
 	session := &types.Session{
 		SessionID: "test_session_1",
 		Type:      string(types.SessionTypeUserChat),
-		UserID:    1,
+		Uin:       1,
 		Title:     "Test Session",
 	}
 
@@ -83,7 +83,7 @@ func TestGetSessionByID(t *testing.T) {
 	session := &types.Session{
 		SessionID: "get_by_id_test",
 		Type:      string(types.SessionTypeUserChat),
-		UserID:    1,
+		Uin:       1,
 		Title:     "Get By ID Test",
 	}
 
@@ -373,7 +373,7 @@ func TestListSessions_ByType(t *testing.T) {
 	}
 
 	typeFilter := string(types.SessionTypeUserChat)
-	sessions, total, err := ListSessions(ctx, db, &typeFilter, nil, nil, nil, nil, nil, 1, 20)
+	sessions, total, err := ListSessions(ctx, db, &typeFilter, nil, nil, nil, nil, nil, nil, 1, 20)
 	if err != nil {
 		t.Fatalf("ListSessions failed: %v", err)
 	}
@@ -414,7 +414,7 @@ func TestListSessions_ByStatus(t *testing.T) {
 	}
 
 	statusFilter := string(types.SessionStatusActive)
-	sessions, total, err := ListSessions(ctx, db, nil, &statusFilter, nil, nil, nil, nil, 1, 20)
+	sessions, total, err := ListSessions(ctx, db, nil, &statusFilter, nil, nil, nil, nil, nil, 1, 20)
 	if err != nil {
 		t.Fatalf("ListSessions failed: %v", err)
 	}
@@ -451,7 +451,7 @@ func TestListSessions_ByKeyword(t *testing.T) {
 	}
 
 	keyword := "Alpha"
-	sessions, total, err := ListSessions(ctx, db, nil, nil, nil, nil, nil, &keyword, 1, 20)
+	sessions, total, err := ListSessions(ctx, db, nil, nil, nil, nil, nil, nil, &keyword, 1, 20)
 	if err != nil {
 		t.Fatalf("ListSessions failed: %v", err)
 	}
@@ -479,7 +479,7 @@ func TestListSessions_Pagination(t *testing.T) {
 		}
 	}
 
-	sessions, total, err := ListSessions(ctx, db, nil, nil, nil, nil, nil, nil, 1, 2)
+	sessions, total, err := ListSessions(ctx, db, nil, nil, nil, nil, nil, nil, nil, 1, 2)
 	if err != nil {
 		t.Fatalf("ListSessions failed: %v", err)
 	}

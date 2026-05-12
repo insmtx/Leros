@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/insmtx/SingerOS/backend/pkg/singeros"
+	"github.com/insmtx/Leros/backend/pkg/leros"
 )
 
 func TestSkillStoreCreatePatchAndSupportingFiles(t *testing.T) {
@@ -146,9 +146,9 @@ func TestSkillStoreRejectsInvalidFrontmatter(t *testing.T) {
 	}
 }
 
-func TestDefaultSkillRootUsesSingerOSHome(t *testing.T) {
+func TestDefaultSkillRootUsesLerosHome(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv(singeros.EnvHome, home)
+	t.Setenv(leros.EnvHome, home)
 
 	root, err := DefaultSkillRoot()
 	if err != nil {
@@ -167,7 +167,7 @@ func newTestStore(t *testing.T) (*SkillStore, string) {
 	home := t.TempDir()
 	root := filepath.Join(home, "project-skills")
 	t.Setenv("HOME", home)
-	t.Setenv(singeros.EnvHome, filepath.Join(home, ".singeros"))
+	t.Setenv(leros.EnvHome, filepath.Join(home, ".leros"))
 
 	store, err := NewSkillStore(root)
 	if err != nil {

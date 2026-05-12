@@ -8,13 +8,14 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/insmtx/SingerOS/backend/internal/api/contract"
-	"github.com/insmtx/SingerOS/backend/types"
+	"github.com/insmtx/Leros/backend/internal/api/auth"
+	"github.com/insmtx/Leros/backend/internal/api/contract"
+	"github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/types"
 )
 
-func setupTestService(t *testing.T) contract.SessionService {
+func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to open test database: %v", err)
@@ -24,12 +25,43 @@ func setupTestService(t *testing.T) contract.SessionService {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}
 
-	return NewSessionService(db, nil, "")
+	return db
+}
+
+func setupTestService(t *testing.T) contract.SessionService {
+	t.Helper()
+	db := setupTestDB(t)
+	return NewSessionService(db, nil, nil, nil)
+}
+
+func setupTestServiceWithSubscriber(t *testing.T, subscriber mq.Subscriber) contract.SessionService {
+	t.Helper()
+	db := setupTestDB(t)
+	return NewSessionService(db, subscriber, nil, nil)
+}
+
+func setupTestContextWithoutCaller(t *testing.T) context.Context {
+	t.Helper()
+	return context.Background()
+}
+
+func setupTestContextWithCaller(t *testing.T) context.Context {
+	t.Helper()
+	caller := &auth.Caller{
+		Uin:   1,
+		OrgID: 1,
+		State: auth.AuthStateSucc,
+	}
+	trace := &auth.Trace{
+		RequestID: "test-request-id",
+		TraceID:   "test-trace-id",
+	}
+	return auth.WithContext(context.Background(), caller, trace)
 }
 
 func TestCreateSession_ValidInput(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	req := &contract.CreateSessionRequest{
 		Type:  string(types.SessionTypeUserChat),
@@ -52,7 +84,7 @@ func TestCreateSession_ValidInput(t *testing.T) {
 
 func TestCreateSession_MissingType(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	req := &contract.CreateSessionRequest{
 		Title: "Test Session",
@@ -70,7 +102,7 @@ func TestCreateSession_MissingType(t *testing.T) {
 
 func TestCreateSession_CustomSessionID(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	req := &contract.CreateSessionRequest{
 		SessionID: "custom_session_id",
@@ -89,7 +121,7 @@ func TestCreateSession_CustomSessionID(t *testing.T) {
 
 func TestCreateSession_DuplicateSessionID(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	req1 := &contract.CreateSessionRequest{
 		SessionID: "duplicate_id",
@@ -118,7 +150,7 @@ func TestCreateSession_DuplicateSessionID(t *testing.T) {
 
 func TestGetSession_NotFound(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	_, err := service.GetSession(ctx, 1, "")
 	if err == nil {
@@ -132,7 +164,7 @@ func TestGetSession_NotFound(t *testing.T) {
 
 func TestGetSession_ByID(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	createReq := &contract.CreateSessionRequest{
 		Type:  string(types.SessionTypeUserChat),
@@ -156,7 +188,7 @@ func TestGetSession_ByID(t *testing.T) {
 
 func TestUpdateSession(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	createReq := &contract.CreateSessionRequest{
 		Type:  string(types.SessionTypeUserChat),
@@ -184,7 +216,7 @@ func TestUpdateSession(t *testing.T) {
 
 func TestDeleteSession(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	createReq := &contract.CreateSessionRequest{
 		Type: string(types.SessionTypeUserChat),
@@ -208,7 +240,7 @@ func TestDeleteSession(t *testing.T) {
 
 func TestActivateSession_InvalidState(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	createReq := &contract.CreateSessionRequest{
 		Type: string(types.SessionTypeUserChat),
@@ -233,7 +265,7 @@ func TestActivateSession_InvalidState(t *testing.T) {
 
 func TestPauseSession(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	createReq := &contract.CreateSessionRequest{
 		Type: string(types.SessionTypeUserChat),
@@ -261,7 +293,7 @@ func TestPauseSession(t *testing.T) {
 
 func TestEndSession_AlreadyEnded(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	createReq := &contract.CreateSessionRequest{
 		Type: string(types.SessionTypeUserChat),
@@ -286,7 +318,7 @@ func TestEndSession_AlreadyEnded(t *testing.T) {
 
 func TestResumeSession_NotPaused(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	createReq := &contract.CreateSessionRequest{
 		Type: string(types.SessionTypeUserChat),
@@ -309,7 +341,7 @@ func TestResumeSession_NotPaused(t *testing.T) {
 
 func TestAddMessage_UpdatesSession(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	createReq := &contract.CreateSessionRequest{
 		Type: string(types.SessionTypeUserChat),
@@ -346,7 +378,7 @@ func TestAddMessage_UpdatesSession(t *testing.T) {
 
 func TestAddMessage_AutoSequence(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	createReq := &contract.CreateSessionRequest{
 		Type: string(types.SessionTypeUserChat),
@@ -376,7 +408,7 @@ func TestAddMessage_AutoSequence(t *testing.T) {
 
 func TestAddMessage_MissingContent(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	createReq := &contract.CreateSessionRequest{
 		Type: string(types.SessionTypeUserChat),
@@ -403,7 +435,7 @@ func TestAddMessage_MissingContent(t *testing.T) {
 
 func TestDeleteMessage_UpdatesSession(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	createReq := &contract.CreateSessionRequest{
 		Type: string(types.SessionTypeUserChat),
@@ -446,7 +478,7 @@ func TestDeleteMessage_UpdatesSession(t *testing.T) {
 
 func TestListSessions_FilterByType(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	req1 := &contract.CreateSessionRequest{
 		Type: string(types.SessionTypeUserChat),
@@ -466,8 +498,8 @@ func TestListSessions_FilterByType(t *testing.T) {
 
 	typeFilter := string(types.SessionTypeUserChat)
 	listReq := &contract.ListSessionsRequest{
-		Type: &typeFilter,
-		Page: 1,
+		Type:    &typeFilter,
+		Page:    1,
 		PerPage: 20,
 	}
 
@@ -487,7 +519,7 @@ func TestListSessions_FilterByType(t *testing.T) {
 
 func TestListSessions_FilterByStatus(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	req1 := &contract.CreateSessionRequest{
 		Type: string(types.SessionTypeUserChat),
@@ -509,8 +541,8 @@ func TestListSessions_FilterByStatus(t *testing.T) {
 
 	statusFilter := string(types.SessionStatusActive)
 	listReq := &contract.ListSessionsRequest{
-		Status: &statusFilter,
-		Page: 1,
+		Status:  &statusFilter,
+		Page:    1,
 		PerPage: 20,
 	}
 
@@ -526,7 +558,7 @@ func TestListSessions_FilterByStatus(t *testing.T) {
 
 func TestGetSessionMessages(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	createReq := &contract.CreateSessionRequest{
 		Type: string(types.SessionTypeUserChat),
@@ -564,7 +596,7 @@ func TestGetSessionMessages(t *testing.T) {
 
 func TestClearSessionMessages(t *testing.T) {
 	service := setupTestService(t)
-	ctx := context.Background()
+	ctx := setupTestContextWithCaller(t)
 
 	createReq := &contract.CreateSessionRequest{
 		Type: string(types.SessionTypeUserChat),
@@ -602,5 +634,38 @@ func TestClearSessionMessages(t *testing.T) {
 
 	if retrieved.LastMessageAt != nil {
 		t.Error("expected last_message_at to be nil after clear")
+	}
+}
+
+func TestCreateSession_MissingCaller(t *testing.T) {
+	service := setupTestService(t)
+	ctx := setupTestContextWithoutCaller(t)
+
+	req := &contract.CreateSessionRequest{
+		Type:  string(types.SessionTypeUserChat),
+		Title: "Test Session",
+	}
+
+	_, err := service.CreateSession(ctx, req)
+	if err == nil {
+		t.Error("expected error when caller is not authenticated")
+	}
+
+	if err.Error() != "user not authenticated or org not set" {
+		t.Errorf("expected 'user not authenticated or org not set' error, got %s", err.Error())
+	}
+}
+
+func TestStreamSessionEvents_MissingCaller(t *testing.T) {
+	service := setupTestServiceWithSubscriber(t, nil)
+	ctx := setupTestContextWithoutCaller(t)
+
+	err := service.StreamSessionEvents(ctx, "test_session", 0, nil)
+	if err == nil {
+		t.Error("expected error when caller is not authenticated")
+	}
+
+	if err.Error() != "user not authenticated or org not set" {
+		t.Errorf("expected 'user not authenticated or org not set' error, got %s", err.Error())
 	}
 }

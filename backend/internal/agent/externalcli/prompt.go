@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/insmtx/SingerOS/backend/internal/agent"
+	"github.com/insmtx/Leros/backend/internal/agent"
 )
 
 func buildPrompt(req *agent.RequestContext) string {
@@ -17,9 +17,9 @@ func buildPrompt(req *agent.RequestContext) string {
 	if strings.TrimSpace(req.SystemPrompt) != "" {
 		sections = append(sections, strings.TrimSpace(req.SystemPrompt))
 	} else {
-		sections = append(sections, "你是 SingerOS 智能助手。请基于下面的结构化上下文完成任务，并在最终输出中给出清晰、可执行的结果。")
+		sections = append(sections, "你是 Leros 智能助手。请基于下面的结构化上下文完成任务，并在最终输出中给出清晰、可执行的结果。")
 	}
-	sections = append(sections, "# SingerOS Runtime Request")
+	sections = append(sections, "# Leros Runtime Request")
 
 	if req.Assistant.ID != "" || req.Assistant.Name != "" || req.Assistant.Role != "" || req.Assistant.SystemPrompt != "" {
 		sections = append(sections, formatJSONSection("Assistant", req.Assistant))

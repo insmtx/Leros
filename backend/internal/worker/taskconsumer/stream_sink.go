@@ -5,20 +5,21 @@ import (
 	"fmt"
 	"time"
 
-	agentevents "github.com/insmtx/SingerOS/backend/internal/agent/events"
-	eventbus "github.com/insmtx/SingerOS/backend/internal/infra/mq"
-	"github.com/insmtx/SingerOS/backend/pkg/dm"
+	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/internal/agent/eventtypes"
+	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/pkg/dm"
 	"github.com/ygpkg/yg-go/logs"
 )
 
 // MQStreamSink publishes agent runtime events as realtime messages.
 type MQStreamSink struct {
 	publisher eventbus.RealtimePublisher
-	task      dm.WorkerTaskMessage
+	task      eventtypes.WorkerTaskMessage
 }
 
 // NewMQStreamSink creates a stream sink for one worker task.
-func NewMQStreamSink(publisher eventbus.RealtimePublisher, task dm.WorkerTaskMessage) *MQStreamSink {
+func NewMQStreamSink(publisher eventbus.RealtimePublisher, task eventtypes.WorkerTaskMessage) *MQStreamSink {
 	return &MQStreamSink{
 		publisher: publisher,
 		task:      task,
@@ -32,11 +33,11 @@ func (s *MQStreamSink) Emit(ctx context.Context, event *agentevents.RunEvent) er
 	}
 
 	topic := s.streamTopic()
-	msg := dm.MessageStreamMessage{
+	msg := eventtypes.MessageStreamMessage{
 		ID:        firstNonEmpty(event.ID, fmt.Sprintf("%s:%d", event.RunID, event.Seq)),
-		Type:      dm.MessageTypeStream,
+		Type:      eventtypes.MessageTypeStream,
 		CreatedAt: time.Now().UTC(),
-		Trace: dm.TraceContext{
+		Trace: eventtypes.TraceContext{
 			TraceID:   firstNonEmpty(event.TraceID, s.task.Trace.TraceID),
 			RequestID: s.task.Trace.RequestID,
 			TaskID:    s.task.Trace.TaskID,
@@ -44,17 +45,17 @@ func (s *MQStreamSink) Emit(ctx context.Context, event *agentevents.RunEvent) er
 			ParentID:  s.task.Trace.ParentID,
 		},
 		Route: s.task.Route,
-		Body: dm.StreamBody{
+		Body: eventtypes.StreamBody{
 			Seq:   event.Seq,
 			Event: streamEventType(event.Type),
-			Payload: dm.StreamPayload{
-				Role:    dm.MessageRoleAssistant,
+			Payload: eventtypes.StreamPayload{
+				Role:    eventtypes.MessageRoleAssistant,
 				Content: event.Content,
 			},
 		},
 	}
-	if msg.Body.Event == dm.StreamEventRunFailed {
-		msg.Body.Error = &dm.StreamError{Message: event.Content}
+	if msg.Body.Event == eventtypes.StreamEventRunFailed {
+		msg.Body.Error = &eventtypes.StreamError{Message: event.Content}
 	}
 
 	if err := s.publisher.PublishRealtime(ctx, topic, msg); err != nil {
@@ -70,27 +71,27 @@ func (s *MQStreamSink) streamTopic() string {
 	return dm.Topic().Org(s.task.Route.OrgID).Worker(s.task.Route.WorkerID).Stream().Build()
 }
 
-func streamEventType(eventType agentevents.RunEventType) dm.StreamEventType {
+func streamEventType(eventType agentevents.RunEventType) eventtypes.StreamEventType {
 	switch eventType {
 	case agentevents.RunEventStarted:
-		return dm.StreamEventRunStarted
+		return eventtypes.StreamEventRunStarted
 	case agentevents.RunEventCompleted:
-		return dm.StreamEventRunCompleted
+		return eventtypes.StreamEventRunCompleted
 	case agentevents.RunEventFailed, agentevents.RunEventCancelled:
-		return dm.StreamEventRunFailed
+		return eventtypes.StreamEventRunFailed
 	case agentevents.RunEventMessageDelta, agentevents.RunEventReasoningDelta:
-		return dm.StreamEventMessageDelta
+		return eventtypes.StreamEventMessageDelta
 	case agentevents.RunEventResult:
-		return dm.StreamEventMessageCompleted
+		return eventtypes.StreamEventMessageCompleted
 	case agentevents.RunEventToolCallStarted:
-		return dm.StreamEventToolCallStarted
+		return eventtypes.StreamEventToolCallStarted
 	case agentevents.RunEventToolCallArguments:
-		return dm.StreamEventToolCallDelta
+		return eventtypes.StreamEventToolCallDelta
 	case agentevents.RunEventToolCallOutput, agentevents.RunEventToolCallCompleted:
-		return dm.StreamEventToolCallFinished
+		return eventtypes.StreamEventToolCallFinished
 	case agentevents.RunEventToolCallFailed:
-		return dm.StreamEventToolCallFinished
+		return eventtypes.StreamEventToolCallFinished
 	default:
-		return dm.StreamEventMessageDelta
+		return eventtypes.StreamEventMessageDelta
 	}
 }

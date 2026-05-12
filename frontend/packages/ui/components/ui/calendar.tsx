@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@singeros/ui/lib/utils";
+import { cn } from "@leros/ui/lib/utils";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import * as React from "react";
 import { type DayButton, DayPicker, getDefaultClassNames } from "react-day-picker";

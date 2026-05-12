@@ -1,25 +1,25 @@
-# SingerOS
+# Leros
 
 ## Enterprise Digital Workforce Operating System
 
-> Build, orchestrate and govern AI-powered digital employees for enterprise.
+> Build, orchestrate and govern AI-powered digital assistants for enterprise.
 
 ---
 
-## 🚀 What is SingerOS?
+## 🚀 What is Leros?
 
-**SingerOS** is an enterprise-grade Multi-Agent Operating System designed to power the next generation of digital workforce.
+**Leros** is an enterprise-grade Multi-Agent Operating System designed to power the next generation of digital workforce.
 
 It is not a chatbot framework.
 It is not a simple workflow engine.
 
-SingerOS is:
+Leros is:
 
 > A distributed, governance-first AI execution system for enterprise digital transformation.
 
-SingerOS enables organizations to:
+Leros enables organizations to:
 
-* Design AI-powered digital employees
+* Design AI-powered digital assistants
 * Orchestrate multi-agent workflows
 * Govern skills, models, and permissions
 * Run intelligent task execution pipelines
@@ -27,7 +27,7 @@ SingerOS enables organizations to:
 
 ---
 
-## 🧠 Why SingerOS?
+## 🧠 Why Leros?
 
 Traditional workflow systems focus on deterministic task automation.
 
@@ -40,20 +40,20 @@ Modern enterprises require:
 * Auditable AI execution
 * Enterprise-grade governance
 
-SingerOS is built to meet these needs.
+Leros is built to meet these needs.
 
 Compared to traditional workflow engines such as DeerFlow:
 
-* SingerOS embeds cognitive agents into workflows
-* SingerOS includes model routing and cost governance
-* SingerOS supports multi-tenant enterprise deployment
-* SingerOS is designed as an AI OS, not just a flow engine
+* Leros embeds cognitive agents into workflows
+* Leros includes model routing and cost governance
+* Leros supports multi-tenant enterprise deployment
+* Leros is designed as an AI OS, not just a flow engine
 
 ---
 
 ## 🎯 Design Principles
 
-SingerOS enforces strict architectural invariants to ensure governance and reliability:
+Leros enforces strict architectural invariants to ensure governance and reliability:
 
 1. **Agent never directly calls external systems** - All external interactions go through Tools
 2. **Skill never performs orchestration logic** - Skills compose Tools, not workflows
@@ -67,11 +67,11 @@ For detailed design philosophy, see [Design Philosophy](docs/DESIGN_PHILOSOPHY.m
 
 ## 🏢 Target Scenarios
 
-SingerOS is designed for:
+Leros is designed for:
 
 ### Enterprise Internal Digital Transformation
 
-* Digital employees for operations
+* Digital assistants for operations
 * Intelligent approval systems
 * Automated reporting
 * Cross-system workflow automation
@@ -101,7 +101,7 @@ SingerOS is designed for:
 
 ## 🔄 Execution Flow
 
-SingerOS follows a unified event-driven execution model:
+Leros follows a unified event-driven execution model:
 
 ```
 User → Event Gateway → EventBus → Control Plane → Orchestrator 
@@ -120,7 +120,7 @@ For detailed architecture, see [Architecture Documentation](docs/ARCHITECTURE.md
 
 ## 🧩 Extensibility
 
-SingerOS supports plugin-based architecture:
+Leros supports plugin-based architecture:
 
 * Skill plugins
 * Agent templates
@@ -163,7 +163,7 @@ All plugins must be:
 
 ## ⚠ Non-Goals
 
-SingerOS is NOT:
+Leros is NOT:
 
 * A prompt playground
 * A simple chatbot UI
@@ -174,17 +174,17 @@ SingerOS is NOT:
 
 ## 🧬 Philosophy
 
-SingerOS treats AI agents as:
+Leros treats AI agents as:
 
-> First-class digital employees with governance, accountability, and operational boundaries.
+> First-class digital assistants with governance, accountability, and operational boundaries.
 
 We believe the future enterprise stack will include:
 
 * Human employees
 * Software systems
-* Digital employees (AI Agents)
+* Digital assistants (AI Agents)
 
-SingerOS is designed to operate the third category.
+Leros is designed to operate the third category.
 
 ---
 
@@ -235,5 +235,5 @@ Singers are:
 * Highly disciplined
 * Excellent collaborators
 
-SingerOS aims to embody the same traits in enterprise AI systems.
+Leros aims to embody the same traits in enterprise AI systems.
 

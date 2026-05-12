@@ -53,7 +53,7 @@ importers:
       '@biomejs/biome':
         specifier: ^2.3.7
         version: 2.4.13
-      '@singeros/biome':
+      '@leros/biome':
         specifier: workspace:*
         version: link:packages/biome
       turbo:
@@ -71,10 +71,10 @@ importers:
       '@electron-toolkit/utils':
         specifier: ^4.0.0
         version: 4.0.0(electron@39.8.9)
-      '@singeros/store':
+      '@leros/store':
         specifier: workspace:*
         version: link:../../packages/store
-      '@singeros/ui':
+      '@leros/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       lucide-react:
@@ -102,7 +102,7 @@ importers:
       '@electron-toolkit/tsconfig':
         specifier: ^2.0.0
         version: 2.0.0(@types/node@25.6.0)
-      '@singeros/tsconfig':
+      '@leros/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
       '@tailwindcss/vite':
@@ -144,10 +144,10 @@ importers:
 
   apps/web:
     dependencies:
-      '@singeros/store':
+      '@leros/store':
         specifier: workspace:*
         version: link:../../packages/store
-      '@singeros/ui':
+      '@leros/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       class-variance-authority:
@@ -181,7 +181,7 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0
     devDependencies:
-      '@singeros/tsconfig':
+      '@leros/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
       '@tailwindcss/postcss':
@@ -207,7 +207,7 @@ importers:
 
   packages/store:
     dependencies:
-      '@singeros/ui':
+      '@leros/ui':
         specifier: workspace:*
         version: link:../ui
       react:
@@ -220,7 +220,7 @@ importers:
         specifier: ^5.0.11
         version: 5.0.12(@types/react@19.2.14)(react@19.2.3)(use-sync-external-store@1.6.0(react@19.2.3))
     devDependencies:
-      '@singeros/tsconfig':
+      '@leros/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
       '@types/react':
@@ -292,7 +292,7 @@ importers:
         specifier: ^1.1.0
         version: 1.1.2(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
     devDependencies:
-      '@singeros/tsconfig':
+      '@leros/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
       '@types/react':

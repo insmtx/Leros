@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@singeros/ui/lib/utils";
+import { cn } from "@leros/ui/lib/utils";
 import type * as React from "react";
 
 function Form({ className, ...props }: React.ComponentProps<"form">) {

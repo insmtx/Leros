@@ -9,8 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	infradb "github.com/insmtx/SingerOS/backend/internal/infra/db"
-	"github.com/insmtx/SingerOS/backend/internal/worker"
+	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
+	"github.com/insmtx/Leros/backend/internal/worker"
+	"github.com/insmtx/Leros/backend/internal/worker/wsproto"
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
 )
@@ -64,116 +65,116 @@ func (s *WorkerManager) handleWorkerWebSocket(c *gin.Context) {
 			return
 		}
 
-		var msg map[string]interface{}
+		var msg wsproto.WSMessage
 		if err := json.Unmarshal(message, &msg); err != nil {
 			logs.Errorf("Failed to parse message: %v", err)
 			continue
 		}
 
-		if msgType, ok := msg["type"].(string); ok && msgType == "worker_register" {
-			if payload, ok := msg["payload"].(map[string]interface{}); ok {
-				if id, ok := payload["worker_id"].(string); ok {
-					workerID = id
-					break
-				}
+		if msg.Type == wsproto.MsgTypeWorkerRegister {
+			var payload wsproto.RegisterPayload
+			if err := msg.GetPayload(&payload); err == nil {
+				workerID = payload.WorkerID
+				break
 			}
 		}
 	}
 
-	worker := &WorkerConnection{
+	w := &WorkerConnection{
 		ID:         workerID,
 		Conn:       conn,
-		Send:       make(chan map[string]interface{}, 256),
+		Send:       make(chan *wsproto.WSMessage, 256),
 		Status:     "active",
 		Registered: time.Now(),
 		LastSeen:   time.Now(),
 	}
 
 	s.mu.Lock()
-	s.workers[workerID] = worker
+	s.workers[workerID] = w
 	s.mu.Unlock()
 
 	logs.Infof("Worker %s registered", workerID)
 
-	welcomeMsg := map[string]interface{}{
-		"type": "welcome",
-		"payload": map[string]interface{}{
-			"message":   "Connected to SingerOS worker server",
-			"worker_id": workerID,
-		},
+	welcomeMsg, err := wsproto.NewPayload(wsproto.MsgTypeWelcome, wsproto.WelcomePayload{
+		Message:  "Connected to SingerOS worker server",
+		WorkerID: workerID,
+	})
+	if err != nil {
+		logs.Errorf("Failed to create welcome payload: %v", err)
+		return
 	}
-	if err := worker.SendJSON(welcomeMsg); err != nil {
+	if err := w.SendWSMessage(welcomeMsg); err != nil {
 		logs.Errorf("Failed to send welcome message: %v", err)
 		return
 	}
 
-	go s.readPump(worker)
-	go s.writePump(worker)
-	go s.heartbeatChecker(worker)
+	go s.readPump(w)
+	go s.writePump(w)
+	go s.heartbeatChecker(w)
 
 	<-ctx.Done()
 }
 
-func (s *WorkerManager) readPump(worker *WorkerConnection) {
+func (s *WorkerManager) readPump(w *WorkerConnection) {
 	defer func() {
-		s.unregisterWorker(worker.ID)
-		worker.Conn.Close()
+		s.unregisterWorker(w.ID)
+		w.Conn.Close()
 	}()
 
-	worker.Conn.SetReadLimit(512 * 1024)
-	worker.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-	worker.Conn.SetPongHandler(func(string) error {
-		worker.mu.Lock()
-		worker.LastSeen = time.Now()
-		worker.mu.Unlock()
-		worker.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	w.Conn.SetReadLimit(512 * 1024)
+	w.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	w.Conn.SetPongHandler(func(string) error {
+		w.mu.Lock()
+		w.LastSeen = time.Now()
+		w.mu.Unlock()
+		w.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		return nil
 	})
 
 	for {
-		_, message, err := worker.Conn.ReadMessage()
+		_, message, err := w.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				logs.Errorf("Worker %s WebSocket error: %v", worker.ID, err)
+				logs.Errorf("Worker %s WebSocket error: %v", w.ID, err)
 			}
 			break
 		}
 
-		var msg map[string]interface{}
+		var msg wsproto.WSMessage
 		if err := json.Unmarshal(message, &msg); err != nil {
-			logs.Errorf("Failed to unmarshal message from worker %s: %v", worker.ID, err)
+			logs.Errorf("Failed to unmarshal message from worker %s: %v", w.ID, err)
 			continue
 		}
 
-		s.handleWorkerMessage(worker, msg)
+		s.handleWorkerMessage(w, &msg)
 	}
 }
 
-func (s *WorkerManager) writePump(worker *WorkerConnection) {
+func (s *WorkerManager) writePump(w *WorkerConnection) {
 	ticker := time.NewTicker(54 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case message, ok := <-worker.Send:
+		case message, ok := <-w.Send:
 			if !ok {
-				worker.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				w.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
-			worker.mu.RLock()
-			err := worker.Conn.WriteJSON(message)
-			worker.mu.RUnlock()
+			w.mu.RLock()
+			err := w.SendWSMessage(message)
+			w.mu.RUnlock()
 
 			if err != nil {
-				logs.Errorf("Failed to write to worker %s: %v", worker.ID, err)
+				logs.Errorf("Failed to write to worker %s: %v", w.ID, err)
 				return
 			}
 		case <-ticker.C:
-			worker.mu.RLock()
-			worker.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			err := worker.Conn.WriteMessage(websocket.PingMessage, nil)
-			worker.mu.RUnlock()
+			w.mu.RLock()
+			w.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			err := w.Conn.WriteMessage(websocket.PingMessage, nil)
+			w.mu.RUnlock()
 
 			if err != nil {
 				return
@@ -182,129 +183,122 @@ func (s *WorkerManager) writePump(worker *WorkerConnection) {
 	}
 }
 
-func (s *WorkerManager) handleWorkerMessage(worker *WorkerConnection, msg map[string]interface{}) {
-	msgType, _ := msg["type"].(string)
-
-	switch msgType {
-	case "heartbeat":
-		worker.mu.Lock()
-		worker.LastSeen = time.Now()
-		worker.Status = "active"
-		worker.mu.Unlock()
-
-		ack := map[string]interface{}{
-			"type": "heartbeat_ack",
-			"payload": map[string]interface{}{
-				"timestamp": time.Now().Unix(),
-			},
-		}
-		select {
-		case worker.Send <- ack:
-		default:
-			logs.Warnf("Heartbeat ack dropped for worker %s", worker.ID)
+func (s *WorkerManager) handleWorkerMessage(w *WorkerConnection, msg *wsproto.WSMessage) {
+	switch msg.Type {
+	case wsproto.MsgTypeHeartbeat:
+		var payload wsproto.HeartbeatPayload
+		if err := msg.GetPayload(&payload); err == nil {
+			w.mu.Lock()
+			w.LastSeen = time.Unix(payload.Timestamp, 0)
+			w.Status = "active"
+			w.mu.Unlock()
 		}
 
-	case "worker_status":
-		if payload, ok := msg["payload"].(map[string]interface{}); ok {
-			if status, ok := payload["status"].(string); ok {
-				worker.mu.Lock()
-				worker.Status = status
-				worker.mu.Unlock()
+		ack, err := wsproto.NewPayload(wsproto.MsgTypeHeartbeatAck, wsproto.HeartbeatAckPayload{
+			Timestamp: time.Now().Unix(),
+		})
+		if err == nil {
+			select {
+			case w.Send <- ack:
+			default:
+				logs.Warnf("Heartbeat ack dropped for worker %s", w.ID)
 			}
 		}
 
-	case "getConfig":
-		s.handleGetConfig(worker, msg)
+	case wsproto.MsgTypeWorkerStatus:
+		var payload wsproto.WorkerStatusPayload
+		if err := msg.GetPayload(&payload); err == nil {
+			w.mu.Lock()
+			w.Status = payload.Status
+			w.mu.Unlock()
+		}
+
+	case wsproto.MsgTypeGetConfig:
+		s.handleGetConfig(w, msg)
 	}
 }
 
-func (s *WorkerManager) handleGetConfig(worker *WorkerConnection, msg map[string]interface{}) {
-	assistantCode := ""
-	if payload, ok := msg["payload"].(map[string]interface{}); ok {
-		if code, ok := payload["assistant_code"].(string); ok {
-			assistantCode = code
+func (s *WorkerManager) handleGetConfig(w *WorkerConnection, msg *wsproto.WSMessage) {
+	var reqPayload wsproto.GetConfigPayload
+	if err := msg.GetPayload(&reqPayload); err != nil {
+		resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
+			Config: nil,
+			Error:  "invalid payload",
+		})
+		select {
+		case w.Send <- resp:
+		default:
+			logs.Warnf("Config response dropped for worker %s", w.ID)
 		}
+		return
 	}
 
-	if assistantCode == "" {
-		resp := map[string]interface{}{
-			"type": "configResponse",
-			"payload": map[string]interface{}{
-				"config": nil,
-				"error":  "assistant_code is required",
-			},
-		}
+	workerID := reqPayload.WorkerID
+
+	if workerID == 0 {
+		resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
+			Config: nil,
+			Error:  "worker_id is required",
+		})
 		select {
-		case worker.Send <- resp:
+		case w.Send <- resp:
 		default:
-			logs.Warnf("Config response dropped for worker %s", worker.ID)
+			logs.Warnf("Config response dropped for worker %s", w.ID)
 		}
 		return
 	}
 
 	if s.db == nil {
-		resp := map[string]interface{}{
-			"type": "configResponse",
-			"payload": map[string]interface{}{
-				"config": nil,
-				"error":  "database not available",
-			},
-		}
+		resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
+			Config: nil,
+			Error:  "database not available",
+		})
 		select {
-		case worker.Send <- resp:
+		case w.Send <- resp:
 		default:
-			logs.Warnf("Config response dropped for worker %s", worker.ID)
+			logs.Warnf("Config response dropped for worker %s", w.ID)
 		}
 		return
 	}
 
-	da, err := infradb.GetDigitalAssistantByCode(context.Background(), s.db, assistantCode)
+	da, err := infradb.GetDigitalAssistantByID(context.Background(), s.db, workerID)
 	if err != nil {
-		logs.Errorf("Failed to get digital assistant %s: %v", assistantCode, err)
-		resp := map[string]interface{}{
-			"type": "configResponse",
-			"payload": map[string]interface{}{
-				"config": nil,
-				"error":  err.Error(),
-			},
-		}
+		logs.Errorf("Failed to get digital assistant %d: %v", workerID, err)
+		resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
+			Config: nil,
+			Error:  err.Error(),
+		})
 		select {
-		case worker.Send <- resp:
+		case w.Send <- resp:
 		default:
-			logs.Warnf("Config response dropped for worker %s", worker.ID)
+			logs.Warnf("Config response dropped for worker %s", w.ID)
 		}
 		return
 	}
 
 	if da == nil {
-		logs.Warnf("Digital assistant %s not found", assistantCode)
-		resp := map[string]interface{}{
-			"type": "configResponse",
-			"payload": map[string]interface{}{
-				"config": nil,
-				"error":  "digital assistant not found",
-			},
-		}
+		logs.Warnf("Digital assistant %d not found", workerID)
+		resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
+			Config: nil,
+			Error:  "digital assistant not found",
+		})
 		select {
-		case worker.Send <- resp:
+		case w.Send <- resp:
 		default:
-			logs.Warnf("Config response dropped for worker %s", worker.ID)
+			logs.Warnf("Config response dropped for worker %s", w.ID)
 		}
 		return
 	}
 
-	resp := map[string]interface{}{
-		"type": "configResponse",
-		"payload": map[string]interface{}{
-			"config": da.Config,
-			"error":  nil,
-		},
-	}
+	resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
+		Config: &da.Config,
+		Error:  "",
+	})
 	select {
-	case worker.Send <- resp:
-		logs.Infof("Config sent to worker %s for assistant %s", worker.ID, assistantCode)
+	case w.Send <- resp:
+		logs.Infof("Config sent to worker %s for assistant ID %d", w.ID, workerID)
 	default:
-		logs.Warnf("Config response dropped for worker %s", worker.ID)
+		logs.Warnf("Config response dropped for worker %s", w.ID)
 	}
 }
 
@@ -312,26 +306,26 @@ func (s *WorkerManager) unregisterWorker(workerID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if worker, ok := s.workers[workerID]; ok {
+	if w, ok := s.workers[workerID]; ok {
 		delete(s.workers, workerID)
-		close(worker.Send)
+		close(w.Send)
 		logs.Infof("Worker %s unregistered", workerID)
 	}
 }
 
-func (s *WorkerManager) heartbeatChecker(worker *WorkerConnection) {
+func (s *WorkerManager) heartbeatChecker(w *WorkerConnection) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		worker.mu.RLock()
-		lastSeen := worker.LastSeen
-		worker.mu.RUnlock()
+		w.mu.RLock()
+		lastSeen := w.LastSeen
+		w.mu.RUnlock()
 
 		if time.Since(lastSeen) > 90*time.Second {
-			logs.Warnf("Worker %s heartbeat timeout", worker.ID)
-			s.unregisterWorker(worker.ID)
-			worker.Conn.Close()
+			logs.Warnf("Worker %s heartbeat timeout", w.ID)
+			s.unregisterWorker(w.ID)
+			w.Conn.Close()
 			return
 		}
 	}
@@ -358,15 +352,15 @@ func (s *WorkerManager) listWorkers(c *gin.Context) {
 
 	s.mu.RLock()
 	workers := make([]WorkerInfo, 0, len(s.workers))
-	for _, worker := range s.workers {
-		worker.mu.RLock()
+	for _, w := range s.workers {
+		w.mu.RLock()
 		workers = append(workers, WorkerInfo{
-			ID:         worker.ID,
-			Status:     worker.Status,
-			Registered: worker.Registered,
-			LastSeen:   worker.LastSeen,
+			ID:         w.ID,
+			Status:     w.Status,
+			Registered: w.Registered,
+			LastSeen:   w.LastSeen,
 		})
-		worker.mu.RUnlock()
+		w.mu.RUnlock()
 	}
 	s.mu.RUnlock()
 
@@ -388,7 +382,7 @@ func (s *WorkerManager) getWorkerInfo(c *gin.Context) {
 	}
 
 	s.mu.RLock()
-	worker, ok := s.workers[req.WorkerID]
+	w, ok := s.workers[req.WorkerID]
 	s.mu.RUnlock()
 
 	if !ok {
@@ -396,14 +390,14 @@ func (s *WorkerManager) getWorkerInfo(c *gin.Context) {
 		return
 	}
 
-	worker.mu.RLock()
+	w.mu.RLock()
 	info := WorkerInfo{
-		ID:         worker.ID,
-		Status:     worker.Status,
-		Registered: worker.Registered,
-		LastSeen:   worker.LastSeen,
+		ID:         w.ID,
+		Status:     w.Status,
+		Registered: w.Registered,
+		LastSeen:   w.LastSeen,
 	}
-	worker.mu.RUnlock()
+	w.mu.RUnlock()
 
 	c.JSON(http.StatusOK, info)
 }
@@ -420,7 +414,7 @@ func (s *WorkerManager) shutdownWorker(c *gin.Context) {
 	}
 
 	s.mu.RLock()
-	worker, ok := s.workers[req.WorkerID]
+	w, ok := s.workers[req.WorkerID]
 	s.mu.RUnlock()
 
 	if !ok {
@@ -428,15 +422,16 @@ func (s *WorkerManager) shutdownWorker(c *gin.Context) {
 		return
 	}
 
-	shutdownMsg := map[string]interface{}{
-		"type": "shutdown",
-		"payload": map[string]interface{}{
-			"timestamp": time.Now().Unix(),
-		},
+	shutdownMsg, err := wsproto.NewPayload(wsproto.MsgTypeShutdown, wsproto.ShutdownPayload{
+		Timestamp: time.Now().Unix(),
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create shutdown payload"})
+		return
 	}
 
 	select {
-	case worker.Send <- shutdownMsg:
+	case w.Send <- shutdownMsg:
 		c.JSON(http.StatusOK, gin.H{"message": "shutdown command sent"})
 	default:
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "worker send buffer full"})

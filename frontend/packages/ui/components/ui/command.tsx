@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@singeros/ui/lib/utils";
+import { cn } from "@leros/ui/lib/utils";
 import { Command as CommandPrimitive } from "cmdk";
 import { Check, Search } from "lucide-react";
 import type * as React from "react";

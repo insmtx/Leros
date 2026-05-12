@@ -1,4 +1,4 @@
-module github.com/insmtx/SingerOS
+module github.com/insmtx/Leros
 
 go 1.24.0
 
@@ -21,8 +21,6 @@ require (
 	gorm.io/driver/sqlite v1.5.6
 	gorm.io/gorm v1.30.1
 )
-
-replace github.com/insmtx/SingerOS/proto => ./gen/github.com/insmtx/SingerOS/proto
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect

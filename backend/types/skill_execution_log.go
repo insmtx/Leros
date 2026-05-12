@@ -1,4 +1,4 @@
-// types 包提供 SingerOS 的核心数据类型定义
+// types 包提供 Leros 的核心数据类型定义
 //
 // 该包定义了数字助手、事件、用户、技能等核心领域模型，
 // 以及相关的常量和数据库表名定义。
@@ -13,8 +13,8 @@ type SkillExecutionLog struct {
 	SkillID uint `gorm:"column:skill_id;type:integer;not null;index"`
 	// 执行会话ID
 	SessionID string `gorm:"column:session_id;type:varchar(255);index"`
-	// 用户ID
-	UserID string `gorm:"column:user_id;type:varchar(255);index"`
+	// 用户UIN
+	Uin string `gorm:"column:uin;type:varchar(255);index"`
 	// 数字助手ID
 	AssistantID string `gorm:"column:assistant_id;type:varchar(255);index"`
 	// 输入参数

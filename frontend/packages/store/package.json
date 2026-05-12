@@ -1,5 +1,5 @@
 {
-  "name": "@singeros/store",
+  "name": "@leros/store",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,14 +15,14 @@
   },
   "dependencies": {
     "zustand": "^5.0.11",
-    "@singeros/ui": "workspace:*"
+    "@leros/ui": "workspace:*"
   },
   "peerDependencies": {
     "react": "catalog:",
     "react-dom": "catalog:"
   },
   "devDependencies": {
-    "@singeros/tsconfig": "workspace:*",
+    "@leros/tsconfig": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "typescript": "catalog:"

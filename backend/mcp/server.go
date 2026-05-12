@@ -1,4 +1,4 @@
-// Package mcp exposes SingerOS capabilities through the Model Context Protocol.
+// Package mcp exposes Leros capabilities through the Model Context Protocol.
 package mcp
 
 import (
@@ -7,16 +7,16 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/insmtx/SingerOS/backend/tools"
-	memorytools "github.com/insmtx/SingerOS/backend/tools/memory"
-	skillmanagetools "github.com/insmtx/SingerOS/backend/tools/skill_manage"
-	testtools "github.com/insmtx/SingerOS/backend/tools/test"
+	"github.com/insmtx/Leros/backend/tools"
+	memorytools "github.com/insmtx/Leros/backend/tools/memory"
+	skillmanagetools "github.com/insmtx/Leros/backend/tools/skill_manage"
+	testtools "github.com/insmtx/Leros/backend/tools/test"
 	mcpsdk "github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 )
 
 const (
-	serverName    = "SingerOS"
+	serverName    = "Leros"
 	serverVersion = "0.1.0"
 )
 
@@ -26,12 +26,12 @@ type Server struct {
 	http http.Handler
 }
 
-// NewServer creates a SingerOS MCP server with the currently public tools.
+// NewServer creates a Leros MCP server with the currently public tools.
 func NewServer() *Server {
 	return NewServerWithTools(NewTools()...)
 }
 
-// NewTools returns the SingerOS tools that are currently exposed through MCP.
+// NewTools returns the Leros tools that are currently exposed through MCP.
 func NewTools() []tools.Tool {
 	return []tools.Tool{
 		testtools.NewEchoTool(),
@@ -40,7 +40,7 @@ func NewTools() []tools.Tool {
 	}
 }
 
-// NewServerWithTools creates a SingerOS MCP server from SingerOS internal tools.
+// NewServerWithTools creates a Leros MCP server from Leros internal tools.
 func NewServerWithTools(publicTools ...tools.Tool) *Server {
 	sdk := mcpserver.NewMCPServer(
 		serverName,

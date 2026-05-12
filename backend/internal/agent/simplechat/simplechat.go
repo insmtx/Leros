@@ -7,9 +7,9 @@ import (
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/internal/agent"
-	einoadapter "github.com/insmtx/SingerOS/backend/internal/agent/eino"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/internal/agent"
+	einoadapter "github.com/insmtx/Leros/backend/internal/agent/eino"
 	"github.com/ygpkg/yg-go/logs"
 )
 

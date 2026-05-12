@@ -1,12 +1,12 @@
-# SingerOS 设计哲学
+# Leros 设计哲学
 
-SingerOS 的本质不是一个 AI 系统，而是一个"可调度的智能执行操作系统"，其核心是 Runtime、调度、能力抽象与事件驱动，而不是模型本身。
+Leros 的本质不是一个 AI 系统，而是一个"可调度的智能执行操作系统"，其核心是 Runtime、调度、能力抽象与事件驱动，而不是模型本身。
 
 ## 核心设计原则
 
 ### Runtime First, Model Second
 
-SingerOS 的核心不是模型，而是 Agent Runtime。
+Leros 的核心不是模型，而是 Agent Runtime。
 
 设计约束：
 
@@ -65,7 +65,7 @@ SingerOS 的核心不是模型，而是 Agent Runtime。
 
 ### Event-Driven Core
 
-SingerOS 的核心通信机制是事件，用于解耦模块和支持分布式架构。
+Leros 的核心通信机制是事件，用于解耦模块和支持分布式架构。
 
 > **核心原则**：所有模块之间只能通过 EventBus 通信
 
@@ -242,7 +242,7 @@ Tool 必须声明：
 
 ### Three-Plane Security Model
 
-SingerOS 采用三层权限安全模型：
+Leros 采用三层权限安全模型：
 
 ```
 Edge Runtime      → 高权限（本地）
@@ -306,11 +306,11 @@ Agent 之间不直接调用，通过事件或任务分发。
 
 ## 架构定位
 
-不把 Agent 当"更强的函数调用系统"，而是把 SingerOS 当"分布式智能执行操作系统"。
+不把 Agent 当"更强的函数调用系统"，而是把 Leros 当"分布式智能执行操作系统"。
 
 ### 三平面架构
 
-SingerOS 采用三平面分离架构：
+Leros 采用三平面分离架构：
 
 - **Control Plane（控制面）**：决策中心，负责 Session 管理、Agent 路由、上下文构建
 - **Execution Plane（执行面）**：执行中心，负责 Agent 推理、Skill 调用、Tool 执行

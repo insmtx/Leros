@@ -1,8 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@singeros/ui/styles/tokens.css";
-@import "@singeros/ui/styles/base.css";
+@import "@leros/ui/styles/tokens.css";
+@import "@leros/ui/styles/base.css";
 
 @custom-variant dark (&:is(.dark *));
 

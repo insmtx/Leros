@@ -4,10 +4,10 @@ package builtin
 import (
 	"fmt"
 
-	"github.com/insmtx/SingerOS/backend/config"
-	"github.com/insmtx/SingerOS/backend/runtime/engines"
-	"github.com/insmtx/SingerOS/backend/runtime/engines/claude"
-	"github.com/insmtx/SingerOS/backend/runtime/engines/codex"
+	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/runtime/engines/claude"
+	"github.com/insmtx/Leros/backend/runtime/engines/codex"
 )
 
 // NewRegistryFromConfig creates a registry with every detected built-in CLI engine.

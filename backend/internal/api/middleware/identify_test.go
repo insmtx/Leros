@@ -8,9 +8,9 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
-	localauth "github.com/insmtx/SingerOS/backend/internal/api/auth"
-	"github.com/insmtx/SingerOS/backend/internal/infra/db"
-	"github.com/insmtx/SingerOS/backend/types"
+	localauth "github.com/insmtx/Leros/backend/internal/api/auth"
+	"github.com/insmtx/Leros/backend/internal/infra/db"
+	"github.com/insmtx/Leros/backend/types"
 	ygauth "github.com/ygpkg/yg-go/apis/runtime/auth"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -33,8 +33,8 @@ func setupTestDB(t *testing.T) *gorm.DB {
 func setupTestUserOrg(t *testing.T, database *gorm.DB, uin uint, orgID uint) {
 	t.Helper()
 	userOrg := &types.UserOrg{
-		Uin:      uin,
-		OrgID:    orgID,
+		Uin:       uin,
+		OrgID:     orgID,
 		IsDefault: true,
 	}
 	if err := db.CreateUserOrg(context.Background(), database, userOrg); err != nil {

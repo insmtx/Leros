@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/insmtx/SingerOS/backend/tools"
+	"github.com/insmtx/Leros/backend/tools"
 )
 
 type assistantNodeInfo struct {

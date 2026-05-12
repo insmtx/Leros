@@ -1,4 +1,4 @@
-// config 包提供 SingerOS 的配置加载和配置类型定义
+// config 包提供 Leros 的配置加载和配置类型定义
 //
 // 该包负责从配置文件加载各种配置项，包括 GitHub 应用配置、
 // GitLab 应用配置、NATS 消息队列配置和数据库配置等。
@@ -17,29 +17,23 @@ type LLMConfig struct {
 	BaseURL  string `yaml:"base_url,omitempty"` // Custom base URL
 }
 
-// Config 是 SingerOS 的主配置结构，包含所有子系统的配置
+// Config 是 Leros 的主配置结构，包含所有子系统的配置
 type Config struct {
 	Server struct {
 		Port string    `yaml:"port,omitempty"` // 服务器端口
 		JWT  JWTConfig `yaml:"jwt,omitempty"`  // JWT 认证配置
 	} `yaml:"server,omitempty"` // 服务器地址
-	Github       *GithubAppConfig `yaml:"github,omitempty"`
-	Gitlab       *GitlabAppConfig `yaml:"gitlab,omitempty"`
-	NATS         *NATSConfig      `yaml:"nats,omitempty"`
-	Database     *DatabaseConfig  `yaml:"database,omitempty"`
-	LLM          *LLMConfig       `yaml:"llm,omitempty"`
-	Scheduler    *SchedulerConfig `yaml:"scheduler,omitempty"`
-	Organization *OrgConfig       `yaml:"organization,omitempty"`
+	Github    *GithubAppConfig `yaml:"github,omitempty"`
+	Gitlab    *GitlabAppConfig `yaml:"gitlab,omitempty"`
+	NATS      *NATSConfig      `yaml:"nats,omitempty"`
+	Database  *DatabaseConfig  `yaml:"database,omitempty"`
+	LLM       *LLMConfig       `yaml:"llm,omitempty"`
+	Scheduler *SchedulerConfig `yaml:"scheduler,omitempty"`
 }
 
 // JWTConfig JWT 认证配置
 type JWTConfig struct {
 	Secret string `yaml:"secret,omitempty"` // JWT 签名密钥
-}
-
-// OrgConfig is the organization configuration structure
-type OrgConfig struct {
-	ID string `yaml:"id,omitempty"`
 }
 
 // DatabaseConfig 是数据库的配置结构
