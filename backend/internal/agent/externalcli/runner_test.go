@@ -6,6 +6,7 @@ import (
 
 	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/insmtx/Leros/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/runtime/events"
 )
 
 func TestRunnerAdaptsEngineResult(t *testing.T) {
@@ -135,15 +136,15 @@ func (e *fakeEngine) RegisterMCP(_ context.Context, _ engines.MCPServerConfig) e
 
 func (e *fakeEngine) Run(_ context.Context, req engines.RunRequest) (*engines.RunHandle, error) {
 	e.runReq = req
-	events := make(chan engines.Event, 4)
-	events <- engines.Event{Type: engines.EventStarted}
+	eventChan := make(chan events.Event, 4)
+	eventChan <- events.Event{Type: events.EventStarted}
 	if e.providerSessionID != "" {
-		events <- engines.Event{Type: engines.EventProviderSessionStarted, Content: e.providerSessionID}
+		eventChan <- events.Event{Type: engines.EventProviderSessionStarted, Content: e.providerSessionID}
 	}
-	events <- engines.Event{Type: engines.EventResult, Content: e.result}
-	events <- engines.Event{Type: engines.EventDone}
-	close(events)
+	eventChan <- events.Event{Type: events.EventResult, Content: e.result}
+	eventChan <- events.Event{Type: events.EventCompleted}
+	close(eventChan)
 	return &engines.RunHandle{
-		Events: events,
+		Events: eventChan,
 	}, nil
 }

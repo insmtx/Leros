@@ -1,4 +1,4 @@
-package eventtypes
+package events
 
 import (
 	"encoding/json"
@@ -21,9 +21,9 @@ func TestWorkerTaskMessageJSONShape(t *testing.T) {
 			RunID:     "run_1",
 		},
 		Route: RouteContext{
-			OrgID:     "1001",
+			OrgID:     1001,
 			SessionID: "sess_1",
-			WorkerID:  "worker_1",
+			WorkerID:  1,
 		},
 		Body: WorkerTaskBody{
 			TaskType: TaskTypeAgentRun,
@@ -102,9 +102,9 @@ func TestMessageStreamMessageJSONShape(t *testing.T) {
 			RunID:   "run_1",
 		},
 		Route: RouteContext{
-			OrgID:     "1001",
+			OrgID:     1001,
 			SessionID: "sess_1",
-			WorkerID:  "worker_1",
+			WorkerID:  1,
 		},
 		Body: StreamBody{
 			Seq:   1,

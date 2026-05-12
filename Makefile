@@ -79,4 +79,9 @@ dev-worker: build
 	LEROS_DEV=true ./bundles/leros worker --worker-id 1 --config ./deployments/dev/worker.config.yaml
 
 dev-frontend:
-	cd deployments/dev && ./dev-frontend.sh
+	-docker rm -f leros-dev-frontend || true
+	docker run -it --name leros-dev-frontend \
+	 --network host \
+	 -v $(PWD)/frontend:/app \
+	 -w /app \
+	 registry.yygu.cn/base/node:24 bash 

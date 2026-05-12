@@ -1,9 +1,4 @@
-// Package eventtypes defines domain message protocols for Leros services.
-//
-// This package contains message structures used for inter-service communication
-// via message queues (NATS JetStream). It separates message protocol definitions
-// from topic construction utilities (which remain in backend/pkg/dm).
-package eventtypes
+package events
 
 import "time"
 
@@ -28,9 +23,9 @@ type TraceContext struct {
 
 // RouteContext carries routing information for message delivery and tenant isolation.
 type RouteContext struct {
-	OrgID     string `json:"org_id"`
+	OrgID     uint   `json:"org_id"`
 	SessionID string `json:"session_id,omitempty"`
-	WorkerID  string `json:"worker_id,omitempty"`
+	WorkerID  uint   `json:"worker_id,omitempty"`
 }
 
 // Envelope is the generic domain message envelope used on MQ topics.

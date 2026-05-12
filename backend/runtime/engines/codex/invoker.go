@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/insmtx/Leros/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/runtime/events"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -43,7 +44,7 @@ type codexItem struct {
 }
 
 // Run 启动 Codex CLI 进程并将 stdout/stderr 直接转换为引擎事件。
-func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Process, <-chan engines.Event, error) {
+func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Process, <-chan events.Event, error) {
 	threadID, resume := resolveThread(req.SessionID, req.Resume)
 	args := buildArgs(threadID, resume, req)
 
@@ -76,62 +77,62 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Pr
 		return nil, nil, fmt.Errorf("start codex: %w", err)
 	}
 
-	events := make(chan engines.Event, 16)
+	evtChan := make(chan events.Event, 16)
 	proc := engines.NewCmdProcess(cmd)
-	events <- engines.Event{Type: engines.EventStarted}
+	evtChan <- events.Event{Type: events.EventStarted}
 
 	go func() {
-		defer close(events)
+		defer close(evtChan)
 		defer cancel()
 
 		var wg sync.WaitGroup
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			scanStdout(ctx, stdout, events)
+			scanStdout(ctx, stdout, evtChan)
 		}()
 		go func() {
 			defer wg.Done()
-			scanPlainOutput(ctx, stderr, events, engines.EventMessageDelta)
+			scanPlainOutput(ctx, stderr, evtChan, events.EventMessageDelta)
 		}()
 
 		err := cmd.Wait()
 		wg.Wait()
 		if err != nil {
-			events <- engines.Event{Type: engines.EventError, Content: err.Error()}
+			evtChan <- events.Event{Type: events.EventFailed, Content: err.Error()}
 			return
 		}
-		events <- engines.Event{Type: engines.EventDone}
+		evtChan <- events.Event{Type: events.EventCompleted}
 	}()
 
-	return proc, events, nil
+	return proc, evtChan, nil
 }
 
-func scanStdout(ctx context.Context, r interface{ Read([]byte) (int, error) }, events chan<- engines.Event) {
+func scanStdout(ctx context.Context, r interface{ Read([]byte) (int, error) }, evtChan chan<- events.Event) {
 	engines.ScanJSONLines(r, func(line string) bool {
 		event := parseCodexLine(line)
 		if event.Type == "" {
 			return true
 		}
-		return sendEvent(ctx, events, event)
+		return sendEvent(ctx, evtChan, event)
 	})
 }
 
-func parseCodexLine(line string) engines.Event {
+func parseCodexLine(line string) events.Event {
 	logs.Infof("Parse Codex line: %s", line)
 	line = strings.TrimSpace(line)
 	if line == "" {
-		return engines.Event{}
+		return events.Event{}
 	}
 	var event codexEvent
 	if json.Unmarshal([]byte(line), &event) != nil {
-		return engines.Event{Type: engines.EventMessageDelta, Content: line}
+		return events.Event{Type: events.EventMessageDelta, Content: line}
 	}
 	if event.Type == "thread.started" && event.ThreadID != "" {
-		return engines.Event{Type: engines.EventProviderSessionStarted, Content: event.ThreadID}
+		return events.Event{Type: engines.EventProviderSessionStarted, Content: event.ThreadID}
 	}
 	if event.Item == nil {
-		return engines.Event{}
+		return events.Event{}
 	}
 
 	item := event.Item
@@ -139,25 +140,25 @@ func parseCodexLine(line string) engines.Event {
 	case "agent_message":
 		text := decodeCodexText(item.Text)
 		if text == "" {
-			return engines.Event{}
+			return events.Event{}
 		}
-		eventType := engines.EventMessageDelta
+		eventType := events.EventMessageDelta
 		if event.Type == "item.completed" {
-			eventType = engines.EventResult
+			eventType = events.EventResult
 		}
-		return engines.Event{Type: eventType, Content: text}
+		return events.Event{Type: eventType, Content: text}
 	case "command_execution", "tool_call", "shell_command":
 		command := firstNonEmptyString(item.Command, item.CommandLine, item.Name)
 		if command != "" {
-			return engines.Event{Type: engines.EventMessageDelta, Content: "$ " + command}
+			return events.Event{Type: events.EventMessageDelta, Content: "$ " + command}
 		}
 	case "command_output", "tool_output", "shell_output":
 		output := firstNonEmptyString(item.Output, decodeCodexText(item.Text))
 		if output != "" {
-			return engines.Event{Type: engines.EventMessageDelta, Content: truncateOutput(output, 300)}
+			return events.Event{Type: events.EventMessageDelta, Content: truncateOutput(output, 300)}
 		}
 	}
-	return engines.Event{}
+	return events.Event{}
 }
 
 func decodeCodexText(raw json.RawMessage) string {
@@ -181,21 +182,21 @@ func decodeCodexText(raw json.RawMessage) string {
 	return ""
 }
 
-func scanPlainOutput(ctx context.Context, r interface{ Read([]byte) (int, error) }, events chan<- engines.Event, eventType engines.EventType) {
+func scanPlainOutput(ctx context.Context, r interface{ Read([]byte) (int, error) }, evtChan chan<- events.Event, eventType events.EventType) {
 	engines.ScanJSONLines(r, func(line string) bool {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			return true
 		}
-		return sendEvent(ctx, events, engines.Event{Type: eventType, Content: line})
+		return sendEvent(ctx, evtChan, events.Event{Type: eventType, Content: line})
 	})
 }
 
-func sendEvent(ctx context.Context, events chan<- engines.Event, event engines.Event) bool {
+func sendEvent(ctx context.Context, evtChan chan<- events.Event, event events.Event) bool {
 	select {
 	case <-ctx.Done():
 		return false
-	case events <- event:
+	case evtChan <- event:
 		return true
 	}
 }

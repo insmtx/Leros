@@ -10,19 +10,19 @@ const defaultSeparator = "."
 const underscoreSeparator = "_"
 const unknownSegment = "unknown"
 
-// TopicBuilder 基于有序片段构造领域消息 topic。
-type TopicBuilder struct {
+// topicBuilder 基于有序片段构造领域消息 topic。
+type topicBuilder struct {
 	segments  []string
 	separator string
 }
 
-// Topic 创建一个空的 topic builder。
-func Topic() TopicBuilder {
-	return TopicBuilder{separator: defaultSeparator}
+// topic 创建一个空的 topic builder。
+func topic() topicBuilder {
+	return topicBuilder{separator: defaultSeparator}
 }
 
 // Add 追加一个或多个普通 topic 片段。
-func (b TopicBuilder) Add(segments ...string) TopicBuilder {
+func (b topicBuilder) Add(segments ...string) topicBuilder {
 	next := b.clone()
 	for _, segment := range segments {
 		next.segments = append(next.segments, cleanSegment(segment))
@@ -31,56 +31,61 @@ func (b TopicBuilder) Add(segments ...string) TopicBuilder {
 }
 
 // Org 追加组织字段片段。
-func (b TopicBuilder) Org(orgID string) TopicBuilder {
+func (b topicBuilder) Org(orgID string) topicBuilder {
 	return b.Add("org", orgID)
 }
 
 // Session 追加会话字段片段。
-func (b TopicBuilder) Session(sessionID string) TopicBuilder {
+func (b topicBuilder) Session(sessionID string) topicBuilder {
 	return b.Add("session", sessionID)
 }
 
 // Worker 追加 Worker 字段片段。
-func (b TopicBuilder) Worker(workerID string) TopicBuilder {
+func (b topicBuilder) Worker(workerID string) topicBuilder {
 	return b.Add("worker", workerID)
 }
 
 // Message 追加 message 字段片段。
-func (b TopicBuilder) Message() TopicBuilder {
+func (b topicBuilder) Message() topicBuilder {
 	return b.Add("message")
 }
 
+// Completed 追加 completed 字段片段。
+func (b topicBuilder) Completed() topicBuilder {
+	return b.Add("completed")
+}
+
 // Stream 追加 stream 字段片段。
-func (b TopicBuilder) Stream() TopicBuilder {
+func (b topicBuilder) Stream() topicBuilder {
 	return b.Add("stream")
 }
 
 // Task 追加 task 字段片段。
-func (b TopicBuilder) Task() TopicBuilder {
+func (b topicBuilder) Task() topicBuilder {
 	return b.Add("task")
 }
 
 // Wildcard 追加单层通配符片段。
-func (b TopicBuilder) Wildcard() TopicBuilder {
+func (b topicBuilder) Wildcard() topicBuilder {
 	next := b.clone()
 	next.segments = append(next.segments, wildcard)
 	return next
 }
 
 // WithSeparator 返回使用指定连接符的新 topic builder。
-func (b TopicBuilder) WithSeparator(separator string) TopicBuilder {
+func (b topicBuilder) WithSeparator(separator string) topicBuilder {
 	next := b.clone()
 	next.separator = separator
 	return next
 }
 
 // WithUnderscoreSeparator 返回使用下划线连接符的新 topic builder。
-func (b TopicBuilder) WithUnderscoreSeparator() TopicBuilder {
+func (b topicBuilder) WithUnderscoreSeparator() topicBuilder {
 	return b.WithSeparator(underscoreSeparator)
 }
 
 // Build 返回使用当前连接符连接后的最终 topic，默认连接符为点号。
-func (b TopicBuilder) Build() string {
+func (b topicBuilder) Build() string {
 	separator := b.separator
 	if separator == "" {
 		separator = defaultSeparator
@@ -88,10 +93,10 @@ func (b TopicBuilder) Build() string {
 	return strings.Join(b.segments, separator)
 }
 
-func (b TopicBuilder) clone() TopicBuilder {
+func (b topicBuilder) clone() topicBuilder {
 	segments := make([]string, len(b.segments))
 	copy(segments, b.segments)
-	return TopicBuilder{segments: segments, separator: b.separator}
+	return topicBuilder{segments: segments, separator: b.separator}
 }
 
 func cleanSegment(value string) string {

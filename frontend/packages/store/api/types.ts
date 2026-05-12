@@ -137,6 +137,8 @@ export type BackendRuntimeConfig = {
 
 export type SSEMessageEvent = {
 	type: string;
+	session_id?: string;
+	payload?: SSEEventPayload;
 	message_id?: string;
 	conversation_id?: string;
 	role?: string;
@@ -147,4 +149,16 @@ export type SSEMessageEvent = {
 	tool_calls?: BackendToolCall[];
 	metadata?: BackendMessageMetadata;
 	sequence?: number;
+	timestamp?: number;
+};
+
+export type SSEEventPayload = {
+	role?: string;
+	content?: string;
+	thinking?: string;
+	tool_calls?: BackendToolCall[];
+	input_tokens?: number;
+	output_tokens?: number;
+	total_tokens?: number;
+	model?: string;
 };

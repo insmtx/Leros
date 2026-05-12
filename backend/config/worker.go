@@ -1,8 +1,8 @@
 package config
 
 type WorkerConfig struct {
-	OrgID    string `yaml:"org_id" json:"org_id"`
-	WorkerID string `yaml:"worker_id" json:"worker_id"`
+	OrgID    uint `yaml:"org_id" json:"org_id"`
+	WorkerID uint `yaml:"worker_id" json:"worker_id"`
 
 	ServerAddr   string `yaml:"server_addr,omitempty" json:"server_addr,omitempty"`
 	SkillsDir    string `yaml:"skills_dir,omitempty" json:"skills_dir,omitempty"`

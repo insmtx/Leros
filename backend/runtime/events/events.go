@@ -1,4 +1,9 @@
-// Package events defines the shared runtime event contract.
+// Package events defines the shared runtime event contract and domain message protocols.
+//
+// This package contains:
+//   - Stable runtime event contract (Event, EventType) for API and engine interfaces
+//   - Domain message protocols (Envelope, WorkerTaskMessage, MessageStreamMessage) for
+//     inter-service communication via message queues (NATS JetStream)
 package events
 
 import "time"

@@ -6,9 +6,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/insmtx/Leros/backend/internal/agent"
-	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/runtime/events"
 )
+
+
 
 // RunTrace 记录一次运行中与自我学习判断相关的事实。
 type RunTrace struct {
@@ -26,7 +27,7 @@ type traceRecorder struct {
 	usedSkillTool bool
 }
 
-func (r *traceRecorder) observe(event *agentevents.RunEvent) {
+func (r *traceRecorder) observe(event *events.Event) {
 	if r == nil || event == nil {
 		return
 	}
@@ -34,16 +35,15 @@ func (r *traceRecorder) observe(event *agentevents.RunEvent) {
 	defer r.mu.Unlock()
 
 	switch event.Type {
-	case agentevents.RunEventToolCallStarted:
+	case events.EventToolCallStarted:
 		r.toolCalls++
 		if name := toolNameFromEventContent(event.Content); name != "" {
 			r.toolNames = append(r.toolNames, name)
-			// TODO 外部CLI 可能无法区分技能调用，后续优化
 			if name == "skill_use" {
 				r.usedSkillTool = true
 			}
 		}
-	case agentevents.RunEventToolCallFailed:
+	case events.EventToolCallFailed:
 		r.toolFailures++
 	}
 }
@@ -64,11 +64,11 @@ func (r *traceRecorder) trace() *RunTrace {
 }
 
 type traceSink struct {
-	next     agent.RunEventSink
+	next     events.Sink
 	recorder *traceRecorder
 }
 
-func (s *traceSink) Emit(ctx context.Context, event *agentevents.RunEvent) error {
+func (s *traceSink) Emit(ctx context.Context, event *events.Event) error {
 	if s != nil && s.recorder != nil {
 		s.recorder.observe(event)
 	}
@@ -78,7 +78,7 @@ func (s *traceSink) Emit(ctx context.Context, event *agentevents.RunEvent) error
 	return s.next.Emit(ctx, event)
 }
 
-func wrapSink(sink agent.RunEventSink, recorder *traceRecorder) agent.RunEventSink {
+func wrapSink(sink events.Sink, recorder *traceRecorder) events.Sink {
 	return &traceSink{
 		next:     sink,
 		recorder: recorder,

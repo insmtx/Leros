@@ -10,11 +10,11 @@ import (
 type logSink struct{}
 
 // NewLogSink returns a sink that writes run events to debug logs.
-func NewLogSink() EventSink {
+func NewLogSink() Sink {
 	return logSink{}
 }
 
-func (logSink) Emit(ctx context.Context, event *RunEvent) error {
+func (logSink) Emit(ctx context.Context, event *Event) error {
 	if event == nil {
 		return nil
 	}

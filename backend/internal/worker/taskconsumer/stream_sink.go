@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
-	"github.com/insmtx/Leros/backend/internal/agent/eventtypes"
+	"github.com/insmtx/Leros/backend/runtime/events"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/pkg/dm"
 	"github.com/ygpkg/yg-go/logs"
@@ -15,11 +14,11 @@ import (
 // MQStreamSink publishes agent runtime events as realtime messages.
 type MQStreamSink struct {
 	publisher eventbus.RealtimePublisher
-	task      eventtypes.WorkerTaskMessage
+	task      events.WorkerTaskMessage
 }
 
 // NewMQStreamSink creates a stream sink for one worker task.
-func NewMQStreamSink(publisher eventbus.RealtimePublisher, task eventtypes.WorkerTaskMessage) *MQStreamSink {
+func NewMQStreamSink(publisher eventbus.RealtimePublisher, task events.WorkerTaskMessage) *MQStreamSink {
 	return &MQStreamSink{
 		publisher: publisher,
 		task:      task,
@@ -27,17 +26,17 @@ func NewMQStreamSink(publisher eventbus.RealtimePublisher, task eventtypes.Worke
 }
 
 // Emit publishes one runtime event to the task's session stream subject.
-func (s *MQStreamSink) Emit(ctx context.Context, event *agentevents.RunEvent) error {
+func (s *MQStreamSink) Emit(ctx context.Context, event *events.Event) error {
 	if s == nil || s.publisher == nil || event == nil {
 		return nil
 	}
 
 	topic := s.streamTopic()
-	msg := eventtypes.MessageStreamMessage{
+	msg := events.MessageStreamMessage{
 		ID:        firstNonEmpty(event.ID, fmt.Sprintf("%s:%d", event.RunID, event.Seq)),
-		Type:      eventtypes.MessageTypeStream,
+		Type:      events.MessageTypeStream,
 		CreatedAt: time.Now().UTC(),
-		Trace: eventtypes.TraceContext{
+		Trace: events.TraceContext{
 			TraceID:   firstNonEmpty(event.TraceID, s.task.Trace.TraceID),
 			RequestID: s.task.Trace.RequestID,
 			TaskID:    s.task.Trace.TaskID,
@@ -45,17 +44,17 @@ func (s *MQStreamSink) Emit(ctx context.Context, event *agentevents.RunEvent) er
 			ParentID:  s.task.Trace.ParentID,
 		},
 		Route: s.task.Route,
-		Body: eventtypes.StreamBody{
+		Body: events.StreamBody{
 			Seq:   event.Seq,
 			Event: streamEventType(event.Type),
-			Payload: eventtypes.StreamPayload{
-				Role:    eventtypes.MessageRoleAssistant,
+			Payload: events.StreamPayload{
+				Role:    events.MessageRoleAssistant,
 				Content: event.Content,
 			},
 		},
 	}
-	if msg.Body.Event == eventtypes.StreamEventRunFailed {
-		msg.Body.Error = &eventtypes.StreamError{Message: event.Content}
+	if msg.Body.Event == events.StreamEventRunFailed {
+		msg.Body.Error = &events.StreamError{Message: event.Content}
 	}
 
 	if err := s.publisher.PublishRealtime(ctx, topic, msg); err != nil {
@@ -66,32 +65,38 @@ func (s *MQStreamSink) Emit(ctx context.Context, event *agentevents.RunEvent) er
 
 func (s *MQStreamSink) streamTopic() string {
 	if s.task.Route.SessionID != "" {
-		return dm.Topic().Org(s.task.Route.OrgID).Session(s.task.Route.SessionID).Message().Stream().Build()
+		t, _ := dm.SessionResultStreamTopic(s.task.Route.OrgID, s.task.Route.SessionID)
+		return t
 	}
-	return dm.Topic().Org(s.task.Route.OrgID).Worker(s.task.Route.WorkerID).Stream().Build()
+	t, err := dm.WorkerTaskTopic(s.task.Route.OrgID, s.task.Route.WorkerID)
+	if err != nil {
+		logs.Errorf("Failed to get worker task topic for stream sink: %v", err)
+		return ""
+	}
+	return t
 }
 
-func streamEventType(eventType agentevents.RunEventType) eventtypes.StreamEventType {
+func streamEventType(eventType events.EventType) events.StreamEventType {
 	switch eventType {
-	case agentevents.RunEventStarted:
-		return eventtypes.StreamEventRunStarted
-	case agentevents.RunEventCompleted:
-		return eventtypes.StreamEventRunCompleted
-	case agentevents.RunEventFailed, agentevents.RunEventCancelled:
-		return eventtypes.StreamEventRunFailed
-	case agentevents.RunEventMessageDelta, agentevents.RunEventReasoningDelta:
-		return eventtypes.StreamEventMessageDelta
-	case agentevents.RunEventResult:
-		return eventtypes.StreamEventMessageCompleted
-	case agentevents.RunEventToolCallStarted:
-		return eventtypes.StreamEventToolCallStarted
-	case agentevents.RunEventToolCallArguments:
-		return eventtypes.StreamEventToolCallDelta
-	case agentevents.RunEventToolCallOutput, agentevents.RunEventToolCallCompleted:
-		return eventtypes.StreamEventToolCallFinished
-	case agentevents.RunEventToolCallFailed:
-		return eventtypes.StreamEventToolCallFinished
+	case events.EventStarted:
+		return events.StreamEventRunStarted
+	case events.EventCompleted:
+		return events.StreamEventRunCompleted
+	case events.EventFailed, events.EventCancelled:
+		return events.StreamEventRunFailed
+	case events.EventMessageDelta, events.EventReasoningDelta:
+		return events.StreamEventMessageDelta
+	case events.EventResult:
+		return events.StreamEventMessageCompleted
+	case events.EventToolCallStarted:
+		return events.StreamEventToolCallStarted
+	case events.EventToolCallArguments:
+		return events.StreamEventToolCallDelta
+	case events.EventToolCallOutput, events.EventToolCallCompleted:
+		return events.StreamEventToolCallFinished
+	case events.EventToolCallFailed:
+		return events.StreamEventToolCallFinished
 	default:
-		return eventtypes.StreamEventMessageDelta
+		return events.StreamEventMessageDelta
 	}
 }

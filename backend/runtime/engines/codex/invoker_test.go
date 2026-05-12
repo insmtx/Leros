@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/insmtx/Leros/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/runtime/events"
 )
 
 func TestAdapterAskCurrentTime(t *testing.T) {
@@ -44,19 +45,19 @@ func TestAdapterAskCurrentTime(t *testing.T) {
 		t.Fatalf("run codex adapter: %v", err)
 	}
 
-	var finalEvent engines.Event
+	var finalEvent events.Event
 	var result string
 	for event := range handle.Events {
 		t.Logf("received event: type=%s, content=%s", event.Type, event.Content)
-		if event.Type == engines.EventResult {
+		if event.Type == events.EventResult {
 			result = strings.TrimSpace(event.Content)
 		}
 		finalEvent = event
 	}
-	if finalEvent.Type == engines.EventError {
+	if finalEvent.Type == events.EventFailed {
 		t.Fatalf("codex execution failed: %s", finalEvent.Content)
 	}
-	if finalEvent.Type != engines.EventDone {
+	if finalEvent.Type != events.EventCompleted {
 		t.Fatalf("unexpected final event: %#v", finalEvent)
 	}
 
@@ -68,7 +69,7 @@ func TestAdapterAskCurrentTime(t *testing.T) {
 
 func TestParseCodexLineEmitsResult(t *testing.T) {
 	event := parseCodexLine(`{"type":"item.completed","item":{"type":"agent_message","text":"final"}}`)
-	if event.Type != engines.EventResult || event.Content != "final" {
+	if event.Type != events.EventResult || event.Content != "final" {
 		t.Fatalf("unexpected event: %#v", event)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/agent"
+	"github.com/insmtx/Leros/backend/runtime/events"
 	einoadapter "github.com/insmtx/Leros/backend/internal/agent/eino"
 	"github.com/ygpkg/yg-go/logs"
 )
@@ -105,7 +106,7 @@ func (s *SimpleChat) Run(ctx context.Context, req *agent.RequestContext) (*agent
 		resultMessage = response.Content
 	}
 
-	usage := &agent.UsagePayload{}
+	usage := &events.UsagePayload{}
 	if response != nil && response.ResponseMeta != nil && response.ResponseMeta.Usage != nil {
 		usage.InputTokens = response.ResponseMeta.Usage.PromptTokens
 		usage.OutputTokens = response.ResponseMeta.Usage.CompletionTokens

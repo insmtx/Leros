@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nats-io/nats.go"
 	"github.com/insmtx/Leros/backend/internal/agent"
-	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
-	"github.com/insmtx/Leros/backend/internal/agent/eventtypes"
+	"github.com/insmtx/Leros/backend/runtime/events"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/pkg/dm"
 	"github.com/ygpkg/yg-go/logs"
@@ -17,8 +17,8 @@ import (
 
 // Config controls one standalone worker task consumer.
 type Config struct {
-	OrgID    string
-	WorkerID string
+	OrgID    uint
+	WorkerID uint
 }
 
 // Consumer subscribes to one worker task topic and dispatches tasks to an agent runtime.
@@ -31,12 +31,10 @@ type Consumer struct {
 
 // New creates a worker task consumer.
 func New(cfg Config, subscriber eventbus.Subscriber, publisher eventbus.RealtimePublisher, runner agent.Runner) (*Consumer, error) {
-	cfg.OrgID = strings.TrimSpace(cfg.OrgID)
-	cfg.WorkerID = strings.TrimSpace(cfg.WorkerID)
-	if cfg.OrgID == "" {
+	if cfg.OrgID == 0 {
 		return nil, fmt.Errorf("worker org_id is required")
 	}
-	if cfg.WorkerID == "" {
+	if cfg.WorkerID == 0 {
 		return nil, fmt.Errorf("worker worker_id is required")
 	}
 	if subscriber == nil {
@@ -55,46 +53,50 @@ func New(cfg Config, subscriber eventbus.Subscriber, publisher eventbus.Realtime
 
 // TaskTopic returns the NATS subject consumed by this worker.
 func (c *Consumer) TaskTopic() string {
-	return dm.Topic().Org(c.cfg.OrgID).Worker(c.cfg.WorkerID).Task().Build()
+	topic, err := dm.WorkerTaskTopic(c.cfg.OrgID, c.cfg.WorkerID)
+	if err != nil {
+		logs.Errorf("Failed to get worker task topic for org_id=%d worker_id=%d: %v", c.cfg.OrgID, c.cfg.WorkerID, err)
+	}
+	return topic
 }
 
 // Start subscribes to the worker task topic.
 func (c *Consumer) Start(ctx context.Context) error {
 	topic := c.TaskTopic()
 	logs.InfoContextf(ctx, "Starting worker task subscription: %s", topic)
-	return c.subscriber.Subscribe(ctx, topic, func(event any) {
+	return c.subscriber.Subscribe(ctx, topic, func(msg *nats.Msg) {
 		logs.InfoContextf(ctx, "Received worker task event from topic: %s", topic)
-		if err := c.handleEvent(ctx, event); err != nil {
+		if err := c.handleEvent(ctx, msg); err != nil {
 			logs.ErrorContextf(ctx, "Failed to handle worker task: %v", err)
 		}
 	})
 }
 
-func (c *Consumer) handleEvent(ctx context.Context, event any) error {
-	msg, err := decodeWorkerTask(event)
+func (c *Consumer) handleEvent(ctx context.Context, msg *nats.Msg) error {
+	taskMsg, err := decodeWorkerTask(msg)
 	if err != nil {
 		return err
 	}
-	if err := c.validateRoute(msg); err != nil {
+	if err := c.validateRoute(taskMsg); err != nil {
 		return err
 	}
-	if msg.Body.TaskType != eventtypes.TaskTypeAgentRun {
-		return fmt.Errorf("unsupported worker task type %q", msg.Body.TaskType)
+	if taskMsg.Body.TaskType != events.TaskTypeAgentRun {
+		return fmt.Errorf("unsupported worker task type %q", taskMsg.Body.TaskType)
 	}
 
 	logs.InfoContextf(ctx,
 		"Received worker task: msg_id=%s task_id=%s run_id=%s org_id=%s worker_id=%s session_id=%s task_type=%s",
-		msg.ID,
-		msg.Trace.TaskID,
-		msg.Trace.RunID,
-		msg.Route.OrgID,
-		msg.Route.WorkerID,
-		msg.Route.SessionID,
-		msg.Body.TaskType,
+		taskMsg.ID,
+		taskMsg.Trace.TaskID,
+		taskMsg.Trace.RunID,
+		taskMsg.Route.OrgID,
+		taskMsg.Route.WorkerID,
+		taskMsg.Route.SessionID,
+		taskMsg.Body.TaskType,
 	)
 
-	req := RequestFromWorkerTask(msg)
-	req.EventSink = NewMQStreamSink(c.publisher, msg)
+	req := RequestFromWorkerTask(taskMsg)
+	req.EventSink = NewMQStreamSink(c.publisher, taskMsg)
 
 	logs.InfoContextf(ctx,
 		"Starting worker task run: task_id=%s run_id=%s runtime=%s assistant_id=%s agent_id=%s",
@@ -102,7 +104,7 @@ func (c *Consumer) handleEvent(ctx context.Context, event any) error {
 		req.RunID,
 		req.Runtime.Kind,
 		req.Assistant.ID,
-		msg.Body.Execution.AgentID,
+		taskMsg.Body.Execution.AgentID,
 	)
 
 	result, err := c.runner.Run(ctx, req)
@@ -115,33 +117,29 @@ func (c *Consumer) handleEvent(ctx context.Context, event any) error {
 	return nil
 }
 
-func decodeWorkerTask(event any) (eventtypes.WorkerTaskMessage, error) {
-	var msg eventtypes.WorkerTaskMessage
-	body, err := json.Marshal(event)
-	if err != nil {
-		return msg, fmt.Errorf("marshal worker task: %w", err)
+func decodeWorkerTask(msg *nats.Msg) (events.WorkerTaskMessage, error) {
+	var taskMsg events.WorkerTaskMessage
+	if err := json.Unmarshal(msg.Data, &taskMsg); err != nil {
+		return taskMsg, fmt.Errorf("unmarshal worker task: %w", err)
 	}
-	if err := json.Unmarshal(body, &msg); err != nil {
-		return msg, fmt.Errorf("unmarshal worker task: %w", err)
+	if taskMsg.Type != "" && taskMsg.Type != events.MessageTypeWorkerTask {
+		return taskMsg, fmt.Errorf("unexpected worker task message type %q", taskMsg.Type)
 	}
-	if msg.Type != "" && msg.Type != eventtypes.MessageTypeWorkerTask {
-		return msg, fmt.Errorf("unexpected worker task message type %q", msg.Type)
-	}
-	return msg, nil
+	return taskMsg, nil
 }
 
-func (c *Consumer) validateRoute(msg eventtypes.WorkerTaskMessage) error {
-	if strings.TrimSpace(msg.Route.OrgID) != "" && msg.Route.OrgID != c.cfg.OrgID {
+func (c *Consumer) validateRoute(msg events.WorkerTaskMessage) error {
+	if msg.Route.OrgID != 0 && msg.Route.OrgID != c.cfg.OrgID {
 		return fmt.Errorf("task org_id %q does not match worker org_id %q", msg.Route.OrgID, c.cfg.OrgID)
 	}
-	if strings.TrimSpace(msg.Route.WorkerID) != "" && msg.Route.WorkerID != c.cfg.WorkerID {
+	if msg.Route.WorkerID != 0 && msg.Route.WorkerID != c.cfg.WorkerID {
 		return fmt.Errorf("task worker_id %q does not match worker_id %q", msg.Route.WorkerID, c.cfg.WorkerID)
 	}
 	return nil
 }
 
 // RequestFromWorkerTask converts the domain message protocol into the agent runtime boundary.
-func RequestFromWorkerTask(msg eventtypes.WorkerTaskMessage) *agent.RequestContext {
+func RequestFromWorkerTask(msg events.WorkerTaskMessage) *agent.RequestContext {
 	return &agent.RequestContext{
 		RunID:   firstNonEmpty(msg.Trace.RunID, msg.Trace.TaskID, msg.ID),
 		TraceID: msg.Trace.TraceID,
@@ -189,7 +187,7 @@ func RequestFromWorkerTask(msg eventtypes.WorkerTaskMessage) *agent.RequestConte
 	}
 }
 
-func inputMessagesFromTask(messages []eventtypes.ChatMessage) []agent.InputMessage {
+func inputMessagesFromTask(messages []events.ChatMessage) []agent.InputMessage {
 	if len(messages) == 0 {
 		return nil
 	}
@@ -203,7 +201,7 @@ func inputMessagesFromTask(messages []eventtypes.ChatMessage) []agent.InputMessa
 	return result
 }
 
-func attachmentsFromTask(attachments []eventtypes.Attachment) []agent.Attachment {
+func attachmentsFromTask(attachments []events.Attachment) []agent.Attachment {
 	if len(attachments) == 0 {
 		return nil
 	}
@@ -228,4 +226,4 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-var _ agentevents.EventSink = (*MQStreamSink)(nil)
+var _ events.Sink = (*MQStreamSink)(nil)

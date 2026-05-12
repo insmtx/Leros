@@ -1,4 +1,4 @@
-package eventtypes
+package events
 
 // TaskType represents the type of task requested for Worker execution.
 type TaskType string

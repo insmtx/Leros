@@ -11,9 +11,10 @@ import (
 	"time"
 
 	"github.com/insmtx/Leros/backend/config"
-	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/env"
 	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
+	"github.com/insmtx/Leros/backend/runtime/events"
 	"github.com/insmtx/Leros/backend/tools"
 	nodetools "github.com/insmtx/Leros/backend/tools/node"
 	skillusetools "github.com/insmtx/Leros/backend/tools/skill_use"
@@ -28,13 +29,13 @@ func TestRunnerBuildSystemPromptOnlyKeepsRuntimePrompt(t *testing.T) {
 		systemPrompt: "Base runtime prompt.",
 	}
 
-	prompt, err := runner.buildSystemPrompt(&RequestContext{
-		Assistant: AssistantContext{
+	prompt, err := runner.buildSystemPrompt(&agent.RequestContext{
+		Assistant: agent.AssistantContext{
 			SystemPrompt: "Assistant-specific prompt.",
 		},
-		Conversation: ConversationContext{
-			Messages: []InputMessage{
-				{Role: "user", Content: "请记住这个项目使用 Go。"},
+		Conversation: agent.ConversationContext{
+			Messages: []agent.InputMessage{
+				{Role: "user", Content: "请记住这个项目使用Go。"},
 			},
 		},
 	})
@@ -54,7 +55,7 @@ func TestRunnerBuildSystemPromptOnlyKeepsRuntimePrompt(t *testing.T) {
 		"Available skills:",
 		"## Skill:",
 		"<session-summary>",
-		"请记住这个项目使用 Go。",
+		"请记住这个项目使用Go。",
 	} {
 		if strings.Contains(prompt, unexpected) {
 			t.Fatalf("expected prompt not to contain %q, got %s", unexpected, prompt)
@@ -80,23 +81,23 @@ func TestAgentRunRealModel(t *testing.T) {
 		t.Fatalf("new runtime env: %v", err)
 	}
 
-	agent, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, env)
+	agt, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, env)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
 
-	result, err := agent.Run(ctx, &RequestContext{
+	result, err := agt.Run(ctx, &agent.RequestContext{
 		RunID: "run_real_model_message",
-		Actor: ActorContext{
+		Actor: agent.ActorContext{
 			UserID:  "test-user",
 			Channel: "test",
 		},
-		Input: InputContext{
-			Type: InputTypeMessage,
+		Input: agent.InputContext{
+			Type: agent.InputTypeMessage,
 			Text: "Reply with exactly this text: Leros agent runtime ok",
 		},
-		Runtime:   RuntimeOptions{MaxStep: 2},
-		EventSink: agentevents.NewLogSink(),
+		Runtime:   agent.RuntimeOptions{MaxStep: 2},
+		EventSink: events.NewLogSink(),
 	})
 	if err != nil {
 		t.Fatalf("run agent: %v", err)
@@ -104,7 +105,7 @@ func TestAgentRunRealModel(t *testing.T) {
 	if result == nil {
 		t.Fatalf("expected result")
 	}
-	if result.Status != RunStatusCompleted {
+	if result.Status != agent.RunStatusCompleted {
 		t.Fatalf("expected completed result, got %+v", result)
 	}
 	if strings.TrimSpace(result.Message) == "" {
@@ -139,15 +140,15 @@ func TestAgentRunNodeTool(t *testing.T) {
 		t.Fatalf("new runtime env: %v", err)
 	}
 
-	agent, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, env)
+	agt, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, env)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
 
 	sink := &recordingEventSink{}
-	result, err := agent.Run(ctx, &RequestContext{
+	result, err := agt.Run(ctx, &agent.RequestContext{
 		RunID: "run_real_model_node_shell_time",
-		Assistant: AssistantContext{
+		Assistant: agent.AssistantContext{
 			ID:   "test-assistant",
 			Name: "Tool Test Assistant",
 			SystemPrompt: strings.Join([]string{
@@ -155,16 +156,16 @@ func TestAgentRunNodeTool(t *testing.T) {
 				"node_shell 的 container_id 必须使用 " + containerID + "。",
 			}, "\n"),
 		},
-		Actor: ActorContext{
+		Actor: agent.ActorContext{
 			UserID:  "test-user",
 			Channel: "test",
 		},
-		Input: InputContext{
-			Type: InputTypeMessage,
+		Input: agent.InputContext{
+			Type: agent.InputTypeMessage,
 			Text: "使用工具查询当前系统时间。",
 		},
-		Runtime: RuntimeOptions{MaxStep: 6},
-		Capability: CapabilityContext{
+		Runtime: agent.RuntimeOptions{MaxStep: 6},
+		Capability: agent.CapabilityContext{
 			AllowedTools: []string{
 				nodetools.ToolNameNodeShell,
 				nodetools.ToolNameNodeFileRead,
@@ -179,7 +180,7 @@ func TestAgentRunNodeTool(t *testing.T) {
 	if result == nil {
 		t.Fatalf("expected result")
 	}
-	if result.Status != RunStatusCompleted {
+	if result.Status != agent.RunStatusCompleted {
 		t.Fatalf("expected completed result, got %+v", result)
 	}
 	if strings.TrimSpace(result.Message) == "" {
@@ -220,15 +221,15 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 		t.Fatalf("new runtime env: %v", err)
 	}
 
-	agent, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, env)
+	agt, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, env)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
 
 	sink := &recordingEventSink{}
-	result, err := agent.Run(ctx, &RequestContext{
+	result, err := agt.Run(ctx, &agent.RequestContext{
 		RunID: "run_real_model_weather_skill_shanghai",
-		Assistant: AssistantContext{
+		Assistant: agent.AssistantContext{
 			ID:   "test-weather-assistant",
 			Name: "Weather Skill Test Assistant",
 			SystemPrompt: strings.Join([]string{
@@ -236,16 +237,16 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 				"node_shell 的 container_id 必须使用 " + containerID + "。",
 			}, "\n"),
 		},
-		Actor: ActorContext{
+		Actor: agent.ActorContext{
 			UserID:  "test-user",
 			Channel: "test",
 		},
-		Input: InputContext{
-			Type: InputTypeTaskInstruction,
+		Input: agent.InputContext{
+			Type: agent.InputTypeTaskInstruction,
 			Text: "使用 weather 这个 skill 来查询上海的天气。",
 		},
-		Runtime: RuntimeOptions{MaxStep: 20},
-		Capability: CapabilityContext{
+		Runtime: agent.RuntimeOptions{MaxStep: 20},
+		Capability: agent.CapabilityContext{
 			AllowedTools: []string{
 				skillusetools.ToolNameSkillUse,
 				nodetools.ToolNameNodeShell,
@@ -259,7 +260,7 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 	if result == nil {
 		t.Fatalf("expected result")
 	}
-	if result.Status != RunStatusCompleted {
+	if result.Status != agent.RunStatusCompleted {
 		t.Fatalf("expected completed result, got %+v", result)
 	}
 	if strings.TrimSpace(result.Message) == "" {
@@ -321,10 +322,10 @@ func realModelTestContext(t *testing.T) (context.Context, context.CancelFunc) {
 
 type recordingEventSink struct {
 	mu     sync.Mutex
-	events []*agentevents.RunEvent
+	events []*events.Event
 }
 
-func (s *recordingEventSink) Emit(ctx context.Context, event *agentevents.RunEvent) error {
+func (s *recordingEventSink) Emit(ctx context.Context, event *events.Event) error {
 	if event == nil {
 		return nil
 	}
