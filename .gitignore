@@ -48,3 +48,5 @@ docs/swagger.json
 docs/swagger.yaml
 singer
 .worktrees
+frontend/.pnpm-store
+.pnpm-store

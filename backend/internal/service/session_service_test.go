@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/nats-io/nats.go"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
@@ -28,16 +29,47 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
+// mockEventBus 是一个简单的 Mock 实现，用于测试
+type mockEventBus struct{}
+
+func (m *mockEventBus) Publish(ctx context.Context, topic string, event any) error {
+	return nil
+}
+
+func (m *mockEventBus) PublishRealtime(ctx context.Context, topic string, event any) error {
+	return nil
+}
+
+func (m *mockEventBus) Subscribe(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
+	return nil
+}
+
+func (m *mockEventBus) SubscribeRealtime(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
+	return nil
+}
+
 func setupTestService(t *testing.T) contract.SessionService {
 	t.Helper()
 	db := setupTestDB(t)
-	return NewSessionService(db, nil, nil, nil)
+	return NewSessionService(db, &mockEventBus{}, nil)
 }
 
 func setupTestServiceWithSubscriber(t *testing.T, subscriber mq.Subscriber) contract.SessionService {
 	t.Helper()
 	db := setupTestDB(t)
-	return NewSessionService(db, subscriber, nil, nil)
+	// 使用 mockEventBus 包装 subscriber
+	eb := &struct {
+		mq.Publisher
+		mq.Subscriber
+		mq.RealtimePublisher
+		mq.RealtimeSubscriber
+	}{
+		RealtimeSubscriber: &mockEventBus{},
+		RealtimePublisher:  &mockEventBus{},
+		Publisher:          &mockEventBus{},
+		Subscriber:         subscriber,
+	}
+	return NewSessionService(db, eb, nil)
 }
 
 func setupTestContextWithoutCaller(t *testing.T) context.Context {

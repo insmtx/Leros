@@ -113,7 +113,7 @@ func (p *natsPublisher) PublishRealtimeWithContext(ctx context.Context, topic st
 }
 
 // SubscribeWithContext 在给定上下文环境中订阅特定主题的消息
-func (p *natsPublisher) SubscribeWithContext(ctx context.Context, topic string, handler func(event any)) error {
+func (p *natsPublisher) SubscribeWithContext(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
 	// 声明 Stream (如果不存在)
 	streamName := streamNameFromTopic(topic)
 	_, err := p.js.AddStream(&nats.StreamConfig{
@@ -128,13 +128,6 @@ func (p *natsPublisher) SubscribeWithContext(ctx context.Context, topic string, 
 	// 创建持久化订阅
 	durableName := fmt.Sprintf("%s_SUBSCRIBER", strings.ReplaceAll(topic, ".", "_"))
 	sub, err := p.js.Subscribe(topic, func(msg *nats.Msg) {
-		// 解析收到的消息
-		var message interface{}
-		if err := json.Unmarshal(msg.Data, &message); err != nil {
-			logs.ErrorContextf(ctx, "Failed to unmarshal message for topic '%s': %v", topic, err)
-			return
-		}
-
 		// Ack before invoking the handler so long-running worker tasks do not
 		// exceed JetStream AckWait and get redelivered while still running.
 		if err := msg.Ack(); err != nil {
@@ -143,7 +136,7 @@ func (p *natsPublisher) SubscribeWithContext(ctx context.Context, topic string, 
 		}
 
 		// 调用用户定义的处理函数
-		handler(message)
+		handler(msg)
 	},
 		nats.Durable(durableName),
 		nats.ManualAck(),
@@ -176,8 +169,37 @@ func (p *natsPublisher) PublishRealtime(ctx context.Context, topic string, event
 }
 
 // Subscribe implements the eventbus.Subscriber interface
-func (p *natsPublisher) Subscribe(ctx context.Context, topic string, handler func(event any)) error {
+func (p *natsPublisher) Subscribe(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
 	return p.SubscribeWithContext(ctx, topic, handler)
+}
+
+// SubscribeRealtime implements the eventbus.RealtimeSubscriber interface
+func (p *natsPublisher) SubscribeRealtime(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return fmt.Errorf("NATS client is closed")
+	}
+	p.mu.Unlock()
+
+	// 使用 Core NATS 订阅，不依赖 JetStream
+	sub, err := p.conn.Subscribe(topic, func(msg *nats.Msg) {
+		handler(msg)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to realtime topic '%s': %w", topic, err)
+	}
+
+	// 在 context 取消时清理订阅
+	go func() {
+		<-ctx.Done()
+		if err := sub.Unsubscribe(); err != nil {
+			logs.WarnContextf(ctx, "Failed to unsubscribe from realtime topic '%s': %v", topic, err)
+		}
+		logs.InfoContextf(ctx, "Unsubscribed from realtime topic: %s", topic)
+	}()
+
+	return nil
 }
 
 // Close 关闭 NATS 连接并释放资源

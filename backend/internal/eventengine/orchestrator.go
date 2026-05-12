@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nats-io/nats.go"
 	"github.com/insmtx/Leros/backend/internal/agent"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	interactionevent "github.com/insmtx/Leros/backend/pkg/event"
@@ -57,16 +58,10 @@ func (o *Orchestrator) Start(ctx context.Context) error {
 	for topic, handler := range o.handlers {
 		go func(t string, h EventHandlerFunc) {
 			logs.InfoContextf(ctx, "Starting subscription for topic: %s", t)
-			err := o.subscriber.Subscribe(ctx, t, func(event any) {
-				// 将通用interface{}转换为	interactionevent.Event
-				jsonBytes, err := json.Marshal(event)
-				if err != nil {
-					logs.ErrorContextf(ctx, "Failed to marshal event to JSON: %v", err)
-					return
-				}
-
+			err := o.subscriber.Subscribe(ctx, t, func(msg *nats.Msg) {
+				// 将 nats.Msg 转换为 interactionevent.Event
 				var interactionEvent interactionevent.Event
-				if err := json.Unmarshal(jsonBytes, &interactionEvent); err != nil {
+				if err := json.Unmarshal(msg.Data, &interactionEvent); err != nil {
 					logs.ErrorContextf(ctx, "Failed to unmarshal event: %v", err)
 					return
 				}
