@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/insmtx/Leros/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/runtime/events"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -44,7 +45,7 @@ type streamContent struct {
 }
 
 // Run 启动 Claude Code 进程并将 stdout/stderr 直接转换为引擎事件。
-func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Process, <-chan engines.Event, error) {
+func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Process, <-chan events.Event, error) {
 	args := buildArgs(req)
 
 	execCtx := ctx
@@ -74,12 +75,12 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Pr
 		return nil, nil, fmt.Errorf("start claude: %w", err)
 	}
 
-	events := make(chan engines.Event, 16)
+	evtChan := make(chan events.Event, 16)
 	proc := engines.NewCmdProcess(cmd)
-	events <- engines.Event{Type: engines.EventStarted}
+	evtChan <- events.Event{Type: events.EventStarted}
 
 	go func() {
-		defer close(events)
+		defer close(evtChan)
 		defer cancel()
 
 		parseState := &claudeStreamState{}
@@ -88,35 +89,35 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Pr
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			scanClaudeStdout(ctx, stdout, events, parseState)
+			scanClaudeStdout(ctx, stdout, evtChan, parseState)
 		}()
 		go func() {
 			defer wg.Done()
-			stderrText = scanPlainOutput(ctx, stderr, events, engines.EventMessageDelta)
+			stderrText = scanPlainOutput(ctx, stderr, evtChan, events.EventMessageDelta)
 		}()
 
 		err := cmd.Wait()
 		wg.Wait()
 		if err != nil {
-			events <- engines.Event{Type: engines.EventError, Content: claudeFailureContent(err, parseState, stderrText)}
+			evtChan <- events.Event{Type: events.EventFailed, Content: claudeFailureContent(err, parseState, stderrText)}
 			return
 		}
 		if parseState.isError {
 			if parseState.result == "" {
 				parseState.result = "claude execution failed"
 			}
-			events <- engines.Event{Type: engines.EventError, Content: parseState.result}
+			evtChan <- events.Event{Type: events.EventFailed, Content: parseState.result}
 			return
 		}
 		if parseState.result == "" && parseState.lastAssistantText != "" {
-			if !sendEvent(ctx, events, engines.Event{Type: engines.EventResult, Content: parseState.lastAssistantText}) {
+			if !sendEvent(ctx, evtChan, events.Event{Type: events.EventResult, Content: parseState.lastAssistantText}) {
 				return
 			}
 		}
-		events <- engines.Event{Type: engines.EventDone}
+		evtChan <- events.Event{Type: events.EventCompleted}
 	}()
 
-	return proc, events, nil
+	return proc, evtChan, nil
 }
 
 type claudeStreamState struct {
@@ -125,30 +126,30 @@ type claudeStreamState struct {
 	lastAssistantText string
 }
 
-func scanClaudeStdout(ctx context.Context, r interface{ Read([]byte) (int, error) }, events chan<- engines.Event, state *claudeStreamState) {
+func scanClaudeStdout(ctx context.Context, r interface{ Read([]byte) (int, error) }, evtChan chan<- events.Event, state *claudeStreamState) {
 	engines.ScanJSONLines(r, func(line string) bool {
 		event := parseClaudeLine(line, state)
 		if event.Type == "" {
 			return true
 		}
-		return sendEvent(ctx, events, event)
+		return sendEvent(ctx, evtChan, event)
 	})
 }
 
-func parseClaudeLine(line string, state *claudeStreamState) engines.Event {
+func parseClaudeLine(line string, state *claudeStreamState) events.Event {
 	logs.Infof("Parse Claude line: %s", line)
 	line = strings.TrimSpace(line)
 	if line == "" {
-		return engines.Event{}
+		return events.Event{}
 	}
 	var event streamEvent
 	if json.Unmarshal([]byte(line), &event) != nil {
-		return engines.Event{Type: engines.EventMessageDelta, Content: line}
+		return events.Event{Type: events.EventMessageDelta, Content: line}
 	}
 	switch event.Type {
 	case "assistant":
 		if event.Message == nil {
-			return engines.Event{}
+			return events.Event{}
 		}
 		var b strings.Builder
 		for _, block := range event.Message.Content {
@@ -167,21 +168,21 @@ func parseClaudeLine(line string, state *claudeStreamState) engines.Event {
 			}
 		}
 		if b.Len() == 0 {
-			return engines.Event{}
+			return events.Event{}
 		}
-		return engines.Event{Type: engines.EventMessageDelta, Content: b.String()}
+		return events.Event{Type: events.EventMessageDelta, Content: b.String()}
 	case "result":
 		state.result = event.Result
 		state.isError = event.IsError
 		if event.IsError || event.Result == "" {
-			return engines.Event{}
+			return events.Event{}
 		}
-		return engines.Event{Type: engines.EventResult, Content: event.Result}
+		return events.Event{Type: events.EventResult, Content: event.Result}
 	}
-	return engines.Event{}
+	return events.Event{}
 }
 
-func scanPlainOutput(ctx context.Context, r interface{ Read([]byte) (int, error) }, events chan<- engines.Event, eventType engines.EventType) string {
+func scanPlainOutput(ctx context.Context, r interface{ Read([]byte) (int, error) }, evtChan chan<- events.Event, eventType events.EventType) string {
 	var output strings.Builder
 	engines.ScanJSONLines(r, func(line string) bool {
 		line = strings.TrimSpace(line)
@@ -192,16 +193,16 @@ func scanPlainOutput(ctx context.Context, r interface{ Read([]byte) (int, error)
 			output.WriteString("\n")
 		}
 		output.WriteString(line)
-		return sendEvent(ctx, events, engines.Event{Type: eventType, Content: line})
+		return sendEvent(ctx, evtChan, events.Event{Type: eventType, Content: line})
 	})
 	return output.String()
 }
 
-func sendEvent(ctx context.Context, events chan<- engines.Event, event engines.Event) bool {
+func sendEvent(ctx context.Context, evtChan chan<- events.Event, event events.Event) bool {
 	select {
 	case <-ctx.Done():
 		return false
-	case events <- event:
+	case evtChan <- event:
 		return true
 	}
 }

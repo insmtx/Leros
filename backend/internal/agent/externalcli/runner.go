@@ -125,29 +125,29 @@ func consumeEvents(ctx context.Context, emitter *events.Emitter, handle *engines
 	consumed := consumeResult{}
 	for event := range handle.Events {
 		switch event.Type {
-		case engines.EventStarted:
+		case events.EventStarted:
 			continue
 		case engines.EventProviderSessionStarted:
 			if strings.TrimSpace(event.Content) != "" {
 				consumed.ProviderSessionID = strings.TrimSpace(event.Content)
 			}
-		case engines.EventResult:
+		case events.EventResult:
 			if strings.TrimSpace(event.Content) != "" {
 				result.Reset()
 				result.WriteString(event.Content)
 				resultSeen = true
 			}
-		case engines.EventDone:
+		case events.EventCompleted:
 			consumed.Message = result.String()
 			return consumed, nil
-		case engines.EventError:
+		case events.EventFailed:
 			if strings.TrimSpace(event.Content) == "" {
 				consumed.Message = result.String()
 				return consumed, fmt.Errorf("external runtime failed")
 			}
 			consumed.Message = result.String()
 			return consumed, fmt.Errorf("%s", event.Content)
-		case engines.EventMessageDelta:
+		case events.EventMessageDelta:
 			if strings.TrimSpace(event.Content) != "" {
 			_ = emitter.Emit(ctx, &events.Event{
 				Type:    events.EventMessageDelta,

@@ -6,7 +6,7 @@ import (
 	"context"
 	"time"
 
-	runtimeevents "github.com/insmtx/Leros/backend/runtime/events"
+	"github.com/insmtx/Leros/backend/runtime/events"
 )
 
 const (
@@ -18,24 +18,24 @@ const (
 
 const (
 	// EventStarted indicates that the external process has started.
-	EventStarted = runtimeevents.EventStarted
+	EventStarted = events.EventStarted
 	// EventProviderSessionStarted indicates that the provider created or exposed a native session ID.
-	EventProviderSessionStarted runtimeevents.EventType = "provider_session.started"
+	EventProviderSessionStarted events.EventType = "provider_session.started"
 	// EventMessageDelta indicates human-readable CLI output that can be streamed to callers.
-	EventMessageDelta = runtimeevents.EventMessageDelta
+	EventMessageDelta = events.EventMessageDelta
 	// EventResult indicates that the final assistant result emitted by the CLI.
-	EventResult = runtimeevents.EventResult
+	EventResult = events.EventResult
 	// EventDone indicates that the external process completed successfully.
-	EventDone = runtimeevents.EventCompleted
+	EventDone = events.EventCompleted
 	// EventError indicates that the external process failed.
-	EventError = runtimeevents.EventFailed
+	EventError = events.EventFailed
 )
 
 // EventType 分类引擎进程发出的生命周期事件类型。
-type EventType = runtimeevents.EventType
+type EventType = events.EventType
 
 // Event 引擎进程发出的生命周期事件。
-type Event = runtimeevents.Event
+type Event = events.Event
 
 // PrepareRequest 包含引擎特定的工作区设置输入。
 type PrepareRequest struct {
@@ -70,8 +70,8 @@ type Process interface {
 
 // RunHandle 引擎进程启动后返回的句柄。
 type RunHandle struct {
-	Process Process      // 进程控制句柄
-	Events  <-chan Event // 事件通道
+	Process Process          // 进程控制句柄
+	Events  <-chan events.Event // 事件通道
 }
 
 // Engine 通过外部 AI CLI 执行提示。
