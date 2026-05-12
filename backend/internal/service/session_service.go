@@ -353,9 +353,9 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID uint, req *co
 			TaskID:    fmt.Sprintf("task_%d", message.ID),
 		},
 		Route: eventtypes.RouteContext{
-			OrgID:     fmt.Sprintf("%d", orgID),
+			OrgID:     orgID,
 			SessionID: session.SessionID,
-			WorkerID:  fmt.Sprintf("%d", session.AllocatedAssistantID),
+			WorkerID:  session.AllocatedAssistantID,
 		},
 		Body: eventtypes.WorkerTaskBody{
 			TaskType: eventtypes.TaskTypeAgentRun,

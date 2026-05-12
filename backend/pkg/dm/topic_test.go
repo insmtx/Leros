@@ -3,7 +3,7 @@ package dm
 import "testing"
 
 func TestTopicBuilderBuildsSubjectsFromSegments(t *testing.T) {
-	got := Topic().
+	got := topic().
 		Org("1001").
 		Session("sess_0").
 		Message().
@@ -15,7 +15,7 @@ func TestTopicBuilderBuildsSubjectsFromSegments(t *testing.T) {
 }
 
 func TestTopicBuilderBuildsWildcardSubjects(t *testing.T) {
-	got := Topic().
+	got := topic().
 		Org("1001").
 		Add("worker").
 		Wildcard().
@@ -28,21 +28,21 @@ func TestTopicBuilderBuildsWildcardSubjects(t *testing.T) {
 }
 
 func TestTopicBuilderCleansSegments(t *testing.T) {
-	if got, want := Topic().Add(" org.1001 ", " worker.1 ").Build(), "org_1001.worker_1"; got != want {
+	if got, want := topic().Add(" org.1001 ", " worker.1 ").Build(), "org_1001.worker_1"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 
-	if got, want := Topic().Add("").Build(), "unknown"; got != want {
+	if got, want := topic().Add("").Build(), "unknown"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 
-	if got, want := Topic().Add("worker * >").Build(), "worker____"; got != want {
+	if got, want := topic().Add("worker * >").Build(), "worker____"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
 
 func TestTopicBuilderIsImmutable(t *testing.T) {
-	base := Topic().Org("1001")
+	base := topic().Org("1001")
 	task := base.Worker("worker_1").Task()
 	stream := base.Session("sess_1").Message().Stream()
 
@@ -58,7 +58,7 @@ func TestTopicBuilderIsImmutable(t *testing.T) {
 }
 
 func TestTopicBuilderWithSeparator(t *testing.T) {
-	got := Topic().
+	got := topic().
 		Org("1001").
 		Worker("worker_1").
 		Task().
@@ -71,7 +71,7 @@ func TestTopicBuilderWithSeparator(t *testing.T) {
 }
 
 func TestTopicBuilderWithUnderscoreSeparator(t *testing.T) {
-	got := Topic().
+	got := topic().
 		Org("1001").
 		Worker("worker_1").
 		Task().
@@ -84,7 +84,7 @@ func TestTopicBuilderWithUnderscoreSeparator(t *testing.T) {
 }
 
 func TestTopicBuilderWithSeparatorIsImmutable(t *testing.T) {
-	base := Topic().Org("1001").Worker("worker_1")
+	base := topic().Org("1001").Worker("worker_1")
 	underscore := base.WithSeparator("_").Task()
 
 	if got, want := base.Task().Build(), "org.1001.worker.worker_1.task"; got != want {

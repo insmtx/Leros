@@ -17,8 +17,8 @@ import (
 
 // Config controls one standalone worker task consumer.
 type Config struct {
-	OrgID    string
-	WorkerID string
+	OrgID    uint
+	WorkerID uint
 }
 
 // Consumer subscribes to one worker task topic and dispatches tasks to an agent runtime.
@@ -31,12 +31,10 @@ type Consumer struct {
 
 // New creates a worker task consumer.
 func New(cfg Config, subscriber eventbus.Subscriber, publisher eventbus.RealtimePublisher, runner agent.Runner) (*Consumer, error) {
-	cfg.OrgID = strings.TrimSpace(cfg.OrgID)
-	cfg.WorkerID = strings.TrimSpace(cfg.WorkerID)
-	if cfg.OrgID == "" {
+	if cfg.OrgID == 0 {
 		return nil, fmt.Errorf("worker org_id is required")
 	}
-	if cfg.WorkerID == "" {
+	if cfg.WorkerID == 0 {
 		return nil, fmt.Errorf("worker worker_id is required")
 	}
 	if subscriber == nil {
@@ -55,7 +53,11 @@ func New(cfg Config, subscriber eventbus.Subscriber, publisher eventbus.Realtime
 
 // TaskTopic returns the NATS subject consumed by this worker.
 func (c *Consumer) TaskTopic() string {
-	return dm.Topic().Org(c.cfg.OrgID).Worker(c.cfg.WorkerID).Task().Build()
+	topic, err := dm.WorkerTaskTopic(c.cfg.OrgID, c.cfg.WorkerID)
+	if err != nil {
+		logs.Errorf("Failed to get worker task topic for org_id=%d worker_id=%d: %v", c.cfg.OrgID, c.cfg.WorkerID, err)
+	}
+	return topic
 }
 
 // Start subscribes to the worker task topic.
@@ -131,10 +133,10 @@ func decodeWorkerTask(event any) (eventtypes.WorkerTaskMessage, error) {
 }
 
 func (c *Consumer) validateRoute(msg eventtypes.WorkerTaskMessage) error {
-	if strings.TrimSpace(msg.Route.OrgID) != "" && msg.Route.OrgID != c.cfg.OrgID {
+	if msg.Route.OrgID != 0 && msg.Route.OrgID != c.cfg.OrgID {
 		return fmt.Errorf("task org_id %q does not match worker org_id %q", msg.Route.OrgID, c.cfg.OrgID)
 	}
-	if strings.TrimSpace(msg.Route.WorkerID) != "" && msg.Route.WorkerID != c.cfg.WorkerID {
+	if msg.Route.WorkerID != 0 && msg.Route.WorkerID != c.cfg.WorkerID {
 		return fmt.Errorf("task worker_id %q does not match worker_id %q", msg.Route.WorkerID, c.cfg.WorkerID)
 	}
 	return nil
