@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/insmtx/Leros/backend/internal/agent"
+	"github.com/insmtx/Leros/backend/runtime/events"
 )
 
 type ConsoleSink struct{}
@@ -13,17 +13,17 @@ func NewConsoleSink() *ConsoleSink {
 	return &ConsoleSink{}
 }
 
-func (s *ConsoleSink) Emit(_ context.Context, event *agent.RunEvent) error {
+func (s *ConsoleSink) Emit(_ context.Context, event *events.Event) error {
 	switch event.Type {
-	case agent.RunEventMessageDelta:
+	case events.EventMessageDelta:
 		fmt.Print(event.Content)
-	case agent.RunEventCompleted:
+	case events.EventCompleted:
 		fmt.Println()
-	case agent.RunEventToolCallStarted:
+	case events.EventToolCallStarted:
 		fmt.Printf("\n[Tool Call Started] %s\n", event.Content)
-	case agent.RunEventToolCallOutput:
+	case events.EventToolCallOutput:
 		fmt.Printf("\n[Tool Output] %s\n", event.Content)
-	case agent.RunEventFailed:
+	case events.EventFailed:
 		fmt.Printf("\n[Error] %s\n", event.Content)
 	}
 	return nil

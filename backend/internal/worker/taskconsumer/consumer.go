@@ -9,8 +9,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/insmtx/Leros/backend/internal/agent"
-	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
-	"github.com/insmtx/Leros/backend/internal/agent/eventtypes"
+	"github.com/insmtx/Leros/backend/runtime/events"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/pkg/dm"
 	"github.com/ygpkg/yg-go/logs"
@@ -81,7 +80,7 @@ func (c *Consumer) handleEvent(ctx context.Context, msg *nats.Msg) error {
 	if err := c.validateRoute(taskMsg); err != nil {
 		return err
 	}
-	if taskMsg.Body.TaskType != eventtypes.TaskTypeAgentRun {
+	if taskMsg.Body.TaskType != events.TaskTypeAgentRun {
 		return fmt.Errorf("unsupported worker task type %q", taskMsg.Body.TaskType)
 	}
 
@@ -118,18 +117,18 @@ func (c *Consumer) handleEvent(ctx context.Context, msg *nats.Msg) error {
 	return nil
 }
 
-func decodeWorkerTask(msg *nats.Msg) (eventtypes.WorkerTaskMessage, error) {
-	var taskMsg eventtypes.WorkerTaskMessage
+func decodeWorkerTask(msg *nats.Msg) (events.WorkerTaskMessage, error) {
+	var taskMsg events.WorkerTaskMessage
 	if err := json.Unmarshal(msg.Data, &taskMsg); err != nil {
 		return taskMsg, fmt.Errorf("unmarshal worker task: %w", err)
 	}
-	if taskMsg.Type != "" && taskMsg.Type != eventtypes.MessageTypeWorkerTask {
+	if taskMsg.Type != "" && taskMsg.Type != events.MessageTypeWorkerTask {
 		return taskMsg, fmt.Errorf("unexpected worker task message type %q", taskMsg.Type)
 	}
 	return taskMsg, nil
 }
 
-func (c *Consumer) validateRoute(msg eventtypes.WorkerTaskMessage) error {
+func (c *Consumer) validateRoute(msg events.WorkerTaskMessage) error {
 	if msg.Route.OrgID != 0 && msg.Route.OrgID != c.cfg.OrgID {
 		return fmt.Errorf("task org_id %q does not match worker org_id %q", msg.Route.OrgID, c.cfg.OrgID)
 	}
@@ -140,7 +139,7 @@ func (c *Consumer) validateRoute(msg eventtypes.WorkerTaskMessage) error {
 }
 
 // RequestFromWorkerTask converts the domain message protocol into the agent runtime boundary.
-func RequestFromWorkerTask(msg eventtypes.WorkerTaskMessage) *agent.RequestContext {
+func RequestFromWorkerTask(msg events.WorkerTaskMessage) *agent.RequestContext {
 	return &agent.RequestContext{
 		RunID:   firstNonEmpty(msg.Trace.RunID, msg.Trace.TaskID, msg.ID),
 		TraceID: msg.Trace.TraceID,
@@ -188,7 +187,7 @@ func RequestFromWorkerTask(msg eventtypes.WorkerTaskMessage) *agent.RequestConte
 	}
 }
 
-func inputMessagesFromTask(messages []eventtypes.ChatMessage) []agent.InputMessage {
+func inputMessagesFromTask(messages []events.ChatMessage) []agent.InputMessage {
 	if len(messages) == 0 {
 		return nil
 	}
@@ -202,7 +201,7 @@ func inputMessagesFromTask(messages []eventtypes.ChatMessage) []agent.InputMessa
 	return result
 }
 
-func attachmentsFromTask(attachments []eventtypes.Attachment) []agent.Attachment {
+func attachmentsFromTask(attachments []events.Attachment) []agent.Attachment {
 	if len(attachments) == 0 {
 		return nil
 	}
@@ -227,4 +226,4 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-var _ agentevents.EventSink = (*MQStreamSink)(nil)
+var _ events.Sink = (*MQStreamSink)(nil)

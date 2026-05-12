@@ -9,7 +9,7 @@ import (
 
 	einotool "github.com/cloudwego/eino/components/tool"
 	einoschema "github.com/cloudwego/eino/schema"
-	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/runtime/events"
 	"github.com/insmtx/Leros/backend/tools"
 )
 
@@ -75,7 +75,7 @@ func (a *ToolAdapter) Definitions() []ToolDefinition {
 }
 
 // EinoTools returns Eino wrappers that inject runtime identity at call time.
-func (a *ToolAdapter) EinoTools(binding ToolBinding, emitter *agentevents.Emitter) ([]einotool.BaseTool, error) {
+func (a *ToolAdapter) EinoTools(binding ToolBinding, emitter *events.Emitter) ([]einotool.BaseTool, error) {
 	if a == nil || a.registry == nil {
 		return nil, nil
 	}
@@ -172,7 +172,7 @@ type invokableTool struct {
 	adapter *ToolAdapter
 	tool    tools.Tool
 	binding ToolBinding
-	emitter *agentevents.Emitter
+	emitter *events.Emitter
 }
 
 func (t *invokableTool) Info(ctx context.Context) (*einoschema.ToolInfo, error) {
@@ -196,21 +196,21 @@ func (t *invokableTool) InvokableRun(ctx context.Context, argumentsInJSON string
 	}
 
 	startedAt := time.Now()
-	_ = t.emitToolEvent(ctx, agentevents.RunEventToolCallStarted, eventContentJSON(map[string]any{
+	_ = t.emitToolEvent(ctx, events.EventToolCallStarted, eventContentJSON(map[string]any{
 		"name":      t.tool.Name(),
 		"arguments": cloneArguments(input),
 	}))
 
 	result, err := invokeTool(ctx, t.tool, input, t.binding.ToolContext)
 	if err != nil {
-		_ = t.emitToolEvent(ctx, agentevents.RunEventToolCallFailed, eventContentJSON(map[string]any{
+		_ = t.emitToolEvent(ctx, events.EventToolCallFailed, eventContentJSON(map[string]any{
 			"name":       t.tool.Name(),
 			"elapsed_ms": time.Since(startedAt).Milliseconds(),
 		}))
 		return errorOutput(err.Error(), t.tool.Name()), nil
 	}
 
-	_ = t.emitToolEvent(ctx, agentevents.RunEventToolCallCompleted, eventContentJSON(map[string]any{
+	_ = t.emitToolEvent(ctx, events.EventToolCallCompleted, eventContentJSON(map[string]any{
 		"name":       t.tool.Name(),
 		"result":     result.Output,
 		"elapsed_ms": time.Since(startedAt).Milliseconds(),
@@ -229,11 +229,11 @@ func errorOutput(detail, toolName string) string {
 	return errStr
 }
 
-func (t *invokableTool) emitToolEvent(ctx context.Context, eventType agentevents.RunEventType, content string) error {
+func (t *invokableTool) emitToolEvent(ctx context.Context, eventType events.EventType, content string) error {
 	if t == nil || t.emitter == nil {
 		return nil
 	}
-	err := t.emitter.Emit(ctx, &agentevents.RunEvent{
+	err := t.emitter.Emit(ctx, &events.Event{
 		Type:    eventType,
 		Content: content,
 	})

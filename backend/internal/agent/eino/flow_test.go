@@ -8,7 +8,7 @@ import (
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
-	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/runtime/events"
 	"github.com/insmtx/Leros/backend/tools"
 )
 
@@ -80,8 +80,8 @@ func TestFlowStreamEmitsMessageEvents(t *testing.T) {
 		t.Fatalf("new flow: %v", err)
 	}
 
-	var emitted []*agentevents.RunEvent
-	emitter := agentevents.NewEmitter("run_stream", "trace_stream", agentevents.SinkFunc(func(ctx context.Context, event *agentevents.RunEvent) error {
+	var emitted []*events.Event
+	emitter := events.NewEmitter("run_stream", "trace_stream", events.SinkFunc(func(ctx context.Context, event *events.Event) error {
 		emitted = append(emitted, event)
 		return nil
 	}))
@@ -96,7 +96,7 @@ func TestFlowStreamEmitsMessageEvents(t *testing.T) {
 	var deltaCount int
 	for _, event := range emitted {
 		switch event.Type {
-		case agentevents.RunEventMessageDelta:
+		case events.EventMessageDelta:
 			deltaCount++
 		}
 	}

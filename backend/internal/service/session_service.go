@@ -10,7 +10,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"gorm.io/gorm"
 
-	"github.com/insmtx/Leros/backend/internal/agent/eventtypes"
 	"github.com/insmtx/Leros/backend/internal/api/auth"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/api/dto"
@@ -337,50 +336,55 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID uint, req *co
 		}
 	}
 
-	topic, err := dm.WorkerTaskTopic(orgID, session.AllocatedAssistantID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct worker task topic: %w", err)
-	}
+	// Only publish task if we have a worker ID
+	if session.AllocatedAssistantID > 0 {
+		topic, err := dm.WorkerTaskTopic(orgID, session.AllocatedAssistantID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to construct worker task topic: %w", err)
+		}
 
-	messagePayload := eventtypes.WorkerTaskMessage{
-		ID:        fmt.Sprintf("msg_%d_%d", session.ID, message.Sequence),
-		Type:      eventtypes.MessageTypeWorkerTask,
-		CreatedAt: time.Now().UTC(),
-		Trace: eventtypes.TraceContext{
-			TraceID:   session.SessionID,
-			RequestID: fmt.Sprintf("req_%d", message.ID),
-			TaskID:    fmt.Sprintf("task_%d", message.ID),
-		},
-		Route: eventtypes.RouteContext{
-			OrgID:     orgID,
-			SessionID: session.SessionID,
-			WorkerID:  session.AllocatedAssistantID,
-		},
-		Body: eventtypes.WorkerTaskBody{
-			TaskType: eventtypes.TaskTypeAgentRun,
-			Actor: eventtypes.ActorContext{
-				UserID:      fmt.Sprintf("%d", session.Uin),
-				DisplayName: "",
-				Channel:     "session",
+		messagePayload := events.WorkerTaskMessage{
+			ID:        fmt.Sprintf("msg_%d_%d", session.ID, message.Sequence),
+			Type:      events.MessageTypeWorkerTask,
+			CreatedAt: time.Now().UTC(),
+			Trace: events.TraceContext{
+				TraceID:   session.SessionID,
+				RequestID: fmt.Sprintf("req_%d", message.ID),
+				TaskID:    fmt.Sprintf("task_%d", message.ID),
 			},
-			Input: eventtypes.TaskInput{
-				Type: eventtypes.InputTypeMessage,
-				Text: message.Content,
+			Route: events.RouteContext{
+				OrgID:     orgID,
+				SessionID: session.SessionID,
+				WorkerID:  session.AllocatedAssistantID,
 			},
-		},
-		Metadata: map[string]any{
-			"session_id":   session.SessionID,
-			"message_type": message.MessageType,
-			"sequence":     message.Sequence,
-			"timestamp":    message.Timestamp,
-		},
-	}
+			Body: events.WorkerTaskBody{
+				TaskType: events.TaskTypeAgentRun,
+				Actor: events.ActorContext{
+					UserID:      fmt.Sprintf("%d", session.Uin),
+					DisplayName: "",
+					Channel:     "session",
+				},
+				Input: events.TaskInput{
+					Type: events.InputTypeMessage,
+					Text: message.Content,
+				},
+			},
+			Metadata: map[string]any{
+				"session_id":   session.SessionID,
+				"message_type": message.MessageType,
+				"sequence":     message.Sequence,
+				"timestamp":    message.Timestamp,
+			},
+		}
 
-	if err := s.eventbus.Publish(ctx, topic, messagePayload); err != nil {
-		logs.ErrorContextf(ctx, "Failed to publish message to assistant %d: %v", session.AllocatedAssistantID, err)
-		return nil, fmt.Errorf("failed to publish message to assistant: %w", err)
+		if err := s.eventbus.Publish(ctx, topic, messagePayload); err != nil {
+			logs.ErrorContextf(ctx, "Failed to publish message to assistant %d: %v", session.AllocatedAssistantID, err)
+			return nil, fmt.Errorf("failed to publish message to assistant: %w", err)
+		}
+		logs.DebugContextf(ctx, "Published message to topic %s: session_id=%s sequence=%d", topic, session.SessionID, message.Sequence)
+	} else {
+		logs.DebugContextf(ctx, "Skipping task publish: no worker allocated for session %s", session.SessionID)
 	}
-	logs.DebugContextf(ctx, "Published message to topic %s: session_id=%s sequence=%d", topic, session.SessionID, message.Sequence)
 
 	return convertToContractSessionMessage(message), nil
 }
@@ -463,7 +467,7 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 		return fmt.Errorf("failed to construct session result stream topic: %w", err)
 	}
 	err = s.eventbus.SubscribeRealtime(ctx, topic, func(msg *nats.Msg) {
-		var streamMsg eventtypes.MessageStreamMessage
+		var streamMsg events.MessageStreamMessage
 		if err := json.Unmarshal(msg.Data, &streamMsg); err != nil {
 			logs.WarnContextf(ctx, "failed to unmarshal to MessageStreamMessage: %v", err)
 			return
@@ -482,13 +486,13 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 		}
 
 		switch streamMsg.Body.Event {
-		case eventtypes.StreamEventMessageDelta:
+		case events.StreamEventMessageDelta:
 			se.Type = dto.SessionEventTypeMessageDelta
 			se.Payload = dto.MessageDeltaPayload{
 				Role:    string(streamMsg.Body.Payload.Role),
 				Content: streamMsg.Body.Payload.Content,
 			}
-		case eventtypes.StreamEventToolCallStarted:
+		case events.StreamEventToolCallStarted:
 			se.Type = dto.SessionEventTypeToolCallStarted
 			if tc := streamMsg.Body.Payload.ToolCall; tc != nil {
 				se.Payload = dto.ToolCallDeltaPayload{
@@ -496,11 +500,11 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 					Name: tc.Name,
 				}
 			}
-		case eventtypes.StreamEventRunStarted:
+		case events.StreamEventRunStarted:
 			se.Type = dto.SessionEventTypeRunStarted
-		case eventtypes.StreamEventRunCompleted:
+		case events.StreamEventRunCompleted:
 			se.Type = dto.SessionEventTypeRunCompleted
-		case eventtypes.StreamEventRunFailed:
+		case events.StreamEventRunFailed:
 			se.Type = dto.SessionEventTypeRunFailed
 		default:
 			logs.WarnContextf(ctx, "unknown stream event type: %v", streamMsg.Body.Event)

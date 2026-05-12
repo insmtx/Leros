@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/agent"
-	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/runtime/events"
 	"github.com/insmtx/Leros/backend/runtime/engines"
 	"github.com/ygpkg/yg-go/logs"
 )
@@ -52,8 +52,8 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 	}
 	ensureRunDefaults(req)
 
-	emitter := agentevents.NewEmitter(req.RunID, req.TraceID, sinkForRequest(req))
-	if err := emitter.Emit(ctx, &agentevents.RunEvent{Type: agentevents.RunEventStarted}); err != nil {
+	emitter := events.NewEmitter(req.RunID, req.TraceID, sinkForRequest(req))
+	if err := emitter.Emit(ctx, &events.Event{Type: events.EventStarted}); err != nil {
 		return nil, err
 	}
 
@@ -104,8 +104,8 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 			"provider_id": firstNonEmptyString(sessionPlan.ProviderSessionID, consumeResult.ProviderSessionID),
 		},
 	}
-	_ = emitter.Emit(ctx, &agentevents.RunEvent{
-		Type:    agentevents.RunEventCompleted,
+	_ = emitter.Emit(ctx, &events.Event{
+		Type:    events.EventCompleted,
 		Content: result.Message,
 	})
 	return result, nil
@@ -116,7 +116,7 @@ type consumeResult struct {
 	ProviderSessionID string
 }
 
-func consumeEvents(ctx context.Context, emitter *agentevents.Emitter, handle *engines.RunHandle) (consumeResult, error) {
+func consumeEvents(ctx context.Context, emitter *events.Emitter, handle *engines.RunHandle) (consumeResult, error) {
 	if handle == nil || handle.Events == nil {
 		return consumeResult{}, nil
 	}
@@ -125,34 +125,34 @@ func consumeEvents(ctx context.Context, emitter *agentevents.Emitter, handle *en
 	consumed := consumeResult{}
 	for event := range handle.Events {
 		switch event.Type {
-		case engines.EventStarted:
+		case events.EventStarted:
 			continue
 		case engines.EventProviderSessionStarted:
 			if strings.TrimSpace(event.Content) != "" {
 				consumed.ProviderSessionID = strings.TrimSpace(event.Content)
 			}
-		case engines.EventResult:
+		case events.EventResult:
 			if strings.TrimSpace(event.Content) != "" {
 				result.Reset()
 				result.WriteString(event.Content)
 				resultSeen = true
 			}
-		case engines.EventDone:
+		case events.EventCompleted:
 			consumed.Message = result.String()
 			return consumed, nil
-		case engines.EventError:
+		case events.EventFailed:
 			if strings.TrimSpace(event.Content) == "" {
 				consumed.Message = result.String()
 				return consumed, fmt.Errorf("external runtime failed")
 			}
 			consumed.Message = result.String()
 			return consumed, fmt.Errorf("%s", event.Content)
-		case engines.EventMessageDelta:
+		case events.EventMessageDelta:
 			if strings.TrimSpace(event.Content) != "" {
-				_ = emitter.Emit(ctx, &agentevents.RunEvent{
-					Type:    agentevents.RunEventMessageDelta,
-					Content: event.Content,
-				})
+			_ = emitter.Emit(ctx, &events.Event{
+				Type:    events.EventMessageDelta,
+				Content: event.Content,
+			})
 				if !resultSeen {
 					result.WriteString(event.Content)
 				}
@@ -282,18 +282,18 @@ func firstNonEmptyString(values ...string) string {
 	return ""
 }
 
-func (r *Runner) failedResult(ctx context.Context, emitter *agentevents.Emitter, req *agent.RequestContext, startedAt time.Time, err error, metadata map[string]any) *agent.RunResult {
+func (r *Runner) failedResult(ctx context.Context, emitter *events.Emitter, req *agent.RequestContext, startedAt time.Time, err error, metadata map[string]any) *agent.RunResult {
 	status := agent.RunStatusFailed
-	eventType := agentevents.RunEventFailed
+	eventType := events.EventFailed
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		status = agent.RunStatusCancelled
-		eventType = agentevents.RunEventCancelled
+		eventType = events.EventCancelled
 	}
 	message := ""
 	if err != nil {
 		message = err.Error()
 	}
-	_ = emitter.Emit(ctx, &agentevents.RunEvent{
+	_ = emitter.Emit(ctx, &events.Event{
 		Type:    eventType,
 		Content: message,
 	})
@@ -333,9 +333,9 @@ func ensureRunDefaults(req *agent.RequestContext) {
 	}
 }
 
-func sinkForRequest(req *agent.RequestContext) agentevents.EventSink {
+func sinkForRequest(req *agent.RequestContext) events.Sink {
 	if req == nil || req.EventSink == nil {
-		return agentevents.NewNoopSink()
+		return events.NewNoopSink()
 	}
 	return req.EventSink
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/insmtx/Leros/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/runtime/events"
 )
 
 func TestAdapterAskCurrentTime(t *testing.T) {
@@ -45,19 +46,19 @@ func TestAdapterAskCurrentTime(t *testing.T) {
 		t.Fatalf("run claude adapter: %v", err)
 	}
 
-	var finalEvent engines.Event
+	var finalEvent events.Event
 	var result string
 	for event := range handle.Events {
 		t.Logf("received event: type=%s, content=%s", event.Type, event.Content)
-		if event.Type == engines.EventResult {
+		if event.Type == events.EventResult {
 			result = strings.TrimSpace(event.Content)
 		}
 		finalEvent = event
 	}
-	if finalEvent.Type == engines.EventError {
+	if finalEvent.Type == events.EventFailed {
 		t.Fatalf("claude execution failed: %s", finalEvent.Content)
 	}
-	if finalEvent.Type != engines.EventDone {
+	if finalEvent.Type != events.EventCompleted {
 		t.Fatalf("unexpected final event: %#v", finalEvent)
 	}
 
@@ -70,7 +71,7 @@ func TestAdapterAskCurrentTime(t *testing.T) {
 func TestParseClaudeLineEmitsResultEvent(t *testing.T) {
 	state := &claudeStreamState{}
 	event := parseClaudeLine(`{"type":"result","result":"final","is_error":false}`, state)
-	if event.Type != engines.EventResult || event.Content != "final" {
+	if event.Type != events.EventResult || event.Content != "final" {
 		t.Fatalf("unexpected event: %#v", event)
 	}
 	if state.result != "final" || state.isError {
@@ -81,7 +82,7 @@ func TestParseClaudeLineEmitsResultEvent(t *testing.T) {
 func TestParseClaudeLineTracksAssistantFallback(t *testing.T) {
 	state := &claudeStreamState{}
 	event := parseClaudeLine(`{"type":"assistant","message":{"content":[{"type":"text","text":"answer"}]}}`, state)
-	if event.Type != engines.EventMessageDelta || event.Content != "answer" {
+	if event.Type != events.EventMessageDelta || event.Content != "answer" {
 		t.Fatalf("unexpected event: %#v", event)
 	}
 	if state.lastAssistantText != "answer" {

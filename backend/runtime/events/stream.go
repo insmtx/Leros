@@ -1,4 +1,4 @@
-package eventtypes
+package events
 
 // StreamEventType represents event types in Worker execution streams.
 type StreamEventType string
@@ -57,12 +57,7 @@ type ToolResultEvent struct {
 	Result     map[string]any `json:"result,omitempty"`
 }
 
-// UsagePayload describes model usage information.
-type UsagePayload struct {
-	InputTokens  int `json:"input_tokens,omitempty"`
-	OutputTokens int `json:"output_tokens,omitempty"`
-	TotalTokens  int `json:"total_tokens,omitempty"`
-}
+
 
 // StreamError describes terminal or recoverable errors in streaming execution.
 type StreamError struct {
