@@ -336,50 +336,55 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID uint, req *co
 		}
 	}
 
-	topic, err := dm.WorkerTaskTopic(orgID, session.AllocatedAssistantID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct worker task topic: %w", err)
-	}
+	// Only publish task if we have a worker ID
+	if session.AllocatedAssistantID > 0 {
+		topic, err := dm.WorkerTaskTopic(orgID, session.AllocatedAssistantID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to construct worker task topic: %w", err)
+		}
 
-	messagePayload := events.WorkerTaskMessage{
-		ID:        fmt.Sprintf("msg_%d_%d", session.ID, message.Sequence),
-		Type:      events.MessageTypeWorkerTask,
-		CreatedAt: time.Now().UTC(),
-		Trace: events.TraceContext{
-			TraceID:   session.SessionID,
-			RequestID: fmt.Sprintf("req_%d", message.ID),
-			TaskID:    fmt.Sprintf("task_%d", message.ID),
-		},
-		Route: events.RouteContext{
-			OrgID:     orgID,
-			SessionID: session.SessionID,
-			WorkerID:  session.AllocatedAssistantID,
-		},
-		Body: events.WorkerTaskBody{
-			TaskType: events.TaskTypeAgentRun,
-			Actor: events.ActorContext{
-				UserID:      fmt.Sprintf("%d", session.Uin),
-				DisplayName: "",
-				Channel:     "session",
+		messagePayload := events.WorkerTaskMessage{
+			ID:        fmt.Sprintf("msg_%d_%d", session.ID, message.Sequence),
+			Type:      events.MessageTypeWorkerTask,
+			CreatedAt: time.Now().UTC(),
+			Trace: events.TraceContext{
+				TraceID:   session.SessionID,
+				RequestID: fmt.Sprintf("req_%d", message.ID),
+				TaskID:    fmt.Sprintf("task_%d", message.ID),
 			},
-			Input: events.TaskInput{
-				Type: events.InputTypeMessage,
-				Text: message.Content,
+			Route: events.RouteContext{
+				OrgID:     orgID,
+				SessionID: session.SessionID,
+				WorkerID:  session.AllocatedAssistantID,
 			},
-		},
-		Metadata: map[string]any{
-			"session_id":   session.SessionID,
-			"message_type": message.MessageType,
-			"sequence":     message.Sequence,
-			"timestamp":    message.Timestamp,
-		},
-	}
+			Body: events.WorkerTaskBody{
+				TaskType: events.TaskTypeAgentRun,
+				Actor: events.ActorContext{
+					UserID:      fmt.Sprintf("%d", session.Uin),
+					DisplayName: "",
+					Channel:     "session",
+				},
+				Input: events.TaskInput{
+					Type: events.InputTypeMessage,
+					Text: message.Content,
+				},
+			},
+			Metadata: map[string]any{
+				"session_id":   session.SessionID,
+				"message_type": message.MessageType,
+				"sequence":     message.Sequence,
+				"timestamp":    message.Timestamp,
+			},
+		}
 
-	if err := s.eventbus.Publish(ctx, topic, messagePayload); err != nil {
-		logs.ErrorContextf(ctx, "Failed to publish message to assistant %d: %v", session.AllocatedAssistantID, err)
-		return nil, fmt.Errorf("failed to publish message to assistant: %w", err)
+		if err := s.eventbus.Publish(ctx, topic, messagePayload); err != nil {
+			logs.ErrorContextf(ctx, "Failed to publish message to assistant %d: %v", session.AllocatedAssistantID, err)
+			return nil, fmt.Errorf("failed to publish message to assistant: %w", err)
+		}
+		logs.DebugContextf(ctx, "Published message to topic %s: session_id=%s sequence=%d", topic, session.SessionID, message.Sequence)
+	} else {
+		logs.DebugContextf(ctx, "Skipping task publish: no worker allocated for session %s", session.SessionID)
 	}
-	logs.DebugContextf(ctx, "Published message to topic %s: session_id=%s sequence=%d", topic, session.SessionID, message.Sequence)
 
 	return convertToContractSessionMessage(message), nil
 }

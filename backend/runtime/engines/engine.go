@@ -17,25 +17,9 @@ const (
 )
 
 const (
-	// EventStarted indicates that the external process has started.
-	EventStarted = events.EventStarted
 	// EventProviderSessionStarted indicates that the provider created or exposed a native session ID.
 	EventProviderSessionStarted events.EventType = "provider_session.started"
-	// EventMessageDelta indicates human-readable CLI output that can be streamed to callers.
-	EventMessageDelta = events.EventMessageDelta
-	// EventResult indicates that the final assistant result emitted by the CLI.
-	EventResult = events.EventResult
-	// EventDone indicates that the external process completed successfully.
-	EventDone = events.EventCompleted
-	// EventError indicates that the external process failed.
-	EventError = events.EventFailed
 )
-
-// EventType 分类引擎进程发出的生命周期事件类型。
-type EventType = events.EventType
-
-// Event 引擎进程发出的生命周期事件。
-type Event = events.Event
 
 // PrepareRequest 包含引擎特定的工作区设置输入。
 type PrepareRequest struct {
