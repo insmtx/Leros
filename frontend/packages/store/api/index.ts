@@ -37,4 +37,5 @@ export type {
 	BackendSkillRef,
 	BackendToolCall,
 	SSEMessageEvent,
+	SSEEventPayload,
 } from "./types";

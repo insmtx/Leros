@@ -59,6 +59,8 @@ type SetState = (
 	replace?: boolean,
 ) => void;
 
+type FullStoreGet = () => Record<string, unknown>;
+
 function mapBackendMessage(msg: BackendMessage): Message {
 	const toolCalls: ToolCall[] | undefined = msg.tool_calls?.map((tc: BackendToolCall) => ({
 		id: tc.id,
@@ -100,17 +102,16 @@ function mapToolCalls(tcList?: BackendToolCall[]): ToolCall[] | undefined {
 	}));
 }
 
-export const createChatSlice = (set: SetState, get: () => ChatStore) =>
-	new ChatActionImpl(set, get);
-
 export class ChatActionImpl {
 	readonly #set: SetState;
 	readonly #get: () => ChatStore;
+	readonly #fullGet: FullStoreGet;
 	#sseClient: FetchSSEClient | null = null;
 
-	constructor(set: SetState, get: () => ChatStore) {
+	constructor(set: SetState, get: () => ChatStore, fullGet: FullStoreGet) {
 		this.#set = set;
 		this.#get = get;
+		this.#fullGet = fullGet;
 	}
 
 	#dispatchChat = (action: ChatActionType) => {
@@ -125,8 +126,41 @@ export class ChatActionImpl {
 		if (!content.trim() && !attachments?.length) return;
 
 		const state = this.#get();
-		const { activeSessionDbId, activeSessionId } = state;
-		if (!activeSessionDbId || !activeSessionId) return;
+		let { activeSessionDbId, activeSessionId } = state;
+
+		if (!activeSessionDbId || !activeSessionId) {
+			try {
+				const res = await sessionApi.create({ type: "chat", title: "新会话" });
+				const session = res.data.data;
+				if (!session) return;
+				activeSessionDbId = session.id;
+				activeSessionId = session.session_id;
+				const conv = {
+					id: session.session_id,
+					title: session.title || "未命名会话",
+					sessionDbId: session.id,
+					type: session.type,
+					status: session.status,
+					createdAt: new Date(session.created_at).getTime(),
+					updatedAt: new Date(session.updated_at).getTime(),
+				};
+				const prevState = this.#fullGet() as {
+					conversations: Array<typeof conv>;
+					activeConversationId: string | null;
+					conversationsLoaded: boolean;
+				};
+				(this.#set as (partial: Record<string, unknown>) => void)({
+					activeSessionDbId,
+					activeSessionId,
+					conversations: [conv, ...prevState.conversations],
+					activeConversationId: conv.id,
+					conversationsLoaded: true,
+				});
+			} catch (err) {
+				console.error("Auto-create conversation error:", err);
+				return;
+			}
+		}
 
 		try {
 			await sessionApi.addMessage({
@@ -184,28 +218,35 @@ export class ChatActionImpl {
 			onMessage: (event) => {
 				try {
 					const data = JSON.parse(event.data) as SSEMessageEvent;
+					const eventType = event.type ?? data.type;
 
-					if (data.chunk) {
-						const msg = this.#get().messagesMap[assistantMsgId];
-						if (msg) {
-							this.#dispatchChat({
-								type: "updateMessage",
-								id: assistantMsgId,
-								value: { ...msg, content: msg.content + data.chunk },
-							});
+					if (eventType === "message.delta") {
+						const payload = data.payload ?? data;
+						const content = payload.content ?? data.content ?? data.chunk;
+						if (content) {
+							const msg = this.#get().messagesMap[assistantMsgId];
+							if (msg) {
+								this.#dispatchChat({
+									type: "updateMessage",
+									id: assistantMsgId,
+									value: { ...msg, content: msg.content + content },
+								});
+							}
 						}
-					} else if (data.content) {
-						const msg = this.#get().messagesMap[assistantMsgId];
-						if (msg) {
-							this.#dispatchChat({
-								type: "updateMessage",
-								id: assistantMsgId,
-								value: { ...msg, content: data.content },
-							});
+					} else if (eventType === "message.result") {
+						const payload = data.payload ?? data;
+						const content = payload.content ?? data.content;
+						if (content) {
+							const msg = this.#get().messagesMap[assistantMsgId];
+							if (msg) {
+								this.#dispatchChat({
+									type: "updateMessage",
+									id: assistantMsgId,
+									value: { ...msg, content: msg.content + content },
+								});
+							}
 						}
-					}
-
-					if (data.status === "complete" || data.status === "error") {
+					} else if (eventType === "run.completed") {
 						const msg = this.#get().messagesMap[assistantMsgId];
 						if (msg) {
 							this.#dispatchChat({
@@ -213,9 +254,9 @@ export class ChatActionImpl {
 								id: assistantMsgId,
 								value: {
 									...msg,
-									status: data.status as MessageStatus,
+									status: "complete",
 									thinking: data.thinking ?? msg.thinking,
-									toolCalls: mapToolCalls(data.tool_calls),
+									toolCalls: mapToolCalls(data.tool_calls ?? data.payload?.tool_calls),
 									metadata: data.metadata
 										? {
 												model: data.metadata.model,
@@ -229,16 +270,56 @@ export class ChatActionImpl {
 						this.#finishStream();
 						this.#sseClient?.close();
 						this.#sseClient = null;
-					}
-
-					if (data.tool_calls) {
+					} else if (eventType === "run.failed") {
 						const msg = this.#get().messagesMap[assistantMsgId];
 						if (msg) {
 							this.#dispatchChat({
 								type: "updateMessage",
 								id: assistantMsgId,
-								value: { ...msg, toolCalls: mapToolCalls(data.tool_calls) },
+								value: { ...msg, status: "error" },
 							});
+						}
+						this.#finishStream();
+						this.#sseClient?.close();
+						this.#sseClient = null;
+					} else if (eventType === "run.usage") {
+						const payload = data.payload ?? data;
+						const msg = this.#get().messagesMap[assistantMsgId];
+						if (msg) {
+							this.#dispatchChat({
+								type: "updateMessage",
+								id: assistantMsgId,
+								value: {
+									...msg,
+									metadata: {
+										...msg.metadata,
+										tokens: (payload as { input_tokens?: number; output_tokens?: number; total_tokens?: number }).total_tokens,
+									},
+								},
+							});
+						}
+					} else if (eventType === "tool_call.started" || eventType === "tool_call.arguments" || eventType === "tool_call.output" || eventType === "tool_call.completed" || eventType === "tool_call.failed") {
+						if (data.tool_calls ?? data.payload?.tool_calls) {
+							const msg = this.#get().messagesMap[assistantMsgId];
+							if (msg) {
+								this.#dispatchChat({
+									type: "updateMessage",
+									id: assistantMsgId,
+									value: { ...msg, toolCalls: mapToolCalls(data.tool_calls ?? data.payload?.tool_calls) },
+								});
+							}
+						}
+					} else if (eventType === "reasoning.delta") {
+						const payload = data.payload ?? data;
+						if (payload.content ?? data.content) {
+							const msg = this.#get().messagesMap[assistantMsgId];
+							if (msg) {
+								this.#dispatchChat({
+									type: "updateMessage",
+									id: assistantMsgId,
+									value: { ...msg, thinking: (msg.thinking ?? "") + (payload.content ?? data.content) },
+								});
+							}
 						}
 					}
 				} catch {
@@ -470,5 +551,5 @@ function chatReducer(state: ChatState, action: ChatActionType): ChatState {
 
 export const chatSlice: SliceCreator<ChatStore> = (...params) => ({
 	..._initialState,
-	...flattenActions<ChatAction>([createChatSlice(params[0] as SetState, params[1])]),
+	...flattenActions<ChatAction>([new ChatActionImpl(params[0] as SetState, params[1] as () => ChatStore, params[1] as FullStoreGet)]),
 });
