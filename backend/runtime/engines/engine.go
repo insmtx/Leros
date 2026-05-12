@@ -23,7 +23,7 @@ const (
 	EventProviderSessionStarted runtimeevents.EventType = "provider_session.started"
 	// EventMessageDelta indicates human-readable CLI output that can be streamed to callers.
 	EventMessageDelta = runtimeevents.EventMessageDelta
-	// EventResult indicates the final assistant result emitted by the CLI.
+	// EventResult indicates that the final assistant result emitted by the CLI.
 	EventResult = runtimeevents.EventResult
 	// EventDone indicates that the external process completed successfully.
 	EventDone = runtimeevents.EventCompleted

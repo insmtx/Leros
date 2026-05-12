@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/runtime/events"
 )
 
 // Runner 是数字员工单次运行的执行边界。
@@ -64,7 +64,7 @@ type RequestContext struct {
 	SystemPrompt string `json:"-"`
 
 	// EventSink 接收运行过程中的流式事件，不参与 JSON 序列化。
-	EventSink RunEventSink `json:"-"`
+	EventSink events.Sink `json:"-"`
 }
 
 // AssistantContext is the assistant snapshot used for one run.
@@ -220,7 +220,7 @@ type RunResult struct {
 	Error string `json:"error,omitempty"`
 
 	// Usage 是模型 token 用量统计。
-	Usage *UsagePayload `json:"usage,omitempty"`
+	Usage *events.UsagePayload `json:"usage,omitempty"`
 
 	// ToolCalls 是本次运行的工具调用摘要。
 	ToolCalls []ToolCallRecord `json:"tool_calls,omitempty"`
@@ -250,24 +250,4 @@ type ToolCallRecord struct {
 	Error string `json:"error,omitempty"`
 }
 
-type RunEvent = agentevents.RunEvent
-type RunEventType = agentevents.RunEventType
-type RunEventSink = agentevents.EventSink
-type UsagePayload = agentevents.UsagePayload
-type ChannelEventSink = agentevents.ChannelSink
 
-const (
-	RunEventStarted           = agentevents.RunEventStarted
-	RunEventCompleted         = agentevents.RunEventCompleted
-	RunEventFailed            = agentevents.RunEventFailed
-	RunEventCancelled         = agentevents.RunEventCancelled
-	RunEventMessageDelta      = agentevents.RunEventMessageDelta
-	RunEventReasoningDelta    = agentevents.RunEventReasoningDelta
-	RunEventResult            = agentevents.RunEventResult
-	RunEventToolCallStarted   = agentevents.RunEventToolCallStarted
-	RunEventToolCallArguments = agentevents.RunEventToolCallArguments
-	RunEventToolCallOutput    = agentevents.RunEventToolCallOutput
-	RunEventToolCallCompleted = agentevents.RunEventToolCallCompleted
-	RunEventToolCallFailed    = agentevents.RunEventToolCallFailed
-	RunEventUsage             = agentevents.RunEventUsage
-)

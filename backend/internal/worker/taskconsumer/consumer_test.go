@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/insmtx/Leros/backend/internal/agent/eventtypes"
+	"github.com/insmtx/Leros/backend/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/pkg/dm"
 )
@@ -34,38 +34,38 @@ func TestPublishWorkerTaskMessageToNATS(t *testing.T) {
 	taskID := randomTestID(t, "task")
 	runID := randomTestID(t, "run")
 
-	msg := eventtypes.WorkerTaskMessage{
+	msg := events.WorkerTaskMessage{
 		ID:        messageID,
-		Type:      eventtypes.MessageTypeWorkerTask,
+		Type:      events.MessageTypeWorkerTask,
 		CreatedAt: time.Now().UTC(),
-		Trace: eventtypes.TraceContext{
+		Trace: events.TraceContext{
 			TraceID:   traceID,
 			RequestID: requestID,
 			TaskID:    taskID,
 			RunID:     runID,
 		},
-		Route: eventtypes.RouteContext{
+		Route: events.RouteContext{
 			OrgID:     orgID,
 			SessionID: sessionID,
 			WorkerID:  workerID,
 		},
-		Body: eventtypes.WorkerTaskBody{
-			TaskType: eventtypes.TaskTypeAgentRun,
-			Actor: eventtypes.ActorContext{
+		Body: events.WorkerTaskBody{
+			TaskType: events.TaskTypeAgentRun,
+			Actor: events.ActorContext{
 				UserID:      "user_test",
 				DisplayName: "Test User",
 				Channel:     "go_test",
 			},
-			Execution: eventtypes.ExecutionTarget{
+			Execution: events.ExecutionTarget{
 				AssistantID: "assistant_test",
 				AgentID:     "agent_test",
 				Tools:       []string{},
 			},
-			Input: eventtypes.TaskInput{
-				Type: eventtypes.InputTypeTaskInstruction,
+			Input: events.TaskInput{
+				Type: events.InputTypeTaskInstruction,
 				Text: "这是一条来自 go test 的真实 NATS worker.task 调试消息，请回复确认 worker 已收到。",
 			},
-			Runtime: eventtypes.RuntimeOptions{
+			Runtime: events.RuntimeOptions{
 				Kind:    "claude",
 				WorkDir: ".",
 			},

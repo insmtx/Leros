@@ -12,7 +12,7 @@ import (
 
 	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/agent"
-	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/agent/externalcli"
 	"github.com/insmtx/Leros/backend/runtime/engines"
 	"github.com/insmtx/Leros/backend/runtime/engines/claude"
@@ -94,7 +94,7 @@ func TestRuntimeRouterClaudeRunnerCallsLerosEchoTool(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
-	eventSink := agent.RunEventSink(agentevents.SinkFunc(func(_ context.Context, event *agentevents.RunEvent) error {
+	eventSink := events.Sink(events.SinkFunc(func(_ context.Context, event *events.Event) error {
 		encoded, _ := json.Marshal(event)
 		t.Logf("runtime event: %s", string(encoded))
 		return nil

@@ -10,7 +10,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"gorm.io/gorm"
 
-	"github.com/insmtx/Leros/backend/internal/agent/eventtypes"
 	"github.com/insmtx/Leros/backend/internal/api/auth"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/api/dto"
@@ -342,29 +341,29 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID uint, req *co
 		return nil, fmt.Errorf("failed to construct worker task topic: %w", err)
 	}
 
-	messagePayload := eventtypes.WorkerTaskMessage{
+	messagePayload := events.WorkerTaskMessage{
 		ID:        fmt.Sprintf("msg_%d_%d", session.ID, message.Sequence),
-		Type:      eventtypes.MessageTypeWorkerTask,
+		Type:      events.MessageTypeWorkerTask,
 		CreatedAt: time.Now().UTC(),
-		Trace: eventtypes.TraceContext{
+		Trace: events.TraceContext{
 			TraceID:   session.SessionID,
 			RequestID: fmt.Sprintf("req_%d", message.ID),
 			TaskID:    fmt.Sprintf("task_%d", message.ID),
 		},
-		Route: eventtypes.RouteContext{
+		Route: events.RouteContext{
 			OrgID:     orgID,
 			SessionID: session.SessionID,
 			WorkerID:  session.AllocatedAssistantID,
 		},
-		Body: eventtypes.WorkerTaskBody{
-			TaskType: eventtypes.TaskTypeAgentRun,
-			Actor: eventtypes.ActorContext{
+		Body: events.WorkerTaskBody{
+			TaskType: events.TaskTypeAgentRun,
+			Actor: events.ActorContext{
 				UserID:      fmt.Sprintf("%d", session.Uin),
 				DisplayName: "",
 				Channel:     "session",
 			},
-			Input: eventtypes.TaskInput{
-				Type: eventtypes.InputTypeMessage,
+			Input: events.TaskInput{
+				Type: events.InputTypeMessage,
 				Text: message.Content,
 			},
 		},
@@ -463,7 +462,7 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 		return fmt.Errorf("failed to construct session result stream topic: %w", err)
 	}
 	err = s.eventbus.SubscribeRealtime(ctx, topic, func(msg *nats.Msg) {
-		var streamMsg eventtypes.MessageStreamMessage
+		var streamMsg events.MessageStreamMessage
 		if err := json.Unmarshal(msg.Data, &streamMsg); err != nil {
 			logs.WarnContextf(ctx, "failed to unmarshal to MessageStreamMessage: %v", err)
 			return
@@ -482,13 +481,13 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 		}
 
 		switch streamMsg.Body.Event {
-		case eventtypes.StreamEventMessageDelta:
+		case events.StreamEventMessageDelta:
 			se.Type = dto.SessionEventTypeMessageDelta
 			se.Payload = dto.MessageDeltaPayload{
 				Role:    string(streamMsg.Body.Payload.Role),
 				Content: streamMsg.Body.Payload.Content,
 			}
-		case eventtypes.StreamEventToolCallStarted:
+		case events.StreamEventToolCallStarted:
 			se.Type = dto.SessionEventTypeToolCallStarted
 			if tc := streamMsg.Body.Payload.ToolCall; tc != nil {
 				se.Payload = dto.ToolCallDeltaPayload{
@@ -496,11 +495,11 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 					Name: tc.Name,
 				}
 			}
-		case eventtypes.StreamEventRunStarted:
+		case events.StreamEventRunStarted:
 			se.Type = dto.SessionEventTypeRunStarted
-		case eventtypes.StreamEventRunCompleted:
+		case events.StreamEventRunCompleted:
 			se.Type = dto.SessionEventTypeRunCompleted
-		case eventtypes.StreamEventRunFailed:
+		case events.StreamEventRunFailed:
 			se.Type = dto.SessionEventTypeRunFailed
 		default:
 			logs.WarnContextf(ctx, "unknown stream event type: %v", streamMsg.Body.Event)

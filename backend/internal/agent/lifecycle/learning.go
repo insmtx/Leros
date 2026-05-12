@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/insmtx/Leros/backend/internal/agent"
-	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/runtime/events"
 )
 
 const (
@@ -47,13 +47,13 @@ func (r *Runner) AfterRunLearning(ctx context.Context, req *agent.RequestContext
 	}
 	learningReq.Capability.AllowedTools = allowedTools
 	learningReq.Runtime.MaxStep = 3
-	learningReq.EventSink = agentevents.NewNoopSink()
+	learningReq.EventSink = events.NewNoopSink()
 
 	next, err := r.builder.Prepare(ctx, learningReq)
 	if err != nil {
 		return err
 	}
-	next.EventSink = agentevents.NewNoopSink()
+	next.EventSink = events.NewNoopSink()
 	_, err = r.delegate.Run(ctx, next)
 	return err
 }
@@ -84,13 +84,13 @@ func (r *Runner) runMemoryFlush(ctx context.Context, req *agent.RequestContext, 
 	}
 	flushReq.Capability.AllowedTools = allowedTools
 	flushReq.Runtime.MaxStep = 2
-	flushReq.EventSink = agentevents.NewNoopSink()
+	flushReq.EventSink = events.NewNoopSink()
 
 	prepared, err := r.builder.Prepare(ctx, flushReq)
 	if err != nil {
 		return err
 	}
-	prepared.EventSink = agentevents.NewNoopSink()
+	prepared.EventSink = events.NewNoopSink()
 	_, err = r.delegate.Run(ctx, prepared)
 	return err
 }

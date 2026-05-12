@@ -14,28 +14,13 @@ import (
 	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/agent"
 	einoadapter "github.com/insmtx/Leros/backend/internal/agent/eino"
-	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
+	"github.com/insmtx/Leros/backend/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/agent/runtimeenv"
 	"github.com/insmtx/Leros/backend/tools"
 	"github.com/ygpkg/yg-go/logs"
 )
 
-type RequestContext = agent.RequestContext
-type RunResult = agent.RunResult
-type UsagePayload = agent.UsagePayload
-type AssistantContext = agent.AssistantContext
-type ActorContext = agent.ActorContext
-type CapabilityContext = agent.CapabilityContext
-type ConversationContext = agent.ConversationContext
-type InputContext = agent.InputContext
-type InputMessage = agent.InputMessage
-type RuntimeOptions = agent.RuntimeOptions
 
-const (
-	InputTypeMessage         = agent.InputTypeMessage
-	InputTypeTaskInstruction = agent.InputTypeTaskInstruction
-	RunStatusCompleted       = agent.RunStatusCompleted
-)
 
 const defaultSystemPrompt = `你是 Leros 助手。
 
@@ -110,7 +95,7 @@ func NewRunner(ctx context.Context, llmConfig *config.LLMConfig, env *runtimeenv
 }
 
 // Run 直接执行标准化请求；统一生命周期入口应优先使用 lifecycle.Runner。
-func (r *Runner) Run(ctx context.Context, req *RequestContext) (*RunResult, error) {
+func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {
 	startedAt := time.Now().UTC()
 	if r == nil || r.chatModel == nil {
 		return nil, fmt.Errorf("eino chat model is not initialized")
@@ -123,10 +108,10 @@ func (r *Runner) Run(ctx context.Context, req *RequestContext) (*RunResult, erro
 	return r.runWithState(ctx, state, startedAt)
 }
 
-func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt time.Time) (*RunResult, error) {
+func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt time.Time) (*agent.RunResult, error) {
 	req := state.req
 
-	if err := emitRunEvent(ctx, state.emitter, req, agentevents.RunEventStarted, nil); err != nil {
+	if err := emitRunEvent(ctx, state.emitter, req, events.EventStarted, nil); err != nil {
 		return nil, err
 	}
 
@@ -147,7 +132,7 @@ func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt ti
 		String() string
 	}
 	var resultMessage string
-	var usage *UsagePayload
+	var usage *events.UsagePayload
 	if req.EventSink != nil {
 		streamedMessage, streamErr := flow.Stream(ctx, state.userInput, state.emitter)
 		err = streamErr
@@ -173,10 +158,10 @@ func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt ti
 		resultMessage = formatLLMResultForLog(message)
 	}
 
-	result := &RunResult{
+	result := &agent.RunResult{
 		RunID:       req.RunID,
 		TraceID:     req.TraceID,
-		Status:      RunStatusCompleted,
+		Status:      agent.RunStatusCompleted,
 		Message:     resultMessage,
 		Usage:       usage,
 		StartedAt:   startedAt,
@@ -184,12 +169,12 @@ func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt ti
 	}
 
 	if usage != nil {
-		_ = state.emitter.Emit(ctx, &agentevents.RunEvent{
-			Type:    agentevents.RunEventUsage,
+	_ = state.emitter.Emit(ctx, &events.Event{
+		Type:    events.EventUsage,
 			Content: eventContentJSON(usage),
 		})
 	}
-	if err := emitRunEvent(ctx, state.emitter, req, agentevents.RunEventCompleted, result); err != nil {
+	if err := emitRunEvent(ctx, state.emitter, req, events.EventCompleted, result); err != nil {
 		return nil, err
 	}
 
@@ -199,7 +184,7 @@ func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt ti
 	return result, nil
 }
 
-func (r *Runner) buildRunState(req *RequestContext) (*runState, error) {
+func (r *Runner) buildRunState(req *agent.RequestContext) (*runState, error) {
 	if req == nil {
 		return nil, errors.New("request context is required")
 	}
@@ -215,7 +200,7 @@ func (r *Runner) buildRunState(req *RequestContext) (*runState, error) {
 		return nil, err
 	}
 
-	emitter := agentevents.NewEmitter(req.RunID, req.TraceID, sinkForRequest(req))
+	emitter := events.NewEmitter(req.RunID, req.TraceID, sinkForRequest(req))
 	toolCtx := tools.ToolContext{
 		RunID:          req.RunID,
 		TraceID:        req.TraceID,
@@ -241,7 +226,7 @@ func (r *Runner) buildRunState(req *RequestContext) (*runState, error) {
 	}, nil
 }
 
-func buildUserInput(req *RequestContext) string {
+func buildUserInput(req *agent.RequestContext) string {
 	if req == nil {
 		return ""
 	}
@@ -267,7 +252,7 @@ func buildUserInput(req *RequestContext) string {
 	}
 }
 
-func (r *Runner) buildSystemPrompt(req *RequestContext) (string, error) {
+func (r *Runner) buildSystemPrompt(req *agent.RequestContext) (string, error) {
 	if req != nil && strings.TrimSpace(req.SystemPrompt) != "" {
 		return strings.TrimSpace(req.SystemPrompt), nil
 	}
@@ -277,7 +262,7 @@ func (r *Runner) buildSystemPrompt(req *RequestContext) (string, error) {
 	return strings.TrimSpace(r.systemPromptForRequest(req)), nil
 }
 
-func (r *Runner) systemPromptForRequest(req *RequestContext) string {
+func (r *Runner) systemPromptForRequest(req *agent.RequestContext) string {
 	prompt := strings.TrimSpace(r.systemPrompt)
 	if req != nil && strings.TrimSpace(req.Assistant.SystemPrompt) != "" {
 		if prompt == "" {
@@ -292,31 +277,31 @@ func (r *Runner) systemPromptForRequest(req *RequestContext) string {
 	return prompt
 }
 
-func ensureRunDefaults(req *RequestContext) {
+func ensureRunDefaults(req *agent.RequestContext) {
 	if req.RunID == "" {
 		req.RunID = fmt.Sprintf("run_%d", time.Now().UTC().UnixNano())
 	}
 	if req.Input.Type == "" {
-		req.Input.Type = InputTypeMessage
+		req.Input.Type = agent.InputTypeMessage
 	}
 }
 
-func maxStepForRequest(req *RequestContext) int {
+func maxStepForRequest(req *agent.RequestContext) int {
 	if req != nil && req.Runtime.MaxStep > 0 {
 		return req.Runtime.MaxStep
 	}
 	return 12
 }
 
-func sinkForRequest(req *RequestContext) agentevents.EventSink {
+func sinkForRequest(req *agent.RequestContext) events.Sink {
 	if req == nil || req.EventSink == nil {
-		return agentevents.NewNoopSink()
+		return events.NewNoopSink()
 	}
 	return req.EventSink
 }
 
-func emitRunEvent(ctx context.Context, emitter *agentevents.Emitter, req *RequestContext, eventType agentevents.RunEventType, result *RunResult) error {
-	event := &agentevents.RunEvent{Type: eventType}
+func emitRunEvent(ctx context.Context, emitter *events.Emitter, req *agent.RequestContext, eventType events.EventType, result *agent.RunResult) error {
+	event := &events.Event{Type: eventType}
 	if result != nil {
 		event.Content = result.Message
 	}
@@ -324,15 +309,12 @@ func emitRunEvent(ctx context.Context, emitter *agentevents.Emitter, req *Reques
 	return nil
 }
 
-func emitRunError(ctx context.Context, emitter *agentevents.Emitter, req *RequestContext, err error) {
-	if err == nil {
-		return
-	}
-	eventType := agentevents.RunEventFailed
+func emitRunError(ctx context.Context, emitter *events.Emitter, req *agent.RequestContext, err error) {
+	eventType := events.EventFailed
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		eventType = agentevents.RunEventCancelled
+		eventType = events.EventCancelled
 	}
-	_ = emitter.Emit(ctx, &agentevents.RunEvent{
+	_ = emitter.Emit(ctx, &events.Event{
 		Type:    eventType,
 		Content: err.Error(),
 	})
@@ -346,11 +328,11 @@ func eventContentJSON(value interface{}) string {
 	return string(encoded)
 }
 
-func usageFromResponseMeta(meta *einoschema.ResponseMeta) *UsagePayload {
+func usageFromResponseMeta(meta *einoschema.ResponseMeta) *events.UsagePayload {
 	if meta == nil || meta.Usage == nil {
 		return nil
 	}
-	return &UsagePayload{
+	return &events.UsagePayload{
 		InputTokens:  meta.Usage.PromptTokens,
 		OutputTokens: meta.Usage.CompletionTokens,
 		TotalTokens:  meta.Usage.TotalTokens,
