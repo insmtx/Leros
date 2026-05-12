@@ -1,3 +1,5 @@
+import { sessionApi } from "../api/sessionApi";
+import type { BackendSession } from "../api/types";
 import type { SliceCreator } from "../types";
 import { flattenActions } from "../utils";
 
@@ -6,7 +8,9 @@ export type WorkspaceMode = "remote" | "local";
 export type Conversation = {
 	id: string;
 	title: string;
-	workspaceId: string;
+	sessionDbId: number;
+	type: string;
+	status: string;
 	createdAt: number;
 	updatedAt: number;
 };
@@ -39,6 +43,7 @@ export type LayoutState = {
 	activeWorkspaceId: string | null;
 	workspaces: Workspace[];
 	conversations: Conversation[];
+	conversationsLoaded: boolean;
 	inputFocused: boolean;
 	activeRightTab: "shortcuts" | "inbox" | "artifacts";
 	navGroups: NavGroup[];
@@ -49,39 +54,30 @@ export type LayoutState = {
 export type LayoutAction = Pick<LayoutActionImpl, keyof LayoutActionImpl>;
 export type LayoutStore = LayoutState & LayoutAction;
 
+function mapSessionToConversation(s: BackendSession): Conversation {
+	return {
+		id: s.session_id,
+		title: s.title || "未命名会话",
+		sessionDbId: s.id,
+		type: s.type,
+		status: s.status,
+		createdAt: new Date(s.created_at).getTime(),
+		updatedAt: new Date(s.updated_at).getTime(),
+	};
+}
+
 const _initialState: LayoutState = {
 	leftRailCollapsed: false,
 	rightRailCollapsed: false,
 	conversationListOpen: true,
-	activeConversationId: "conv-1",
+	activeConversationId: null,
 	activeWorkspaceId: null,
 	workspaces: [
 		{ id: "remote-1", name: "远程工作区", mode: "remote", collapsed: false },
 		{ id: "local-1", name: "本地工作区", mode: "local", collapsed: false },
 	],
-	conversations: [
-		{
-			id: "conv-1",
-			title: "代码审查讨论",
-			workspaceId: "remote-1",
-			createdAt: Date.now(),
-			updatedAt: Date.now(),
-		},
-		{
-			id: "conv-2",
-			title: "需求指派",
-			workspaceId: "remote-1",
-			createdAt: Date.now() - 3600000,
-			updatedAt: Date.now() - 3600000,
-		},
-		{
-			id: "conv-3",
-			title: "技术问答",
-			workspaceId: "local-1",
-			createdAt: Date.now() - 7200000,
-			updatedAt: Date.now() - 7200000,
-		},
-	],
+	conversations: [],
+	conversationsLoaded: false,
 	inputFocused: false,
 	activeRightTab: "shortcuts",
 	navGroups: [
@@ -120,16 +116,16 @@ type SetState = (
 	replace?: boolean,
 ) => void;
 
-export const createLayoutSlice = (set: SetState, get: () => LayoutStore, _api?: unknown) =>
-	new LayoutActionImpl(set, get, _api);
+export const createLayoutSlice = (set: SetState, get: () => LayoutStore) =>
+	new LayoutActionImpl(set, get);
 
 export class LayoutActionImpl {
 	readonly #set: SetState;
+	readonly #get: () => LayoutStore;
 
-	constructor(set: SetState, _get: () => LayoutStore, _api?: unknown) {
-		void _api;
-		void _get;
+	constructor(set: SetState, get: () => LayoutStore) {
 		this.#set = set;
+		this.#get = get;
 	}
 
 	toggleLeftRail = () => {
@@ -158,28 +154,73 @@ export class LayoutActionImpl {
 		this.#set({ activeConversationId: conversationId });
 	};
 
-	createConversation = (workspaceId: string, title: string) => {
-		const now = Date.now();
-		const newConversation: Conversation = {
-			id: `conv-${now}`,
-			title,
-			workspaceId,
-			createdAt: now,
-			updatedAt: now,
-		};
-		this.#set((state) => ({
-			conversations: [...state.conversations, newConversation],
-			activeConversationId: newConversation.id,
-		}));
-		return newConversation.id;
+	fetchConversations = async () => {
+		if (this.#get().conversationsLoaded) return;
+		try {
+			const res = await sessionApi.list({ page: 1, per_page: 50 });
+			const items = res.data.data?.items ?? [];
+			this.#set({
+				conversations: items.map(mapSessionToConversation),
+				conversationsLoaded: true,
+			});
+		} catch (err) {
+			console.error("fetchConversations error:", err);
+		}
 	};
 
-	deleteConversation = (conversationId: string) => {
-		this.#set((state) => ({
-			conversations: state.conversations.filter((c) => c.id !== conversationId),
-			activeConversationId:
-				state.activeConversationId === conversationId ? null : state.activeConversationId,
-		}));
+	createConversation = async (title: string) => {
+		try {
+			const res = await sessionApi.create({
+				type: "chat",
+				title: title || "新会话",
+			});
+			const session = res.data.data;
+			if (!session) throw new Error("No session data returned");
+			const conv = mapSessionToConversation(session);
+			this.#set((state) => ({
+				conversations: [conv, ...state.conversations],
+				activeConversationId: conv.id,
+				conversationsLoaded: true,
+			}));
+			return conv.id;
+		} catch (err) {
+			console.error("createConversation error:", err);
+			return null;
+		}
+	};
+
+	deleteConversation = async (conversationId: string) => {
+		const state = this.#get();
+		const conv = state.conversations.find((c) => c.id === conversationId);
+		if (!conv) return;
+
+		try {
+			await sessionApi.delete(conv.sessionDbId);
+			this.#set((state) => ({
+				conversations: state.conversations.filter((c) => c.id !== conversationId),
+				activeConversationId:
+					state.activeConversationId === conversationId ? null : state.activeConversationId,
+			}));
+		} catch (err) {
+			console.error("deleteConversation error:", err);
+		}
+	};
+
+	updateConversationTitle = async (conversationId: string, title: string) => {
+		const state = this.#get();
+		const conv = state.conversations.find((c) => c.id === conversationId);
+		if (!conv) return;
+
+		try {
+			await sessionApi.update({ id: conv.sessionDbId, title });
+			this.#set((state) => ({
+				conversations: state.conversations.map((c) =>
+					c.id === conversationId ? { ...c, title, updatedAt: Date.now() } : c,
+				),
+			}));
+		} catch (err) {
+			console.error("updateConversationTitle error:", err);
+		}
 	};
 
 	setInputFocused = (focused: boolean) => {
@@ -209,5 +250,5 @@ export class LayoutActionImpl {
 
 export const layoutSlice: SliceCreator<LayoutStore> = (...params) => ({
 	..._initialState,
-	...flattenActions<LayoutAction>([createLayoutSlice(params[0] as SetState, params[1], params[2])]),
+	...flattenActions<LayoutAction>([createLayoutSlice(params[0] as SetState, params[1])]),
 });
