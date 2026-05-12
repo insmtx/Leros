@@ -50,6 +50,11 @@ func (b topicBuilder) Message() topicBuilder {
 	return b.Add("message")
 }
 
+// Completed 追加 completed 字段片段。
+func (b topicBuilder) Completed() topicBuilder {
+	return b.Add("completed")
+}
+
 // Stream 追加 stream 字段片段。
 func (b topicBuilder) Stream() topicBuilder {
 	return b.Add("stream")

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nats-io/nats.go"
 	"github.com/insmtx/Leros/backend/internal/agent"
 	agentevents "github.com/insmtx/Leros/backend/internal/agent/events"
 	"github.com/insmtx/Leros/backend/internal/agent/eventtypes"
@@ -64,39 +65,39 @@ func (c *Consumer) TaskTopic() string {
 func (c *Consumer) Start(ctx context.Context) error {
 	topic := c.TaskTopic()
 	logs.InfoContextf(ctx, "Starting worker task subscription: %s", topic)
-	return c.subscriber.Subscribe(ctx, topic, func(event any) {
+	return c.subscriber.Subscribe(ctx, topic, func(msg *nats.Msg) {
 		logs.InfoContextf(ctx, "Received worker task event from topic: %s", topic)
-		if err := c.handleEvent(ctx, event); err != nil {
+		if err := c.handleEvent(ctx, msg); err != nil {
 			logs.ErrorContextf(ctx, "Failed to handle worker task: %v", err)
 		}
 	})
 }
 
-func (c *Consumer) handleEvent(ctx context.Context, event any) error {
-	msg, err := decodeWorkerTask(event)
+func (c *Consumer) handleEvent(ctx context.Context, msg *nats.Msg) error {
+	taskMsg, err := decodeWorkerTask(msg)
 	if err != nil {
 		return err
 	}
-	if err := c.validateRoute(msg); err != nil {
+	if err := c.validateRoute(taskMsg); err != nil {
 		return err
 	}
-	if msg.Body.TaskType != eventtypes.TaskTypeAgentRun {
-		return fmt.Errorf("unsupported worker task type %q", msg.Body.TaskType)
+	if taskMsg.Body.TaskType != eventtypes.TaskTypeAgentRun {
+		return fmt.Errorf("unsupported worker task type %q", taskMsg.Body.TaskType)
 	}
 
 	logs.InfoContextf(ctx,
 		"Received worker task: msg_id=%s task_id=%s run_id=%s org_id=%s worker_id=%s session_id=%s task_type=%s",
-		msg.ID,
-		msg.Trace.TaskID,
-		msg.Trace.RunID,
-		msg.Route.OrgID,
-		msg.Route.WorkerID,
-		msg.Route.SessionID,
-		msg.Body.TaskType,
+		taskMsg.ID,
+		taskMsg.Trace.TaskID,
+		taskMsg.Trace.RunID,
+		taskMsg.Route.OrgID,
+		taskMsg.Route.WorkerID,
+		taskMsg.Route.SessionID,
+		taskMsg.Body.TaskType,
 	)
 
-	req := RequestFromWorkerTask(msg)
-	req.EventSink = NewMQStreamSink(c.publisher, msg)
+	req := RequestFromWorkerTask(taskMsg)
+	req.EventSink = NewMQStreamSink(c.publisher, taskMsg)
 
 	logs.InfoContextf(ctx,
 		"Starting worker task run: task_id=%s run_id=%s runtime=%s assistant_id=%s agent_id=%s",
@@ -104,7 +105,7 @@ func (c *Consumer) handleEvent(ctx context.Context, event any) error {
 		req.RunID,
 		req.Runtime.Kind,
 		req.Assistant.ID,
-		msg.Body.Execution.AgentID,
+		taskMsg.Body.Execution.AgentID,
 	)
 
 	result, err := c.runner.Run(ctx, req)
@@ -117,19 +118,15 @@ func (c *Consumer) handleEvent(ctx context.Context, event any) error {
 	return nil
 }
 
-func decodeWorkerTask(event any) (eventtypes.WorkerTaskMessage, error) {
-	var msg eventtypes.WorkerTaskMessage
-	body, err := json.Marshal(event)
-	if err != nil {
-		return msg, fmt.Errorf("marshal worker task: %w", err)
+func decodeWorkerTask(msg *nats.Msg) (eventtypes.WorkerTaskMessage, error) {
+	var taskMsg eventtypes.WorkerTaskMessage
+	if err := json.Unmarshal(msg.Data, &taskMsg); err != nil {
+		return taskMsg, fmt.Errorf("unmarshal worker task: %w", err)
 	}
-	if err := json.Unmarshal(body, &msg); err != nil {
-		return msg, fmt.Errorf("unmarshal worker task: %w", err)
+	if taskMsg.Type != "" && taskMsg.Type != eventtypes.MessageTypeWorkerTask {
+		return taskMsg, fmt.Errorf("unexpected worker task message type %q", taskMsg.Type)
 	}
-	if msg.Type != "" && msg.Type != eventtypes.MessageTypeWorkerTask {
-		return msg, fmt.Errorf("unexpected worker task message type %q", msg.Type)
-	}
-	return msg, nil
+	return taskMsg, nil
 }
 
 func (c *Consumer) validateRoute(msg eventtypes.WorkerTaskMessage) error {

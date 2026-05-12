@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"gorm.io/gorm"
 
 	"github.com/insmtx/Leros/backend/internal/agent/eventtypes"
@@ -25,18 +26,16 @@ import (
 var _ contract.SessionService = (*sessionService)(nil)
 
 type sessionService struct {
-	db         *gorm.DB
-	subscriber eventbus.Subscriber
-	publisher  eventbus.Publisher
-	inferrer   AssistantInferrer
+	db       *gorm.DB
+	eventbus eventbus.EventBus
+	inferrer AssistantInferrer
 }
 
-func NewSessionService(db *gorm.DB, subscriber eventbus.Subscriber, publisher eventbus.Publisher, inferrer AssistantInferrer) contract.SessionService {
+func NewSessionService(db *gorm.DB, eventbus eventbus.EventBus, inferrer AssistantInferrer) contract.SessionService {
 	return &sessionService{
-		db:         db,
-		subscriber: subscriber,
-		publisher:  publisher,
-		inferrer:   inferrer,
+		db:       db,
+		eventbus: eventbus,
+		inferrer: inferrer,
 	}
 }
 
@@ -377,7 +376,7 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID uint, req *co
 		},
 	}
 
-	if err := s.publisher.Publish(ctx, topic, messagePayload); err != nil {
+	if err := s.eventbus.Publish(ctx, topic, messagePayload); err != nil {
 		logs.ErrorContextf(ctx, "Failed to publish message to assistant %d: %v", session.AllocatedAssistantID, err)
 		return nil, fmt.Errorf("failed to publish message to assistant: %w", err)
 	}
@@ -463,50 +462,68 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 	if err != nil {
 		return fmt.Errorf("failed to construct session result stream topic: %w", err)
 	}
-	return s.subscriber.Subscribe(ctx, topic, func(event any) {
-		switch msg := event.(type) {
-		case eventtypes.MessageStreamMessage:
-			if msg.Body.Seq <= lastSequence {
-				return
-			}
+	err = s.eventbus.SubscribeRealtime(ctx, topic, func(msg *nats.Msg) {
+		var streamMsg eventtypes.MessageStreamMessage
+		if err := json.Unmarshal(msg.Data, &streamMsg); err != nil {
+			logs.WarnContextf(ctx, "failed to unmarshal to MessageStreamMessage: %v", err)
+			return
+		}
 
-			se := dto.SessionEvent{
-				SessionID: msg.Route.SessionID,
-				Sequence:  msg.Body.Seq,
-				Timestamp: msg.CreatedAt.UnixMilli(),
-			}
+		// 现在处理正确类型的消息
+		if streamMsg.Body.Seq <= lastSequence {
+			logs.DebugContextf(ctx, "skipping old message for session %s: seq=%d lastSequence=%d", sessionID, streamMsg.Body.Seq, lastSequence)
+			return
+		}
 
-			switch msg.Body.Event {
-			case eventtypes.StreamEventMessageDelta:
-				se.Type = dto.SessionEventTypeMessageDelta
-				se.Payload = dto.MessageDeltaPayload{
-					Role:    string(msg.Body.Payload.Role),
-					Content: msg.Body.Payload.Content,
-				}
-			case eventtypes.StreamEventToolCallStarted:
-				se.Type = dto.SessionEventTypeToolCallStarted
-				if tc := msg.Body.Payload.ToolCall; tc != nil {
-					se.Payload = dto.ToolCallDeltaPayload{
-						ID:   tc.ID,
-						Name: tc.Name,
-					}
-				}
-			case eventtypes.StreamEventRunStarted:
-				se.Type = dto.SessionEventTypeRunStarted
-			case eventtypes.StreamEventRunCompleted:
-				se.Type = dto.SessionEventTypeRunCompleted
-			case eventtypes.StreamEventRunFailed:
-				se.Type = dto.SessionEventTypeRunFailed
-			default:
-				logs.Warnf("unknown stream event type: %v", msg.Body.Event)
-				return
+		se := dto.SessionEvent{
+			SessionID: streamMsg.Route.SessionID,
+			Sequence:  streamMsg.Body.Seq,
+			Timestamp: streamMsg.CreatedAt.UnixMilli(),
+		}
+
+		switch streamMsg.Body.Event {
+		case eventtypes.StreamEventMessageDelta:
+			se.Type = dto.SessionEventTypeMessageDelta
+			se.Payload = dto.MessageDeltaPayload{
+				Role:    string(streamMsg.Body.Payload.Role),
+				Content: streamMsg.Body.Payload.Content,
 			}
-			_ = sink.Emit(ctx, &events.Event{
-				Type:    events.EventType(se.Type),
-				Content: toJSONString(se),
-			})
+		case eventtypes.StreamEventToolCallStarted:
+			se.Type = dto.SessionEventTypeToolCallStarted
+			if tc := streamMsg.Body.Payload.ToolCall; tc != nil {
+				se.Payload = dto.ToolCallDeltaPayload{
+					ID:   tc.ID,
+					Name: tc.Name,
+				}
+			}
+		case eventtypes.StreamEventRunStarted:
+			se.Type = dto.SessionEventTypeRunStarted
+		case eventtypes.StreamEventRunCompleted:
+			se.Type = dto.SessionEventTypeRunCompleted
+		case eventtypes.StreamEventRunFailed:
+			se.Type = dto.SessionEventTypeRunFailed
+		default:
+			logs.WarnContextf(ctx, "unknown stream event type: %v", streamMsg.Body.Event)
+			return
+		}
+		err = sink.Emit(ctx, &events.Event{
+			Type:    events.EventType(se.Type),
+			Content: toJSONString(se),
+		})
+		if err != nil {
+			logs.ErrorContextf(ctx, "failed to emit session event for session %s: %v", sessionID, err)
 		}
 	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to session result stream topic: %w", err)
+	}
+	logs.DebugContextf(ctx, "subscribed to session result stream topic: %s", topic)
+
+	// 阻塞等待 context 结束，这样 goroutine 不会立即退出
+	<-ctx.Done()
+	logs.DebugContextf(ctx, "session event stream ended for session: %s", sessionID)
+
+	return nil
 }
 
 func convertToContractSession(session *types.Session) *contract.Session {

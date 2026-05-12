@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ygpkg/yg-go/logs"
 
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/api/dto"
@@ -236,22 +237,28 @@ func (h *SessionHandler) SessionEvents(ctx *gin.Context) {
 
 	go func() {
 		defer close(eventChan)
-		if err := h.service.StreamSessionEvents(ctx, req.SessionID, req.LastSequence, sink); err != nil {
+		err := h.service.StreamSessionEvents(ctx, req.SessionID, req.LastSequence, sink)
+		if err != nil {
+			logs.ErrorContextf(ctx, "failed to stream session events for session %s: %v", req.SessionID, err)
 			ctx.SSEvent("error", dto.Error(dto.CodeInternalError, err.Error()))
 		}
+		logs.DebugContextf(ctx, "session event stream goroutine exiting for session %s", req.SessionID)
 	}()
 
 	for {
 		select {
 		case event, ok := <-eventChan:
 			if !ok {
+				logs.WarnContextf(ctx, "event channel closed for session %s", req.SessionID)
 				return
 			}
 			ctx.SSEvent(string(event.Type), event.Content)
 			ctx.Writer.Flush()
 		case <-ctx.Writer.CloseNotify():
+			logs.InfoContextf(ctx, "client closed connection for session %s event stream", req.SessionID)
 			return
 		case <-ctx.Done():
+			logs.InfoContextf(ctx, "client closed connection for session %s event stream (Done)", req.SessionID)
 			return
 		}
 	}

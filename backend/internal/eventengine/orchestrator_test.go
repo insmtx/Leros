@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/nats-io/nats.go"
 	"github.com/insmtx/Leros/backend/internal/agent"
 	interactionevent "github.com/insmtx/Leros/backend/pkg/event"
 )
@@ -70,7 +71,7 @@ func TestOrchestratorRegisterAndGet(t *testing.T) {
 // 简单的mock subscriber实现
 type mockSubscriber struct{}
 
-func (ms *mockSubscriber) Subscribe(ctx context.Context, topic string, handler func(event any)) error {
+func (ms *mockSubscriber) Subscribe(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
 	return nil
 }
 

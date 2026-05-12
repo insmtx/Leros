@@ -31,3 +31,15 @@ func SessionResultStreamTopic(orgid uint, sessionid string) (string, error) {
 	orgidStr := fmt.Sprintf("%d", orgid)
 	return topic().Org(orgidStr).Session(sessionid).Message().Stream().Build(), nil
 }
+
+// SessionCompletedTopic 构造会话完成 topic，格式为 "org.{org_id}.session.{session_id}.completed"。
+func SessionCompletedTopic(orgid uint, sessionid string) (string, error) {
+	if orgid == 0 {
+		return "", errors.New("orgid is required")
+	}
+	if sessionid == "" {
+		return "", errors.New("sessionid is required")
+	}
+	orgidStr := fmt.Sprintf("%d", orgid)
+	return topic().Org(orgidStr).Session(sessionid).Completed().Build(), nil
+}
