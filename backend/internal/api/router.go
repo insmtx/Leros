@@ -18,7 +18,6 @@ import (
 	"github.com/insmtx/Leros/backend/internal/service"
 	"github.com/insmtx/Leros/backend/internal/worker/scheduler"
 	workerserver "github.com/insmtx/Leros/backend/internal/worker/server"
-	singerMCP "github.com/insmtx/Leros/backend/mcp"
 	ygmiddleware "github.com/ygpkg/yg-go/apis/runtime/middleware"
 	"github.com/ygpkg/yg-go/logs"
 
@@ -79,10 +78,6 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		logs.Info("Session routes registered successfully")
 	}
 
-	{
-		singerMCP.RegisterRoutes(v1, singerMCP.NewServer())
-		logs.Info("MCP routes registered successfully")
-	}
 	// Swagger UI 路由
 	v1.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	return r

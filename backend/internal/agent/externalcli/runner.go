@@ -41,6 +41,14 @@ func NewRunner(name string, engine engines.Engine, llmConfig *config.LLMConfig) 
 	}, nil
 }
 
+// SetSessionStore replaces the provider session store used for external CLI resumes.
+func (r *Runner) SetSessionStore(store ProviderSessionStore) {
+	if r == nil || store == nil {
+		return
+	}
+	r.sessionStore = store
+}
+
 // Run 直接通过外部 CLI 执行标准化请求；统一生命周期入口应优先使用 lifecycle.Runner。
 func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {
 	startedAt := time.Now().UTC()

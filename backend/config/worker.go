@@ -8,9 +8,10 @@ type WorkerConfig struct {
 	SkillsDir    string `yaml:"skills_dir,omitempty" json:"skills_dir,omitempty"`
 	ToolsEnabled bool   `yaml:"tools_enabled,omitempty" json:"tools_enabled,omitempty"`
 
-	NATS *NATSConfig       `yaml:"nats,omitempty"`
-	LLM  *LLMConfig        `yaml:"llm,omitempty" json:"llm,omitempty"`
-	CLI  *CLIEnginesConfig `yaml:"cli,omitempty"`
+	NATS     *NATSConfig       `yaml:"nats,omitempty"`
+	Database *DatabaseConfig   `yaml:"database,omitempty"`
+	LLM      *LLMConfig        `yaml:"llm,omitempty" json:"llm,omitempty"`
+	CLI      *CLIEnginesConfig `yaml:"cli,omitempty"`
 }
 
 // CLIEnginesConfig is the configuration for external AI coding CLIs.
