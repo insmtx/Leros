@@ -6,14 +6,17 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/insmtx/Leros/backend/config"
-	"github.com/insmtx/Leros/backend/internal/worker/client"
+	agentruntime "github.com/insmtx/Leros/backend/internal/agent/runtime"
+	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
+	"github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/internal/worker/taskconsumer"
 	singerMCP "github.com/insmtx/Leros/backend/mcp"
-	"github.com/insmtx/Leros/backend/runtime/engines"
-	"github.com/insmtx/Leros/backend/runtime/engines/builtin"
 	"github.com/spf13/cobra"
+	"github.com/ygpkg/yg-go/lifecycle"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -29,25 +32,8 @@ var workerCmd = &cobra.Command{
 	Use:   "worker",
 	Short: "Start the Leros background worker",
 	Long:  `Start the background worker service for processing asynchronous tasks and events.`,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if workerWorkerID == "" {
-			return fmt.Errorf("worker-id is required")
-		}
-		return nil
-	},
 	Run: func(cmd *cobra.Command, args []string) {
 		runTaskWorker(workerDefaultRuntime)
-		// ctx := cmd.Context()
-
-		// worker, err := createWorker(ctx)
-		// if err != nil {
-		// 	logs.Fatalf("Failed to create worker: %v", err)
-		// 	return
-		// }
-
-		// if err := worker.Start(ctx); err != nil {
-		// 	logs.Fatalf("Failed to start worker: %v", err)
-		// }
 	},
 }
 
@@ -58,20 +44,6 @@ func init() {
 	workerCmd.PersistentFlags().StringVar(&workerWorkerID, "worker-id", "", "Worker ID for configuration retrieval")
 	workerCmd.PersistentFlags().StringVar(&workerDefaultRuntime, "default-runtime", "", "Default agent runtime kind, for example singeros, claude, or codex")
 	rootCmd.AddCommand(workerCmd)
-}
-
-func createWorker(ctx context.Context) (*client.WorkerClient, error) {
-	_, err := loadWorkerConfig()
-	if err != nil {
-		return nil, fmt.Errorf("load config: %w", err)
-	}
-
-	return client.NewWorker(ctx, &client.WorkerConfig{
-		ServerAddr:   workerServerAddr,
-		WorkerID:     workerWorkerID,
-		SkillsDir:    "",
-		ToolsEnabled: true,
-	})
 }
 
 func loadWorkerConfig() (*config.WorkerConfig, error) {
@@ -92,6 +64,105 @@ func loadWorkerConfig() (*config.WorkerConfig, error) {
 	}
 
 	return cfg, nil
+}
+
+func runTaskWorker(defaultRuntime string) {
+	cfg, err := loadWorkerConfig()
+	if err != nil {
+		logs.Fatalf("Failed to load config: %v", err)
+		return
+	}
+	if err := validateTaskWorkerConfig(cfg); err != nil {
+		logs.Fatalf("Invalid worker config: %v", err)
+		return
+	}
+
+	if cfg.Database != nil && cfg.Database.URL != "" {
+		db, err := infradb.InitDB(*cfg.Database)
+		if err != nil {
+			logs.Fatalf("Failed to initialize database: %v", err)
+			return
+		}
+		if sqlDB, err := db.DB(); err == nil {
+			lifecycle.Std().AddCloseFunc(sqlDB.Close)
+		}
+		logs.Info("Worker database initialized successfully")
+	} else {
+		logs.Warn("No database configuration provided for worker")
+	}
+
+	mcpServer, err := startWorkerMCPServer(workerListenAddr)
+	if err != nil {
+		logs.Fatalf("Failed to start worker MCP server: %v", err)
+		return
+	}
+
+	natsURL := "nats://nats:4222"
+	if cfg.NATS != nil && strings.TrimSpace(cfg.NATS.URL) != "" {
+		natsURL = cfg.NATS.URL
+	}
+
+	bus, err := mq.NewPublisher(natsURL)
+	if err != nil {
+		logs.Fatalf("Failed to create NATS client: %v", err)
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	runtimeService, err := agentruntime.NewService(ctx, agentruntime.Options{
+		LLMConfig:      cfg.LLM,
+		CLIConfig:      cfg.CLI,
+		ToolsEnabled:   true,
+		DefaultRuntime: defaultRuntime,
+	})
+	if err != nil {
+		cancel()
+		_ = bus.Close()
+		logs.Fatalf("Failed to create agent runtime service: %v", err)
+		return
+	}
+
+	consumer, err := taskconsumer.New(taskconsumer.Config{
+		OrgID:    cfg.OrgID,
+		WorkerID: cfg.WorkerID,
+	}, bus, bus, runtimeService)
+	if err != nil {
+		cancel()
+		_ = bus.Close()
+		logs.Fatalf("Failed to create worker task consumer: %v", err)
+		return
+	}
+	if err := consumer.Start(ctx); err != nil {
+		cancel()
+		_ = bus.Close()
+		logs.Fatalf("Failed to start worker task consumer: %v", err)
+		return
+	}
+
+	lifecycle.Std().AddCloseFunc(func() error {
+		cancel()
+		return nil
+	})
+	lifecycle.Std().AddCloseFunc(func() error {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		return mcpServer.Shutdown(shutdownCtx)
+	})
+	lifecycle.Std().AddCloseFunc(bus.Close)
+
+	logs.Infof("Agent worker started: org_id=%s worker_id=%s topic=%s", cfg.OrgID, cfg.WorkerID, consumer.TaskTopic())
+	lifecycle.Std().WaitExit()
+	logs.Info("Agent worker exited")
+}
+
+func validateTaskWorkerConfig(cfg *config.WorkerConfig) error {
+	if cfg == nil {
+		return fmt.Errorf("config is required")
+	}
+	if strings.TrimSpace(cfg.WorkerID) == "" {
+		return fmt.Errorf("worker.worker_id is required")
+	}
+	return nil
 }
 
 func startWorkerMCPServer(addr string) (*http.Server, error) {
@@ -121,36 +192,4 @@ func startWorkerMCPServer(addr string) (*http.Server, error) {
 	}()
 
 	return server, nil
-}
-
-func defaultCLIBootstrapOptions(addr string) builtin.BootstrapOptions {
-	return builtin.BootstrapOptions{
-		MCP: engines.MCPServerConfig{
-			Name:        "leros",
-			URL:         mcpURLFromAddr(addr),
-			BearerToken: singerMCP.DefaultAuthToken(),
-		},
-	}
-}
-
-func mcpURLFromAddr(addr string) string {
-	host := "localhost"
-	port := "8081"
-
-	if strings.TrimSpace(addr) != "" {
-		if splitHost, splitPort, err := net.SplitHostPort(addr); err == nil {
-			if splitHost != "" && splitHost != "0.0.0.0" && splitHost != "::" && splitHost != "[::]" {
-				host = splitHost
-			}
-			if splitPort != "" {
-				port = splitPort
-			}
-		} else if strings.HasPrefix(addr, ":") {
-			port = strings.TrimPrefix(addr, ":")
-		} else {
-			host = addr
-		}
-	}
-
-	return fmt.Sprintf("http://%s:%s/v1/mcp", host, port)
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/agent/leros"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/env"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/lifecycle"
+	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/runtime/engines/builtin"
 	"github.com/ygpkg/yg-go/logs"
 )
@@ -105,6 +106,9 @@ func (s *Service) buildRouter(ctx context.Context, opts Options) (agent.Runner, 
 			runner, err := externalcli.NewRunner(name, engine, opts.LLMConfig)
 			if err != nil {
 				return nil, err
+			}
+			if db := infradb.GetDB(); db != nil {
+				runner.SetSessionStore(externalcli.NewSessionMetadataProviderSessionStore(db))
 			}
 			if err := router.Register(name, runner); err != nil {
 				return nil, err
