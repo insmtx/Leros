@@ -17,7 +17,7 @@ func WorkerTaskTopic(orgid, workerid uint) (string, error) {
 	}
 	orgidStr := fmt.Sprintf("%d", orgid)
 	workeridStr := fmt.Sprintf("%d", workerid)
-	return Topic().Org(orgidStr).Worker(workeridStr).Task().Build(), nil
+	return topic().Org(orgidStr).Worker(workeridStr).Task().Build(), nil
 }
 
 // SessionResultStreamTopic 构造会话结果流 topic，格式为 "org.{org_id}.session.{session_id}.stream"。
@@ -29,5 +29,5 @@ func SessionResultStreamTopic(orgid uint, sessionid string) (string, error) {
 		return "", errors.New("sessionid is required")
 	}
 	orgidStr := fmt.Sprintf("%d", orgid)
-	return Topic().Org(orgidStr).Session(sessionid).Message().Stream().Build(), nil
+	return topic().Org(orgidStr).Session(sessionid).Message().Stream().Build(), nil
 }

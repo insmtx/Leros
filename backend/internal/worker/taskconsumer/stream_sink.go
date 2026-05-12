@@ -66,9 +66,15 @@ func (s *MQStreamSink) Emit(ctx context.Context, event *agentevents.RunEvent) er
 
 func (s *MQStreamSink) streamTopic() string {
 	if s.task.Route.SessionID != "" {
-		return dm.Topic().Org(s.task.Route.OrgID).Session(s.task.Route.SessionID).Message().Stream().Build()
+		t, _ := dm.SessionResultStreamTopic(s.task.Route.OrgID, s.task.Route.SessionID)
+		return t
 	}
-	return dm.Topic().Org(s.task.Route.OrgID).Worker(s.task.Route.WorkerID).Stream().Build()
+	t, err := dm.WorkerTaskTopic(s.task.Route.OrgID, s.task.Route.WorkerID)
+	if err != nil {
+		logs.Errorf("Failed to get worker task topic for stream sink: %v", err)
+		return ""
+	}
+	return t
 }
 
 func streamEventType(eventType agentevents.RunEventType) eventtypes.StreamEventType {

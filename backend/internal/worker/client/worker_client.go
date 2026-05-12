@@ -18,20 +18,20 @@ type WorkerClient struct {
 	runtime   agent.AgentRuntime
 	config    *WorkerConfig
 	daID      uint
-	workerID  string
+	workerID  uint
 	startedAt time.Time
 	status    string
 	wsClient  *WSClient
 }
 
 type WorkerConfig struct {
-	Runtime      agent.AgentRuntime
-	LLMConfig    *config.LLMConfig
-	SkillsDir    string
-	ToolsEnabled bool
-	ServerAddr   string
+	Runtime            agent.AgentRuntime
+	LLMConfig          *config.LLMConfig
+	SkillsDir          string
+	ToolsEnabled       bool
+	ServerAddr         string
 	DigitalAssistantID uint
-	WorkerID     string
+	WorkerID           uint
 }
 
 func NewWorker(ctx context.Context, cfg *WorkerConfig) (*WorkerClient, error) {
@@ -39,15 +39,15 @@ func NewWorker(ctx context.Context, cfg *WorkerConfig) (*WorkerClient, error) {
 		return nil, fmt.Errorf("worker config is required")
 	}
 
-	workerIDStr := cfg.WorkerID
-	if workerIDStr == "" {
-		workerIDStr = fmt.Sprintf("worker_%d", cfg.DigitalAssistantID)
+	workerID := cfg.WorkerID
+	if workerID == 0 {
+		workerID = cfg.DigitalAssistantID
 	}
 
 	w := &WorkerClient{
 		config:    cfg,
 		daID:      cfg.DigitalAssistantID,
-		workerID:  workerIDStr,
+		workerID:  workerID,
 		startedAt: time.Now(),
 		status:    "initialized",
 	}
@@ -179,7 +179,7 @@ func (w *WorkerClient) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (w *WorkerClient) GetWorkerID() string {
+func (w *WorkerClient) GetWorkerID() uint {
 	return w.workerID
 }
 

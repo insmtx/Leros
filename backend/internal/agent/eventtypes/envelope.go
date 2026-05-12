@@ -28,9 +28,9 @@ type TraceContext struct {
 
 // RouteContext carries routing information for message delivery and tenant isolation.
 type RouteContext struct {
-	OrgID     string `json:"org_id"`
+	OrgID     uint   `json:"org_id"`
 	SessionID string `json:"session_id,omitempty"`
-	WorkerID  string `json:"worker_id,omitempty"`
+	WorkerID  uint   `json:"worker_id,omitempty"`
 }
 
 // Envelope is the generic domain message envelope used on MQ topics.

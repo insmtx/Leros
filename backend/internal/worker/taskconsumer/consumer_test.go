@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -16,8 +17,8 @@ import (
 
 func TestPublishWorkerTaskMessageToNATS(t *testing.T) {
 	natsURL := getenv("LEROS_TEST_NATS_URL", "nats://localhost:4222")
-	orgID := getenv("LEROS_TEST_ORG_ID", "1001")
-	workerID := getenv("LEROS_TEST_WORKER_ID", "worker_1")
+	orgID := getenvUint("LEROS_TEST_ORG_ID", 1001)
+	workerID := getenvUint("LEROS_TEST_WORKER_ID", 1)
 	sessionID := getenv("LEROS_TEST_SESSION_ID", "session_1")
 
 	bus, err := mq.NewPublisher(natsURL)
@@ -26,7 +27,7 @@ func TestPublishWorkerTaskMessageToNATS(t *testing.T) {
 	}
 	defer bus.Close()
 
-	topic := dm.Topic().Org(orgID).Worker(workerID).Task().Build()
+	topic, _ := dm.WorkerTaskTopic(orgID, workerID)
 	messageID := randomTestID(t, "msg")
 	traceID := randomTestID(t, "trace")
 	requestID := randomTestID(t, "request")
@@ -97,6 +98,18 @@ func getenv(key string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func getenvUint(key string, fallback uint) uint {
+	valueStr := os.Getenv(key)
+	if valueStr == "" {
+		return fallback
+	}
+	value, err := strconv.ParseUint(valueStr, 10, 32)
+	if err != nil {
+		return fallback
+	}
+	return uint(value)
 }
 
 func randomTestID(t *testing.T, prefix string) string {
