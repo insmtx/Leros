@@ -6,10 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/insmtx/Leros/backend/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 )
-
-
 
 // RunTrace 记录一次运行中与自我学习判断相关的事实。
 type RunTrace struct {

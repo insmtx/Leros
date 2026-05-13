@@ -12,7 +12,7 @@ import (
 	"github.com/cloudwego/eino/compose"
 	einoreact "github.com/cloudwego/eino/flow/agent/react"
 	einoschema "github.com/cloudwego/eino/schema"
-	"github.com/insmtx/Leros/backend/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 )
 
 // Flow wraps the Eino agent loop used by the Leros runtime agent.

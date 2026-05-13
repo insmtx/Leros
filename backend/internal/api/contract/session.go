@@ -2,7 +2,7 @@ package contract
 
 import "context"
 
-import "github.com/insmtx/Leros/backend/runtime/events"
+import "github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 
 // SessionService 定义会话服务接口
 type SessionService interface {

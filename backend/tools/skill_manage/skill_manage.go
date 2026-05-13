@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	skillruntime "github.com/insmtx/Leros/backend/internal/skill/runtime"
+	skillmanageinternal "github.com/insmtx/Leros/backend/internal/skill/manage"
 	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
 	"github.com/insmtx/Leros/backend/tools"
 )
@@ -35,7 +35,7 @@ const skillManageDescription = `管理技能（创建和更新）。技能是你
 // Tool lets the agent create and update procedural skills.
 type Tool struct {
 	tools.BaseTool
-	manager *skillruntime.Manager
+	manager *skillmanageinternal.Manager
 }
 
 // NewTool creates skill_manage with the default Leros skills store.
@@ -46,15 +46,15 @@ func NewTool() *Tool {
 
 // NewToolWithStore creates skill_manage with an explicit store.
 func NewToolWithStore(store *skillstore.SkillStore) *Tool {
-	var manager *skillruntime.Manager
+	var manager *skillmanageinternal.Manager
 	if store != nil {
-		manager, _ = skillruntime.NewManager(store, skillruntime.NewPostProcessor(store.RootDir(), nil))
+		manager, _ = skillmanageinternal.NewManager(store, skillmanageinternal.NewPostProcessor(store.RootDir(), nil))
 	}
 	return NewToolWithManager(manager)
 }
 
-// NewToolWithManager creates skill_manage with an explicit runtime manager.
-func NewToolWithManager(manager *skillruntime.Manager) *Tool {
+// NewToolWithManager creates skill_manage with an explicit skill manager.
+func NewToolWithManager(manager *skillmanageinternal.Manager) *Tool {
 	return &Tool{
 		BaseTool: tools.NewBaseTool(
 			ToolNameSkillManage,

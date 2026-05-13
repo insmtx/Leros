@@ -14,8 +14,8 @@ import (
 	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/agent"
 	einoadapter "github.com/insmtx/Leros/backend/internal/agent/eino"
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/env"
-	"github.com/insmtx/Leros/backend/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/deps"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/tools"
 	"github.com/ygpkg/yg-go/logs"
 )
@@ -69,12 +69,12 @@ type Runner struct {
 }
 
 // NewRunner 创建基于 Eino Flow 的 Leros 内置 Agent。
-func NewRunner(ctx context.Context, llmConfig *config.LLMConfig, env *env.Environment) (*Runner, error) {
+func NewRunner(ctx context.Context, llmConfig *config.LLMConfig, env *deps.Container) (*Runner, error) {
 	if llmConfig == nil {
 		return nil, fmt.Errorf("llm config is required")
 	}
 	if env == nil {
-		return nil, fmt.Errorf("runtime environment is required")
+		return nil, fmt.Errorf("runtime dependencies are required")
 	}
 	if env.ToolRegistry() == nil {
 		return nil, fmt.Errorf("tool registry is required")

@@ -6,7 +6,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/insmtx/Leros/backend/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 )
 
 const (
@@ -54,7 +54,7 @@ type Process interface {
 
 // RunHandle 引擎进程启动后返回的句柄。
 type RunHandle struct {
-	Process Process          // 进程控制句柄
+	Process Process             // 进程控制句柄
 	Events  <-chan events.Event // 事件通道
 }
 

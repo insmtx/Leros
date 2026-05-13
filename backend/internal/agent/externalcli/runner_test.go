@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/insmtx/Leros/backend/engines"
 	"github.com/insmtx/Leros/backend/internal/agent"
-	"github.com/insmtx/Leros/backend/runtime/engines"
-	"github.com/insmtx/Leros/backend/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 )
 
 func TestRunnerAdaptsEngineResult(t *testing.T) {

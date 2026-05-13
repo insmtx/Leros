@@ -1,4 +1,4 @@
-package env
+package deps
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
-	skillruntime "github.com/insmtx/Leros/backend/internal/skill/runtime"
+	skillmanage "github.com/insmtx/Leros/backend/internal/skill/manage"
 	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
 	"github.com/insmtx/Leros/backend/tools"
 	memorytools "github.com/insmtx/Leros/backend/tools/memory"
@@ -15,19 +15,19 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
-// Options controls runtime environment assembly.
+// Options controls runtime dependency assembly.
 type Options struct {
 	ToolsEnabled bool
 }
 
-// Environment owns runtime dependencies shared by lifecycle and concrete runtimes.
-type Environment struct {
+// Container owns runtime dependencies shared by lifecycle and concrete runtimes.
+type Container struct {
 	skillsProvider skillcatalog.CatalogProvider
 	toolRegistry   *tools.Registry
 }
 
-// New builds the shared runtime environment for one worker process.
-func New(ctx context.Context, opts Options) (*Environment, error) {
+// New builds the shared runtime dependency container for one worker process.
+func New(ctx context.Context, opts Options) (*Container, error) {
 	catalogProvider, err := skillcatalog.NewFileCatalogProvider(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load skills: %w", err)
@@ -43,31 +43,31 @@ func New(ctx context.Context, opts Options) (*Environment, error) {
 	}
 	logs.Infof("Loaded %d tools for runtime", len(registry.List()))
 
-	return &Environment{
+	return &Container{
 		skillsProvider: catalogProvider,
 		toolRegistry:   registry,
 	}, nil
 }
 
 // SkillsProvider returns the reloadable skill catalog provider.
-func (e *Environment) SkillsProvider() skillcatalog.CatalogProvider {
-	if e == nil || e.skillsProvider == nil {
+func (c *Container) SkillsProvider() skillcatalog.CatalogProvider {
+	if c == nil || c.skillsProvider == nil {
 		return skillcatalog.NewStaticCatalogProvider(skillcatalog.NewEmptyCatalog())
 	}
-	return e.skillsProvider
+	return c.skillsProvider
 }
 
 // ToolRegistry returns the runtime tool registry.
-func (e *Environment) ToolRegistry() *tools.Registry {
-	if e == nil || e.toolRegistry == nil {
+func (c *Container) ToolRegistry() *tools.Registry {
+	if c == nil || c.toolRegistry == nil {
 		return tools.NewRegistry()
 	}
-	return e.toolRegistry
+	return c.toolRegistry
 }
 
 // AvailableToolNames returns registered tool names from the requested list.
-func (e *Environment) AvailableToolNames(names []string) []string {
-	if e == nil || e.toolRegistry == nil || len(names) == 0 {
+func (c *Container) AvailableToolNames(names []string) []string {
+	if c == nil || c.toolRegistry == nil || len(names) == 0 {
 		return nil
 	}
 	result := make([]string, 0, len(names))
@@ -80,7 +80,7 @@ func (e *Environment) AvailableToolNames(names []string) []string {
 		if _, ok := seen[name]; ok {
 			continue
 		}
-		if _, err := e.toolRegistry.Get(name); err == nil {
+		if _, err := c.toolRegistry.Get(name); err == nil {
 			result = append(result, name)
 			seen[name] = struct{}{}
 		}
@@ -96,7 +96,7 @@ func registerTools(registry *tools.Registry, catalogProvider *skillcatalog.FileC
 	if err != nil {
 		return fmt.Errorf("new skill store: %w", err)
 	}
-	manager, err := skillruntime.NewManager(store, skillruntime.NewPostProcessor(store.RootDir(), catalogProvider))
+	manager, err := skillmanage.NewManager(store, skillmanage.NewPostProcessor(store.RootDir(), catalogProvider))
 	if err != nil {
 		return fmt.Errorf("new skill manager: %w", err)
 	}

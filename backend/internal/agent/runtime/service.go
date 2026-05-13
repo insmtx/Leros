@@ -6,13 +6,13 @@ import (
 	"strings"
 
 	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/engines/builtin"
 	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/insmtx/Leros/backend/internal/agent/externalcli"
 	"github.com/insmtx/Leros/backend/internal/agent/leros"
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/env"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/deps"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/lifecycle"
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
-	"github.com/insmtx/Leros/backend/runtime/engines/builtin"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -24,16 +24,16 @@ type Options struct {
 }
 
 type Service struct {
-	env    *env.Environment
+	env    *deps.Container
 	router agent.Runner
 }
 
 func NewService(ctx context.Context, opts Options) (*Service, error) {
-	env, err := env.New(ctx, env.Options{
+	env, err := deps.New(ctx, deps.Options{
 		ToolsEnabled: opts.ToolsEnabled,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("create runtime environment: %w", err)
+		return nil, fmt.Errorf("create runtime dependencies: %w", err)
 	}
 
 	s := &Service{env: env}
@@ -59,7 +59,7 @@ func (s *Service) Run(ctx context.Context, req *agent.RequestContext) (*agent.Ru
 	return s.router.Run(ctx, req)
 }
 
-func (s *Service) Environment() *env.Environment {
+func (s *Service) Environment() *deps.Container {
 	return s.env
 }
 

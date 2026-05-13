@@ -3,7 +3,7 @@ package skillmanage
 import (
 	"fmt"
 
-	skillruntime "github.com/insmtx/Leros/backend/internal/skill/runtime"
+	skillmanageinternal "github.com/insmtx/Leros/backend/internal/skill/manage"
 	"github.com/insmtx/Leros/backend/tools"
 )
 
@@ -15,7 +15,7 @@ func NewTools() []tools.Tool {
 }
 
 // NewToolsWithManager returns all skill management tools using an explicit manager.
-func NewToolsWithManager(manager *skillruntime.Manager) []tools.Tool {
+func NewToolsWithManager(manager *skillmanageinternal.Manager) []tools.Tool {
 	return []tools.Tool{
 		NewToolWithManager(manager),
 	}
@@ -27,7 +27,7 @@ func Register(registry *tools.Registry) error {
 }
 
 // RegisterWithManager adds skill management tools to the runtime registry.
-func RegisterWithManager(registry *tools.Registry, manager *skillruntime.Manager) error {
+func RegisterWithManager(registry *tools.Registry, manager *skillmanageinternal.Manager) error {
 	if registry == nil {
 		return fmt.Errorf("tool registry is required")
 	}
