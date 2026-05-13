@@ -80,7 +80,7 @@ func NewRunner(ctx context.Context, llmConfig *config.LLMConfig, env *deps.Conta
 		return nil, fmt.Errorf("tool registry is required")
 	}
 
-	chatModel, err := einoadapter.NewOpenAIChatModel(ctx, llmConfig)
+	chatModel, err := einoadapter.NewChatModel(ctx, llmConfig)
 	if err != nil {
 		return nil, err
 	}

@@ -49,7 +49,7 @@ func New(ctx context.Context, cfg *Config) (*SimpleChat, error) {
 		BaseURL:  cfg.BaseURL,
 	}
 
-	chatModel, err := einoadapter.NewOpenAIChatModel(ctx, llmConfig)
+	chatModel, err := einoadapter.NewChatModel(ctx, llmConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create chat model: %w", err)
 	}

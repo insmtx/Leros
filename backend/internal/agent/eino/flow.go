@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	einomodel "github.com/cloudwego/eino/components/model"
+	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	einoreact "github.com/cloudwego/eino/flow/agent/react"
 	einoschema "github.com/cloudwego/eino/schema"
@@ -38,13 +39,14 @@ func NewFlow(ctx context.Context, cfg *FlowConfig) (*Flow, error) {
 	if cfg.Model == nil {
 		return nil, fmt.Errorf("tool-calling model is required")
 	}
-	if cfg.ToolAdapter == nil {
-		return nil, fmt.Errorf("tool adapter is required")
-	}
 
-	toolList, err := cfg.ToolAdapter.EinoTools(cfg.Binding, cfg.Emitter)
-	if err != nil {
-		return nil, fmt.Errorf("build eino tools: %w", err)
+	var toolList []einotool.BaseTool
+	if cfg.ToolAdapter != nil {
+		var err error
+		toolList, err = cfg.ToolAdapter.EinoTools(cfg.Binding, cfg.Emitter)
+		if err != nil {
+			return nil, fmt.Errorf("build eino tools: %w", err)
+		}
 	}
 
 	maxStep := cfg.MaxStep

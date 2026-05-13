@@ -11,7 +11,7 @@ type NATSConfig struct {
 
 // LLMConfig is the configuration structure for LLM providers
 type LLMConfig struct {
-	Provider string `yaml:"provider"`           // LLM Provider (openai, claude, etc.)
+	Provider string `yaml:"provider"`           // LLM Provider (openai, anthropic, etc.)
 	APIKey   string `yaml:"api_key"`            // API Key
 	Model    string `yaml:"model,omitempty"`    // Default model
 	BaseURL  string `yaml:"base_url,omitempty"` // Custom base URL
