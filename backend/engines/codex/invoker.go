@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/insmtx/Leros/backend/runtime/engines"
-	"github.com/insmtx/Leros/backend/runtime/events"
+	"github.com/insmtx/Leros/backend/engines"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	"github.com/ygpkg/yg-go/logs"
 )
 

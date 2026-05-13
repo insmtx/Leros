@@ -57,8 +57,6 @@ type ToolResultEvent struct {
 	Result     map[string]any `json:"result,omitempty"`
 }
 
-
-
 // StreamError describes terminal or recoverable errors in streaming execution.
 type StreamError struct {
 	Code    string `json:"code,omitempty"`

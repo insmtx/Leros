@@ -4,7 +4,7 @@ package claude
 import (
 	"context"
 
-	"github.com/insmtx/Leros/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/engines"
 )
 
 // Adapter 通过 Claude Code 执行提示。

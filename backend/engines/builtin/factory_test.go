@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/insmtx/Leros/backend/config"
-	"github.com/insmtx/Leros/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/engines"
 )
 
 func TestNewRegistryFromConfigDetectsInstalledEngines(t *testing.T) {

@@ -11,10 +11,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/insmtx/Leros/backend/config"
 	agentruntime "github.com/insmtx/Leros/backend/internal/agent/runtime"
+	runtimemcp "github.com/insmtx/Leros/backend/internal/agent/runtime/mcp"
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/internal/worker/taskconsumer"
-	singerMCP "github.com/insmtx/Leros/backend/mcp"
 	"github.com/spf13/cobra"
 	"github.com/ygpkg/yg-go/lifecycle"
 	"github.com/ygpkg/yg-go/logs"
@@ -183,7 +183,7 @@ func startWorkerMCPServer(addr string) (*http.Server, error) {
 
 	r := gin.New()
 	v1 := r.Group("/v1")
-	singerMCP.RegisterRoutes(v1, singerMCP.NewServer())
+	runtimemcp.RegisterRoutes(v1, runtimemcp.NewServer())
 
 	server := &http.Server{
 		Addr:    addr,

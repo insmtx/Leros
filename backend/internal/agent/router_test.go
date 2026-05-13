@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/engines"
+	"github.com/insmtx/Leros/backend/engines/claude"
 	"github.com/insmtx/Leros/backend/internal/agent"
-	"github.com/insmtx/Leros/backend/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/agent/externalcli"
-	"github.com/insmtx/Leros/backend/runtime/engines"
-	"github.com/insmtx/Leros/backend/runtime/engines/claude"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 )
 
 func TestRuntimeRouterUsesRequestedRuntime(t *testing.T) {

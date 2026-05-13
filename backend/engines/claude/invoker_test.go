@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/insmtx/Leros/backend/runtime/engines"
-	"github.com/insmtx/Leros/backend/runtime/events"
+	"github.com/insmtx/Leros/backend/engines"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 )
 
 func TestAdapterAskCurrentTime(t *testing.T) {

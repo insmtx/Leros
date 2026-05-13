@@ -4,7 +4,7 @@ package codex
 import (
 	"context"
 
-	"github.com/insmtx/Leros/backend/runtime/engines"
+	"github.com/insmtx/Leros/backend/engines"
 )
 
 // Adapter 通过 Codex CLI 执行提示。

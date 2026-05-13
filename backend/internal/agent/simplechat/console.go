@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/insmtx/Leros/backend/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 )
 
 type ConsoleSink struct{}

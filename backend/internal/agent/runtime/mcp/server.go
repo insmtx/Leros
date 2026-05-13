@@ -1,4 +1,4 @@
-// Package mcp exposes Leros capabilities through the Model Context Protocol.
+// Package mcp exposes Leros runtime capabilities through the Model Context Protocol.
 package mcp
 
 import (

@@ -8,7 +8,7 @@ import (
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
-	"github.com/insmtx/Leros/backend/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/tools"
 )
 

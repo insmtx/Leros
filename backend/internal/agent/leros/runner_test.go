@@ -12,9 +12,9 @@ import (
 
 	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/agent"
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/env"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/deps"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
-	"github.com/insmtx/Leros/backend/runtime/events"
 	"github.com/insmtx/Leros/backend/tools"
 	nodetools "github.com/insmtx/Leros/backend/tools/node"
 	skillusetools "github.com/insmtx/Leros/backend/tools/skill_use"
@@ -74,14 +74,14 @@ func TestAgentRunRealModel(t *testing.T) {
 	ctx, cancel := realModelTestContext(t)
 	defer cancel()
 
-	env, err := env.New(ctx, env.Options{
+	runtimeDeps, err := deps.New(ctx, deps.Options{
 		ToolsEnabled: false,
 	})
 	if err != nil {
 		t.Fatalf("new runtime env: %v", err)
 	}
 
-	agt, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, env)
+	agt, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, runtimeDeps)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
@@ -133,14 +133,14 @@ func TestAgentRunNodeTool(t *testing.T) {
 		t.Fatalf("register node tools: %v", err)
 	}
 
-	env, err := env.New(ctx, env.Options{
+	runtimeDeps, err := deps.New(ctx, deps.Options{
 		ToolsEnabled: true,
 	})
 	if err != nil {
 		t.Fatalf("new runtime env: %v", err)
 	}
 
-	agt, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, env)
+	agt, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, runtimeDeps)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
@@ -214,14 +214,14 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 		t.Fatalf("register node tools: %v", err)
 	}
 
-	env, err := env.New(ctx, env.Options{
+	runtimeDeps, err := deps.New(ctx, deps.Options{
 		ToolsEnabled: true,
 	})
 	if err != nil {
 		t.Fatalf("new runtime env: %v", err)
 	}
 
-	agt, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, env)
+	agt, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, runtimeDeps)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}

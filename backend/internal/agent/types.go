@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/insmtx/Leros/backend/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 )
 
 // Runner 是数字员工单次运行的执行边界。
@@ -249,5 +249,3 @@ type ToolCallRecord struct {
 	// Error 是工具执行失败时的错误摘要。
 	Error string `json:"error,omitempty"`
 }
-
-

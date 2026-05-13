@@ -9,8 +9,8 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/agent"
-	"github.com/insmtx/Leros/backend/runtime/events"
 	einoadapter "github.com/insmtx/Leros/backend/internal/agent/eino"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	"github.com/ygpkg/yg-go/logs"
 )
 

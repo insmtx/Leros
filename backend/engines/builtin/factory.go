@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/insmtx/Leros/backend/config"
-	"github.com/insmtx/Leros/backend/runtime/engines"
-	"github.com/insmtx/Leros/backend/runtime/engines/claude"
-	"github.com/insmtx/Leros/backend/runtime/engines/codex"
+	"github.com/insmtx/Leros/backend/engines"
+	"github.com/insmtx/Leros/backend/engines/claude"
+	"github.com/insmtx/Leros/backend/engines/codex"
 )
 
 // NewRegistryFromConfig creates a registry with every detected built-in CLI engine.
