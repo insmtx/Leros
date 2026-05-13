@@ -171,11 +171,20 @@ type RuntimeOptions struct {
 
 // ModelOptions lets callers override model behavior when supported.
 type ModelOptions struct {
+	// ID 是数据库中持久化的模型配置ID；为空时运行时回退到组织默认模型。
+	ID uint `json:"id,omitempty"`
+
 	// Provider 是模型供应商标识。
 	Provider string `json:"provider,omitempty"`
 
 	// Model 是具体模型名称。
 	Model string `json:"model,omitempty"`
+
+	// APIKey 是运行期解析出的模型凭证，不参与请求序列化。
+	APIKey string `json:"-"`
+
+	// BaseURL 是运行期解析出的模型服务地址。
+	BaseURL string `json:"base_url,omitempty"`
 
 	// Temperature 是模型采样温度。
 	Temperature float64 `json:"temperature,omitempty"`

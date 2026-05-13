@@ -12,7 +12,7 @@ import (
 func TestRunnerAdaptsEngineResult(t *testing.T) {
 	SetDefaultProviderSessionStore(NewInMemoryProviderSessionStore())
 	engine := &fakeEngine{result: "done"}
-	runner, err := NewRunner("fake", engine, nil)
+	runner, err := NewRunner("fake", engine)
 	if err != nil {
 		t.Fatalf("new runner: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestRunnerStoresProviderSessionAndResumes(t *testing.T) {
 		result:            "done",
 		providerSessionID: "provider-session-1",
 	}
-	runner, err := NewRunner("codex", engine, nil)
+	runner, err := NewRunner("codex", engine)
 	if err != nil {
 		t.Fatalf("new runner: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestRunnerStoresProviderSessionAndResumes(t *testing.T) {
 func TestRunnerPreallocatesClaudeProviderSession(t *testing.T) {
 	SetDefaultProviderSessionStore(NewInMemoryProviderSessionStore())
 	engine := &fakeEngine{result: "done"}
-	runner, err := NewRunner(engines.EngineClaude, engine, nil)
+	runner, err := NewRunner(engines.EngineClaude, engine)
 	if err != nil {
 		t.Fatalf("new runner: %v", err)
 	}

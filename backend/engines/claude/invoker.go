@@ -57,7 +57,7 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Pr
 	cmd := exec.CommandContext(execCtx, inv.binary, args...)
 	cmd.Dir = req.WorkDir
 	cmd.Stdin = strings.NewReader(req.Prompt)
-	cmd.Env = engines.BuildRunEnv(inv.baseEnv, req.ExtraEnv, req.Model)
+	cmd.Env = engines.BuildRunEnv(inv.baseEnv, req.ExtraEnv, claudeModelEnv(req.Model))
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -118,6 +118,14 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Pr
 	}()
 
 	return proc, evtChan, nil
+}
+
+func claudeModelEnv(model engines.ModelConfig) map[string]string {
+	return map[string]string{
+		"ANTHROPIC_API_KEY":    model.APIKey,
+		"ANTHROPIC_AUTH_TOKEN": model.APIKey,
+		"ANTHROPIC_BASE_URL":   model.BaseURL,
+	}
 }
 
 type claudeStreamState struct {

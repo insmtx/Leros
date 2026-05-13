@@ -113,12 +113,7 @@ func (w *WorkerClient) handleAssistantConfig(ctx context.Context, assistantConfi
 	logs.Infof("Worker %s initialized with assistant config", w.workerID)
 }
 func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) (agent.AgentRuntime, error) {
-	if cfg.LLMConfig == nil {
-		return nil, fmt.Errorf("llm config is required")
-	}
-
 	runtimeService, err := agentruntime.NewService(ctx, agentruntime.Options{
-		LLMConfig:    cfg.LLMConfig,
 		ToolsEnabled: cfg.ToolsEnabled,
 	})
 	if err != nil {

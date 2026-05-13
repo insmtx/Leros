@@ -81,7 +81,7 @@ func TestRuntimeRouterClaudeRunnerCallsLerosEchoTool(t *testing.T) {
 		llmConfig.Provider, llmConfig.Model, llmConfig.BaseURL != "", llmConfig.APIKey != "")
 
 	claudeEngine := claude.NewAdapter(claudePath, nil)
-	claudeRunner, err := externalcli.NewRunner(engines.EngineClaude, claudeEngine, llmConfig)
+	claudeRunner, err := externalcli.NewRunner(engines.EngineClaude, claudeEngine)
 	if err != nil {
 		t.Fatalf("new claude runner: %v", err)
 	}

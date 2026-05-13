@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/agent"
@@ -63,16 +62,12 @@ func DefaultSystemPrompt() string {
 
 // Runner 是 Leros 内置 Eino 运行时入口。
 type Runner struct {
-	chatModel    einomodel.ToolCallingChatModel
 	toolAdapter  *einoadapter.ToolAdapter
 	systemPrompt string
 }
 
 // NewRunner 创建基于 Eino Flow 的 Leros 内置 Agent。
-func NewRunner(ctx context.Context, llmConfig *config.LLMConfig, env *deps.Container) (*Runner, error) {
-	if llmConfig == nil {
-		return nil, fmt.Errorf("llm config is required")
-	}
+func NewRunner(ctx context.Context, env *deps.Container) (*Runner, error) {
 	if env == nil {
 		return nil, fmt.Errorf("runtime dependencies are required")
 	}
@@ -80,13 +75,7 @@ func NewRunner(ctx context.Context, llmConfig *config.LLMConfig, env *deps.Conta
 		return nil, fmt.Errorf("tool registry is required")
 	}
 
-	chatModel, err := einoadapter.NewChatModel(ctx, llmConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Runner{
-		chatModel:    chatModel,
 		toolAdapter:  einoadapter.NewToolAdapter(env.ToolRegistry()),
 		systemPrompt: defaultSystemPrompt,
 	}, nil
@@ -95,8 +84,8 @@ func NewRunner(ctx context.Context, llmConfig *config.LLMConfig, env *deps.Conta
 // Run 直接执行标准化请求；统一生命周期入口应优先使用 lifecycle.Runner。
 func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {
 	startedAt := time.Now().UTC()
-	if r == nil || r.chatModel == nil {
-		return nil, fmt.Errorf("eino chat model is not initialized")
+	if r == nil {
+		return nil, fmt.Errorf("leros runner is not initialized")
 	}
 
 	state, err := r.buildRunState(req)
@@ -113,8 +102,19 @@ func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt ti
 		return nil, err
 	}
 
+	chatModel, err := einoadapter.NewChatModel(ctx, &config.LLMConfig{
+		Provider: req.Model.Provider,
+		APIKey:   req.Model.APIKey,
+		Model:    req.Model.Model,
+		BaseURL:  req.Model.BaseURL,
+	})
+	if err != nil {
+		emitRunError(ctx, state.emitter, req, err)
+		return nil, err
+	}
+
 	flow, err := einoadapter.NewFlow(ctx, &einoadapter.FlowConfig{
-		Model:        r.chatModel,
+		Model:        chatModel,
 		ToolAdapter:  r.toolAdapter,
 		Binding:      state.toolBinding,
 		Emitter:      state.emitter,

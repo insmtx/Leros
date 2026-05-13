@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/insmtx/Leros/backend/internal/agent/leros"
 	localmemory "github.com/insmtx/Leros/backend/internal/memory/local"
 	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 // ContextBuilder 统一为内部 Agent 和外部 CLI 构建运行上下文。
@@ -48,35 +50,60 @@ func (b *ContextBuilder) Prepare(ctx context.Context, req *agent.RequestContext)
 		return nil, fmt.Errorf("request context is required")
 	}
 
+	startedAt := time.Now()
+	logs.InfoContextf(ctx, "Agent context prepare started: run_id=%s trace_id=%s assistant_id=%s conversation_id=%s input_type=%s input_text_len=%d messages=%d attachments=%d",
+		req.RunID,
+		req.TraceID,
+		req.Assistant.ID,
+		req.Conversation.ID,
+		req.Input.Type,
+		len(strings.TrimSpace(req.Input.Text)),
+		len(req.Input.Messages),
+		len(req.Input.Attachments),
+	)
+
 	cloned := cloneRequest(req)
 	systemPrompt, err := b.BuildSystemPrompt(ctx, cloned)
 	if err != nil {
+		logs.WarnContextf(ctx, "Agent context build system prompt failed: run_id=%s trace_id=%s error=%v",
+			req.RunID, req.TraceID, err)
 		return nil, err
 	}
 
 	cloned.SystemPrompt = systemPrompt
+	logs.InfoContextf(ctx, "Agent context prepare completed: run_id=%s trace_id=%s system_prompt_len=%d elapsed=%s",
+		cloned.RunID, cloned.TraceID, len(cloned.SystemPrompt), time.Since(startedAt))
 	return cloned, nil
 }
 
 // BuildSystemPrompt 生成统一系统提示词，供所有运行时复用。
 func (b *ContextBuilder) BuildSystemPrompt(ctx context.Context, req *agent.RequestContext) (string, error) {
 	sections := make([]string, 0, 6)
+	sectionNames := make([]string, 0, 5)
 	if base := strings.TrimSpace(b.basePromptForRequest(req)); base != "" {
 		sections = append(sections, base)
+		sectionNames = append(sectionNames, "base")
 	}
 	if skills := strings.TrimSpace(b.buildSkillsContext()); skills != "" {
 		sections = append(sections, skills)
+		sectionNames = append(sectionNames, "skills")
 	}
 	if memory := strings.TrimSpace(buildMemoryContext(ctx)); memory != "" {
 		sections = append(sections, memory)
+		sectionNames = append(sectionNames, "memory")
 	}
 	if summary := strings.TrimSpace(buildSessionSummaryContext(req)); summary != "" {
 		sections = append(sections, summary)
+		sectionNames = append(sectionNames, "session_summary")
 	}
 	if guidance := strings.TrimSpace(learningGuidance()); guidance != "" {
 		sections = append(sections, guidance)
+		sectionNames = append(sectionNames, "learning_guidance")
 	}
-	return strings.Join(sections, "\n\n"), nil
+	prompt := strings.Join(sections, "\n\n")
+	logs.InfoContextf(ctx, "Agent system prompt built: run_id=%s trace_id=%s sections=%s section_count=%d prompt_len=%d",
+		requestRunID(req), requestTraceID(req), strings.Join(sectionNames, ","), len(sections), len(prompt))
+	return prompt, nil
 }
 
 func (b *ContextBuilder) basePromptForRequest(req *agent.RequestContext) string {
@@ -93,28 +120,35 @@ func (b *ContextBuilder) basePromptForRequest(req *agent.RequestContext) string 
 
 func (b *ContextBuilder) buildSkillsContext() string {
 	if b == nil || b.SkillsProvider() == nil {
+		logs.Debug("Agent skills context skipped: skills provider unavailable")
 		return ""
 	}
 	catalog := b.SkillsProvider().Current()
 	if catalog == nil {
+		logs.Debug("Agent skills context skipped: catalog unavailable")
 		return ""
 	}
 	summaries := catalog.List()
 	if len(summaries) == 0 {
+		logs.Debug("Agent skills context skipped: empty catalog")
 		return ""
 	}
 
 	sections := []string{buildSkillSummarySection(summaries)}
+	alwaysCount := 0
 	for _, summary := range summaries {
 		if !summary.Always {
 			continue
 		}
 		entry, err := catalog.Get(summary.Name)
 		if err != nil {
+			logs.Warnf("Agent always-on skill load failed: skill=%s error=%v", summary.Name, err)
 			continue
 		}
+		alwaysCount++
 		sections = append(sections, "## Skill: "+entry.Manifest.Name+"\n"+strings.TrimSpace(entry.Body))
 	}
+	logs.Infof("Agent skills context built: skills=%d always_on=%d", len(summaries), alwaysCount)
 	return strings.Join(filterEmpty(sections), "\n\n")
 }
 
@@ -145,13 +179,21 @@ func buildSkillSummarySection(summaries []skillcatalog.Summary) string {
 func buildMemoryContext(ctx context.Context) string {
 	store, err := localmemory.NewStore(localmemory.Options{})
 	if err != nil {
+		logs.WarnContextf(ctx, "Agent memory context skipped: create store error=%v", err)
 		return ""
 	}
 	block, err := store.BuildPromptBlock(ctx)
 	if err != nil {
+		logs.WarnContextf(ctx, "Agent memory context skipped: build prompt block error=%v", err)
 		return ""
 	}
-	return strings.TrimSpace(block)
+	block = strings.TrimSpace(block)
+	if block == "" {
+		logs.DebugContextf(ctx, "Agent memory context skipped: empty prompt block")
+		return ""
+	}
+	logs.InfoContextf(ctx, "Agent memory context built: len=%d", len(block))
+	return block
 }
 
 func buildSessionSummaryContext(req *agent.RequestContext) string {
