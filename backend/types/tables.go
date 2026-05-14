@@ -6,7 +6,7 @@ package types
 
 // 数据库表名前缀常量
 const (
-	tablenamePrefix = "singer_" // 数据库表名统一前缀
+	tablenamePrefix = "leros_" // 数据库表名统一前缀
 )
 
 // 数据库表名常量定义
