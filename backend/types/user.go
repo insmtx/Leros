@@ -8,9 +8,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// TableNameUser 用户表名
-const TableNameUser = "singer_users"
-
 // User 表示系统中的用户信息
 //
 // 该结构存储用户的基本信息，包括 GitHub 关联信息、

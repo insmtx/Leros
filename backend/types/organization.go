@@ -2,9 +2,6 @@ package types
 
 import "gorm.io/gorm"
 
-// TableNameOrganization 组织表名
-const TableNameOrganization = tablenamePrefix + "organizations"
-
 // Organization 表示系统中的组织/企业信息
 //
 // 组织是系统中的顶级实体，可以代表公司、团队或项目。

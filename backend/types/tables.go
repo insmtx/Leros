@@ -11,6 +11,14 @@ const (
 
 // 数据库表名常量定义
 const (
+
+	// TableNameUser 用户表名
+	TableNameUser = tablenamePrefix + "users"
+	// TableNameOrganization 组织表名
+	TableNameOrganization = tablenamePrefix + "organizations"
+	// TableNameUserOrg 用户组织关联表名
+	TableNameUserOrg = tablenamePrefix + "user_orgs"
+
 	// TableNameDigitalAssistant 数字助手表名
 	TableNameDigitalAssistant = tablenamePrefix + "digital_assistant"
 	// TableNameDigitalAssistantInstance 数字助手实例表名

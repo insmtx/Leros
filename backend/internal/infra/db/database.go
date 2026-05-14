@@ -23,7 +23,7 @@ const dbName = "singer"
 //
 // 使用 dbtools 初始化数据库连接，并根据配置决定是否启用调试模式，
 // 最后运行数据库迁移来创建所有必要的表结构。
-func InitDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
+func InitDB(cfg config.DatabaseConfig, llmCfg *config.LLMConfig) (*gorm.DB, error) {
 	if cfg.URL == "" {
 		return nil, fmt.Errorf("database URL is required")
 	}
@@ -42,8 +42,8 @@ func InitDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	// 初始化开发数据（默认组织、用户、用户组织关联）
-	if err := InitDevData(db); err != nil {
+	// 初始化开发数据（默认组织、用户、用户组织关联、默认 LLM 模型）
+	if err := InitDevData(db, llmCfg); err != nil {
 		return nil, fmt.Errorf("failed to init dev data: %w", err)
 	}
 
@@ -57,6 +57,8 @@ func InitDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 func runMigrations(db *gorm.DB) error {
 	models := []interface{}{
 		&types.User{},
+		&types.Organization{},
+		&types.UserOrg{},
 		&types.Event{},
 		&types.DigitalAssistant{},
 		&types.Skill{},
@@ -64,8 +66,6 @@ func runMigrations(db *gorm.DB) error {
 		&types.SkillExecutionLog{},
 		&types.Session{},
 		&types.SessionMessage{},
-		&types.Organization{},
-		&types.UserOrg{},
 		&types.LLMModel{},
 	}
 
@@ -78,8 +78,8 @@ func runMigrations(db *gorm.DB) error {
 }
 
 // InitDevData 初始化开发环境数据（仅在数据为空时执行）
-// 包括：默认组织、默认用户、用户组织关联
-func InitDevData(db *gorm.DB) error {
+// 包括：默认组织、默认用户、用户组织关联、默认 LLM 模型
+func InitDevData(db *gorm.DB, llmCfg *config.LLMConfig) error {
 	// 初始化默认组织
 	var orgCount int64
 	db.Model(&types.Organization{}).Count(&orgCount)
@@ -143,10 +143,50 @@ func InitDevData(db *gorm.DB) error {
 		logs.Infof("Default user-org association created (uin=%d, user_id=%d, org_id=%d)", userOrg.Uin, userOrg.UserID, userOrg.OrgID)
 	}
 
+	// 初始化默认 LLM 模型（仅在表为空且配置中提供 LLM 配置时执行）
+	var modelCount int64
+	db.Model(&types.LLMModel{}).Count(&modelCount)
+	if modelCount == 0 && llmCfg != nil && llmCfg.APIKey != "" {
+		modelName := llmCfg.Model
+		if modelName == "" {
+			modelName = "default"
+		}
+
+		defaultLLMModel := &types.LLMModel{
+			OrgID:           1,
+			Code:            "llm_default",
+			Name:            llmCfg.Provider,
+			Description:     "Default LLM model from config",
+			Provider:        llmCfg.Provider,
+			ModelName:       modelName,
+			BaseURL:         llmCfg.BaseURL,
+			APIKeyEncrypted: llmCfg.APIKey,
+			APIKeyMasked:    maskAPIKey(llmCfg.APIKey),
+			MaxTokens:       4096,
+			Temperature:     0.7,
+			TimeoutSec:      120,
+			Status:          string(types.LLMModelStatusActive),
+			IsDefault:       true,
+			IsSystem:        true,
+		}
+		if err := db.Create(defaultLLMModel).Error; err != nil {
+			return fmt.Errorf("failed to create default LLM model: %w", err)
+		}
+		logs.Infof("Default LLM model created (provider=%s, model=%s)", llmCfg.Provider, modelName)
+	}
+
 	return nil
 }
 
 // GetDB 获取默认的数据库实例
 func GetDB() *gorm.DB {
 	return dbtools.DB(dbName)
+}
+
+// maskAPIKey 将 API Key 脱敏显示
+func maskAPIKey(key string) string {
+	if len(key) <= 7 {
+		return "***"
+	}
+	return key[:3] + "***" + key[len(key)-4:]
 }
