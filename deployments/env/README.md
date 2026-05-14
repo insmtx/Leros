@@ -5,7 +5,7 @@ Docker Compose setup for Leros development environment.
 ## Services
 
 This setup brings up the following services:
-- **singer**: Main application server
+- **leros**: Main application server
 - **postgresql**: Database server
 - **nats**: Message broker with JetStream
 - **redis**: In-memory database for caching

@@ -20,10 +20,10 @@ import (
 
 func TestRuntimeRouterUsesRequestedRuntime(t *testing.T) {
 	router := agent.NewRuntimeRouter(agent.RuntimeKindLeros)
-	singerRunner := &testRunner{message: "singer"}
+	lerosRunner := &testRunner{message: "leros"}
 	codexRunner := &testRunner{message: "codex"}
 
-	if err := router.Register(agent.RuntimeKindLeros, singerRunner); err != nil {
+	if err := router.Register(agent.RuntimeKindLeros, lerosRunner); err != nil {
 		t.Fatalf("register leros: %v", err)
 	}
 	if err := router.Register("codex", codexRunner); err != nil {

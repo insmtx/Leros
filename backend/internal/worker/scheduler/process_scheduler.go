@@ -128,7 +128,7 @@ func (ps *ProcessScheduler) List(ctx context.Context) ([]*worker.WorkerInstance,
 func (ps *ProcessScheduler) startProcess(instance *ProcessInstance, spec *worker.WorkerSpec) error {
 	cmdPath := ps.config.WorkerBinary
 	if cmdPath == "" {
-		cmdPath = "./bundles/singer"
+		cmdPath = "./bundles/leros"
 	}
 
 	if _, err := os.Stat(cmdPath); os.IsNotExist(err) {

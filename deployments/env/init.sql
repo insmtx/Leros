@@ -1,4 +1,4 @@
--- Database initialization for SingerOS
+-- Database initialization for Leros
 
 -- Create extension if not exists
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

@@ -10,10 +10,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nats-io/nats.go"
 	"github.com/insmtx/Leros/backend/internal/agent"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	interactionevent "github.com/insmtx/Leros/backend/pkg/event"
+	"github.com/nats-io/nats.go"
 	"github.com/ygpkg/yg-go/logs"
 )
 

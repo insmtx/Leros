@@ -219,7 +219,7 @@ func truncateOutput(value string, maxLen int) string {
 
 func buildArgs(threadID string, resume bool, req engines.RunRequest) []string {
 	args := []string{"exec"}
-	args = append(args, singerProviderConfigArgs(req)...)
+	args = append(args, lerosProviderConfigArgs(req)...)
 	if req.Model.Model != "" {
 		args = append(args, "--model", req.Model.Model)
 	}
@@ -244,7 +244,7 @@ func ensureV1Suffix(url string) string {
 	return url
 }
 
-func singerProviderConfigArgs(req engines.RunRequest) []string {
+func lerosProviderConfigArgs(req engines.RunRequest) []string {
 	baseURL := ensureV1Suffix(firstNonEmptyString(
 		req.Model.BaseURL,
 		os.Getenv("OPENAI_API_BASE"),

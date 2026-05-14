@@ -224,16 +224,3 @@ We welcome:
 
 Enterprise partners are welcome to collaborate.
 
----
-
-## 🐶 Why “Singer”?
-
-Singers are:
-
-* Expressive
-* Adaptive
-* Highly disciplined
-* Excellent collaborators
-
-Leros aims to embody the same traits in enterprise AI systems.
-

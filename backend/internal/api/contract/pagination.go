@@ -6,8 +6,8 @@ import (
 
 // Pagination pagination request base
 type Pagination struct {
-	Offset  int `json:"offset,omitempty"`
-	Limit   int `json:"limit,omitempty"`
+	Offset  int  `json:"offset,omitempty"`
+	Limit   int  `json:"limit,omitempty"`
 	ListAll bool `json:"list_all,omitempty"`
 }
 
