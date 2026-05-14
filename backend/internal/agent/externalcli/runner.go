@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/insmtx/Leros/backend/engines"
 	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
@@ -58,16 +57,13 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 	ensureRunDefaults(req)
 
 	emitter := events.NewEmitter(req.RunID, req.TraceID, sinkForRequest(req))
-	if err := emitter.Emit(ctx, &events.Event{Type: events.EventStarted}); err != nil {
-		return nil, err
-	}
 
 	workDir := strings.TrimSpace(req.Runtime.WorkDir)
 	if workDir == "" {
 		workDir = "."
 	}
 	if err := r.engine.Prepare(ctx, engines.PrepareRequest{WorkDir: workDir}); err != nil {
-		return r.failedResult(ctx, emitter, req, startedAt, err, failureMetadata(workDir)), err
+		return r.failedResult(req, startedAt, err, failureMetadata(workDir)), err
 	}
 
 	sessionPlan := r.resolveProviderSession(ctx, req, workDir)
@@ -80,7 +76,7 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 		Model:       modelForRequest(req),
 	})
 	if err != nil {
-		return r.failedResult(ctx, emitter, req, startedAt, err, failureMetadata(workDir)), err
+		return r.failedResult(req, startedAt, err, failureMetadata(workDir)), err
 	}
 
 	if handle != nil && handle.Process != nil {
@@ -90,7 +86,7 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 	consumeResult, err := consumeEvents(ctx, emitter, handle)
 	if err != nil {
 		r.markProviderSessionFailed(ctx, sessionPlan, err)
-		return r.failedResult(ctx, emitter, req, startedAt, err, failureMetadata(workDir)), err
+		return r.failedResult(req, startedAt, err, failureMetadata(workDir)), err
 	}
 	r.persistProviderSession(ctx, sessionPlan, consumeResult.ProviderSessionID)
 
@@ -109,10 +105,6 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 			"provider_id": firstNonEmptyString(sessionPlan.ProviderSessionID, consumeResult.ProviderSessionID),
 		},
 	}
-	_ = emitter.Emit(ctx, &events.Event{
-		Type:    events.EventCompleted,
-		Content: result.Message,
-	})
 	return result, nil
 }
 
@@ -162,6 +154,11 @@ func consumeEvents(ctx context.Context, emitter *events.Emitter, handle *engines
 					result.WriteString(event.Content)
 				}
 			}
+		case events.EventToolCallStarted, events.EventToolCallCompleted, events.EventToolCallFailed:
+			_ = emitter.Emit(ctx, &events.Event{
+				Type:    event.Type,
+				Content: event.Content,
+			})
 		default:
 			if strings.TrimSpace(event.Content) != "" {
 				if !resultSeen {
@@ -204,9 +201,6 @@ func (r *Runner) resolveProviderSession(ctx context.Context, req *agent.RequestC
 		plan.ProviderSessionID = strings.TrimSpace(binding.ProviderSessionID)
 		plan.Resume = true
 		return plan
-	}
-	if canPreallocateProviderSessionID(r.name) {
-		plan.ProviderSessionID = uuid.NewString()
 	}
 	return plan
 }
@@ -274,10 +268,6 @@ func metadataString(metadata map[string]any, key string) string {
 	}
 }
 
-func canPreallocateProviderSessionID(provider string) bool {
-	return strings.EqualFold(provider, engines.EngineClaude)
-}
-
 func firstNonEmptyString(values ...string) string {
 	for _, value := range values {
 		if strings.TrimSpace(value) != "" {
@@ -287,21 +277,15 @@ func firstNonEmptyString(values ...string) string {
 	return ""
 }
 
-func (r *Runner) failedResult(ctx context.Context, emitter *events.Emitter, req *agent.RequestContext, startedAt time.Time, err error, metadata map[string]any) *agent.RunResult {
+func (r *Runner) failedResult(req *agent.RequestContext, startedAt time.Time, err error, metadata map[string]any) *agent.RunResult {
 	status := agent.RunStatusFailed
-	eventType := events.EventFailed
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		status = agent.RunStatusCancelled
-		eventType = events.EventCancelled
 	}
 	message := ""
 	if err != nil {
 		message = err.Error()
 	}
-	_ = emitter.Emit(ctx, &events.Event{
-		Type:    eventType,
-		Content: message,
-	})
 	return &agent.RunResult{
 		RunID:       req.RunID,
 		TraceID:     req.TraceID,

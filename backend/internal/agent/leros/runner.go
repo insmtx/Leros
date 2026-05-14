@@ -3,7 +3,6 @@ package leros
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -98,10 +97,6 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt time.Time) (*agent.RunResult, error) {
 	req := state.req
 
-	if err := emitRunEvent(ctx, state.emitter, req, events.EventStarted, nil); err != nil {
-		return nil, err
-	}
-
 	chatModel, err := einoadapter.NewChatModel(ctx, &config.LLMConfig{
 		Provider: req.Model.Provider,
 		APIKey:   req.Model.APIKey,
@@ -109,7 +104,6 @@ func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt ti
 		BaseURL:  req.Model.BaseURL,
 	})
 	if err != nil {
-		emitRunError(ctx, state.emitter, req, err)
 		return nil, err
 	}
 
@@ -122,7 +116,6 @@ func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt ti
 		MaxStep:      state.maxStep,
 	})
 	if err != nil {
-		emitRunError(ctx, state.emitter, req, err)
 		return nil, err
 	}
 
@@ -149,7 +142,6 @@ func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt ti
 		}
 	}
 	if err != nil {
-		emitRunError(ctx, state.emitter, req, err)
 		return nil, err
 	}
 	if resultMessage == "" && message != nil {
@@ -164,16 +156,6 @@ func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt ti
 		Usage:       usage,
 		StartedAt:   startedAt,
 		CompletedAt: time.Now().UTC(),
-	}
-
-	if usage != nil {
-		_ = state.emitter.Emit(ctx, &events.Event{
-			Type:    events.EventUsage,
-			Content: eventContentJSON(usage),
-		})
-	}
-	if err := emitRunEvent(ctx, state.emitter, req, events.EventCompleted, result); err != nil {
-		return nil, err
 	}
 
 	logs.InfoContextf(ctx, "Leros runtime final LLM result: run_id=%s actor=%s result=%s",
@@ -296,34 +278,6 @@ func sinkForRequest(req *agent.RequestContext) events.Sink {
 		return events.NewNoopSink()
 	}
 	return req.EventSink
-}
-
-func emitRunEvent(ctx context.Context, emitter *events.Emitter, req *agent.RequestContext, eventType events.EventType, result *agent.RunResult) error {
-	event := &events.Event{Type: eventType}
-	if result != nil {
-		event.Content = result.Message
-	}
-	_ = emitter.Emit(ctx, event)
-	return nil
-}
-
-func emitRunError(ctx context.Context, emitter *events.Emitter, req *agent.RequestContext, err error) {
-	eventType := events.EventFailed
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		eventType = events.EventCancelled
-	}
-	_ = emitter.Emit(ctx, &events.Event{
-		Type:    eventType,
-		Content: err.Error(),
-	})
-}
-
-func eventContentJSON(value interface{}) string {
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Sprintf("%v", value)
-	}
-	return string(encoded)
 }
 
 func usageFromResponseMeta(meta *einoschema.ResponseMeta) *events.UsagePayload {

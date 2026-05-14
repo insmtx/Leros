@@ -2,6 +2,7 @@ package claude
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -90,6 +91,36 @@ func TestParseClaudeLineTracksAssistantFallback(t *testing.T) {
 	}
 }
 
+func TestParseClaudeLineEmitsToolCallStarted(t *testing.T) {
+	state := &claudeStreamState{}
+	event := parseClaudeLine(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"call_123","name":"Bash","input":{"command":"date","description":"查询当前系统时间"}}]}}`, state)
+	if event.Type != events.EventToolCallStarted {
+		t.Fatalf("unexpected event type: %#v", event)
+	}
+
+	content := decodeEventContent(t, event.Content)
+	if content["call_id"] != "call_123" || content["name"] != "Bash" {
+		t.Fatalf("unexpected tool call content: %#v", content)
+	}
+	args, ok := content["arguments"].(map[string]any)
+	if !ok || args["command"] != "date" {
+		t.Fatalf("unexpected tool call arguments: %#v", content["arguments"])
+	}
+}
+
+func TestParseClaudeLineEmitsToolCallCompleted(t *testing.T) {
+	state := &claudeStreamState{toolNames: map[string]string{"call_123": "Bash"}}
+	event := parseClaudeLine(`{"type":"user","message":{"role":"user","content":[{"tool_use_id":"call_123","type":"tool_result","content":"Thu May 14 14:19:24 CST 2026","is_error":false}]}}`, state)
+	if event.Type != events.EventToolCallCompleted {
+		t.Fatalf("unexpected event type: %#v", event)
+	}
+
+	content := decodeEventContent(t, event.Content)
+	if content["tool_call_id"] != "call_123" || content["name"] != "Bash" || content["result"] != "Thu May 14 14:19:24 CST 2026" || content["is_error"] != false {
+		t.Fatalf("unexpected tool result content: %#v", content)
+	}
+}
+
 func TestClaudeFailureContentPrefersClaudeResult(t *testing.T) {
 	err := errors.New("exit status 1")
 	state := &claudeStreamState{result: "authentication failed"}
@@ -116,4 +147,13 @@ func firstNonEmptyEnv(keys ...string) string {
 		}
 	}
 	return ""
+}
+
+func decodeEventContent(t *testing.T, content string) map[string]any {
+	t.Helper()
+	var decoded map[string]any
+	if err := json.Unmarshal([]byte(content), &decoded); err != nil {
+		t.Fatalf("decode event content: %v", err)
+	}
+	return decoded
 }

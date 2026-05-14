@@ -30,13 +30,34 @@ func newRunner(delegate agent.Runner, builder *ContextBuilder, toolAvailability 
 }
 
 // Run 构建统一上下文、执行具体运行时，并在结束后触发自我学习检查。
-func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {
-	startedAt := time.Now()
+func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (result *agent.RunResult, runErr error) {
+	startedAt := time.Now().UTC()
+	emitter := NewRunEventEmitter()
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			result, runErr = emitter.EmitPanic(ctx, req, startedAt, recovered)
+		}
+	}()
+
+	result, runErr = r.run(ctx, req, startedAt, emitter)
+	return result, runErr
+}
+
+func (r *Runner) run(ctx context.Context, req *agent.RequestContext, startedAt time.Time, emitter *RunEventEmitter) (*agent.RunResult, error) {
 	if r == nil || r.delegate == nil {
-		return nil, fmt.Errorf("lifecycle delegate runner is required")
+		return emitter.EmitFailed(ctx, req, startedAt, RunPhasePrepare, fmt.Errorf("delegate runner is required"), nil)
 	}
 	if r.builder == nil {
-		return nil, fmt.Errorf("lifecycle context builder is required")
+		return emitter.EmitFailed(ctx, req, startedAt, RunPhasePrepare, fmt.Errorf("context builder is required"), nil)
+	}
+
+	recorder := &traceRecorder{}
+	if req != nil {
+		req.EventSink = wrapSink(req.EventSink, recorder)
+	}
+	emitter.setSequence(recorder.nextSeq)
+	if err := emitter.EmitStarted(ctx, req); err != nil {
+		return emitter.EmitFailed(ctx, req, startedAt, RunPhasePrepare, err, nil)
 	}
 
 	logs.InfoContextf(ctx, "Agent lifecycle run started: run_id=%s trace_id=%s task_id=%s runtime=%s assistant_id=%s input_type=%s",
@@ -52,7 +73,7 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 	if err != nil {
 		logs.WarnContextf(ctx, "Agent lifecycle context prepare failed: run_id=%s trace_id=%s error=%v",
 			requestRunID(req), requestTraceID(req), err)
-		return nil, err
+		return emitter.EmitFailed(ctx, req, startedAt, RunPhasePrepare, err, nil)
 	}
 	logs.InfoContextf(ctx, "Agent lifecycle context prepared: run_id=%s trace_id=%s system_prompt_len=%d skills=%d tools=%d messages=%d attachments=%d",
 		prepared.RunID,
@@ -67,7 +88,7 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 	if err := EnsureModelConfig(ctx, prepared); err != nil {
 		logs.WarnContextf(ctx, "Agent lifecycle model config failed: run_id=%s trace_id=%s model_id=%d error=%v",
 			prepared.RunID, prepared.TraceID, prepared.Model.ID, err)
-		return nil, err
+		return emitter.EmitFailed(ctx, prepared, startedAt, RunPhaseModel, err, nil)
 	}
 	logs.InfoContextf(ctx, "Agent lifecycle model config ready: run_id=%s trace_id=%s model_id=%d provider=%s model=%s base_url_set=%t",
 		prepared.RunID,
@@ -78,19 +99,23 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 		prepared.Model.BaseURL != "",
 	)
 
-	recorder := &traceRecorder{}
-	prepared.EventSink = wrapSink(prepared.EventSink, recorder)
-
 	delegateStartedAt := time.Now()
 	logs.InfoContextf(ctx, "Agent lifecycle delegate run started: run_id=%s trace_id=%s runtime=%s",
 		prepared.RunID, prepared.TraceID, prepared.Runtime.Kind)
+		
 	result, runErr := r.delegate.Run(ctx, prepared)
 	if runErr != nil {
 		logs.WarnContextf(ctx, "Agent lifecycle delegate run failed: run_id=%s trace_id=%s elapsed=%s error=%v",
 			prepared.RunID, prepared.TraceID, time.Since(delegateStartedAt), runErr)
+		result, runErr = emitter.EmitFailed(ctx, prepared, startedAt, RunPhaseRuntime, runErr, metadataFromResult(result))
 	} else {
 		logs.InfoContextf(ctx, "Agent lifecycle delegate run completed: run_id=%s trace_id=%s status=%s elapsed=%s",
 			prepared.RunID, prepared.TraceID, resultStatus(result), time.Since(delegateStartedAt))
+		if err := emitter.EmitSucceeded(ctx, prepared, result); err != nil {
+			logs.WarnContextf(ctx, "Agent lifecycle success event emit failed: run_id=%s trace_id=%s error=%v",
+				prepared.RunID, prepared.TraceID, err)
+			return result, err
+		}
 	}
 
 	if err := r.AfterRunLearning(ctx, prepared, result, recorder.trace()); err != nil {
@@ -150,4 +175,15 @@ func resultStatus(result *agent.RunResult) agent.RunStatus {
 		return ""
 	}
 	return result.Status
+}
+
+func metadataFromResult(result *agent.RunResult) map[string]any {
+	if result == nil || result.Metadata == nil {
+		return nil
+	}
+	metadata := make(map[string]any, len(result.Metadata))
+	for key, value := range result.Metadata {
+		metadata[key] = value
+	}
+	return metadata
 }

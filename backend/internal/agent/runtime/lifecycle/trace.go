@@ -23,6 +23,7 @@ type traceRecorder struct {
 	toolFailures  int
 	toolNames     []string
 	usedSkillTool bool
+	maxSeq        int64
 }
 
 func (r *traceRecorder) observe(event *events.Event) {
@@ -31,6 +32,10 @@ func (r *traceRecorder) observe(event *events.Event) {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	if event.Seq > r.maxSeq {
+		r.maxSeq = event.Seq
+	}
 
 	switch event.Type {
 	case events.EventToolCallStarted:
@@ -44,6 +49,17 @@ func (r *traceRecorder) observe(event *events.Event) {
 	case events.EventToolCallFailed:
 		r.toolFailures++
 	}
+}
+
+func (r *traceRecorder) nextSeq() int64 {
+	if r == nil {
+		return 1
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.maxSeq++
+	return r.maxSeq
 }
 
 func (r *traceRecorder) trace() *RunTrace {

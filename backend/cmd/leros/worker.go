@@ -189,6 +189,7 @@ func startWorkerMCPServer(addr string) (*http.Server, error) {
 	}
 
 	r := gin.New()
+	r.GET("/health", workerHealth)
 	v1 := r.Group("/v1")
 	runtimemcp.RegisterRoutes(v1, runtimemcp.NewServer())
 
@@ -205,4 +206,31 @@ func startWorkerMCPServer(addr string) (*http.Server, error) {
 	}()
 
 	return server, nil
+}
+
+type workerHealthResponse struct {
+	Status   string `json:"status"`
+	Healthy  bool   `json:"healthy"`
+	OrgID    uint   `json:"org_id"`
+	WorkerID uint   `json:"worker_id"`
+}
+
+func workerHealth(c *gin.Context) {
+	orgID := identity.OrgID()
+	workerID := identity.WorkerID()
+	healthy := orgID != 0 && workerID != 0
+
+	status := "healthy"
+	code := http.StatusOK
+	if !healthy {
+		status = "unhealthy"
+		code = http.StatusServiceUnavailable
+	}
+
+	c.JSON(code, workerHealthResponse{
+		Status:   status,
+		Healthy:  healthy,
+		OrgID:    orgID,
+		WorkerID: workerID,
+	})
 }
