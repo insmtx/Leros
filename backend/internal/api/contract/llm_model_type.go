@@ -52,18 +52,18 @@ type UpdateLLMModelRequest struct {
 
 // ListLLMModelsRequest 查询LLM模型配置列表请求
 type ListLLMModelsRequest struct {
-	Provider *string `json:"provider,omitempty" form:"provider,omitempty"`
-	Status   *string `json:"status,omitempty" form:"status,omitempty"`
-	Keyword  *string `json:"keyword,omitempty" form:"keyword,omitempty"`
-	Page     int     `json:"page,omitempty" form:"page,default=1"`
-	PerPage  int     `json:"per_page,omitempty" form:"per_page,default=20"`
+	Provider *string `json:"provider,omitempty"`
+	Status   *string `json:"status,omitempty"`
+	Keyword  *string `json:"keyword,omitempty"`
+	Pagination
 }
 
 // LLMModelList LLM模型配置列表响应
 type LLMModelList struct {
-	Total int64      `json:"total"`
-	Page  int        `json:"page"`
-	Items []LLMModel `json:"items"`
+	Total  int64      `json:"total"`
+	Offset int        `json:"offset"`
+	Limit  int        `json:"limit"`
+	Items  []LLMModel `json:"items"`
 }
 
 // TestLLMModelRequest 测试LLM模型配置请求

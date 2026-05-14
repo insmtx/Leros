@@ -25,13 +25,12 @@ type UpdateSessionRequest struct {
 
 // ListSessionsRequest 查询会话列表请求
 type ListSessionsRequest struct {
-	Type          *string `form:"type,omitempty"`
-	Status        *string `form:"status,omitempty"`
-	AssistantID   *uint   `form:"assistant_id,omitempty"`
-	AssistantCode *string `form:"assistant_code,omitempty"`
-	Keyword       *string `form:"keyword,omitempty"`
-	Page          int     `form:"page,default=1"`
-	PerPage       int     `form:"per_page,default=20"`
+	Type          *string `json:"type,omitempty"`
+	Status        *string `json:"status,omitempty"`
+	AssistantID   *uint   `json:"assistant_id,omitempty"`
+	AssistantCode *string `json:"assistant_code,omitempty"`
+	Keyword       *string `json:"keyword,omitempty"`
+	Pagination
 }
 
 // AddMessageRequest 添加消息请求
@@ -85,9 +84,10 @@ type SessionMessage struct {
 
 // SessionList 会话列表响应
 type SessionList struct {
-	Total int64     `json:"total"`
-	Page  int       `json:"page"`
-	Items []Session `json:"items"`
+	Total  int64     `json:"total"`
+	Offset int       `json:"offset"`
+	Limit  int       `json:"limit"`
+	Items  []Session `json:"items"`
 }
 
 // MessageList 消息列表响应

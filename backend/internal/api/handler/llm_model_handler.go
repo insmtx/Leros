@@ -213,6 +213,8 @@ func (h *LLMModelHandler) ListLLMModels(ctx *gin.Context) {
 		return
 	}
 
+	req.Pagination.Fill()
+
 	result, err := h.service.ListLLMModels(ctx, &req)
 	if err != nil {
 		handleLLMModelServiceError(ctx, err)

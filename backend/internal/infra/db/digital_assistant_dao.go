@@ -65,7 +65,7 @@ func DigitalAssistantCodeExists(ctx context.Context, db *gorm.DB, code string, e
 }
 
 // ListDigitalAssistant 分页查询数字助手列表
-func ListDigitalAssistant(ctx context.Context, db *gorm.DB, orgID *uint, ownerID *uint, status *string, keyword *string, page, perPage int) ([]*types.DigitalAssistant, int64, error) {
+func ListDigitalAssistant(ctx context.Context, db *gorm.DB, orgID *uint, ownerID *uint, status *string, keyword *string, offset, limit int) ([]*types.DigitalAssistant, int64, error) {
 	var entities []*types.DigitalAssistant
 	var total int64
 
@@ -89,8 +89,7 @@ func ListDigitalAssistant(ctx context.Context, db *gorm.DB, orgID *uint, ownerID
 		return nil, 0, err
 	}
 
-	offset := (page - 1) * perPage
-	err = query.Offset(offset).Limit(perPage).Order("created_at DESC").Find(&entities).Error
+	err = query.Offset(offset).Limit(limit).Order("created_at DESC").Find(&entities).Error
 	if err != nil {
 		return nil, 0, err
 	}
