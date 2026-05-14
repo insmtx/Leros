@@ -329,8 +329,7 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID uint, req *co
 		assignedAssistantID := s.inferrer.InferAssignedAssistantID(ctx, orgID, session.Type)
 		if assignedAssistantID > 0 {
 			session.AllocatedAssistantID = assignedAssistantID
-			session.UpdatedAt = time.Now()
-			if err := db.UpdateSession(ctx, s.db, session); err != nil {
+			if err := db.UpdateAllocatedAssistantID(ctx, s.db, session.ID, assignedAssistantID); err != nil {
 				return nil, fmt.Errorf("failed to update allocated_assistant_id: %w", err)
 			}
 		}

@@ -357,7 +357,7 @@ Execution Engine：执行逻辑 → 决定如何执行
 ```go
 package agent
 
-type AgentRuntime interface {
+type Runner interface {
     Run(ctx context.Context, req *RequestContext) (*RunResult, error)
 }
 ```
@@ -366,9 +366,7 @@ type AgentRuntime interface {
 
 ```
 internal/agent/
-├── runtime.go           # Agent Runtime 接口
-├── agent.go             # Agent 核心实现
-├── types.go             # 类型定义（RequestContext, RunResult）
+├── types.go             # 类型定义（Runner, RequestContext, RunResult）
 ├── config.go            # 配置管理
 ├── state.go             # 状态管理
 ├── skills_prompt.go     # Skills Prompt 注入
