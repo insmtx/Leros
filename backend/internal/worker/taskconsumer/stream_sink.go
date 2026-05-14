@@ -60,6 +60,9 @@ func (s *MQStreamSink) Emit(ctx context.Context, event *events.Event) error {
 	if err := s.publisher.PublishRealtime(ctx, topic, msg); err != nil {
 		logs.WarnContextf(ctx, "Failed to publish worker stream event to %s: %v", topic, err)
 	}
+	if msg.Body.Event == events.StreamEventRunCompleted || msg.Body.Event == events.StreamEventRunFailed {
+		s.emitCompleted(ctx, msg)
+	}
 	return nil
 }
 
@@ -74,6 +77,20 @@ func (s *MQStreamSink) streamTopic() string {
 		return ""
 	}
 	return t
+}
+
+func (s *MQStreamSink) emitCompleted(ctx context.Context, msg events.MessageStreamMessage) {
+	if s.task.Route.SessionID == "" {
+		return
+	}
+	topic, err := dm.SessionCompletedTopic(s.task.Route.OrgID, s.task.Route.SessionID)
+	if err != nil {
+		logs.WarnContextf(ctx, "Failed to get session completed topic for stream sink: %v", err)
+		return
+	}
+	if err := s.publisher.PublishRealtime(ctx, topic, msg); err != nil {
+		logs.WarnContextf(ctx, "Failed to publish worker completed event to %s: %v", topic, err)
+	}
 }
 
 func streamEventType(eventType events.EventType) events.StreamEventType {

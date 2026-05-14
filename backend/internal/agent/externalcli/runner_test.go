@@ -90,7 +90,7 @@ func TestRunnerStoresProviderSessionAndResumes(t *testing.T) {
 	}
 }
 
-func TestRunnerPreallocatesClaudeProviderSession(t *testing.T) {
+func TestRunnerDoesNotPreallocateClaudeProviderSession(t *testing.T) {
 	SetDefaultProviderSessionStore(NewInMemoryProviderSessionStore())
 	engine := &fakeEngine{result: "done"}
 	runner, err := NewRunner(engines.EngineClaude, engine)
@@ -115,8 +115,53 @@ func TestRunnerPreallocatesClaudeProviderSession(t *testing.T) {
 	if engine.runReq.Resume {
 		t.Fatal("first claude run should not resume")
 	}
-	if engine.runReq.SessionID == "" {
-		t.Fatal("expected preallocated claude provider session id")
+	if engine.runReq.SessionID != "" {
+		t.Fatalf("first claude run should use CLI-generated provider session, got %q", engine.runReq.SessionID)
+	}
+}
+
+func TestRunnerForwardsExternalToolEvents(t *testing.T) {
+	SetDefaultProviderSessionStore(NewInMemoryProviderSessionStore())
+	engine := &fakeEngine{
+		events: []events.Event{
+			{Type: events.EventStarted},
+			{Type: events.EventToolCallStarted, Content: `{"call_id":"call_123","name":"Bash","arguments":{"command":"date"}}`},
+			{Type: events.EventToolCallCompleted, Content: `{"tool_call_id":"call_123","name":"Bash","result":"Thu May 14 14:19:24 CST 2026","is_error":false}`},
+			{Type: events.EventResult, Content: "done"},
+			{Type: events.EventCompleted},
+		},
+	}
+	runner, err := NewRunner(engines.EngineClaude, engine)
+	if err != nil {
+		t.Fatalf("new runner: %v", err)
+	}
+
+	var emitted []events.Event
+	sink := events.SinkFunc(func(_ context.Context, event *events.Event) error {
+		emitted = append(emitted, *event)
+		return nil
+	})
+	result, err := runner.Run(context.Background(), &agent.RequestContext{
+		RunID:     "run_tool_events",
+		TraceID:   "trace_tool_events",
+		EventSink: sink,
+		Input: agent.InputContext{
+			Type: agent.InputTypeMessage,
+			Text: "hello",
+		},
+		Runtime: agent.RuntimeOptions{WorkDir: "/tmp"},
+	})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if result.Message != "done" {
+		t.Fatalf("expected result done, got %q", result.Message)
+	}
+	if !hasEvent(emitted, events.EventToolCallStarted) {
+		t.Fatalf("expected forwarded tool_call.started, got %#v", emitted)
+	}
+	if !hasEvent(emitted, events.EventToolCallCompleted) {
+		t.Fatalf("expected forwarded tool_call.completed, got %#v", emitted)
 	}
 }
 
@@ -124,6 +169,7 @@ type fakeEngine struct {
 	runReq            engines.RunRequest
 	result            string
 	providerSessionID string
+	events            []events.Event
 }
 
 func (e *fakeEngine) Prepare(_ context.Context, _ engines.PrepareRequest) error {
@@ -136,15 +182,32 @@ func (e *fakeEngine) RegisterMCP(_ context.Context, _ engines.MCPServerConfig) e
 
 func (e *fakeEngine) Run(_ context.Context, req engines.RunRequest) (*engines.RunHandle, error) {
 	e.runReq = req
-	eventChan := make(chan events.Event, 4)
-	eventChan <- events.Event{Type: events.EventStarted}
+	eventList := e.events
+	if len(eventList) == 0 {
+		eventList = []events.Event{
+			{Type: events.EventStarted},
+			{Type: events.EventResult, Content: e.result},
+			{Type: events.EventCompleted},
+		}
+	}
+	eventChan := make(chan events.Event, len(eventList)+1)
 	if e.providerSessionID != "" {
 		eventChan <- events.Event{Type: engines.EventProviderSessionStarted, Content: e.providerSessionID}
 	}
-	eventChan <- events.Event{Type: events.EventResult, Content: e.result}
-	eventChan <- events.Event{Type: events.EventCompleted}
+	for _, event := range eventList {
+		eventChan <- event
+	}
 	close(eventChan)
 	return &engines.RunHandle{
 		Events: eventChan,
 	}, nil
+}
+
+func hasEvent(eventList []events.Event, eventType events.EventType) bool {
+	for _, event := range eventList {
+		if event.Type == eventType {
+			return true
+		}
+	}
+	return false
 }
