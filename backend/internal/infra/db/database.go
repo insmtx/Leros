@@ -17,7 +17,7 @@ import (
 )
 
 // dbName 是数据库名称常量
-const dbName = "singer"
+const dbName = "leros"
 
 // InitDB 创建并初始化数据库连接
 //
@@ -109,7 +109,7 @@ func InitDevData(db *gorm.DB, llmCfg *config.LLMConfig) error {
 			GithubID:    0,
 			GithubLogin: "admin",
 			Name:        "Admin User",
-			Email:       "admin@singer.local",
+			Email:       "admin@leros.local",
 			Password:    string(hashedPassword),
 		}
 		if err := db.Create(defaultUser).Error; err != nil {

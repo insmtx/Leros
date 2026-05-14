@@ -47,7 +47,7 @@ sleep 5
 for service in postgresql nats redis; do
     echo -n "Checking $service... "
     for i in {1..30}; do
-        status=$(docker inspect --format='{{.State.Health.Status}}' singer-dev-$service 2>/dev/null || echo "starting")
+        status=$(docker inspect --format='{{.State.Health.Status}}' leros-dev-$service 2>/dev/null || echo "starting")
         if [ "$status" = "healthy" ]; then
             echo -e "${GREEN}healthy${NC}"
             break

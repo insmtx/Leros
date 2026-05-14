@@ -18,5 +18,5 @@ nats:
 
 # database:
 #   driver: postgres
-#   url: "host=localhost user=singer password=singer dbname=singer port=5432 sslmode=disable"
+#   url: "host=localhost user=leros password=leros dbname=leros port=5432 sslmode=disable"
 #   debug: false

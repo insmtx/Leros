@@ -221,7 +221,7 @@ const (
 
 ```bash
 # 构建主服务
-go build -o ./bundles/singer ./backend/cmd/singer/main.go
+go build -o ./bundles/leros ./backend/cmd/leros/main.go
 ```
 
 ### 单元测试
@@ -251,7 +251,7 @@ docker-compose up -d
 # 在连接的 GitHub 仓库创建 PR
 
 # 4. 查看日志
-docker-compose logs -f singer
+docker-compose logs -f leros
 
 # 5. 验证 PR Review
 # 在 GitHub PR 页面查看 AI Review

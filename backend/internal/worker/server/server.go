@@ -96,7 +96,7 @@ func (s *WorkerManager) handleWorkerWebSocket(c *gin.Context) {
 	logs.Infof("Worker %s registered", workerID)
 
 	welcomeMsg, err := wsproto.NewPayload(wsproto.MsgTypeWelcome, wsproto.WelcomePayload{
-		Message:  "Connected to SingerOS worker server",
+		Message:  "Connected to Leros worker server",
 		WorkerID: workerID,
 	})
 	if err != nil {

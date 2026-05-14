@@ -14,7 +14,7 @@ import (
 func TestNewDockerCLIScheduler(t *testing.T) {
 	cfg := &config.SchedulerConfig{
 		Mode:       "docker-cli",
-		WorkingDir: "/tmp/singer-os",
+		WorkingDir: "/tmp/leros",
 	}
 
 	scheduler := NewDockerCLIScheduler(cfg)
@@ -76,7 +76,7 @@ func TestContainerName(t *testing.T) {
 
 func TestContainerWorkingDir(t *testing.T) {
 	cfg := &config.SchedulerConfig{
-		WorkingDir: "/tmp/singer-os",
+		WorkingDir: "/tmp/leros",
 	}
 	scheduler := NewDockerCLIScheduler(cfg).(*DockerCLIScheduler)
 
@@ -88,12 +88,12 @@ func TestContainerWorkingDir(t *testing.T) {
 		{
 			name:     "simple worker id",
 			workerID: "worker123",
-			want:     "/tmp/singer-os/workspace/worker123",
+			want:     "/tmp/leros/workspace/worker123",
 		},
 		{
 			name:     "worker id with special chars",
 			workerID: "worker-456_test",
-			want:     "/tmp/singer-os/workspace/worker-456_test",
+			want:     "/tmp/leros/workspace/worker-456_test",
 		},
 	}
 

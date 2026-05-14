@@ -75,11 +75,11 @@ func (s *Service) buildRouter(ctx context.Context, opts Options) (agent.Runner, 
 	cliNames := []string{}
 
 	logs.Info("Registering Leros agent runtime")
-	singerRunner, err := leros.NewRunner(ctx, s.env)
+	lerosRunner, err := leros.NewRunner(ctx, s.env)
 	if err != nil {
 		return nil, err
 	}
-	if err := router.Register(agent.RuntimeKindLeros, singerRunner); err != nil {
+	if err := router.Register(agent.RuntimeKindLeros, lerosRunner); err != nil {
 		return nil, err
 	}
 	registered++

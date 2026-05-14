@@ -102,7 +102,7 @@ func (r *Runner) run(ctx context.Context, req *agent.RequestContext, startedAt t
 	delegateStartedAt := time.Now()
 	logs.InfoContextf(ctx, "Agent lifecycle delegate run started: run_id=%s trace_id=%s runtime=%s",
 		prepared.RunID, prepared.TraceID, prepared.Runtime.Kind)
-		
+
 	result, runErr := r.delegate.Run(ctx, prepared)
 	if runErr != nil {
 		logs.WarnContextf(ctx, "Agent lifecycle delegate run failed: run_id=%s trace_id=%s elapsed=%s error=%v",
