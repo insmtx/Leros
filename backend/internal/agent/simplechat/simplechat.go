@@ -14,7 +14,7 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
-var _ agent.AgentRuntime = (*SimpleChat)(nil)
+var _ agent.Runner = (*SimpleChat)(nil)
 
 type SimpleChat struct {
 	chatModel    einomodel.ToolCallingChatModel
