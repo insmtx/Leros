@@ -43,6 +43,7 @@ type WorkerTaskBody struct {
 	Execution ExecutionTarget `json:"execution"`
 	Input     TaskInput       `json:"input"`
 
+	Model   ModelOptions   `json:"model,omitempty"`
 	Runtime RuntimeOptions `json:"runtime,omitempty"`
 	Policy  TaskPolicy     `json:"policy,omitempty"`
 }
@@ -85,6 +86,11 @@ type Attachment struct {
 	Name     string `json:"name,omitempty"`
 	MimeType string `json:"mime_type,omitempty"`
 	URL      string `json:"url,omitempty"`
+}
+
+// ModelOptions carries the requested persisted model configuration.
+type ModelOptions struct {
+	ID uint `json:"id,omitempty"`
 }
 
 // RuntimeOptions controls the execution parameters for Worker Runtime.

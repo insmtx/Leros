@@ -14,6 +14,7 @@ import (
 	runtimemcp "github.com/insmtx/Leros/backend/internal/agent/runtime/mcp"
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/internal/worker/identity"
 	"github.com/insmtx/Leros/backend/internal/worker/taskconsumer"
 	"github.com/spf13/cobra"
 	"github.com/ygpkg/yg-go/lifecycle"
@@ -96,6 +97,7 @@ func runTaskWorker(defaultRuntime string) {
 	} else {
 		logs.Warn("No database configuration provided for worker")
 	}
+	identity.Set(cfg.OrgID, cfg.WorkerID)
 
 	mcpServer, err := startWorkerMCPServer(workerListenAddr)
 	if err != nil {
@@ -116,7 +118,6 @@ func runTaskWorker(defaultRuntime string) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	runtimeService, err := agentruntime.NewService(ctx, agentruntime.Options{
-		LLMConfig:      cfg.LLM,
 		CLIConfig:      cfg.CLI,
 		ToolsEnabled:   true,
 		DefaultRuntime: defaultRuntime,
@@ -167,6 +168,12 @@ func validateTaskWorkerConfig(cfg *config.WorkerConfig) error {
 	}
 	if cfg.WorkerID == 0 {
 		return fmt.Errorf("worker.worker_id is required")
+	}
+	if cfg.OrgID == 0 {
+		return fmt.Errorf("worker.org_id is required")
+	}
+	if cfg.Database == nil || strings.TrimSpace(cfg.Database.URL) == "" {
+		return fmt.Errorf("worker.database.url is required")
 	}
 	return nil
 }

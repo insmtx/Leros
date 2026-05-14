@@ -56,7 +56,7 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Pr
 
 	cmd := exec.CommandContext(execCtx, inv.binary, args...)
 	cmd.Dir = req.WorkDir
-	cmd.Env = engines.BuildRunEnv(inv.baseEnv, req.ExtraEnv, req.Model)
+	cmd.Env = engines.BuildRunEnv(inv.baseEnv, req.ExtraEnv, codexModelEnv(req.Model))
 	if !resume {
 		cmd.Stdin = strings.NewReader(req.Prompt)
 	}
@@ -106,6 +106,15 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Pr
 	}()
 
 	return proc, evtChan, nil
+}
+
+func codexModelEnv(model engines.ModelConfig) map[string]string {
+	baseURL := ensureV1Suffix(model.BaseURL)
+	return map[string]string{
+		"OPENAI_API_KEY":  model.APIKey,
+		"OPENAI_API_BASE": baseURL,
+		"OPENAI_BASE_URL": baseURL,
+	}
 }
 
 func scanStdout(ctx context.Context, r interface{ Read([]byte) (int, error) }, evtChan chan<- events.Event) {
@@ -224,31 +233,30 @@ func buildArgs(threadID string, resume bool, req engines.RunRequest) []string {
 	return append(args, "-", "--json", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox")
 }
 
-func singerProviderConfigArgs(req engines.RunRequest) []string {
-	baseURL := firstNonEmptyString(
-		req.Model.BaseURL,
-		envValue(req.ExtraEnv, "OPENAI_API_BASE"),
-		envValue(req.ExtraEnv, "OPENAI_BASE_URL"),
-		os.Getenv("OPENAI_API_BASE"),
-		os.Getenv("OPENAI_BASE_URL"),
-	)
-	return []string{
-		"-c", `model_provider="singer"`,
-		"-c", `model_providers.singer.name="singer"`,
-		"-c", fmt.Sprintf(`model_providers.singer.base_url=%q`, baseURL),
-		"-c", `model_providers.singer.env_key="OPENAI_API_KEY"`,
-		"-c", `model_providers.singer.wire_api="chat"`,
+// ensureV1Suffix 确保 URL 以 /v1 结尾。
+func ensureV1Suffix(url string) string {
+	if url == "" {
+		return url
 	}
+	if !strings.HasSuffix(url, "/v1") {
+		url = strings.TrimSuffix(url, "/") + "/v1"
+	}
+	return url
 }
 
-func envValue(entries []string, key string) string {
-	prefix := key + "="
-	for _, entry := range entries {
-		if strings.HasPrefix(entry, prefix) {
-			return strings.TrimPrefix(entry, prefix)
-		}
+func singerProviderConfigArgs(req engines.RunRequest) []string {
+	baseURL := ensureV1Suffix(firstNonEmptyString(
+		req.Model.BaseURL,
+		os.Getenv("OPENAI_API_BASE"),
+		os.Getenv("OPENAI_BASE_URL"),
+	))
+	return []string{
+		"-c", `model_provider="leros"`,
+		"-c", `model_providers.leros.name="leros"`,
+		"-c", fmt.Sprintf(`model_providers.leros.base_url=%q`, baseURL),
+		"-c", `model_providers.leros.env_key="OPENAI_API_KEY"`,
+		"-c", `model_providers.leros.wire_api="chat"`,
 	}
-	return ""
 }
 
 func firstNonEmptyString(values ...string) string {

@@ -13,25 +13,11 @@ func BuildBaseEnv(extraEnv map[string]string) []string {
 	return builder.slice()
 }
 
-// BuildRunEnv 为 CLI 进程组装环境变量条目，根据不同的模型提供商设置对应的 API 密钥环境变量。
-func BuildRunEnv(baseEnv []string, extraEnv []string, model ModelConfig) []string {
+// BuildRunEnv 为 CLI 进程组装环境变量条目。
+func BuildRunEnv(baseEnv []string, extraEnv []string, modelEnv map[string]string) []string {
 	builder := newEnvBuilder(baseEnv)
 	builder.applyEntries(extraEnv)
-
-	switch strings.ToLower(model.Provider) {
-	case "anthropic", "claude":
-		builder.setIfNotEmpty("ANTHROPIC_API_KEY", model.APIKey)
-		builder.setIfNotEmpty("ANTHROPIC_AUTH_TOKEN", model.APIKey)
-		builder.setIfNotEmpty("ANTHROPIC_BASE_URL", model.BaseURL)
-	case "openai", "codex", "deepseek", "moonshot", "qwen", "zhipu", "":
-		builder.setIfNotEmpty("OPENAI_API_KEY", model.APIKey)
-		builder.setIfNotEmpty("OPENAI_API_BASE", model.BaseURL)
-		builder.setIfNotEmpty("OPENAI_BASE_URL", model.BaseURL)
-	default:
-		builder.setIfNotEmpty("OPENAI_API_KEY", model.APIKey)
-		builder.setIfNotEmpty("OPENAI_BASE_URL", model.BaseURL)
-	}
-
+	builder.applyMap(modelEnv)
 	return builder.slice()
 }
 
@@ -65,14 +51,6 @@ func (b *envBuilder) applyEntries(entries []string) {
 		}
 		b.values[key] = value
 	}
-}
-
-func (b *envBuilder) setIfNotEmpty(key string, value string) {
-	key = strings.TrimSpace(key)
-	if key == "" || value == "" {
-		return
-	}
-	b.values[key] = value
 }
 
 func (b *envBuilder) slice() []string {

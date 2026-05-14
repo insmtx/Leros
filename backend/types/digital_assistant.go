@@ -122,7 +122,7 @@ type RuntimeConfig struct {
 
 // LLMConfig LLM配置定义了大型语言模型的类型和参数
 type LLMConfig struct {
-	// LLM配置 - 类型，LLM提供商类型标识 (如：openai, claude, deepseek等)
+	// LLM配置 - 类型，LLM提供商类型标识 (如：openai, anthropic, deepseek等)
 	Type string `json:"type"` // 建议使用 types.LLMProviderType 定义的常量值
 	// LLM配置 - 配置，LLM相关自定义配置选项
 	// TODO

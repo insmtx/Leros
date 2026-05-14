@@ -170,6 +170,9 @@ func RequestFromWorkerTask(msg events.WorkerTaskMessage) *agent.RequestContext {
 			WorkDir: msg.Body.Runtime.WorkDir,
 			MaxStep: msg.Body.Runtime.MaxStep,
 		},
+		Model: agent.ModelOptions{
+			ID: msg.Body.Model.ID,
+		},
 		Capability: agent.CapabilityContext{
 			AllowedTools: append([]string(nil), msg.Body.Execution.Tools...),
 		},

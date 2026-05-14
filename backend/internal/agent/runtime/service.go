@@ -74,23 +74,16 @@ func (s *Service) buildRouter(ctx context.Context, opts Options) (agent.Runner, 
 	registeredKinds := make(map[string]struct{})
 	cliNames := []string{}
 
-	if opts.LLMConfig != nil && opts.LLMConfig.APIKey != "" {
-		switch opts.LLMConfig.Provider {
-		case "", "openai":
-			logs.Info("Registering Leros agent runtime")
-			singerRunner, err := leros.NewRunner(ctx, opts.LLMConfig, s.env)
-			if err != nil {
-				return nil, err
-			}
-			if err := router.Register(agent.RuntimeKindLeros, singerRunner); err != nil {
-				return nil, err
-			}
-			registered++
-			registeredKinds[agent.RuntimeKindLeros] = struct{}{}
-		default:
-			logs.Warnf("Skipping Leros agent runtime for unsupported Eino chat model provider: %s", opts.LLMConfig.Provider)
-		}
+	logs.Info("Registering Leros agent runtime")
+	singerRunner, err := leros.NewRunner(ctx, s.env)
+	if err != nil {
+		return nil, err
 	}
+	if err := router.Register(agent.RuntimeKindLeros, singerRunner); err != nil {
+		return nil, err
+	}
+	registered++
+	registeredKinds[agent.RuntimeKindLeros] = struct{}{}
 
 	if opts.CLIConfig != nil {
 		cliRegistry, err := builtin.NewRegistryFromConfig(opts.CLIConfig)
@@ -103,7 +96,7 @@ func (s *Service) buildRouter(ctx context.Context, opts Options) (agent.Runner, 
 			if !ok {
 				continue
 			}
-			runner, err := externalcli.NewRunner(name, engine, opts.LLMConfig)
+			runner, err := externalcli.NewRunner(name, engine)
 			if err != nil {
 				return nil, err
 			}
@@ -145,11 +138,5 @@ func (s *Service) selectDefaultRuntime(defaultRuntime string, opts Options, cliN
 	if opts.CLIConfig != nil && strings.TrimSpace(opts.CLIConfig.Default) != "" {
 		return opts.CLIConfig.Default
 	}
-	if opts.LLMConfig != nil && opts.LLMConfig.APIKey != "" {
-		return agent.RuntimeKindLeros
-	}
-	if len(cliNames) > 0 {
-		return cliNames[0]
-	}
-	return ""
+	return agent.RuntimeKindLeros
 }

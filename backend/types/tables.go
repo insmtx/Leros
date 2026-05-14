@@ -30,4 +30,7 @@ const (
 	TableNameSession = tablenamePrefix + "session"
 	// TableNameSessionMessage 会话消息表名
 	TableNameSessionMessage = tablenamePrefix + "session_message"
+
+	// TableNameLLMModel LLM模型配置表名
+	TableNameLLMModel = tablenamePrefix + "llm_model"
 )

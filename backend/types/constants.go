@@ -110,10 +110,18 @@ type LLMProviderType string
 const (
 	// LLMProviderOpenAI 表示OpenAI提供商
 	LLMProviderOpenAI LLMProviderType = "openai"
-	// LLMProviderClaude 表示Anthropic Claude提供商
-	LLMProviderClaude LLMProviderType = "claude"
+	// LLMProviderAnthropic 表示Anthropic提供商
+	LLMProviderAnthropic LLMProviderType = "anthropic"
 	// LLMProviderDeepSeek 表示DeepSeek提供商
 	LLMProviderDeepSeek LLMProviderType = "deepseek"
+	// LLMProviderQwen 表示通义千问提供商
+	LLMProviderQwen LLMProviderType = "qwen"
+	// LLMProviderGemini 表示Google Gemini提供商
+	LLMProviderGemini LLMProviderType = "gemini"
+	// LLMProviderArk 表示火山方舟提供商
+	LLMProviderArk LLMProviderType = "ark"
+	// LLMProviderOpenRouter 表示OpenRouter提供商
+	LLMProviderOpenRouter LLMProviderType = "openrouter"
 	// LLMProviderCustom 表示自定义提供商
 	LLMProviderCustom LLMProviderType = "custom"
 )

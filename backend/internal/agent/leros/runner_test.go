@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/deps"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
@@ -81,7 +80,7 @@ func TestAgentRunRealModel(t *testing.T) {
 		t.Fatalf("new runtime env: %v", err)
 	}
 
-	agt, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, runtimeDeps)
+	agt, err := NewRunner(ctx, runtimeDeps)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
@@ -96,6 +95,7 @@ func TestAgentRunRealModel(t *testing.T) {
 			Type: agent.InputTypeMessage,
 			Text: "Reply with exactly this text: Leros agent runtime ok",
 		},
+		Model:     realModelOptions(apiKey),
 		Runtime:   agent.RuntimeOptions{MaxStep: 2},
 		EventSink: events.NewLogSink(),
 	})
@@ -140,7 +140,7 @@ func TestAgentRunNodeTool(t *testing.T) {
 		t.Fatalf("new runtime env: %v", err)
 	}
 
-	agt, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, runtimeDeps)
+	agt, err := NewRunner(ctx, runtimeDeps)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
@@ -160,6 +160,7 @@ func TestAgentRunNodeTool(t *testing.T) {
 			UserID:  "test-user",
 			Channel: "test",
 		},
+		Model: realModelOptions(apiKey),
 		Input: agent.InputContext{
 			Type: agent.InputTypeMessage,
 			Text: "使用工具查询当前系统时间。",
@@ -221,7 +222,7 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 		t.Fatalf("new runtime env: %v", err)
 	}
 
-	agt, err := NewRunner(ctx, &config.LLMConfig{Provider: "openai", APIKey: apiKey, Model: firstNonEmptyEnv("LEROS_LLM_MODEL"), BaseURL: firstNonEmptyEnv("LEROS_LLM_BASE_URL")}, runtimeDeps)
+	agt, err := NewRunner(ctx, runtimeDeps)
 	if err != nil {
 		t.Fatalf("new agent: %v", err)
 	}
@@ -241,6 +242,7 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 			UserID:  "test-user",
 			Channel: "test",
 		},
+		Model: realModelOptions(apiKey),
 		Input: agent.InputContext{
 			Type: agent.InputTypeTaskInstruction,
 			Text: "使用 weather 这个 skill 来查询上海的天气。",
@@ -276,6 +278,15 @@ func firstNonEmptyEnv(keys ...string) string {
 		}
 	}
 	return ""
+}
+
+func realModelOptions(apiKey string) agent.ModelOptions {
+	return agent.ModelOptions{
+		Provider: "openai",
+		APIKey:   apiKey,
+		Model:    firstNonEmptyEnv("LEROS_LLM_MODEL"),
+		BaseURL:  firstNonEmptyEnv("LEROS_LLM_BASE_URL"),
+	}
 }
 
 func realModelNodeContainerID() string {

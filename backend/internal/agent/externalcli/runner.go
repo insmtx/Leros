@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/engines"
 	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
@@ -20,12 +19,11 @@ import (
 type Runner struct {
 	name         string
 	engine       engines.Engine
-	model        engines.ModelConfig
 	sessionStore ProviderSessionStore
 }
 
 // NewRunner 创建基于外部 CLI 引擎的 Leros runner。
-func NewRunner(name string, engine engines.Engine, llmConfig *config.LLMConfig) (*Runner, error) {
+func NewRunner(name string, engine engines.Engine) (*Runner, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, fmt.Errorf("runtime name is required")
@@ -36,7 +34,6 @@ func NewRunner(name string, engine engines.Engine, llmConfig *config.LLMConfig) 
 	return &Runner{
 		name:         name,
 		engine:       engine,
-		model:        modelFromConfig(llmConfig),
 		sessionStore: DefaultProviderSessionStore(),
 	}, nil
 }
@@ -80,7 +77,7 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 		Resume:      sessionPlan.Resume,
 		WorkDir:     workDir,
 		Prompt:      buildPrompt(req),
-		Model:       modelForRequest(req, r.model),
+		Model:       modelForRequest(req),
 	})
 	if err != nil {
 		return r.failedResult(ctx, emitter, req, startedAt, err, failureMetadata(workDir)), err
@@ -348,28 +345,15 @@ func sinkForRequest(req *agent.RequestContext) events.Sink {
 	return req.EventSink
 }
 
-func modelFromConfig(cfg *config.LLMConfig) engines.ModelConfig {
-	if cfg == nil {
+func modelForRequest(req *agent.RequestContext) engines.ModelConfig {
+	if req == nil {
 		return engines.ModelConfig{}
 	}
-	return engines.ModelConfig{
-		Provider: cfg.Provider,
-		Model:    cfg.Model,
-		APIKey:   cfg.APIKey,
-		BaseURL:  cfg.BaseURL,
-	}
-}
-
-func modelForRequest(req *agent.RequestContext, fallback engines.ModelConfig) engines.ModelConfig {
-	model := fallback
-	if req == nil {
-		return model
-	}
-	if strings.TrimSpace(req.Model.Provider) != "" {
-		model.Provider = req.Model.Provider
-	}
-	if strings.TrimSpace(req.Model.Model) != "" {
-		model.Model = req.Model.Model
+	model := engines.ModelConfig{
+		Provider: req.Model.Provider,
+		Model:    req.Model.Model,
+		APIKey:   req.Model.APIKey,
+		BaseURL:  req.Model.BaseURL,
 	}
 	return model
 }

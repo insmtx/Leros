@@ -25,9 +25,13 @@ const (
 type LLMProviderType string
 
 const (
-	LLMProviderOpenAI   LLMProviderType = "openai"
-	LLMProviderClaude   LLMProviderType = "claude"
-	LLMProviderDeepSeek LLMProviderType = "deepseek"
+	LLMProviderOpenAI     LLMProviderType = "openai"
+	LLMProviderAnthropic  LLMProviderType = "anthropic"
+	LLMProviderDeepSeek   LLMProviderType = "deepseek"
+	LLMProviderQwen       LLMProviderType = "qwen"
+	LLMProviderGemini     LLMProviderType = "gemini"
+	LLMProviderArk        LLMProviderType = "ark"
+	LLMProviderOpenRouter LLMProviderType = "openrouter"
 )
 
 // MemoryType 记忆类型常量
