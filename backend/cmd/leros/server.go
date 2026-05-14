@@ -48,10 +48,9 @@ var serverCmd = &cobra.Command{
 			return
 		}
 
-		var db *gorm.DB
-		if cfg.Database != nil && cfg.Database.URL != "" {
-			var err error
-			db, err = infradb.InitDB(*cfg.Database)
+	var db *gorm.DB
+	if cfg.Database != nil && cfg.Database.URL != "" {
+		db, err = infradb.InitDB(*cfg.Database, cfg.LLM)
 			if err != nil {
 				logs.Fatalf("Failed to initialize database: %v", err)
 				return

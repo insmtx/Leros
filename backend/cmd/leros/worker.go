@@ -85,7 +85,7 @@ func runTaskWorker(defaultRuntime string) {
 	}
 
 	if cfg.Database != nil && cfg.Database.URL != "" {
-		db, err := infradb.InitDB(*cfg.Database)
+		db, err := infradb.InitDB(*cfg.Database, cfg.LLM)
 		if err != nil {
 			logs.Fatalf("Failed to initialize database: %v", err)
 			return
