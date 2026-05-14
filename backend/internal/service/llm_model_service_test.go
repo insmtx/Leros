@@ -66,7 +66,7 @@ func TestCreateLLMModelGeneratesCodeDefaultsNameAndMasksAPIKey(t *testing.T) {
 	if model.Name != "gpt-4o-mini" {
 		t.Fatalf("expected name to default to model, got %q", model.Name)
 	}
-	if model.BaseURL != "https://api.openai.com/v1" {
+	if model.BaseURL != "https://api.openai.com" {
 		t.Fatalf("expected normalized base_url, got %q", model.BaseURL)
 	}
 	if model.APIKey != "sk-***7890" {
@@ -135,7 +135,7 @@ func TestCreateLLMModelTrimsChatCompletionsPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateLLMModel failed: %v", err)
 	}
-	if model.BaseURL != "https://api.openai.com/v1" {
+	if model.BaseURL != "https://api.openai.com" {
 		t.Fatalf("expected normalized base_url in response, got %q", model.BaseURL)
 	}
 
@@ -143,8 +143,50 @@ func TestCreateLLMModelTrimsChatCompletionsPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetLLMModelByID failed: %v", err)
 	}
-	if stored.BaseURL != "https://api.openai.com/v1" {
+	if stored.BaseURL != "https://api.openai.com" {
 		t.Fatalf("expected normalized base_url in database, got %q", stored.BaseURL)
+	}
+}
+
+func TestCreateLLMModelForcesFirstOrgModelDefault(t *testing.T) {
+	service, database := setupLLMModelService(t)
+	ctx := setupTestContextWithCaller(t)
+
+	first, err := service.CreateLLMModel(ctx, &contract.CreateLLMModelRequest{
+		Provider: string(types.LLMProviderOpenAI),
+		Model:    "gpt-4o-mini",
+		BaseURL:  "https://api.openai.com/v1",
+		APIKey:   "sk-test-1234567890",
+	})
+	if err != nil {
+		t.Fatalf("first CreateLLMModel failed: %v", err)
+	}
+	if !first.IsDefault {
+		t.Fatal("expected first org llm model to be forced default")
+	}
+
+	second, err := service.CreateLLMModel(ctx, &contract.CreateLLMModelRequest{
+		Provider: string(types.LLMProviderDeepSeek),
+		Model:    "deepseek-chat",
+		BaseURL:  "https://api.deepseek.com/v1",
+		APIKey:   "sk-test-abcdefgh",
+	})
+	if err != nil {
+		t.Fatalf("second CreateLLMModel failed: %v", err)
+	}
+	if second.IsDefault {
+		t.Fatal("expected non-first org llm model to keep requested default flag")
+	}
+
+	if count := countDefaultLLMModels(t, database, 1); count != 1 {
+		t.Fatalf("expected one default llm model, got %d", count)
+	}
+	storedFirst, err := dbrepo.GetLLMModelByID(ctx, database, first.ID)
+	if err != nil {
+		t.Fatalf("GetLLMModelByID failed: %v", err)
+	}
+	if !storedFirst.IsDefault {
+		t.Fatal("expected first org llm model default flag to be stored")
 	}
 }
 
@@ -323,7 +365,7 @@ func TestUpdateLLMModelTrimsChatCompletionsPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateLLMModel failed: %v", err)
 	}
-	if updated.BaseURL != "https://example.com/v1" {
+	if updated.BaseURL != "https://example.com" {
 		t.Fatalf("expected normalized base_url in response, got %q", updated.BaseURL)
 	}
 
@@ -331,7 +373,7 @@ func TestUpdateLLMModelTrimsChatCompletionsPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetLLMModelByID failed: %v", err)
 	}
-	if stored.BaseURL != "https://example.com/v1" {
+	if stored.BaseURL != "https://example.com" {
 		t.Fatalf("expected normalized base_url in database, got %q", stored.BaseURL)
 	}
 }

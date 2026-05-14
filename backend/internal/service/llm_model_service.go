@@ -71,6 +71,13 @@ func (s *llmModelService) CreateLLMModel(ctx context.Context, req *contract.Crea
 	}
 
 	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if !model.IsDefault {
+			hasModels, err := orgHasLLMModels(ctx, tx, caller.OrgID)
+			if err != nil {
+				return err
+			}
+			model.IsDefault = !hasModels
+		}
 		if model.IsDefault {
 			if err := clearOrgDefaultLLMModels(ctx, tx, caller.OrgID, 0); err != nil {
 				return err
@@ -345,6 +352,14 @@ func clearOrgDefaultLLMModels(ctx context.Context, database *gorm.DB, orgID uint
 		query = query.Where("id != ?", excludeID)
 	}
 	return query.Update("is_default", false).Error
+}
+
+func orgHasLLMModels(ctx context.Context, database *gorm.DB, orgID uint) (bool, error) {
+	var count int64
+	if err := database.WithContext(ctx).Model(&types.LLMModel{}).Where("org_id = ?", orgID).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func convertToContractLLMModel(model *types.LLMModel) *contract.LLMModel {
