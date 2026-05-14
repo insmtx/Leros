@@ -219,7 +219,7 @@ func (s *llmModelService) ListLLMModels(ctx context.Context, req *contract.ListL
 		return nil, err
 	}
 
-	models, total, err := db.ListLLMModels(ctx, s.db, &caller.OrgID, req.Provider, req.Status, req.Keyword, req.Page, req.PerPage)
+	models, total, err := db.ListLLMModels(ctx, s.db, &caller.OrgID, req.Provider, req.Status, req.Keyword, req.Offset, req.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -229,9 +229,10 @@ func (s *llmModelService) ListLLMModels(ctx context.Context, req *contract.ListL
 		items = append(items, *convertToContractLLMModel(model))
 	}
 	return &contract.LLMModelList{
-		Total: total,
-		Page:  req.Page,
-		Items: items,
+		Total:  total,
+		Offset: req.Offset,
+		Limit:  req.Limit,
+		Items:  items,
 	}, nil
 }
 

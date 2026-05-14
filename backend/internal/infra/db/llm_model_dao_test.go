@@ -138,7 +138,7 @@ func TestListLLMModels(t *testing.T) {
 
 	orgID := uint(1)
 	provider := string(types.LLMProviderDeepSeek)
-	items, total, err := ListLLMModels(ctx, database, &orgID, &provider, nil, nil, 1, 20)
+	items, total, err := ListLLMModels(ctx, database, &orgID, &provider, nil, nil, 0, 20)
 	if err != nil {
 		t.Fatalf("ListLLMModels failed: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestListLLMModels(t *testing.T) {
 	}
 
 	keyword := "openai"
-	items, total, err = ListLLMModels(ctx, database, &orgID, nil, nil, &keyword, 1, 20)
+	items, total, err = ListLLMModels(ctx, database, &orgID, nil, nil, &keyword, 0, 20)
 	if err != nil {
 		t.Fatalf("ListLLMModels failed: %v", err)
 	}

@@ -167,8 +167,8 @@ func (s *sessionService) ListSessions(ctx context.Context, req *contract.ListSes
 		req.AssistantID,
 		req.AssistantCode,
 		req.Keyword,
-		req.Page,
-		req.PerPage,
+		req.Offset,
+		req.Limit,
 	)
 	if err != nil {
 		return nil, err
@@ -180,9 +180,10 @@ func (s *sessionService) ListSessions(ctx context.Context, req *contract.ListSes
 	}
 
 	return &contract.SessionList{
-		Total: total,
-		Page:  req.Page,
-		Items: items,
+		Total:  total,
+		Offset: req.Offset,
+		Limit:  req.Limit,
+		Items:  items,
 	}, nil
 }
 

@@ -81,7 +81,7 @@ func ExpireSessions(ctx context.Context, db *gorm.DB) error {
 }
 
 // ListSessions 分页查询会话列表
-func ListSessions(ctx context.Context, db *gorm.DB, sessionType *string, status *string, userID *uint, orgID *uint, assistantID *uint, assistantCode *string, keyword *string, page, perPage int) ([]*types.Session, int64, error) {
+func ListSessions(ctx context.Context, db *gorm.DB, sessionType *string, status *string, userID *uint, orgID *uint, assistantID *uint, assistantCode *string, keyword *string, offset, limit int) ([]*types.Session, int64, error) {
 	var entities []*types.Session
 	var total int64
 
@@ -114,8 +114,7 @@ func ListSessions(ctx context.Context, db *gorm.DB, sessionType *string, status 
 		return nil, 0, err
 	}
 
-	offset := (page - 1) * perPage
-	err = query.Offset(offset).Limit(perPage).Order("created_at DESC").Find(&entities).Error
+	err = query.Offset(offset).Limit(limit).Order("created_at DESC").Find(&entities).Error
 	if err != nil {
 		return nil, 0, err
 	}

@@ -67,7 +67,7 @@ func DeleteLLMModel(ctx context.Context, db *gorm.DB, id uint) error {
 }
 
 // ListLLMModels 分页查询LLM模型配置列表
-func ListLLMModels(ctx context.Context, db *gorm.DB, orgID *uint, provider *string, status *string, keyword *string, page, perPage int) ([]*types.LLMModel, int64, error) {
+func ListLLMModels(ctx context.Context, db *gorm.DB, orgID *uint, provider *string, status *string, keyword *string, offset, limit int) ([]*types.LLMModel, int64, error) {
 	var entities []*types.LLMModel
 	var total int64
 
@@ -92,15 +92,7 @@ func ListLLMModels(ctx context.Context, db *gorm.DB, orgID *uint, provider *stri
 		return nil, 0, err
 	}
 
-	if page <= 0 {
-		page = 1
-	}
-	if perPage <= 0 {
-		perPage = 20
-	}
-
-	offset := (page - 1) * perPage
-	err = query.Offset(offset).Limit(perPage).Order("is_default DESC, created_at DESC").Find(&entities).Error
+	err = query.Offset(offset).Limit(limit).Order("is_default DESC, created_at DESC").Find(&entities).Error
 	if err != nil {
 		return nil, 0, err
 	}

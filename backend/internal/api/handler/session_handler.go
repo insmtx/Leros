@@ -195,6 +195,8 @@ func (h *SessionHandler) ListSessions(ctx *gin.Context) {
 		return
 	}
 
+	req.Pagination.Fill()
+
 	result, err := h.service.ListSessions(ctx, &req)
 	if err != nil {
 		handleSessionServiceError(ctx, err)
