@@ -1,4 +1,4 @@
-// Package nodetools provides Docker-backed tools for operating an assistant node.
+// Package nodetools provides worker-local tools for operating an assistant node.
 package nodetools
 
 import (
@@ -8,20 +8,18 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/insmtx/Leros/backend/tools"
+	"github.com/insmtx/Leros/backend/tools/node/security"
 )
 
 const (
-	// ProviderNode identifies tools that operate against an assistant work node.
 	ProviderNode = "node"
 
-	// ToolNameNodeShell executes shell commands inside a node container.
-	ToolNameNodeShell = "node_shell"
-	// ToolNameNodeFileRead reads files from a node container.
-	ToolNameNodeFileRead = "node_file_read"
-	// ToolNameNodeFileWrite writes files into a node container.
+	ToolNameNodeShell     = "node_shell"
+	ToolNameNodeFileRead  = "node_file_read"
 	ToolNameNodeFileWrite = "node_file_write"
 )
 
@@ -40,10 +38,11 @@ type nodeExecutor interface {
 }
 
 type nodeExecRequest struct {
-	ContainerID string
-	Args        []string
-	Stdin       *string
-	Timeout     time.Duration
+	Args       []string
+	Stdin      *string
+	WorkingDir string
+	Env        map[string]string
+	Timeout    time.Duration
 }
 
 type nodeExecResult struct {
@@ -53,14 +52,11 @@ type nodeExecResult struct {
 	TimedOut bool
 }
 
-type dockerCLIExecutor struct{}
+type localExecutor struct{}
 
-func (e dockerCLIExecutor) Exec(ctx context.Context, req nodeExecRequest) (nodeExecResult, error) {
-	if strings.TrimSpace(req.ContainerID) == "" {
-		return nodeExecResult{}, fmt.Errorf("container_id is required")
-	}
+func (e localExecutor) Exec(ctx context.Context, req nodeExecRequest) (nodeExecResult, error) {
 	if len(req.Args) == 0 {
-		return nodeExecResult{}, fmt.Errorf("docker exec command is required")
+		return nodeExecResult{}, fmt.Errorf("command is required")
 	}
 
 	execCtx := ctx
@@ -70,17 +66,22 @@ func (e dockerCLIExecutor) Exec(ctx context.Context, req nodeExecRequest) (nodeE
 	}
 	defer cancel()
 
-	args := []string{"exec"}
-	if req.Stdin != nil {
-		args = append(args, "-i")
+	cmd := exec.CommandContext(execCtx, req.Args[0], req.Args[1:]...)
+	if strings.TrimSpace(req.WorkingDir) != "" {
+		cmd.Dir = req.WorkingDir
 	}
-	args = append(args, req.ContainerID)
-	args = append(args, req.Args...)
-
-	cmd := exec.CommandContext(execCtx, "docker", args...)
+	cmd.Env = security.SanitizedEnv(req.Env)
 	if req.Stdin != nil {
 		cmd.Stdin = strings.NewReader(*req.Stdin)
 	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return nil
+		}
+		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
+	cmd.WaitDelay = 5 * time.Second
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -114,7 +115,6 @@ func (e dockerCLIExecutor) Exec(ctx context.Context, req nodeExecRequest) (nodeE
 	return result, err
 }
 
-// NewTools returns all Docker node tools for registration.
 func NewTools() []tools.Tool {
 	return []tools.Tool{
 		NewNodeShellTool(),
@@ -123,7 +123,10 @@ func NewTools() []tools.Tool {
 	}
 }
 
-// Register registers all Docker node tools into the provided registry.
+func SetWriteSafeRoot(root string) {
+	security.SetWriteSafeRoot(root)
+}
+
 func Register(registry *tools.Registry) error {
 	if registry == nil {
 		return fmt.Errorf("tool registry is required")
@@ -136,100 +139,4 @@ func Register(registry *tools.Registry) error {
 	}
 
 	return nil
-}
-
-func stringValue(input map[string]interface{}, key string) string {
-	value, _ := input[key].(string)
-	return strings.TrimSpace(value)
-}
-
-func intValue(value interface{}) (int, error) {
-	switch typed := value.(type) {
-	case nil:
-		return 0, nil
-	case int:
-		return typed, nil
-	case int32:
-		return int(typed), nil
-	case int64:
-		return int(typed), nil
-	case float64:
-		return int(typed), nil
-	default:
-		return 0, fmt.Errorf("invalid integer value")
-	}
-}
-
-func boolValue(value interface{}) (bool, error) {
-	switch typed := value.(type) {
-	case nil:
-		return false, nil
-	case bool:
-		return typed, nil
-	default:
-		return false, fmt.Errorf("invalid boolean value")
-	}
-}
-
-func clampInt(value, minValue, maxValue int) int {
-	if value < minValue {
-		return minValue
-	}
-	if value > maxValue {
-		return maxValue
-	}
-	return value
-}
-
-func shellQuote(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
-}
-
-func truncateOutput(output string, maxLines int) (string, bool, int) {
-	output = strings.TrimSpace(output)
-	if output == "" {
-		return "", false, 0
-	}
-
-	lines := strings.Split(output, "\n")
-	if len(lines) <= maxLines {
-		return output, false, len(lines)
-	}
-
-	return fmt.Sprintf("[输出共 %d 行，显示最后 %d 行]\n%s", len(lines), maxLines, strings.Join(lines[len(lines)-maxLines:], "\n")), true, len(lines)
-}
-
-func combineOutput(stdout string, stderr string) string {
-	stdout = strings.TrimSpace(stdout)
-	stderr = strings.TrimSpace(stderr)
-	switch {
-	case stdout != "" && stderr != "":
-		return stdout + "\n" + stderr
-	case stdout != "":
-		return stdout
-	default:
-		return stderr
-	}
-}
-
-func parentDir(path string) string {
-	index := strings.LastIndex(path, "/")
-	if index <= 0 {
-		return ""
-	}
-	return path[:index]
-}
-
-func countContentLines(content string) int {
-	if content == "" {
-		return 1
-	}
-
-	normalized := strings.ReplaceAll(content, "\r\n", "\n")
-	trimmed := strings.TrimSuffix(normalized, "\n")
-	if trimmed == "" {
-		return 1
-	}
-
-	return len(strings.Split(trimmed, "\n"))
 }

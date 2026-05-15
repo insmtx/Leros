@@ -1,38 +1,42 @@
 package nodetools
 
 import (
+	"bufio"
 	"context"
 	"fmt"
-	"strconv"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/insmtx/Leros/backend/tools"
+
+	"github.com/insmtx/Leros/backend/tools/node/util"
 )
 
-// NodeFileReadTool reads files from a node container.
+// NodeFileReadTool reads files from the worker workspace.
 type NodeFileReadTool struct {
 	tools.BaseTool
-	executor nodeExecutor
 }
 
-// NewNodeFileReadTool creates a Docker-backed node file read tool.
+// NewNodeFileReadTool creates a worker-local node file read tool.
 func NewNodeFileReadTool() *NodeFileReadTool {
-	return newNodeFileReadToolWithExecutor(dockerCLIExecutor{})
+	return newNodeFileReadToolWithExecutor(nil)
 }
 
 func newNodeFileReadToolWithExecutor(executor nodeExecutor) *NodeFileReadTool {
+	_ = executor
 	return &NodeFileReadTool{
 		BaseTool: tools.NewBaseTool(
 			ToolNameNodeFileRead,
-			"Read a file from an assistant node Docker container with optional line ranges",
+			"Read a file from the worker workspace with optional line ranges",
 			tools.Schema{
 				Type:     "object",
 				Required: []string{"path"},
 				Properties: map[string]*tools.Property{
 					"path": {
 						Type:        "string",
-						Description: "File path inside the container",
+						Description: "File path inside the workspace",
 					},
 					"offset": {
 						Type:        "integer",
@@ -45,7 +49,6 @@ func newNodeFileReadToolWithExecutor(executor nodeExecutor) *NodeFileReadTool {
 				},
 			},
 		),
-		executor: executor,
 	}
 }
 
@@ -54,15 +57,15 @@ func (t *NodeFileReadTool) Validate(input map[string]interface{}) error {
 	if input == nil {
 		return fmt.Errorf("input is required")
 	}
-	if stringValue(input, "path") == "" {
+	if util.StringValue(input, "path") == "" {
 		return fmt.Errorf("path is required")
 	}
-	if offset, err := intValue(input["offset"]); err != nil {
+	if offset, err := util.IntValue(input["offset"]); err != nil {
 		return fmt.Errorf("offset must be an integer")
 	} else if offset < 0 {
 		return fmt.Errorf("offset must be greater than or equal to 0")
 	}
-	if limit, err := intValue(input["limit"]); err != nil {
+	if limit, err := util.IntValue(input["limit"]); err != nil {
 		return fmt.Errorf("limit must be an integer")
 	} else if limit < 0 {
 		return fmt.Errorf("limit must be greater than or equal to 0")
@@ -70,48 +73,39 @@ func (t *NodeFileReadTool) Validate(input map[string]interface{}) error {
 	return nil
 }
 
-// Execute reads a file from the target node container.
+// Execute reads a file from the worker workspace.
 func (t *NodeFileReadTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
-	if t.executor == nil {
-		return "", fmt.Errorf("node executor is required")
-	}
+	_ = ctx
 
-	toolCtx, err := tools.RequireToolContext(ctx)
-	if err != nil {
-		return "", fmt.Errorf("请先与一个已绑定工作节点的 AI 员工对话")
-	}
-	nodeInfo, err := nodeInfoForAssistant(toolCtx)
+	path := util.StringValue(input, "path")
+	resolvedPath, err := filepath.Abs(path)
 	if err != nil {
 		return "", err
 	}
-	containerID := nodeInfo.ContainerID
-
-	path := stringValue(input, "path")
-	offset, _ := intValue(input["offset"])
-	limit, _ := intValue(input["limit"])
+	offset, _ := util.IntValue(input["offset"])
+	limit, _ := util.IntValue(input["limit"])
 	if limit == 0 {
 		limit = defaultReadLimit
 	}
-	limit = clampInt(limit, 1, maxReadLimit)
+	limit = util.ClampInt(limit, 1, maxReadLimit)
 
-	checkResult, err := t.executor.Exec(ctx, nodeExecRequest{
-		ContainerID: containerID,
-		Args:        []string{"sh", "-c", fmt.Sprintf("test -f %s && echo EXISTS || echo NOTFOUND", shellQuote(path))},
-		Timeout:     5 * time.Second,
-	})
+	info, err := os.Stat(resolvedPath)
+	if os.IsNotExist(err) {
+		return tools.JSONString(map[string]interface{}{
+			"path":    path,
+			"exists":  false,
+			"message": fmt.Sprintf("file does not exist: %s", path),
+		})
+	}
 	if err != nil {
 		return "", fmt.Errorf("check node file: %w", err)
 	}
-	if strings.Contains(checkResult.Stdout, "NOTFOUND") {
+	if !info.Mode().IsRegular() {
 		return tools.JSONString(map[string]interface{}{
-			"container_id": containerID,
-			"path":         path,
-			"exists":       false,
-			"message":      fmt.Sprintf("file does not exist: %s", path),
+			"path":    path,
+			"exists":  false,
+			"message": fmt.Sprintf("path is not a regular file: %s", path),
 		})
-	}
-	if checkResult.ExitCode != 0 {
-		return "", fmt.Errorf("check node file failed: %s", strings.TrimSpace(combineOutput(checkResult.Stdout, checkResult.Stderr)))
 	}
 
 	shownStart := offset
@@ -119,52 +113,21 @@ func (t *NodeFileReadTool) Execute(ctx context.Context, input map[string]interfa
 		shownStart = 1
 	}
 
-	readCommand := fmt.Sprintf("head -n %d %s", limit, shellQuote(path))
-	if offset > 0 {
-		endLine := offset + limit - 1
-		readCommand = fmt.Sprintf("sed -n '%d,%dp' %s", offset, endLine, shellQuote(path))
-	}
-
-	readResult, err := t.executor.Exec(ctx, nodeExecRequest{
-		ContainerID: containerID,
-		Args:        []string{"sh", "-c", readCommand},
-		Timeout:     15 * time.Second,
-	})
+	lines, totalLines, err := readFileLines(resolvedPath, shownStart, limit)
 	if err != nil {
-		return "", fmt.Errorf("read node file: %w", err)
-	}
-	if readResult.TimedOut {
-		return tools.JSONString(map[string]interface{}{
-			"container_id": containerID,
-			"path":         path,
-			"timed_out":    true,
-			"message":      fmt.Sprintf("read file timed out: %s", path),
-		})
-	}
-	if readResult.ExitCode != 0 {
-		return "", fmt.Errorf("read node file failed: %s", strings.TrimSpace(combineOutput(readResult.Stdout, readResult.Stderr)))
+		return "", err
 	}
 
-	content := strings.TrimRight(readResult.Stdout, "\n")
-	lines := []string{}
-	if content != "" {
-		lines = strings.Split(content, "\n")
-	}
+	content := strings.Join(lines, "\n")
 	numbered := make([]string, 0, len(lines))
 	for index, line := range lines {
 		numbered = append(numbered, fmt.Sprintf("%6d|%s", shownStart+index, line))
 	}
 
-	totalLines := 0
-	if totalResult, err := t.executor.Exec(ctx, nodeExecRequest{
-		ContainerID: containerID,
-		Args:        []string{"sh", "-c", fmt.Sprintf("wc -l < %s", shellQuote(path))},
-		Timeout:     5 * time.Second,
-	}); err == nil && totalResult.ExitCode == 0 {
-		totalLines, _ = strconv.Atoi(strings.TrimSpace(totalResult.Stdout))
+	shownEnd := 0
+	if len(lines) > 0 {
+		shownEnd = shownStart + len(lines) - 1
 	}
-
-	shownEnd := shownStart + len(lines) - 1
 	hasMore := totalLines > 0 && len(lines) > 0 && shownEnd < totalLines
 	numberedContent := strings.Join(numbered, "\n")
 	if hasMore {
@@ -172,7 +135,6 @@ func (t *NodeFileReadTool) Execute(ctx context.Context, input map[string]interfa
 	}
 
 	return tools.JSONString(map[string]interface{}{
-		"container_id":       containerID,
 		"path":               path,
 		"exists":             true,
 		"offset":             shownStart,
@@ -186,4 +148,40 @@ func (t *NodeFileReadTool) Execute(ctx context.Context, input map[string]interfa
 		"display":            numberedContent,
 		"display_line_count": len(lines),
 	})
+}
+
+func readFileLines(path string, startLine int, limit int) ([]string, int, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, 0, fmt.Errorf("read node file: %w", err)
+	}
+	defer file.Close()
+
+	reader := bufio.NewReader(file)
+	lines := make([]string, 0, limit)
+	totalLines := 0
+
+	for {
+		line, err := reader.ReadString('\n')
+		if len(line) > 0 {
+			totalLines++
+			line = strings.TrimRight(line, "\r\n")
+			if totalLines >= startLine && len(lines) < limit {
+				lines = append(lines, line)
+			}
+		}
+		if err == nil {
+			continue
+		}
+		if errorsIsEOF(err) {
+			break
+		}
+		return nil, 0, fmt.Errorf("read node file: %w", err)
+	}
+
+	return lines, totalLines, nil
+}
+
+func errorsIsEOF(err error) bool {
+	return err == io.EOF
 }

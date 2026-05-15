@@ -3,35 +3,37 @@ package nodetools
 import (
 	"context"
 	"fmt"
-	"strings"
-	"time"
+	"os"
+	"path/filepath"
 
 	"github.com/insmtx/Leros/backend/tools"
+	"github.com/insmtx/Leros/backend/tools/node/security"
+	"github.com/insmtx/Leros/backend/tools/node/util"
 )
 
-// NodeFileWriteTool writes files to a node container.
+// NodeFileWriteTool writes files to the worker workspace.
 type NodeFileWriteTool struct {
 	tools.BaseTool
-	executor nodeExecutor
 }
 
-// NewNodeFileWriteTool creates a Docker-backed node file write tool.
+// NewNodeFileWriteTool creates a worker-local node file write tool.
 func NewNodeFileWriteTool() *NodeFileWriteTool {
-	return newNodeFileWriteToolWithExecutor(dockerCLIExecutor{})
+	return newNodeFileWriteToolWithExecutor(nil)
 }
 
 func newNodeFileWriteToolWithExecutor(executor nodeExecutor) *NodeFileWriteTool {
+	_ = executor
 	return &NodeFileWriteTool{
 		BaseTool: tools.NewBaseTool(
 			ToolNameNodeFileWrite,
-			"Create or modify a file inside an assistant node Docker container",
+			"Create or modify a file inside the worker workspace",
 			tools.Schema{
 				Type:     "object",
 				Required: []string{"path", "content"},
 				Properties: map[string]*tools.Property{
 					"path": {
 						Type:        "string",
-						Description: "File path inside the container",
+						Description: "File path inside the workspace",
 					},
 					"content": {
 						Type:        "string",
@@ -44,7 +46,6 @@ func newNodeFileWriteToolWithExecutor(executor nodeExecutor) *NodeFileWriteTool 
 				},
 			},
 		),
-		executor: executor,
 	}
 }
 
@@ -53,89 +54,65 @@ func (t *NodeFileWriteTool) Validate(input map[string]interface{}) error {
 	if input == nil {
 		return fmt.Errorf("input is required")
 	}
-	if stringValue(input, "path") == "" {
+	if util.StringValue(input, "path") == "" {
 		return fmt.Errorf("path is required")
 	}
 	if _, ok := input["content"].(string); !ok {
 		return fmt.Errorf("content is required")
 	}
-	if _, err := boolValue(input["append"]); err != nil {
+	if _, err := util.BoolValue(input["append"]); err != nil {
 		return fmt.Errorf("append must be a boolean")
 	}
 	return nil
 }
 
-// Execute writes a file to the target node container.
+// Execute writes a file to the worker workspace.
 func (t *NodeFileWriteTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
-	if t.executor == nil {
-		return "", fmt.Errorf("node executor is required")
+	_ = ctx
+
+	path := util.StringValue(input, "path")
+
+	if err := security.IsWriteDenied(path); err != nil {
+		return "", err
 	}
 
-	toolCtx, err := tools.RequireToolContext(ctx)
-	if err != nil {
-		return "", fmt.Errorf("请先与一个已绑定工作节点的 AI 员工对话")
-	}
-	nodeInfo, err := nodeInfoForAssistant(toolCtx)
+	resolvedPath, err := filepath.Abs(path)
 	if err != nil {
 		return "", err
 	}
-	containerID := nodeInfo.ContainerID
-
-	path := stringValue(input, "path")
 	content := input["content"].(string)
-	appendMode, _ := boolValue(input["append"])
+	appendMode, _ := util.BoolValue(input["append"])
 
-	if dir := parentDir(path); dir != "" {
-		mkdirResult, err := t.executor.Exec(ctx, nodeExecRequest{
-			ContainerID: containerID,
-			Args:        []string{"sh", "-c", fmt.Sprintf("mkdir -p %s", shellQuote(dir))},
-			Timeout:     10 * time.Second,
-		})
-		if err != nil {
-			return "", fmt.Errorf("create node file parent directory: %w", err)
-		}
-		if mkdirResult.ExitCode != 0 {
-			return "", fmt.Errorf("create node file parent directory failed: %s", strings.TrimSpace(combineOutput(mkdirResult.Stdout, mkdirResult.Stderr)))
-		}
-	}
-
-	teeCommand := fmt.Sprintf("tee %s", shellQuote(path))
+	flags := os.O_CREATE | os.O_WRONLY | os.O_TRUNC
 	if appendMode {
-		teeCommand = fmt.Sprintf("tee -a %s", shellQuote(path))
+		flags = os.O_CREATE | os.O_WRONLY | os.O_APPEND
 	}
-	writeResult, err := t.executor.Exec(ctx, nodeExecRequest{
-		ContainerID: containerID,
-		Args:        []string{"sh", "-c", teeCommand},
-		Stdin:       &content,
-		Timeout:     30 * time.Second,
-	})
+
+	file, err := os.OpenFile(resolvedPath, flags, 0644)
 	if err != nil {
 		return "", fmt.Errorf("write node file: %w", err)
 	}
-	if writeResult.TimedOut {
-		return tools.JSONString(map[string]interface{}{
-			"container_id": containerID,
-			"path":         path,
-			"timed_out":    true,
-			"message":      fmt.Sprintf("write file timed out: %s", path),
-		})
+	bytesWritten, err := file.WriteString(content)
+	if err != nil {
+		_ = file.Close()
+		return "", fmt.Errorf("write node file: %w", err)
 	}
-	if writeResult.ExitCode != 0 {
-		return "", fmt.Errorf("write node file failed: %s", strings.TrimSpace(combineOutput(writeResult.Stdout, writeResult.Stderr)))
+	if err := file.Close(); err != nil {
+		return "", fmt.Errorf("write node file: %w", err)
 	}
 
 	action := "written"
 	if appendMode {
 		action = "appended"
 	}
-	lineCount := countContentLines(content)
+	lineCount := util.CountContentLines(content)
 
 	return tools.JSONString(map[string]interface{}{
-		"container_id": containerID,
-		"path":         path,
-		"append":       appendMode,
-		"action":       action,
-		"line_count":   lineCount,
-		"message":      fmt.Sprintf("file %s: %s (%d lines)", action, path, lineCount),
+		"path":          path,
+		"append":        appendMode,
+		"action":        action,
+		"line_count":    lineCount,
+		"bytes_written": bytesWritten,
+		"message":       fmt.Sprintf("file %s: %s (%d lines)", action, path, lineCount),
 	})
 }

@@ -19,6 +19,8 @@ type Publisher interface {
 type RealtimePublisher interface {
 	// PublishRealtime 发布实时消息，持久化由接收端按需处理。
 	PublishRealtime(ctx context.Context, topic string, event any) error
+	// FlushRealtime 刷新实时消息连接缓冲区，用于关键边界事件。
+	FlushRealtime(ctx context.Context) error
 }
 
 // Subscriber 是事件订阅者接口，定义了订阅指定主题事件的方法

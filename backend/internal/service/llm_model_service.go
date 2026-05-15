@@ -304,7 +304,6 @@ func (s *llmModelService) TestLLMModel(ctx context.Context, req *contract.TestLL
 
 	flow, err := agenteino.NewFlow(ctx, &agenteino.FlowConfig{
 		Model:        chatModel,
-		ToolAdapter:  nil,
 		SystemPrompt: "You are testing Leros LLM connectivity. Reply with only: ok",
 		MaxStep:      1,
 	})

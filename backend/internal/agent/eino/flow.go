@@ -14,6 +14,7 @@ import (
 	einoreact "github.com/cloudwego/eino/flow/agent/react"
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 // Flow wraps the Eino agent loop used by the Leros runtime agent.
@@ -24,8 +25,7 @@ type Flow struct {
 // FlowConfig describes the dependencies required to build an Eino flow.
 type FlowConfig struct {
 	Model        einomodel.ToolCallingChatModel
-	ToolAdapter  *ToolAdapter
-	Binding      ToolBinding
+	Tools        []einotool.BaseTool
 	Emitter      *events.Emitter
 	SystemPrompt string
 	MaxStep      int
@@ -40,15 +40,6 @@ func NewFlow(ctx context.Context, cfg *FlowConfig) (*Flow, error) {
 		return nil, fmt.Errorf("tool-calling model is required")
 	}
 
-	var toolList []einotool.BaseTool
-	if cfg.ToolAdapter != nil {
-		var err error
-		toolList, err = cfg.ToolAdapter.EinoTools(cfg.Binding, cfg.Emitter)
-		if err != nil {
-			return nil, fmt.Errorf("build eino tools: %w", err)
-		}
-	}
-
 	maxStep := cfg.MaxStep
 	if maxStep <= 0 {
 		maxStep = 8
@@ -57,7 +48,11 @@ func NewFlow(ctx context.Context, cfg *FlowConfig) (*Flow, error) {
 	agent, err := einoreact.NewAgent(ctx, &einoreact.AgentConfig{
 		ToolCallingModel: cfg.Model,
 		ToolsConfig: compose.ToolsNodeConfig{
-			Tools: toolList,
+			Tools: cfg.Tools,
+			UnknownToolsHandler: func(ctx context.Context, toolName, toolInput string) (string, error) {
+				logs.WarnContextf(ctx, "[WARN] unknown tool call: %s with input: %s", toolName, toolInput)
+				return fmt.Sprintf(`Tool "%s" does not exist. Please use a valid tool and retry.`, toolName), nil
+			},
 		},
 		MessageModifier: buildMessageModifier(cfg.SystemPrompt),
 		StreamToolCallChecker: func(_ context.Context, sr *einoschema.StreamReader[*einoschema.Message]) (bool, error) {

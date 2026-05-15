@@ -11,17 +11,18 @@ import (
 	"time"
 
 	"github.com/insmtx/Leros/backend/internal/agent"
+	einoadapter "github.com/insmtx/Leros/backend/internal/agent/eino"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/deps"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
 	"github.com/insmtx/Leros/backend/tools"
+	memorytools "github.com/insmtx/Leros/backend/tools/memory"
 	nodetools "github.com/insmtx/Leros/backend/tools/node"
+	skillmanagetools "github.com/insmtx/Leros/backend/tools/skill_manage"
 	skillusetools "github.com/insmtx/Leros/backend/tools/skill_use"
 	"github.com/ygpkg/yg-go/logs"
 	"go.uber.org/zap/zapcore"
 )
-
-const defaultTestNodeContainerID = "b327e241316c2a2f62cbee986edd0e71235205f0fde5dc7a4543f5344396b351"
 
 func TestRunnerBuildSystemPromptOnlyKeepsRuntimePrompt(t *testing.T) {
 	runner := &Runner{
@@ -59,6 +60,56 @@ func TestRunnerBuildSystemPromptOnlyKeepsRuntimePrompt(t *testing.T) {
 		if strings.Contains(prompt, unexpected) {
 			t.Fatalf("expected prompt not to contain %q, got %s", unexpected, prompt)
 		}
+	}
+}
+
+func TestRunnerBuildRunStateMergesDefaultAndRequestTools(t *testing.T) {
+	registry := tools.NewRegistry()
+	if err := memorytools.Register(registry); err != nil {
+		t.Fatalf("register memory tools: %v", err)
+	}
+	if err := skillusetools.Register(registry, skillcatalog.NewEmptyCatalog()); err != nil {
+		t.Fatalf("register skill use tools: %v", err)
+	}
+	if err := skillmanagetools.Register(registry); err != nil {
+		t.Fatalf("register skill manage tools: %v", err)
+	}
+	if err := nodetools.Register(registry); err != nil {
+		t.Fatalf("register node tools: %v", err)
+	}
+
+	runner := &Runner{
+		toolAdapter: einoadapter.NewToolAdapter(registry),
+	}
+	state, err := runner.buildRunState(&agent.RequestContext{
+		RunID: "run_tools",
+		Input: agent.InputContext{
+			Type: agent.InputTypeMessage,
+			Text: "hello",
+		},
+		Capability: agent.CapabilityContext{
+			AllowedTools: []string{
+				"custom_tool",
+				nodetools.ToolNameNodeShell,
+				"custom_tool",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("build run state: %v", err)
+	}
+
+	expected := []string{
+		memorytools.ToolNameMemory,
+		skillusetools.ToolNameSkillUse,
+		skillmanagetools.ToolNameSkillManage,
+		nodetools.ToolNameNodeShell,
+		nodetools.ToolNameNodeFileRead,
+		nodetools.ToolNameNodeFileWrite,
+		"custom_tool",
+	}
+	if got := strings.Join(state.toolBinding.AllowedTools, ","); got != strings.Join(expected, ",") {
+		t.Fatalf("unexpected allowed tools:\nwant: %v\n got: %v", expected, state.toolBinding.AllowedTools)
 	}
 }
 
@@ -126,8 +177,6 @@ func TestAgentRunNodeTool(t *testing.T) {
 
 	ctx, cancel := realModelTestContext(t)
 	defer cancel()
-	containerID := realModelNodeContainerID()
-
 	registry := tools.NewRegistry()
 	if err := nodetools.Register(registry); err != nil {
 		t.Fatalf("register node tools: %v", err)
@@ -153,7 +202,7 @@ func TestAgentRunNodeTool(t *testing.T) {
 			Name: "Tool Test Assistant",
 			SystemPrompt: strings.Join([]string{
 				"你必须使用工具完成用户任务，不能凭空回答。",
-				"node_shell 的 container_id 必须使用 " + containerID + "。",
+				"node_shell 会在当前 worker 环境中执行命令。",
 			}, "\n"),
 		},
 		Actor: agent.ActorContext{
@@ -200,8 +249,6 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 
 	ctx, cancel := realModelTestContext(t)
 	defer cancel()
-	containerID := realModelNodeContainerID()
-
 	catalog, skillDir := newBundledRuntimeSkillsCatalog(t)
 	if _, err := catalog.Get("weather"); err != nil {
 		t.Fatalf("weather skill must be available in %s: %v", skillDir, err)
@@ -235,7 +282,7 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 			Name: "Weather Skill Test Assistant",
 			SystemPrompt: strings.Join([]string{
 				"你必须使用工具完成用户任务，不能凭空回答。",
-				"node_shell 的 container_id 必须使用 " + containerID + "。",
+				"node_shell 会在当前 worker 环境中执行命令。",
 			}, "\n"),
 		},
 		Actor: agent.ActorContext{
@@ -287,13 +334,6 @@ func realModelOptions(apiKey string) agent.ModelOptions {
 		Model:    firstNonEmptyEnv("LEROS_LLM_MODEL"),
 		BaseURL:  firstNonEmptyEnv("LEROS_LLM_BASE_URL"),
 	}
-}
-
-func realModelNodeContainerID() string {
-	if containerID := firstNonEmptyEnv("LEROS_TEST_NODE_CONTAINER_ID"); containerID != "" {
-		return containerID
-	}
-	return defaultTestNodeContainerID
 }
 
 func newBundledRuntimeSkillsCatalog(t *testing.T) (*skillcatalog.Catalog, string) {

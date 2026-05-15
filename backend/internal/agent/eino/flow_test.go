@@ -28,10 +28,13 @@ func TestFlowGenerate(t *testing.T) {
 
 	model := &fakeToolCallingModel{}
 	adapter := NewToolAdapter(registry)
+	einoTools, err := adapter.EinoTools(ToolBinding{ToolContext: tools.ToolContext{UserID: "u1"}}, nil)
+	if err != nil {
+		t.Fatalf("build eino tools: %v", err)
+	}
 	flow, err := NewFlow(context.Background(), &FlowConfig{
 		Model:        model,
-		ToolAdapter:  adapter,
-		Binding:      ToolBinding{ToolContext: tools.ToolContext{UserID: "u1"}},
+		Tools:        einoTools,
 		SystemPrompt: "You are Leros.\n\nAvailable skills:\n- github-pr-review: Review pull requests.",
 	})
 	if err != nil {
@@ -71,10 +74,14 @@ func TestFlowGenerate(t *testing.T) {
 
 func TestFlowStreamEmitsMessageEvents(t *testing.T) {
 	registry := tools.NewRegistry()
+	adapter := NewToolAdapter(registry)
+	einoTools, err := adapter.EinoTools(ToolBinding{ToolContext: tools.ToolContext{UserID: "u1"}}, nil)
+	if err != nil {
+		t.Fatalf("build eino tools: %v", err)
+	}
 	flow, err := NewFlow(context.Background(), &FlowConfig{
-		Model:       &streamingTextModel{},
-		ToolAdapter: NewToolAdapter(registry),
-		Binding:     ToolBinding{ToolContext: tools.ToolContext{UserID: "u1"}},
+		Model: &streamingTextModel{},
+		Tools: einoTools,
 	})
 	if err != nil {
 		t.Fatalf("new flow: %v", err)
