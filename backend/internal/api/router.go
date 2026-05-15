@@ -5,6 +5,8 @@
 package api
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/insmtx/Leros/backend/config"
 	auth "github.com/insmtx/Leros/backend/internal/api/auth"
@@ -15,6 +17,7 @@ import (
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	githubprovider "github.com/insmtx/Leros/backend/internal/infra/providers/github"
 	"github.com/insmtx/Leros/backend/internal/infra/websocket"
+	"github.com/insmtx/Leros/backend/internal/runnable"
 	"github.com/insmtx/Leros/backend/internal/service"
 	"github.com/insmtx/Leros/backend/internal/worker/scheduler"
 	workerserver "github.com/insmtx/Leros/backend/internal/worker/server"
@@ -80,6 +83,10 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		sessionService := service.NewSessionService(db, eventbus, inferrer)
 		handler.RegisterSessionRoutes(v1, sessionService)
 		logs.Info("Session routes registered successfully")
+
+		// Start session completed consumer in background
+		go runnable.StartSessionCompleted(context.Background(), sessionService, eventbus)
+		logs.Info("Session completed runnable started")
 	}
 
 	// Swagger UI 路由

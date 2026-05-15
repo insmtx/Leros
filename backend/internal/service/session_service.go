@@ -561,7 +561,7 @@ func convertToContractSession(session *types.Session) *contract.Session {
 
 func convertToContractSessionMessage(message *types.SessionMessage) *contract.SessionMessage {
 	result := &contract.SessionMessage{
-		ID:          fmt.Sprintf("%d", message.ID), // 转换为 string 以匹配前端
+		ID:          fmt.Sprintf("%d", message.ID),
 		SessionID:   message.SessionID,
 		Role:        message.Role,
 		Content:     message.Content,
@@ -589,4 +589,104 @@ func convertToContractSessionMessage(message *types.SessionMessage) *contract.Se
 	}
 
 	return result
+}
+
+func (s *sessionService) CompleteSessionMessage(ctx context.Context, req *contract.CompleteSessionMessageRequest) error {
+	if req.SessionID == "" {
+		return errors.New("session_id is required")
+	}
+
+	session, err := db.GetSessionBySessionID(ctx, s.db, req.SessionID)
+	if err != nil {
+		return fmt.Errorf("find session %s: %w", req.SessionID, err)
+	}
+	if session == nil {
+		return fmt.Errorf("session %s not found", req.SessionID)
+	}
+
+	sequence, err := db.GetNextSequence(ctx, s.db, req.SessionID)
+	if err != nil {
+		return fmt.Errorf("get sequence for %s: %w", req.SessionID, err)
+	}
+
+	msgEntity := &types.SessionMessage{
+		SessionID:   req.SessionID,
+		Role:        string(types.MessageRoleAssistant),
+		Content:     req.Content,
+		MessageType: string(types.MessageTypeText),
+		Status:      string(types.MessageStatusComplete),
+		Sequence:    sequence,
+		Timestamp:   req.CreatedAt.UnixMilli(),
+	}
+
+	if req.ToolCalls != nil && len(req.ToolCalls) > 0 {
+		msgEntity.ToolCalls = req.ToolCalls
+		for i := range msgEntity.ToolCalls {
+			msgEntity.ToolCalls[i].Status = types.ToolCallStatusSuccess
+		}
+	}
+
+	if req.Metadata != nil {
+		msgEntity.Metadata = *req.Metadata
+	}
+
+	if err := db.CreateMessage(ctx, s.db, msgEntity); err != nil {
+		return fmt.Errorf("create message for %s: %w", req.SessionID, err)
+	}
+
+	now := time.Now()
+	if err := db.IncrementMessageCount(ctx, s.db, session.ID); err != nil {
+		logs.WarnContextf(ctx, "increment count for %s: %v", req.SessionID, err)
+	}
+	if err := db.UpdateLastMessageAt(ctx, s.db, session.ID, now); err != nil {
+		logs.WarnContextf(ctx, "update last_message_at for %s: %v", req.SessionID, err)
+	}
+
+	logs.DebugContextf(ctx, "persisted completed session message: session_id=%s seq=%d", req.SessionID, sequence)
+	return nil
+}
+
+func (s *sessionService) FailedSessionMessage(ctx context.Context, req *contract.FailedSessionMessageRequest) error {
+	if req.SessionID == "" {
+		return errors.New("session_id is required")
+	}
+
+	session, err := db.GetSessionBySessionID(ctx, s.db, req.SessionID)
+	if err != nil {
+		return fmt.Errorf("find session %s: %w", req.SessionID, err)
+	}
+	if session == nil {
+		return fmt.Errorf("session %s not found", req.SessionID)
+	}
+
+	sequence, err := db.GetNextSequence(ctx, s.db, req.SessionID)
+	if err != nil {
+		return fmt.Errorf("get sequence for %s: %w", req.SessionID, err)
+	}
+
+	msgEntity := &types.SessionMessage{
+		SessionID:   req.SessionID,
+		Role:        string(types.MessageRoleSystem),
+		Content:     req.ErrorMsg,
+		MessageType: string(types.MessageTypeText),
+		Status:      string(types.MessageStatusError),
+		Sequence:    sequence,
+		Timestamp:   req.CreatedAt.UnixMilli(),
+		Metadata:    types.MessageMetadata{Extra: map[string]interface{}{"error_code": req.ErrorCode}},
+	}
+
+	if err := db.CreateMessage(ctx, s.db, msgEntity); err != nil {
+		return fmt.Errorf("create message for %s: %w", req.SessionID, err)
+	}
+
+	now := time.Now()
+	if err := db.IncrementMessageCount(ctx, s.db, session.ID); err != nil {
+		logs.WarnContextf(ctx, "increment count for %s: %v", req.SessionID, err)
+	}
+	if err := db.UpdateLastMessageAt(ctx, s.db, session.ID, now); err != nil {
+		logs.WarnContextf(ctx, "update last_message_at for %s: %v", req.SessionID, err)
+	}
+
+	logs.DebugContextf(ctx, "persisted failed session message: session_id=%s seq=%d", req.SessionID, sequence)
+	return nil
 }

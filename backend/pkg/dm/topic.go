@@ -43,3 +43,8 @@ func SessionCompletedTopic(orgid uint, sessionid string) (string, error) {
 	orgidStr := fmt.Sprintf("%d", orgid)
 	return topic().Org(orgidStr).Session(sessionid).Completed().Build(), nil
 }
+
+// SessionCompletedTopicWildcard 构造会话完成 topic 的通配符模式，格式为 "org.*.session.*.completed"。
+func SessionCompletedTopicWildcard() string {
+	return topic().Org(wildcard).Session(wildcard).Completed().Build()
+}

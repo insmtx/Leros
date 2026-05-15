@@ -1,8 +1,10 @@
 package contract
 
-import "context"
+import (
+	"context"
 
-import "github.com/insmtx/Leros/backend/internal/agent/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
+)
 
 // SessionService 定义会话服务接口
 type SessionService interface {
@@ -27,4 +29,9 @@ type SessionService interface {
 
 	// Event streaming
 	StreamSessionEvents(ctx context.Context, sessionID string, lastSequence int64, sink events.Sink) error
+
+	// CompleteSessionMessage 处理 session 完成事件，将最终回复消息入库
+	CompleteSessionMessage(ctx context.Context, req *CompleteSessionMessageRequest) error
+	// FailedSessionMessage 处理 session 失败事件，将错误消息入库
+	FailedSessionMessage(ctx context.Context, req *FailedSessionMessageRequest) error
 }
