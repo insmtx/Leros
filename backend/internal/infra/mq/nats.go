@@ -27,6 +27,16 @@ type natsPublisher struct {
 const defaultRealtimeFlushTimeout = 5 * time.Second
 const defaultSessionStreamMaxAge = 30 * time.Minute
 
+const (
+	sessionTopicSegmentLen          = 6
+	sessionTopicOrgIndex            = 0
+	sessionTopicOrgIDIndex          = 1
+	sessionTopicSessionIndex        = 2
+	sessionTopicSessionIDIndex      = 3
+	sessionTopicMessageSegmentIndex = 4
+	sessionTopicStreamSegmentIndex  = 5
+)
+
 // NewPublisher 创建一个新的 NATS JetStream 发布者实例
 func NewPublisher(url string) (*natsPublisher, error) {
 	conn, err := nats.Connect(url)
@@ -119,6 +129,7 @@ func (p *natsPublisher) SubscribeWithContext(ctx context.Context, topic string, 
 	}
 
 	// 创建每次连接独立的回放订阅，避免不同客户端共享同一 durable 状态。
+	// DeliverAll 让客户端重连后可从历史开始回放，再由上层按 lastSequence 去重。
 	sub, err := p.js.Subscribe(topic, func(msg *nats.Msg) {
 		// Ack before invoking the handler so long-running worker tasks do not
 		// exceed JetStream AckWait and get redelivered while still running.
@@ -228,13 +239,16 @@ func streamConfigFromTopic(streamName string, topic string) *nats.StreamConfig {
 
 func isSessionResultStreamTopic(topic string) bool {
 	segments := strings.Split(topic, ".")
-	if len(segments) != 6 {
+	if len(segments) != sessionTopicSegmentLen {
 		return false
 	}
-	if segments[0] != "org" || segments[2] != "session" || segments[4] != "message" || segments[5] != "stream" {
+	if segments[sessionTopicOrgIndex] != "org" ||
+		segments[sessionTopicSessionIndex] != "session" ||
+		segments[sessionTopicMessageSegmentIndex] != "message" ||
+		segments[sessionTopicStreamSegmentIndex] != "stream" {
 		return false
 	}
-	return segments[1] != "" && segments[3] != ""
+	return segments[sessionTopicOrgIDIndex] != "" && segments[sessionTopicSessionIDIndex] != ""
 }
 
 func contextWithDefaultDeadline(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {

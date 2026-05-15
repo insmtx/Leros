@@ -72,6 +72,8 @@ func (s *MQStreamSink) Emit(ctx context.Context, event *events.Event) error {
 }
 
 func (s *MQStreamSink) publishStream(ctx context.Context, topic string, msg events.MessageStreamMessage) error {
+	// Session stream 需要支持断线重连后的历史回放，因此发布到 JetStream 持久流；
+	// 非 session 的 worker 主题仍保持 realtime，以降低非会话场景开销。
 	if s.task.Route.SessionID != "" {
 		return s.publisher.Publish(ctx, topic, msg)
 	}
