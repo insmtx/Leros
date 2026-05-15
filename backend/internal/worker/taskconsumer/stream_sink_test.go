@@ -66,8 +66,14 @@ func TestMQStreamSinkPublishesCompletedEventToSessionCompletedTopic(t *testing.T
 			if publisher.calls[0].topic != streamTopic {
 				t.Fatalf("expected first publish to stream topic %q, got %q", streamTopic, publisher.calls[0].topic)
 			}
+			if publisher.calls[0].mode != "persist" {
+				t.Fatalf("expected first publish mode persist, got %q", publisher.calls[0].mode)
+			}
 			if publisher.calls[1].topic != completedTopic {
 				t.Fatalf("expected second publish to completed topic %q, got %q", completedTopic, publisher.calls[1].topic)
+			}
+			if publisher.calls[1].mode != "realtime" {
+				t.Fatalf("expected second publish mode realtime, got %q", publisher.calls[1].mode)
 			}
 			completedMsg, ok := publisher.calls[1].event.(events.MessageStreamMessage)
 			if !ok {
@@ -88,12 +94,23 @@ type recordingRealtimePublisher struct {
 }
 
 type realtimePublishCall struct {
+	mode  string
 	topic string
 	event any
 }
 
+func (p *recordingRealtimePublisher) Publish(_ context.Context, topic string, event any) error {
+	p.calls = append(p.calls, realtimePublishCall{
+		mode:  "persist",
+		topic: topic,
+		event: event,
+	})
+	return nil
+}
+
 func (p *recordingRealtimePublisher) PublishRealtime(_ context.Context, topic string, event any) error {
 	p.calls = append(p.calls, realtimePublishCall{
+		mode:  "realtime",
 		topic: topic,
 		event: event,
 	})

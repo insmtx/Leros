@@ -13,12 +13,17 @@ import (
 
 // MQStreamSink publishes agent runtime events as realtime messages.
 type MQStreamSink struct {
-	publisher eventbus.RealtimePublisher
+	publisher streamPublisher
 	task      events.WorkerTaskMessage
 }
 
+type streamPublisher interface {
+	eventbus.Publisher
+	eventbus.RealtimePublisher
+}
+
 // NewMQStreamSink creates a stream sink for one worker task.
-func NewMQStreamSink(publisher eventbus.RealtimePublisher, task events.WorkerTaskMessage) *MQStreamSink {
+func NewMQStreamSink(publisher streamPublisher, task events.WorkerTaskMessage) *MQStreamSink {
 	return &MQStreamSink{
 		publisher: publisher,
 		task:      task,
@@ -57,13 +62,20 @@ func (s *MQStreamSink) Emit(ctx context.Context, event *events.Event) error {
 		msg.Body.Error = &events.StreamError{Message: event.Content}
 	}
 
-	if err := s.publisher.PublishRealtime(ctx, topic, msg); err != nil {
+	if err := s.publishStream(ctx, topic, msg); err != nil {
 		logs.WarnContextf(ctx, "Failed to publish worker stream event to %s: %v", topic, err)
 	}
 	if msg.Body.Event == events.StreamEventRunCompleted || msg.Body.Event == events.StreamEventRunFailed {
 		s.emitCompleted(ctx, msg)
 	}
 	return nil
+}
+
+func (s *MQStreamSink) publishStream(ctx context.Context, topic string, msg events.MessageStreamMessage) error {
+	if s.task.Route.SessionID != "" {
+		return s.publisher.Publish(ctx, topic, msg)
+	}
+	return s.publisher.PublishRealtime(ctx, topic, msg)
 }
 
 func (s *MQStreamSink) streamTopic() string {

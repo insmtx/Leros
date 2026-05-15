@@ -25,6 +25,7 @@ type natsPublisher struct {
 }
 
 const defaultRealtimeFlushTimeout = 5 * time.Second
+const defaultSessionStreamMaxAge = 30 * time.Minute
 
 // NewPublisher 创建一个新的 NATS JetStream 发布者实例
 func NewPublisher(url string) (*natsPublisher, error) {
@@ -68,11 +69,7 @@ func (p *natsPublisher) PublishWithContext(ctx context.Context, topic string, me
 
 	// 声明 Stream (如果不存在)
 	streamName := streamNameFromTopic(topic)
-	_, err = p.js.AddStream(&nats.StreamConfig{
-		Name:     streamName,
-		Subjects: []string{topic, topic + ".*"},
-		Storage:  nats.FileStorage,
-	})
+	_, err = p.js.AddStream(streamConfigFromTopic(streamName, topic))
 	if err != nil {
 		return fmt.Errorf("failed to declare stream '%s': %w", streamName, err)
 	}
@@ -116,17 +113,12 @@ func (p *natsPublisher) PublishRealtimeWithContext(ctx context.Context, topic st
 func (p *natsPublisher) SubscribeWithContext(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
 	// 声明 Stream (如果不存在)
 	streamName := streamNameFromTopic(topic)
-	_, err := p.js.AddStream(&nats.StreamConfig{
-		Name:     streamName,
-		Subjects: []string{topic, topic + ".*"},
-		Storage:  nats.FileStorage,
-	})
+	_, err := p.js.AddStream(streamConfigFromTopic(streamName, topic))
 	if err != nil {
 		return fmt.Errorf("failed to declare stream '%s': %w", streamName, err)
 	}
 
-	// 创建持久化订阅
-	durableName := fmt.Sprintf("%s_SUBSCRIBER", strings.ReplaceAll(topic, ".", "_"))
+	// 创建每次连接独立的回放订阅，避免不同客户端共享同一 durable 状态。
 	sub, err := p.js.Subscribe(topic, func(msg *nats.Msg) {
 		// Ack before invoking the handler so long-running worker tasks do not
 		// exceed JetStream AckWait and get redelivered while still running.
@@ -138,7 +130,7 @@ func (p *natsPublisher) SubscribeWithContext(ctx context.Context, topic string, 
 		// 调用用户定义的处理函数
 		handler(msg)
 	},
-		nats.Durable(durableName),
+		nats.DeliverAll(),
 		nats.ManualAck(),
 		nats.Context(ctx),
 	)
@@ -220,6 +212,22 @@ func (p *natsPublisher) Close() error {
 // streamNameFromTopic 根据 topic 生成 Stream 名称
 func streamNameFromTopic(topic string) string {
 	return fmt.Sprintf("%s_STREAM", strings.ReplaceAll(topic, ".", "_"))
+}
+
+func streamConfigFromTopic(streamName string, topic string) *nats.StreamConfig {
+	cfg := &nats.StreamConfig{
+		Name:     streamName,
+		Subjects: []string{topic, topic + ".*"},
+		Storage:  nats.FileStorage,
+	}
+	if isSessionResultStreamTopic(topic) {
+		cfg.MaxAge = defaultSessionStreamMaxAge
+	}
+	return cfg
+}
+
+func isSessionResultStreamTopic(topic string) bool {
+	return strings.Contains(topic, ".session.") && strings.HasSuffix(topic, ".stream")
 }
 
 func contextWithDefaultDeadline(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {

@@ -12,6 +12,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/api/auth"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/pkg/dm"
 	"github.com/insmtx/Leros/backend/types"
 )
 
@@ -45,6 +46,19 @@ func (m *mockEventBus) Subscribe(ctx context.Context, topic string, handler func
 }
 
 func (m *mockEventBus) SubscribeRealtime(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
+	return nil
+}
+
+type recordingSubscriber struct {
+	topic       string
+	subscribeFn func()
+}
+
+func (r *recordingSubscriber) Subscribe(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
+	r.topic = topic
+	if r.subscribeFn != nil {
+		r.subscribeFn()
+	}
 	return nil
 }
 
@@ -713,5 +727,27 @@ func TestStreamSessionEvents_MissingCaller(t *testing.T) {
 
 	if err.Error() != "user not authenticated or org not set" {
 		t.Errorf("expected 'user not authenticated or org not set' error, got %s", err.Error())
+	}
+}
+
+func TestStreamSessionEvents_UsesPersistentSubscriber(t *testing.T) {
+	subscriber := &recordingSubscriber{}
+	service := setupTestServiceWithSubscriber(t, subscriber)
+	baseCtx := setupTestContextWithCaller(t)
+	ctx, cancel := context.WithCancel(baseCtx)
+	defer cancel()
+	subscriber.subscribeFn = cancel
+
+	err := service.StreamSessionEvents(ctx, "test_session", 0, nil)
+	if err != nil {
+		t.Fatalf("StreamSessionEvents failed: %v", err)
+	}
+
+	expectedTopic, err := dm.SessionResultStreamTopic(1, "test_session")
+	if err != nil {
+		t.Fatalf("SessionResultStreamTopic failed: %v", err)
+	}
+	if subscriber.topic != expectedTopic {
+		t.Fatalf("subscriber topic = %q, want %q", subscriber.topic, expectedTopic)
 	}
 }

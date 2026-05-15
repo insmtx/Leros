@@ -25,12 +25,12 @@ type Config struct {
 type Consumer struct {
 	cfg        Config
 	subscriber eventbus.Subscriber
-	publisher  eventbus.RealtimePublisher
+	publisher  streamPublisher
 	runner     agent.Runner
 }
 
 // New creates a worker task consumer.
-func New(cfg Config, subscriber eventbus.Subscriber, publisher eventbus.RealtimePublisher, runner agent.Runner) (*Consumer, error) {
+func New(cfg Config, subscriber eventbus.Subscriber, publisher streamPublisher, runner agent.Runner) (*Consumer, error) {
 	if cfg.OrgID == 0 {
 		return nil, fmt.Errorf("worker org_id is required")
 	}
