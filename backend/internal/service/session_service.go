@@ -561,7 +561,7 @@ func convertToContractSession(session *types.Session) *contract.Session {
 
 func convertToContractSessionMessage(message *types.SessionMessage) *contract.SessionMessage {
 	result := &contract.SessionMessage{
-		ID:          fmt.Sprintf("%d", message.ID), // 转换为 string 以匹配前端
+		ID:          fmt.Sprintf("%d", message.ID),
 		SessionID:   message.SessionID,
 		Role:        message.Role,
 		Content:     message.Content,
