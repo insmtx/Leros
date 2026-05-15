@@ -7,11 +7,13 @@ package mq
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/insmtx/Leros/backend/pkg/dm"
 	"github.com/nats-io/nats.go"
 	"github.com/ygpkg/yg-go/logs"
 )
@@ -67,13 +69,13 @@ func (p *natsPublisher) PublishWithContext(ctx context.Context, topic string, me
 	}
 
 	// 声明 Stream (如果不存在)
-	streamName := streamNameFromTopic(topic)
+	streamName := dm.StreamNameFromTopic(topic)
 	_, err = p.js.AddStream(&nats.StreamConfig{
 		Name:     streamName,
 		Subjects: []string{topic, topic + ".*"},
 		Storage:  nats.FileStorage,
 	})
-	if err != nil {
+	if err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) && !strings.Contains(err.Error(), "subjects overlap") {
 		return fmt.Errorf("failed to declare stream '%s': %w", streamName, err)
 	}
 
@@ -110,13 +112,13 @@ func (p *natsPublisher) PublishRealtimeWithContext(ctx context.Context, topic st
 // SubscribeWithContext 在给定上下文环境中订阅特定主题的消息
 func (p *natsPublisher) SubscribeWithContext(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
 	// 声明 Stream (如果不存在)
-	streamName := streamNameFromTopic(topic)
+	streamName := dm.StreamNameFromTopic(topic)
 	_, err := p.js.AddStream(&nats.StreamConfig{
 		Name:     streamName,
 		Subjects: []string{topic, topic + ".*"},
 		Storage:  nats.FileStorage,
 	})
-	if err != nil {
+	if err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) && !strings.Contains(err.Error(), "subjects overlap") {
 		return fmt.Errorf("failed to declare stream '%s': %w", streamName, err)
 	}
 
@@ -228,11 +230,6 @@ func (p *natsPublisher) Close() error {
 	p.conn.Close()
 
 	return nil
-}
-
-// streamNameFromTopic 根据 topic 生成 Stream 名称
-func streamNameFromTopic(topic string) string {
-	return fmt.Sprintf("%s_STREAM", strings.ReplaceAll(topic, ".", "_"))
 }
 
 func contextWithDefaultDeadline(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
