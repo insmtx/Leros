@@ -130,8 +130,6 @@ const (
 type MemoryType string
 
 const (
-	// MemoryTypeRedis 表示基于Redis的记忆存储
-	MemoryTypeRedis MemoryType = "redis"
 	// MemoryTypePostgres 表示基于PostgreSQL的记忆存储
 	MemoryTypePostgres MemoryType = "postgres"
 	// MemoryTypeInMemory 表示内存记忆存储

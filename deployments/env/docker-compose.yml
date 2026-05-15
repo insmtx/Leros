@@ -36,21 +36,6 @@ services:
       retries: 3
       start_period: 5s
 
-  redis:
-    image: registry.yygu.cn/library/redis:8.2
-    container_name: leros-redis
-    environment:
-      - REDIS_PASSWORD=redis_password
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "redis_password", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-
   leros:
     image: localhost/env_leros:latest
     container_name: leros-app
@@ -61,12 +46,9 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     environment:
       - DATABASE_URL=postgres://leros_user:leros_password@postgresql:5432/leros_db
       - NATS_URL=nats://nats:4222
-      - REDIS_URL=redis://:redis_password@redis:6379
       - GIN_MODE=release
     volumes:
       - ./config.yaml:/app/config.yaml
@@ -81,12 +63,9 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     environment:
       - DATABASE_URL=postgres://leros_user:leros_password@postgresql:5432/leros_db
       - NATS_URL=nats://nats:4222
-      - REDIS_URL=redis://:redis_password@redis:6379
     volumes:
       - ./config.yaml:/app/config.yaml
     command: ["worker", "--config", "/app/config.yaml"]
@@ -95,4 +74,3 @@ services:
 volumes:
   postgres_data:
   nats_data:
-  redis_data:

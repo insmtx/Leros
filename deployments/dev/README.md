@@ -15,7 +15,7 @@ Edit `.env` file and set your `LLM_API_KEY` and other configuration.
 
 ### Start Infrastructure
 
-Start infrastructure (PostgreSQL, NATS, Redis):
+Start infrastructure (PostgreSQL, NATS):
 
 ```bash
 docker-compose -f docker-compose.dev.yml up -d
@@ -62,7 +62,6 @@ docker-compose -f docker-compose.dev.yml down
 | PostgreSQL | 5433      | 5432           |
 | NATS       | 4223      | 4222           |
 | NATS Mon.  | 8223      | 8222           |
-| Redis      | 6380      | 6379           |
 
 ## Configuration Files
 
@@ -74,7 +73,7 @@ docker-compose -f docker-compose.dev.yml down
 
 The dev environment separates infrastructure from application services:
 
-1. **Infrastructure** (docker-compose): PostgreSQL, NATS, Redis
+1. **Infrastructure** (docker-compose): PostgreSQL, NATS
 2. **Application** (individual scripts): Server, Worker, Frontend
 
 This allows developers to:

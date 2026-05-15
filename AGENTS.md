@@ -303,7 +303,6 @@ MVP 特性：
 | 消息队列 | NATS JetStream | ✅ 活跃 |
 | ORM | GORM | ✅ 活跃 (类型已定义) |
 | 数据库 | Postgres | 🔄 计划中 |
-| 缓存 | Redis | 🔄 计划中 |
 | 向量存储 | Qdrant | 🔄 计划中 |
 | LLM | OpenAI / Claude / DeepSeek | 🔄 计划中 |
 
