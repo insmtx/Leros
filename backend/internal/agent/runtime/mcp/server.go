@@ -10,7 +10,6 @@ import (
 	"github.com/insmtx/Leros/backend/tools"
 	memorytools "github.com/insmtx/Leros/backend/tools/memory"
 	skillmanagetools "github.com/insmtx/Leros/backend/tools/skill_manage"
-	testtools "github.com/insmtx/Leros/backend/tools/test"
 	mcpsdk "github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 )
@@ -34,7 +33,6 @@ func NewServer() *Server {
 // NewTools returns the Leros tools that are currently exposed through MCP.
 func NewTools() []tools.Tool {
 	return []tools.Tool{
-		testtools.NewEchoTool(),
 		memorytools.NewTool(),
 		skillmanagetools.NewTool(),
 	}

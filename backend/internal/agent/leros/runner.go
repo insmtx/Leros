@@ -15,6 +15,10 @@ import (
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/deps"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/tools"
+	memorytools "github.com/insmtx/Leros/backend/tools/memory"
+	nodetools "github.com/insmtx/Leros/backend/tools/node"
+	skillmanagetools "github.com/insmtx/Leros/backend/tools/skill_manage"
+	skillusetools "github.com/insmtx/Leros/backend/tools/skill_use"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -53,6 +57,15 @@ const defaultSystemPrompt = `你是 Leros 助手。
 - 不反复确认；只有关键参数缺失、有歧义或操作高风险时才提问。
 - 报告结果时，优先说明实际完成了什么、关键返回值是什么、失败时下一步如何处理。
 - 只输出对用户有用的内容，不加无意义前缀。`
+
+var defaultToolNames = []string{
+	memorytools.ToolNameMemory,
+	skillusetools.ToolNameSkillUse,
+	skillmanagetools.ToolNameSkillManage,
+	nodetools.ToolNameNodeShell,
+	nodetools.ToolNameNodeFileRead,
+	nodetools.ToolNameNodeFileWrite,
+}
 
 // DefaultSystemPrompt 返回 Leros 内置 Agent 的基础系统提示词。
 func DefaultSystemPrompt() string {
@@ -107,10 +120,14 @@ func (r *Runner) runWithState(ctx context.Context, state *runState, startedAt ti
 		return nil, err
 	}
 
+	einoTools, err := r.toolAdapter.EinoTools(state.toolBinding, state.emitter)
+	if err != nil {
+		return nil, fmt.Errorf("build eino tools: %w", err)
+	}
+
 	flow, err := einoadapter.NewFlow(ctx, &einoadapter.FlowConfig{
 		Model:        chatModel,
-		ToolAdapter:  r.toolAdapter,
-		Binding:      state.toolBinding,
+		Tools:        einoTools,
 		Emitter:      state.emitter,
 		SystemPrompt: state.systemPrompt,
 		MaxStep:      state.maxStep,
@@ -200,10 +217,36 @@ func (r *Runner) buildRunState(req *agent.RequestContext) (*runState, error) {
 		systemPrompt: systemPrompt,
 		toolBinding: einoadapter.ToolBinding{
 			ToolContext:  toolCtx,
-			AllowedTools: req.Capability.AllowedTools,
+			AllowedTools: mergeToolNames(r.availableDefaultToolNames(), req.Capability.AllowedTools),
 		},
 		maxStep: maxStepForRequest(req),
 	}, nil
+}
+
+func (r *Runner) availableDefaultToolNames() []string {
+	if r == nil || r.toolAdapter == nil {
+		return nil
+	}
+	return r.toolAdapter.AvailableToolNames(defaultToolNames)
+}
+
+func mergeToolNames(values ...[]string) []string {
+	result := make([]string, 0)
+	seen := make(map[string]struct{})
+	for _, list := range values {
+		for _, name := range list {
+			name = strings.TrimSpace(name)
+			if name == "" {
+				continue
+			}
+			if _, exists := seen[name]; exists {
+				continue
+			}
+			seen[name] = struct{}{}
+			result = append(result, name)
+		}
+	}
+	return result
 }
 
 func buildUserInput(req *agent.RequestContext) string {

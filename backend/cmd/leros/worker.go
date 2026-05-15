@@ -16,6 +16,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/internal/worker/identity"
 	"github.com/insmtx/Leros/backend/internal/worker/taskconsumer"
+	nodetools "github.com/insmtx/Leros/backend/tools/node"
 	"github.com/spf13/cobra"
 	"github.com/ygpkg/yg-go/lifecycle"
 	"github.com/ygpkg/yg-go/logs"
@@ -117,6 +118,9 @@ func runTaskWorker(defaultRuntime string) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	if cfg.WriteSafeRoot != "" {
+		nodetools.SetWriteSafeRoot(cfg.WriteSafeRoot)
+	}
 	runtimeService, err := agentruntime.NewService(ctx, agentruntime.Options{
 		CLIConfig:      cfg.CLI,
 		ToolsEnabled:   true,

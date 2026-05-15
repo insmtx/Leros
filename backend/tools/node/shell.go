@@ -3,28 +3,31 @@ package nodetools
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/insmtx/Leros/backend/tools"
+	"github.com/insmtx/Leros/backend/tools/node/security"
+	"github.com/insmtx/Leros/backend/tools/node/util"
 )
 
-// NodeShellTool executes shell commands in a node container.
+// NodeShellTool executes shell commands in the worker environment.
 type NodeShellTool struct {
 	tools.BaseTool
 	executor nodeExecutor
 }
 
-// NewNodeShellTool creates a Docker-backed node shell tool.
+// NewNodeShellTool creates a worker-local node shell tool.
 func NewNodeShellTool() *NodeShellTool {
-	return newNodeShellToolWithExecutor(dockerCLIExecutor{})
+	return newNodeShellToolWithExecutor(localExecutor{})
 }
 
 func newNodeShellToolWithExecutor(executor nodeExecutor) *NodeShellTool {
 	return &NodeShellTool{
 		BaseTool: tools.NewBaseTool(
 			ToolNameNodeShell,
-			"Execute a shell command inside an assistant node Docker container",
+			"Execute a shell command in the worker environment",
 			tools.Schema{
 				Type:     "object",
 				Required: []string{"command"},
@@ -35,7 +38,7 @@ func newNodeShellToolWithExecutor(executor nodeExecutor) *NodeShellTool {
 					},
 					"working_dir": {
 						Type:        "string",
-						Description: "Working directory inside the container; defaults to /workspace",
+						Description: "Working directory inside the workspace; defaults to the workspace root",
 					},
 					"timeout": {
 						Type:        "integer",
@@ -53,10 +56,10 @@ func (t *NodeShellTool) Validate(input map[string]interface{}) error {
 	if input == nil {
 		return fmt.Errorf("input is required")
 	}
-	if stringValue(input, "command") == "" {
+	if util.StringValue(input, "command") == "" {
 		return fmt.Errorf("command is required")
 	}
-	if _, err := intValue(input["timeout"]); err != nil {
+	if _, err := util.IntValue(input["timeout"]); err != nil {
 		return fmt.Errorf("timeout must be an integer")
 	}
 	if workingDir, ok := input["working_dir"].(string); ok && strings.TrimSpace(workingDir) == "" {
@@ -65,72 +68,76 @@ func (t *NodeShellTool) Validate(input map[string]interface{}) error {
 	return nil
 }
 
-// Execute runs the shell command inside the target node container.
+// Execute runs the shell command in the worker environment.
 func (t *NodeShellTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	if t.executor == nil {
 		return "", fmt.Errorf("node executor is required")
 	}
 
-	toolCtx, err := tools.RequireToolContext(ctx)
-	if err != nil {
-		return "", fmt.Errorf("请先与一个已绑定工作节点的 AI 员工对话")
-	}
-	nodeInfo, err := nodeInfoForAssistant(toolCtx)
-	if err != nil {
-		return "", err
-	}
-	containerID := nodeInfo.ContainerID
+	command := util.StringValue(input, "command")
 
-	command := stringValue(input, "command")
-	workingDir := stringValue(input, "working_dir")
-	if workingDir == "" {
-		workingDir = defaultWorkingDir
+	approval := security.CheckDangerousCommand(command)
+	if !approval.Approved {
+		return tools.JSONString(map[string]interface{}{
+			"command":     command,
+			"approved":    false,
+			"status":      approval.Status,
+			"pattern_key": approval.PatternKey,
+			"description": approval.Description,
+			"message":     approval.Message,
+		})
 	}
 
-	timeoutSeconds, _ := intValue(input["timeout"])
+	workingDir := util.StringValue(input, "working_dir")
+	if workingDir != "" {
+		absPath, err := filepath.Abs(workingDir)
+		if err != nil {
+			return "", fmt.Errorf("resolve working directory: %w", err)
+		}
+		workingDir = absPath
+	}
+
+	timeoutSeconds, _ := util.IntValue(input["timeout"])
 	if timeoutSeconds == 0 {
 		timeoutSeconds = defaultShellTimeout
 	}
-	timeoutSeconds = clampInt(timeoutSeconds, minShellTimeout, maxShellTimeout)
+	timeoutSeconds = util.ClampInt(timeoutSeconds, minShellTimeout, maxShellTimeout)
 
-	shellCommand := fmt.Sprintf("cd %s && %s", shellQuote(workingDir), command)
 	result, err := t.executor.Exec(ctx, nodeExecRequest{
-		ContainerID: containerID,
-		Args:        []string{"sh", "-c", shellCommand},
-		Timeout:     time.Duration(timeoutSeconds) * time.Second,
+		Args:       []string{"sh", "-lc", command},
+		WorkingDir: workingDir,
+		Timeout:    time.Duration(timeoutSeconds) * time.Second,
 	})
 	if err != nil {
 		return "", fmt.Errorf("execute node shell command: %w", err)
 	}
 	if result.TimedOut {
 		return tools.JSONString(map[string]interface{}{
-			"container_id": containerID,
-			"command":      command,
-			"working_dir":  workingDir,
-			"timeout":      timeoutSeconds,
-			"timed_out":    true,
-			"message":      fmt.Sprintf("command timed out after %ds", timeoutSeconds),
+			"command":     command,
+			"working_dir": workingDir,
+			"timeout":     timeoutSeconds,
+			"timed_out":   true,
+			"message":     fmt.Sprintf("command timed out after %ds", timeoutSeconds),
 		})
 	}
 
-	combined := combineOutput(result.Stdout, result.Stderr)
-	output, truncated, totalLines := truncateOutput(combined, defaultOutputMaxLines)
+	combined := util.CombineOutput(result.Stdout, result.Stderr)
+	output, truncated, totalLines := util.TruncateOutput(combined, defaultOutputMaxLines)
 	display := fmt.Sprintf("[exit_code=%d]", result.ExitCode)
 	if output != "" {
 		display += "\n" + output
 	}
 
 	return tools.JSONString(map[string]interface{}{
-		"container_id": containerID,
-		"command":      command,
-		"working_dir":  workingDir,
-		"timeout":      timeoutSeconds,
-		"exit_code":    result.ExitCode,
-		"stdout":       result.Stdout,
-		"stderr":       result.Stderr,
-		"output":       output,
-		"display":      display,
-		"truncated":    truncated,
-		"total_lines":  totalLines,
+		"command":     command,
+		"working_dir": workingDir,
+		"timeout":     timeoutSeconds,
+		"exit_code":   result.ExitCode,
+		"stdout":      result.Stdout,
+		"stderr":      result.Stderr,
+		"output":      output,
+		"display":     display,
+		"truncated":   truncated,
+		"total_lines": totalLines,
 	})
 }

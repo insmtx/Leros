@@ -10,6 +10,7 @@ import (
 	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
 	"github.com/insmtx/Leros/backend/tools"
 	memorytools "github.com/insmtx/Leros/backend/tools/memory"
+	nodetools "github.com/insmtx/Leros/backend/tools/node"
 	skillmanagetools "github.com/insmtx/Leros/backend/tools/skill_manage"
 	skillusetools "github.com/insmtx/Leros/backend/tools/skill_use"
 	"github.com/ygpkg/yg-go/logs"
@@ -105,6 +106,9 @@ func registerTools(registry *tools.Registry, catalogProvider *skillcatalog.FileC
 	}
 	if err := memorytools.Register(registry); err != nil {
 		return fmt.Errorf("register memory tool: %w", err)
+	}
+	if err := nodetools.Register(registry); err != nil {
+		return fmt.Errorf("register node tools: %w", err)
 	}
 	return nil
 }

@@ -74,6 +74,29 @@ func (a *ToolAdapter) Definitions() []ToolDefinition {
 	return definitions
 }
 
+// AvailableToolNames returns registered tool names from the requested list.
+func (a *ToolAdapter) AvailableToolNames(names []string) []string {
+	if a == nil || a.registry == nil || len(names) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(names))
+	seen := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		if _, err := a.registry.Get(name); err == nil {
+			result = append(result, name)
+			seen[name] = struct{}{}
+		}
+	}
+	return result
+}
+
 // EinoTools returns Eino wrappers that inject runtime identity at call time.
 func (a *ToolAdapter) EinoTools(binding ToolBinding, emitter *events.Emitter) ([]einotool.BaseTool, error) {
 	if a == nil || a.registry == nil {
