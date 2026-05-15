@@ -60,18 +60,24 @@ func TestMQStreamSinkPublishesCompletedEventToSessionCompletedTopic(t *testing.T
 
 			streamTopic, _ := dm.SessionResultStreamTopic(orgID, sessionID)
 			completedTopic, _ := dm.SessionCompletedTopic(orgID, sessionID)
-			if len(publisher.calls) != 2 {
-				t.Fatalf("expected stream and completed publishes, got %d", len(publisher.calls))
+			if len(publisher.realtimeCalls) != 1 {
+				t.Fatalf("expected one stream realtime publish, got %d", len(publisher.realtimeCalls))
 			}
-			if publisher.calls[0].topic != streamTopic {
-				t.Fatalf("expected first publish to stream topic %q, got %q", streamTopic, publisher.calls[0].topic)
+			if len(publisher.persistentCalls) != 1 {
+				t.Fatalf("expected one completed persistent publish, got %d", len(publisher.persistentCalls))
 			}
-			if publisher.calls[1].topic != completedTopic {
-				t.Fatalf("expected second publish to completed topic %q, got %q", completedTopic, publisher.calls[1].topic)
+			if publisher.flushes != 1 {
+				t.Fatalf("expected one realtime flush, got %d", publisher.flushes)
 			}
-			completedMsg, ok := publisher.calls[1].event.(events.MessageStreamMessage)
+			if publisher.realtimeCalls[0].topic != streamTopic {
+				t.Fatalf("expected realtime publish to stream topic %q, got %q", streamTopic, publisher.realtimeCalls[0].topic)
+			}
+			if publisher.persistentCalls[0].topic != completedTopic {
+				t.Fatalf("expected persistent publish to completed topic %q, got %q", completedTopic, publisher.persistentCalls[0].topic)
+			}
+			completedMsg, ok := publisher.persistentCalls[0].event.(events.MessageStreamMessage)
 			if !ok {
-				t.Fatalf("expected completed publish event type %T, got %T", completedMsg, publisher.calls[1].event)
+				t.Fatalf("expected completed publish event type %T, got %T", completedMsg, publisher.persistentCalls[0].event)
 			}
 			if completedMsg.Body.Event != tt.wantStream {
 				t.Fatalf("expected completed event %q, got %q", tt.wantStream, completedMsg.Body.Event)
@@ -84,18 +90,33 @@ func TestMQStreamSinkPublishesCompletedEventToSessionCompletedTopic(t *testing.T
 }
 
 type recordingRealtimePublisher struct {
-	calls []realtimePublishCall
+	realtimeCalls   []publishCall
+	persistentCalls []publishCall
+	flushes         int
 }
 
-type realtimePublishCall struct {
+type publishCall struct {
 	topic string
 	event any
 }
 
-func (p *recordingRealtimePublisher) PublishRealtime(_ context.Context, topic string, event any) error {
-	p.calls = append(p.calls, realtimePublishCall{
+func (p *recordingRealtimePublisher) Publish(_ context.Context, topic string, event any) error {
+	p.persistentCalls = append(p.persistentCalls, publishCall{
 		topic: topic,
 		event: event,
 	})
+	return nil
+}
+
+func (p *recordingRealtimePublisher) PublishRealtime(_ context.Context, topic string, event any) error {
+	p.realtimeCalls = append(p.realtimeCalls, publishCall{
+		topic: topic,
+		event: event,
+	})
+	return nil
+}
+
+func (p *recordingRealtimePublisher) FlushRealtime(context.Context) error {
+	p.flushes++
 	return nil
 }

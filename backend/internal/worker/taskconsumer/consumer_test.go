@@ -133,8 +133,8 @@ func sendWorkerTaskMessage(ctx context.Context, t *testing.T, publisher mq.Publi
 }
 
 // receiveWorkerTaskReply 订阅 agent 运行回复 topic，并等待当前测试任务的完成消息。
-// 因为回复使用 Core NATS 实时消息，测试会先启动本函数并确认订阅成功，再发送任务，避免运行很快时漏掉回复。
-func receiveWorkerTaskReply(ctx context.Context, t *testing.T, subscriber mq.RealtimeSubscriber, streamTopic string, completedTopic string, taskID string, runID string, ready chan<- error) error {
+// stream topic 使用 Core NATS 实时订阅，completed topic 使用 JetStream 订阅以匹配最终落盘语义。
+func receiveWorkerTaskReply(ctx context.Context, t *testing.T, subscriber mq.EventBus, streamTopic string, completedTopic string, taskID string, runID string, ready chan<- error) error {
 	t.Helper()
 
 	completedCh := make(chan events.MessageStreamMessage, 1)
@@ -155,7 +155,7 @@ func receiveWorkerTaskReply(ctx context.Context, t *testing.T, subscriber mq.Rea
 		ready <- err
 		return err
 	}
-	err = subscriber.SubscribeRealtime(ctx, completedTopic, func(natsMsg *nats.Msg) {
+	err = subscriber.Subscribe(ctx, completedTopic, func(natsMsg *nats.Msg) {
 		var completedMsg events.MessageStreamMessage
 		if err := json.Unmarshal(natsMsg.Data, &completedMsg); err != nil {
 			t.Logf("\ntopic:\n【%s】\nmalformed:%v\n%s\n\n", completedTopic, err, string(natsMsg.Data))

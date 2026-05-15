@@ -40,6 +40,10 @@ func (m *mockEventBus) PublishRealtime(ctx context.Context, topic string, event 
 	return nil
 }
 
+func (m *mockEventBus) FlushRealtime(ctx context.Context) error {
+	return nil
+}
+
 func (m *mockEventBus) Subscribe(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
 	return nil
 }

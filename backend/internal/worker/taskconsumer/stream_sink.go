@@ -11,14 +11,20 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
+// ResultPublisher publishes worker run stream events and persisted result events.
+type ResultPublisher interface {
+	eventbus.Publisher
+	eventbus.RealtimePublisher
+}
+
 // MQStreamSink publishes agent runtime events as realtime messages.
 type MQStreamSink struct {
-	publisher eventbus.RealtimePublisher
+	publisher ResultPublisher
 	task      events.WorkerTaskMessage
 }
 
 // NewMQStreamSink creates a stream sink for one worker task.
-func NewMQStreamSink(publisher eventbus.RealtimePublisher, task events.WorkerTaskMessage) *MQStreamSink {
+func NewMQStreamSink(publisher ResultPublisher, task events.WorkerTaskMessage) *MQStreamSink {
 	return &MQStreamSink{
 		publisher: publisher,
 		task:      task,
@@ -88,8 +94,12 @@ func (s *MQStreamSink) emitCompleted(ctx context.Context, msg events.MessageStre
 		logs.WarnContextf(ctx, "Failed to get session completed topic for stream sink: %v", err)
 		return
 	}
-	if err := s.publisher.PublishRealtime(ctx, topic, msg); err != nil {
+	if err := s.publisher.Publish(ctx, topic, msg); err != nil {
 		logs.WarnContextf(ctx, "Failed to publish worker completed event to %s: %v", topic, err)
+		return
+	}
+	if err := s.publisher.FlushRealtime(ctx); err != nil {
+		logs.WarnContextf(ctx, "Failed to flush worker completed event to %s: %v", topic, err)
 	}
 }
 

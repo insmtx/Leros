@@ -103,11 +103,6 @@ func (p *natsPublisher) PublishRealtimeWithContext(ctx context.Context, topic st
 	if err := p.conn.Publish(topic, body); err != nil {
 		return fmt.Errorf("failed to publish message to subject '%s': %w", topic, err)
 	}
-	flushCtx, cancel := contextWithDefaultDeadline(ctx, defaultRealtimeFlushTimeout)
-	defer cancel()
-	if err := p.conn.FlushWithContext(flushCtx); err != nil {
-		return fmt.Errorf("failed to flush message to subject '%s': %w", topic, err)
-	}
 
 	return nil
 }
@@ -166,6 +161,24 @@ func (p *natsPublisher) Publish(ctx context.Context, topic string, event any) er
 // PublishRealtime implements the eventbus.RealtimePublisher interface.
 func (p *natsPublisher) PublishRealtime(ctx context.Context, topic string, event any) error {
 	return p.PublishRealtimeWithContext(ctx, topic, event)
+}
+
+// FlushRealtime implements the eventbus.RealtimePublisher interface.
+func (p *natsPublisher) FlushRealtime(ctx context.Context) error {
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return fmt.Errorf("NATS client is closed")
+	}
+	p.mu.Unlock()
+
+	flushCtx, cancel := contextWithDefaultDeadline(ctx, defaultRealtimeFlushTimeout)
+	defer cancel()
+	if err := p.conn.FlushWithContext(flushCtx); err != nil {
+		return fmt.Errorf("failed to flush realtime messages: %w", err)
+	}
+
+	return nil
 }
 
 // Subscribe implements the eventbus.Subscriber interface
