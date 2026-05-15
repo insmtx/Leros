@@ -68,7 +68,7 @@ Leros 采用**契约驱动的服务架构**，而不是：
 backend/
 │
 ├── cmd/
-│   └── singer/                # 主后端服务（Phase 1.5: Server+Orchestrator 单进程）
+│   └── leros/                # 主后端服务（Phase 1.5: Server+Orchestrator 单进程）
 │       ├── main.go            # 主入口
 │       ├── server.go          # Server 启动逻辑
 │       └── worker.go          # Worker stub（Phase 2 完善）
@@ -664,7 +664,7 @@ type StreamPayload struct {
 #### Phase 1.5（当前实际）：单进程 Server+Worker+Orchestrator
 
 ```bash
-cmd/singer/               # 主服务（所有功能：Server + Worker + Orchestrator）
+cmd/leros/               # 主服务（所有功能：Server + Worker + Orchestrator）
 ```
 
 **特点：**
@@ -677,7 +677,7 @@ cmd/singer/               # 主服务（所有功能：Server + Worker + Orchest
 #### Phase 2（计划）：分离 Worker 进程逻辑
 
 ```bash
-cmd/singer/               # 通过启动参数区分模式
+cmd/leros/               # 通过启动参数区分模式
                           # --mode=server   API 服务
                           # --mode=worker   执行节点
 ```

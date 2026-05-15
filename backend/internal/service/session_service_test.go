@@ -48,16 +48,26 @@ func (m *mockEventBus) SubscribeRealtime(ctx context.Context, topic string, hand
 	return nil
 }
 
+// mockInferrer 是一个简单的 Mock 实现，总是返回固定的 assistant ID
+type mockInferrer struct {
+	assistantID uint
+}
+
+func (m *mockInferrer) InferAssignedAssistantID(ctx context.Context, sessionOrgID uint, sessionType string) uint {
+	return m.assistantID
+}
+
 func setupTestService(t *testing.T) contract.SessionService {
 	t.Helper()
 	db := setupTestDB(t)
-	return NewSessionService(db, &mockEventBus{}, nil)
+	inferrer := &mockInferrer{assistantID: 1}
+	return NewSessionService(db, &mockEventBus{}, inferrer)
 }
 
 func setupTestServiceWithSubscriber(t *testing.T, subscriber mq.Subscriber) contract.SessionService {
 	t.Helper()
 	db := setupTestDB(t)
-	// 使用 mockEventBus 包装 subscriber
+	inferrer := &mockInferrer{assistantID: 1}
 	eb := &struct {
 		mq.Publisher
 		mq.Subscriber
@@ -69,7 +79,7 @@ func setupTestServiceWithSubscriber(t *testing.T, subscriber mq.Subscriber) cont
 		Publisher:          &mockEventBus{},
 		Subscriber:         subscriber,
 	}
-	return NewSessionService(db, eb, nil)
+	return NewSessionService(db, eb, inferrer)
 }
 
 func setupTestContextWithoutCaller(t *testing.T) context.Context {
@@ -530,9 +540,11 @@ func TestListSessions_FilterByType(t *testing.T) {
 
 	typeFilter := string(types.SessionTypeUserChat)
 	listReq := &contract.ListSessionsRequest{
-		Type:    &typeFilter,
-		Page:    1,
-		PerPage: 20,
+		Type: &typeFilter,
+		Pagination: contract.Pagination{
+			Offset: 0,
+			Limit:  20,
+		},
 	}
 
 	result, err := service.ListSessions(ctx, listReq)
@@ -573,9 +585,11 @@ func TestListSessions_FilterByStatus(t *testing.T) {
 
 	statusFilter := string(types.SessionStatusActive)
 	listReq := &contract.ListSessionsRequest{
-		Status:  &statusFilter,
-		Page:    1,
-		PerPage: 20,
+		Status: &statusFilter,
+		Pagination: contract.Pagination{
+			Offset: 0,
+			Limit:  20,
+		},
 	}
 
 	result, err := service.ListSessions(ctx, listReq)

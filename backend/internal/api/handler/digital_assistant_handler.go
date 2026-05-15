@@ -209,6 +209,8 @@ func (h *DigitalAssistantHandler) ListDigitalAssistant(ctx *gin.Context) {
 		return
 	}
 
+	req.Pagination.Fill()
+
 	result, err := h.service.ListDigitalAssistant(ctx, &req)
 	if err != nil {
 		if err.Error() == "user not authenticated or org not set" {

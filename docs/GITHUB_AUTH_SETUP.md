@@ -38,7 +38,7 @@ GET /github/callback
 这将在成功时返回带有访问令牌和用户信息的 JSON 响应.
 
 ## 数据持久化
-认证的用户信息将保存在数据库的 `singer_users` 表中，包含以下字段:
+认证的用户信息将保存在数据库的 `leros_users` 表中，包含以下字段:
 - github_id: GitHub 上用户的唯一 ID
 - github_login: 用户的 GitHub 登录名
 - name: 用户的显示名称

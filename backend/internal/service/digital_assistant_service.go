@@ -208,7 +208,8 @@ func (s *digitalAssistantService) ListDigitalAssistant(ctx context.Context, req 
 		return nil, err
 	}
 
-	entities, total, err := db.ListDigitalAssistant(ctx, s.db, &orgID, nil, req.Status, req.Keyword, req.Page, req.PerPage)
+	entities, total, err := db.ListDigitalAssistant(ctx, s.db, &orgID, nil, req.Status, req.Keyword, req.Offset, req.Limit)
+
 	if err != nil {
 		return nil, err
 	}
@@ -219,9 +220,10 @@ func (s *digitalAssistantService) ListDigitalAssistant(ctx context.Context, req 
 	}
 
 	return &contract.DigitalAssistantList{
-		Total: total,
-		Page:  req.Page,
-		Items: items,
+		Total:  total,
+		Offset: req.Offset,
+		Limit:  req.Limit,
+		Items:  items,
 	}, nil
 }
 

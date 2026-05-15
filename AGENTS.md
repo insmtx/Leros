@@ -5,7 +5,7 @@
 ## 构建/检查/测试 命令
 
 ### 构建命令
-- `go build -o ./bundles/singer ./backend/cmd/singer/main.go` - 构建主 Leros 后端服务（输出到 `./bundles/`）
+- `go build -o ./bundles/leros ./backend/cmd/leros/main.go` - 构建主 Leros 后端服务（输出到 `./bundles/`）
 - `make docker-build` - 构建 Docker 镜像（标签：registry.yygu.cn/insmtx/Leros:latest）
 - `make docker-run` - 在本地运行 Docker 镜像
 - `make run` - 以前台模式启动 docker-compose 服务
@@ -99,7 +99,7 @@ import (
 ## 项目结构
 
 - `/backend` - 主要 Go 应用程序代码
-  - `/backend/cmd/singer` - 主 Leros 后端服务入口点
+  - `/backend/cmd/leros` - 主 Leros 后端服务入口点
   - `/backend/config` - 配置加载和类型
   - `/backend/gateway` - HTTP 网关包
   - `/backend/interaction` - 事件驱动交互层
@@ -243,7 +243,7 @@ Leros/
 │
 ├── backend/
 │   ├── cmd/
-│   │   └── singer/          # 主后端服务（HTTP + 事件网关）
+│   │   └── leros/          # 主后端服务（HTTP + 事件网关）
 │   │
 │   ├── config/              # 配置加载和类型（GitHub app config，等）
 │   │

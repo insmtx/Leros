@@ -17,6 +17,10 @@ func NewLLMModelHandler(service contract.LLMModelService) *LLMModelHandler {
 	return &LLMModelHandler{service: service}
 }
 
+// ================================================================
+// Route Registration
+// ================================================================
+
 func (h *LLMModelHandler) RegisterRoutes(r gin.IRouter) {
 	r.POST("/CreateLLMModel", h.CreateLLMModel)
 	r.POST("/GetLLMModel", h.GetLLMModel)
@@ -32,6 +36,21 @@ func RegisterLLMModelRoutes(r gin.IRouter, service contract.LLMModelService) {
 	h.RegisterRoutes(r)
 }
 
+// ================================================================
+// Handler Methods
+// ================================================================
+
+// @Summary 创建LLM模型
+// @Description 创建一个新的LLM模型配置
+// @Tags LLMModel
+// @Accept json
+// @Produce json
+// @Param body body contract.CreateLLMModelRequest true "创建LLM模型请求"
+// @Success 200 {object} dto.Response "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /CreateLLMModel [post]
 func (h *LLMModelHandler) CreateLLMModel(ctx *gin.Context) {
 	var req contract.CreateLLMModelRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -52,6 +71,19 @@ type GetLLMModelRequest struct {
 	Code *string `json:"code,omitempty"`
 }
 
+// @Summary 获取LLM模型详情
+// @Description 根据ID或Code获取LLM模型配置详情
+// @Tags LLMModel
+// @Accept json
+// @Produce json
+// @Param body body GetLLMModelRequest true "获取LLM模型请求"
+// @Success 200 {object} dto.Response "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 403 {object} dto.ErrorResponse "权限不足"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /GetLLMModel [post]
 func (h *LLMModelHandler) GetLLMModel(ctx *gin.Context) {
 	var req GetLLMModelRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -80,6 +112,16 @@ func (h *LLMModelHandler) GetLLMModel(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, dto.Success(result))
 }
 
+// @Summary 获取默认LLM模型
+// @Description 获取组织的默认LLM模型配置
+// @Tags LLMModel
+// @Accept json
+// @Produce json
+// @Success 200 {object} dto.Response "成功响应"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 404 {object} dto.ErrorResponse "默认模型不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /GetDefaultLLMModel [post]
 func (h *LLMModelHandler) GetDefaultLLMModel(ctx *gin.Context) {
 	result, err := h.service.GetDefaultLLMModel(ctx)
 	if err != nil {
@@ -94,6 +136,19 @@ type UpdateLLMModelRequest struct {
 	contract.UpdateLLMModelRequest
 }
 
+// @Summary 更新LLM模型
+// @Description 更新LLM模型配置信息
+// @Tags LLMModel
+// @Accept json
+// @Produce json
+// @Param body body UpdateLLMModelRequest true "更新LLM模型请求"
+// @Success 200 {object} dto.Response "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 403 {object} dto.ErrorResponse "权限不足"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /UpdateLLMModel [post]
 func (h *LLMModelHandler) UpdateLLMModel(ctx *gin.Context) {
 	var req UpdateLLMModelRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -113,6 +168,19 @@ type DeleteLLMModelRequest struct {
 	ID uint `json:"id" binding:"required"`
 }
 
+// @Summary 删除LLM模型
+// @Description 根据ID删除LLM模型配置
+// @Tags LLMModel
+// @Accept json
+// @Produce json
+// @Param body body DeleteLLMModelRequest true "删除LLM模型请求"
+// @Success 200 {object} dto.Response "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 403 {object} dto.ErrorResponse "权限不足"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /DeleteLLMModel [post]
 func (h *LLMModelHandler) DeleteLLMModel(ctx *gin.Context) {
 	var req DeleteLLMModelRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -127,12 +195,25 @@ func (h *LLMModelHandler) DeleteLLMModel(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, dto.Success(nil))
 }
 
+// @Summary 查询LLM模型列表
+// @Description 分页查询LLM模型配置列表
+// @Tags LLMModel
+// @Accept json
+// @Produce json
+// @Param body body contract.ListLLMModelsRequest true "查询列表请求"
+// @Success 200 {object} dto.Response "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /ListLLMModels [post]
 func (h *LLMModelHandler) ListLLMModels(ctx *gin.Context) {
 	var req contract.ListLLMModelsRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
 		return
 	}
+
+	req.Pagination.Fill()
 
 	result, err := h.service.ListLLMModels(ctx, &req)
 	if err != nil {
@@ -142,6 +223,17 @@ func (h *LLMModelHandler) ListLLMModels(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, dto.Success(result))
 }
 
+// @Summary 测试LLM模型
+// @Description 测试LLM模型配置的连通性
+// @Tags LLMModel
+// @Accept json
+// @Produce json
+// @Param body body contract.TestLLMModelRequest true "测试LLM模型请求"
+// @Success 200 {object} dto.Response "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /TestLLMModel [post]
 func (h *LLMModelHandler) TestLLMModel(ctx *gin.Context) {
 	var req contract.TestLLMModelRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -157,27 +249,35 @@ func (h *LLMModelHandler) TestLLMModel(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, dto.Success(result))
 }
 
+// ================================================================
+// Error Handling
+// ================================================================
+
 func handleLLMModelServiceError(ctx *gin.Context, err error) {
-	if err.Error() == "user not authenticated or org not set" {
-		ctx.JSON(http.StatusUnauthorized, dto.Error(dto.CodeInternalError, err.Error()))
+	errMsg := err.Error()
+
+	// 通用错误处理
+	switch errMsg {
+	case "user not authenticated or org not set":
+		ctx.JSON(http.StatusUnauthorized, dto.Error(dto.CodeInternalError, errMsg))
+		return
+	case "permission denied":
+		ctx.JSON(http.StatusForbidden, dto.Error(dto.CodeInternalError, errMsg))
 		return
 	}
-	if err.Error() == "permission denied" {
-		ctx.JSON(http.StatusForbidden, dto.Error(dto.CodeInternalError, err.Error()))
-		return
+
+	// LLM模型特有错误处理
+	switch errMsg {
+	case "llm model not found":
+		ctx.JSON(http.StatusNotFound, dto.Error(dto.CodeNotFound, errMsg))
+	case "id or code is required",
+		"provider is required",
+		"model is required",
+		"base_url is required",
+		"api_key is required",
+		"llm model with this code already exists":
+		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, errMsg))
+	default:
+		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, errMsg))
 	}
-	if err.Error() == "llm model not found" {
-		ctx.JSON(http.StatusNotFound, dto.Error(dto.CodeNotFound, err.Error()))
-		return
-	}
-	if err.Error() == "id or code is required" ||
-		err.Error() == "provider is required" ||
-		err.Error() == "model is required" ||
-		err.Error() == "base_url is required" ||
-		err.Error() == "api_key is required" ||
-		err.Error() == "llm model with this code already exists" {
-		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
-		return
-	}
-	ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
 }

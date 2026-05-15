@@ -12,11 +12,11 @@ import (
 func TestSyncBuiltinSkillsAlsoSyncsLerosUserSkills(t *testing.T) {
 	builtinRoot := t.TempDir()
 	targetRoot := t.TempDir()
-	singerOSHome := t.TempDir()
-	t.Setenv(leros.EnvHome, singerOSHome)
+	lerosOSHome := t.TempDir()
+	t.Setenv(leros.EnvHome, lerosOSHome)
 
 	writeSyncTestSkill(t, filepath.Join(builtinRoot, "review-flow"), "review-flow", "builtin body")
-	writeSyncTestSkill(t, filepath.Join(singerOSHome, "skills", "review-flow"), "review-flow", "user body")
+	writeSyncTestSkill(t, filepath.Join(lerosOSHome, "skills", "review-flow"), "review-flow", "user body")
 
 	if err := SyncBuiltinSkills(builtinRoot, []string{targetRoot}); err != nil {
 		t.Fatalf("sync skills: %v", err)

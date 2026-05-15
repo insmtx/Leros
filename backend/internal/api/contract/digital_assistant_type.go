@@ -150,17 +150,17 @@ type UpdateDigitalAssistantStatusRequest struct {
 
 // ListDigitalAssistantRequest 查询数字助手列表请求
 type ListDigitalAssistantRequest struct {
-	Status  *string `form:"status,omitempty"`
-	Keyword *string `form:"keyword,omitempty"`
-	Page    int     `form:"page,default=1"`
-	PerPage int     `form:"per_page,default=20"`
+	Status  *string `json:"status,omitempty"`
+	Keyword *string `json:"keyword,omitempty"`
+	Pagination
 }
 
 // DigitalAssistantList 数字助手列表响应
 type DigitalAssistantList struct {
-	Total int64              `json:"total"`
-	Page  int                `json:"page"`
-	Items []DigitalAssistant `json:"items"`
+	Total  int64              `json:"total"`
+	Offset int                `json:"offset"`
+	Limit  int                `json:"limit"`
+	Items  []DigitalAssistant `json:"items"`
 }
 
 // DigitalAssistantDetail 数字助手详情响应

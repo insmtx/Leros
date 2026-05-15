@@ -4,7 +4,7 @@ worker_id: 1
 org_id: 1
 
 database:
-  url: "postgres://singer_dev_user:singer_dev_password@localhost:5432/singer_dev_db?sslmode=disable"
+  url: "postgres://leros_dev_user:leros_dev_password@localhost:5433/leros_dev_db?sslmode=disable"
   debug: true
 
 nats:

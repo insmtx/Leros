@@ -14,7 +14,1594 @@ const docTemplate = `{
     },
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
-    "paths": {}
+    "paths": {
+        "/AddMessage": {
+            "post": {
+                "description": "向指定会话添加一条消息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "添加会话消息",
+                "parameters": [
+                    {
+                        "description": "添加消息请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.AddMessageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ClearSessionMessages": {
+            "post": {
+                "description": "清空指定会话的所有消息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "清空会话消息",
+                "parameters": [
+                    {
+                        "description": "清空消息请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.ClearSessionMessagesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/CreateDigitalAssistant": {
+            "post": {
+                "description": "创建一个新的数字助手实例",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "DigitalAssistant"
+                ],
+                "summary": "创建数字助手",
+                "parameters": [
+                    {
+                        "description": "创建数字助手请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.CreateDigitalAssistantRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/CreateSession": {
+            "post": {
+                "description": "创建一个新的会话实例",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "创建会话",
+                "parameters": [
+                    {
+                        "description": "创建会话请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.CreateSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/DeleteDigitalAssistant": {
+            "post": {
+                "description": "根据ID删除数字助手",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "DigitalAssistant"
+                ],
+                "summary": "删除数字助手",
+                "parameters": [
+                    {
+                        "description": "删除数字助手请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.DeleteDigitalAssistantRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "权限不足",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/DeleteMessage": {
+            "post": {
+                "description": "根据ID删除会话消息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "删除会话消息",
+                "parameters": [
+                    {
+                        "description": "删除消息请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.DeleteMessageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/DeleteSession": {
+            "post": {
+                "description": "根据ID删除会话",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "删除会话",
+                "parameters": [
+                    {
+                        "description": "删除会话请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.DeleteSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/GetDigitalAssistant": {
+            "post": {
+                "description": "根据ID或Code获取数字助手详情",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "DigitalAssistant"
+                ],
+                "summary": "获取数字助手详情",
+                "parameters": [
+                    {
+                        "description": "获取数字助手请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.GetDigitalAssistantRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "权限不足",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/GetSession": {
+            "post": {
+                "description": "根据ID或SessionID获取会话详情",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "获取会话详情",
+                "parameters": [
+                    {
+                        "description": "获取会话请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.GetSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/GetSessionMessages": {
+            "post": {
+                "description": "分页获取指定会话的消息列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "获取会话消息列表",
+                "parameters": [
+                    {
+                        "description": "获取消息列表请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.GetSessionMessagesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ListDigitalAssistant": {
+            "post": {
+                "description": "分页查询数字助手列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "DigitalAssistant"
+                ],
+                "summary": "查询数字助手列表",
+                "parameters": [
+                    {
+                        "description": "查询列表请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.ListDigitalAssistantRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ListSessions": {
+            "post": {
+                "description": "分页查询会话列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "查询会话列表",
+                "parameters": [
+                    {
+                        "description": "查询列表请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.ListSessionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/SessionEvents": {
+            "post": {
+                "description": "通过SSE订阅会话的事件流",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "订阅会话事件流",
+                "parameters": [
+                    {
+                        "description": "订阅事件请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.SessionEventsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SSE事件流",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/UpdateDigitalAssistant": {
+            "post": {
+                "description": "更新数字助手基本信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "DigitalAssistant"
+                ],
+                "summary": "更新数字助手",
+                "parameters": [
+                    {
+                        "description": "更新数字助手请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.UpdateDigitalAssistantRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "权限不足",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/UpdateDigitalAssistantConfig": {
+            "post": {
+                "description": "更新数字助手的配置信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "DigitalAssistant"
+                ],
+                "summary": "更新数字助手配置",
+                "parameters": [
+                    {
+                        "description": "更新配置请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.UpdateDigitalAssistantConfigRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "权限不足",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/UpdateDigitalAssistantStatus": {
+            "post": {
+                "description": "更新数字助手的运行状态",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "DigitalAssistant"
+                ],
+                "summary": "更新数字助手状态",
+                "parameters": [
+                    {
+                        "description": "更新状态请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.UpdateDigitalAssistantStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "权限不足",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/UpdateSession": {
+            "post": {
+                "description": "更新会话基本信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Session"
+                ],
+                "summary": "更新会话",
+                "parameters": [
+                    {
+                        "description": "更新会话请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/backend_internal_api_handler.UpdateSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "backend_internal_api_handler.AddMessageRequest": {
+            "type": "object",
+            "required": [
+                "content",
+                "role",
+                "session_id"
+            ],
+            "properties": {
+                "chunks": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "content": {
+                    "type": "string"
+                },
+                "message_type": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_types.MessageMetadata"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "thinking": {
+                    "type": "string"
+                },
+                "tool_calls": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_insmtx_Leros_backend_types.ToolCall"
+                    }
+                }
+            }
+        },
+        "backend_internal_api_handler.ClearSessionMessagesRequest": {
+            "type": "object",
+            "required": [
+                "session_id"
+            ],
+            "properties": {
+                "session_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "backend_internal_api_handler.DeleteDigitalAssistantRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "backend_internal_api_handler.DeleteMessageRequest": {
+            "type": "object",
+            "required": [
+                "message_id"
+            ],
+            "properties": {
+                "message_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "backend_internal_api_handler.DeleteSessionRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "backend_internal_api_handler.GetDigitalAssistantRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "backend_internal_api_handler.GetSessionMessagesRequest": {
+            "type": "object",
+            "required": [
+                "session_id"
+            ],
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "per_page": {
+                    "type": "integer"
+                },
+                "session_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "backend_internal_api_handler.GetSessionRequest": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_api_handler.SessionEventsRequest": {
+            "type": "object",
+            "required": [
+                "session_id"
+            ],
+            "properties": {
+                "last_sequence": {
+                    "type": "integer"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_api_handler.UpdateDigitalAssistantConfigRequest": {
+            "type": "object",
+            "required": [
+                "config",
+                "id"
+            ],
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig"
+                },
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "backend_internal_api_handler.UpdateDigitalAssistantRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "config": {
+                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_api_handler.UpdateDigitalAssistantStatusRequest": {
+            "type": "object",
+            "required": [
+                "id",
+                "status"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "backend_internal_api_handler.UpdateSessionRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "expired_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_types.SessionMetadata"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig": {
+            "type": "object",
+            "properties": {
+                "channels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.ChannelRef"
+                    }
+                },
+                "knowledge": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.KnowledgeRef"
+                    }
+                },
+                "llm_config": {
+                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.LLMConfig"
+                },
+                "memory_config": {
+                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.MemoryConfig"
+                },
+                "policies_config": {
+                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.PolicyConfig"
+                },
+                "runtime_config": {
+                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.RuntimeConfig"
+                },
+                "skills": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.SkillRef"
+                    }
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_contract.ChannelRef": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_contract.CreateDigitalAssistantRequest": {
+            "type": "object",
+            "required": [
+                "code",
+                "config",
+                "name"
+            ],
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "config": {
+                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_contract.CreateSessionRequest": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "assistant_id": {
+                    "type": "integer"
+                },
+                "expired_at": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_types.SessionMetadata"
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_contract.DigitalAssistant": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "config": {
+                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "org_id": {
+                    "type": "integer"
+                },
+                "owner_id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_contract.KnowledgeRef": {
+            "type": "object",
+            "properties": {
+                "dataset_id": {
+                    "type": "string"
+                },
+                "repo": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_contract.LLMConfig": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_contract.ListDigitalAssistantRequest": {
+            "type": "object",
+            "properties": {
+                "keyword": {
+                    "type": "string"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "per_page": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_contract.ListSessionsRequest": {
+            "type": "object",
+            "properties": {
+                "assistant_code": {
+                    "type": "string"
+                },
+                "assistant_id": {
+                    "type": "integer"
+                },
+                "keyword": {
+                    "type": "string"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "per_page": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_contract.MemoryConfig": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_contract.PolicyConfig": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_contract.RuntimeConfig": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_contract.SkillRef": {
+            "type": "object",
+            "properties": {
+                "skill_code": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.DigitalAssistant"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "details": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_types.MessageMetadata": {
+            "type": "object",
+            "properties": {
+                "extra": {
+                    "description": "其他扩展字段",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "file_name": {
+                    "description": "文件名",
+                    "type": "string"
+                },
+                "file_url": {
+                    "description": "文件URL（当 MessageType 为 file 时）",
+                    "type": "string"
+                },
+                "image_url": {
+                    "description": "图片URL（当 MessageType 为 image 时）",
+                    "type": "string"
+                },
+                "language": {
+                    "description": "代码语言（当 MessageType 为 code 时）",
+                    "type": "string"
+                },
+                "latency": {
+                    "description": "延迟（毫秒）",
+                    "type": "integer"
+                },
+                "model": {
+                    "description": "LLM 模型名称",
+                    "type": "string"
+                },
+                "tokens": {
+                    "description": "Token 数量",
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_types.SessionMetadata": {
+            "type": "object",
+            "properties": {
+                "extra": {
+                    "description": "元数据 - 其他扩展字段",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "ip_address": {
+                    "description": "元数据 - IP地址",
+                    "type": "string"
+                },
+                "tags": {
+                    "description": "元数据 - 自定义标签",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "user_agent": {
+                    "description": "元数据 - 用户代理信息",
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_types.ToolCall": {
+            "type": "object",
+            "properties": {
+                "arguments": {
+                    "description": "工具参数",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "duration": {
+                    "description": "持续时间（毫秒）",
+                    "type": "integer"
+                },
+                "id": {
+                    "description": "工具调用ID",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "工具名称",
+                    "type": "string"
+                },
+                "result": {
+                    "description": "工具调用结果"
+                },
+                "status": {
+                    "description": "工具调用状态",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_types.ToolCallStatus"
+                        }
+                    ]
+                }
+            }
+        },
+        "github_com_insmtx_Leros_backend_types.ToolCallStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "running",
+                "success",
+                "error"
+            ],
+            "x-enum-varnames": [
+                "ToolCallStatusPending",
+                "ToolCallStatusRunning",
+                "ToolCallStatusSuccess",
+                "ToolCallStatusError"
+            ]
+        }
+    }
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
@@ -27,6 +1614,8 @@ var SwaggerInfo = &swag.Spec{
 	Description:      "Leros 数字助手平台 API，提供数字助手管理、技能调用、事件处理等功能",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
+	LeftDelim:        "{{",
+	RightDelim:       "}}",
 }
 
 func init() {

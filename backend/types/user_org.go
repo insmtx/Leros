@@ -2,9 +2,6 @@ package types
 
 import "gorm.io/gorm"
 
-// TableNameUserOrg 用户组织关联表名
-const TableNameUserOrg = tablenamePrefix + "user_orgs"
-
 // UserOrg 表示用户与组织的关联关系
 //
 // 该表是多对多关系的中间表，用于关联用户和组织。

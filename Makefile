@@ -61,8 +61,7 @@ logs:
 .PHONY: swagger swagger-clean
 
 swagger:
-	cd backend/cmd/leros && swag init --parseDependency --generalInfo server.go --output ../../../docs/swagger --exclude example
-	sed -i '/LeftDelim/d; /RightDelim/d' docs/swagger/docs.go
+	cd backend/cmd/leros && swag init --parseDependency --parseInternal --generalInfo server.go --output ../../../docs/swagger --exclude example
 
 swagger-clean:
 	rm -rf docs/swagger

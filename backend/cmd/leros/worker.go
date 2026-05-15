@@ -50,7 +50,7 @@ func init() {
 	workerCmd.PersistentFlags().StringVar(&workerServerAddr, "server-addr", "127.0.0.1:8080", "Server address for WebSocket connection")
 	workerCmd.PersistentFlags().StringVar(&workerListenAddr, "listen-addr", ":8081", "Worker MCP server listen address for runtime bootstrap")
 	workerCmd.PersistentFlags().UintVar(&workerWorkerID, "worker-id", 0, "Worker ID for configuration retrieval")
-	workerCmd.PersistentFlags().StringVar(&workerDefaultRuntime, "default-runtime", "", "Default agent runtime kind, for example singeros, claude, or codex")
+	workerCmd.PersistentFlags().StringVar(&workerDefaultRuntime, "default-runtime", "", "Default agent runtime kind, for example leros, claude, or codex")
 	rootCmd.AddCommand(workerCmd)
 }
 
@@ -86,7 +86,7 @@ func runTaskWorker(defaultRuntime string) {
 	}
 
 	if cfg.Database != nil && cfg.Database.URL != "" {
-		db, err := infradb.InitDB(*cfg.Database)
+		db, err := infradb.InitDB(*cfg.Database, cfg.LLM)
 		if err != nil {
 			logs.Fatalf("Failed to initialize database: %v", err)
 			return

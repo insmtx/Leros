@@ -13,7 +13,7 @@
 ```yaml
 database:
   driver: postgres
-  url: "host=localhost user=singer password=singer dbname=singer port=5432 sslmode=disable"
+  url: "host=localhost user=leros password=leros dbname=leros port=5432 sslmode=disable"
   debug: false
 ```
 
@@ -25,14 +25,14 @@ database:
 使用 `minimal-config.yaml` 可以在没有PostgreSQL的情况下启动服务：
 
 ```bash
-./singer --config minimal-config.yaml
+./leros --config minimal-config.yaml
 ```
 
 ### 完整模式 (使用数据库)
 使用完整配置启动，包括数据库：
 
 ```bash
-./singer --config example-config.yaml
+./leros --config example-config.yaml
 ```
 
 ## 启动检查清单

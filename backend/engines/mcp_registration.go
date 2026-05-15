@@ -10,7 +10,7 @@ import (
 )
 
 const mcpRegisterTimeout = 10 * time.Second
-const singerOSMCPTokenEnvVar = "LEROS_MCP_TOKEN"
+const lerosMCPTokenEnvVar = "LEROS_MCP_TOKEN"
 
 // MCPServerConfig describes the Leros MCP endpoint registered with an external CLI client.
 type MCPServerConfig struct {
@@ -32,7 +32,7 @@ func NormalizeMCPServerConfig(cfg MCPServerConfig) MCPServerConfig {
 
 // LerosMCPTokenEnvVar returns the env var name used for CLI MCP bearer token registration.
 func LerosMCPTokenEnvVar() string {
-	return singerOSMCPTokenEnvVar
+	return lerosMCPTokenEnvVar
 }
 
 // RunCLICommand runs a CLI command with a bounded timeout.
