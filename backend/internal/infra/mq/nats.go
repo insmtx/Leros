@@ -7,7 +7,6 @@ package mq
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -29,6 +28,7 @@ type natsPublisher struct {
 const defaultRealtimeFlushTimeout = 5 * time.Second
 
 // NewPublisher 创建一个新的 NATS JetStream 发布者实例
+// 在初始化阶段创建所有预配置的 Streams
 func NewPublisher(url string) (*natsPublisher, error) {
 	conn, err := nats.Connect(url)
 	if err != nil {
@@ -49,8 +49,143 @@ func NewPublisher(url string) (*natsPublisher, error) {
 		closed: false,
 	}
 
+	if err := publisher.initStreams(); err != nil {
+		conn.Close()
+		logs.Errorf("Failed to initialize NATS streams: %v", err)
+		return nil, fmt.Errorf("failed to initialize NATS streams: %w", err)
+	}
+
 	logs.Infof("Successfully connected to NATS at %s with JetStream", url)
 	return publisher, nil
+}
+
+// initStreams 在初始化阶段创建或更新所有预配置的 Stream
+func (p *natsPublisher) initStreams() error {
+	// 先清理可能冲突的旧 streams
+	existingStreamsCh := p.js.StreamNames()
+	var existingStreams []string
+	for name := range existingStreamsCh {
+		existingStreams = append(existingStreams, name)
+	}
+	for _, name := range existingStreams {
+		info, err := p.js.StreamInfo(name)
+		if err != nil {
+			continue
+		}
+		// 检查是否与预配置的 stream 冲突（同 subjects 但不同名）
+		isConfigured := false
+		for streamName, subjects := range dm.StreamSubjects {
+			if name == streamName {
+				isConfigured = true
+				break
+			}
+			// 判断 subjects 是否重叠
+			if hasOverlap(info.Config.Subjects, subjects) {
+				logs.Warnf("Deleting conflicting stream '%s' (subjects: %v)", name, info.Config.Subjects)
+				if err := p.js.DeleteStream(name); err != nil {
+					logs.Warnf("Failed to delete conflicting stream '%s': %v", name, err)
+				}
+			}
+		}
+		// 如果 stream 已存在但不是我们配置的，检查其 subjects
+		if !isConfigured {
+			for _, subj := range info.Config.Subjects {
+				for _, cfgSubjects := range dm.StreamSubjects {
+					if hasOverlap([]string{subj}, cfgSubjects) {
+						logs.Warnf("Deleting conflicting stream '%s' with subject %q", name, subj)
+						_ = p.js.DeleteStream(name)
+						break
+					}
+				}
+			}
+		}
+	}
+
+	for streamName, subjects := range dm.StreamSubjects {
+		_, addErr := p.js.AddStream(&nats.StreamConfig{
+			Name:     streamName,
+			Subjects: subjects,
+			Storage:  nats.FileStorage,
+		})
+		if addErr == nil {
+			logs.Infof("Created JetStream stream '%s' with subjects: %v", streamName, subjects)
+			continue
+		}
+
+		// AddStream 失败，尝试 UpdateStream
+		if _, err := p.js.UpdateStream(&nats.StreamConfig{
+			Name:     streamName,
+			Subjects: subjects,
+			Storage:  nats.FileStorage,
+		}); err != nil {
+			return fmt.Errorf("failed to initialize stream '%s': AddStream=%v, UpdateStream=%w", streamName, addErr, err)
+		}
+		logs.Infof("Updated JetStream stream '%s' with subjects: %v", streamName, subjects)
+	}
+	return nil
+}
+
+// hasOverlap 检查两组 subjects 是否有重叠
+func hasOverlap(a, b []string) bool {
+	for _, s1 := range a {
+		for _, s2 := range b {
+			if subjectsOverlap(s1, s2) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// subjectsOverlap 检查两个 NATS subject 模式是否重叠
+func subjectsOverlap(s1, s2 string) bool {
+	if s1 == s2 {
+		return true
+	}
+	p1 := strings.Split(s1, ".")
+	p2 := strings.Split(s2, ".")
+
+	// 不同长度的固定部分不重叠
+	if len(p1) != len(p2) {
+		// 通配符情况: org.*.worker.*.task 与 org.1.worker.2.task 重叠
+		return partialMatch(p1, p2)
+	}
+
+	for i := range p1 {
+		if p1[i] == "*" || p2[i] == "*" {
+			continue
+		}
+		if p1[i] == ">" || p2[i] == ">" {
+			return true
+		}
+		if p1[i] != p2[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// partialMatch 检查不同长度的 subject 是否可能重叠（通配符场景）
+func partialMatch(p1, p2 []string) bool {
+	// 处理 > 通配符
+	for i, s := range p1 {
+		if s == ">" {
+			return true
+		}
+		if i < len(p2) && p1[i] != "*" && p2[i] != p1[i] {
+			return false
+		}
+	}
+	for i, s := range p2 {
+		if s == ">" {
+			return true
+		}
+		if i < len(p1) && p2[i] != "*" && p1[i] != p2[i] {
+			return false
+		}
+	}
+	// 短的是长的前缀且短的以 * 结尾可能重叠
+	return false
 }
 
 // PublishWithContext 在给定上下文环境中发布消息到指定主题
@@ -66,17 +201,6 @@ func (p *natsPublisher) PublishWithContext(ctx context.Context, topic string, me
 	body, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
-	}
-
-	// 声明 Stream (如果不存在)
-	streamName := dm.StreamNameFromTopic(topic)
-	_, err = p.js.AddStream(&nats.StreamConfig{
-		Name:     streamName,
-		Subjects: []string{topic, topic + ".*"},
-		Storage:  nats.FileStorage,
-	})
-	if err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) && !strings.Contains(err.Error(), "subjects overlap") {
-		return fmt.Errorf("failed to declare stream '%s': %w", streamName, err)
 	}
 
 	// 发布消息
@@ -109,50 +233,27 @@ func (p *natsPublisher) PublishRealtimeWithContext(ctx context.Context, topic st
 	return nil
 }
 
-// SubscribeWithContext 在给定上下文环境中订阅特定主题的消息
+// SubscribeWithContext 在给定上下文环境中订阅特定主题的消息。
+// 该函数会阻塞直到 context 被取消或订阅返回错误。
 func (p *natsPublisher) SubscribeWithContext(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
-	// 声明 Stream (如果不存在)
-	streamName := dm.StreamNameFromTopic(topic)
-	_, err := p.js.AddStream(&nats.StreamConfig{
-		Name:     streamName,
-		Subjects: []string{topic, topic + ".*"},
-		Storage:  nats.FileStorage,
-	})
-	if err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) && !strings.Contains(err.Error(), "subjects overlap") {
-		return fmt.Errorf("failed to declare stream '%s': %w", streamName, err)
-	}
-
-	// 创建持久化订阅
-	durableName := fmt.Sprintf("%s_SUBSCRIBER", strings.ReplaceAll(topic, ".", "_"))
+	// 使用 OrderedConsumer 不依赖 durable consumer，避免重启时 "consumer already bound" 错误。
+	// OrderedConsumer 使用 AckNone 策略，无需手动 ack。
 	sub, err := p.js.Subscribe(topic, func(msg *nats.Msg) {
-		// Ack before invoking the handler so long-running worker tasks do not
-		// exceed JetStream AckWait and get redelivered while still running.
-		if err := msg.Ack(); err != nil {
-			logs.ErrorContextf(ctx, "Failed to ack message for topic '%s': %v", topic, err)
-			return
-		}
-
-		// 调用用户定义的处理函数
 		handler(msg)
-	},
-		nats.Durable(durableName),
-		nats.ManualAck(),
-		nats.Context(ctx),
-	)
+	}, nats.OrderedConsumer(), nats.Context(ctx))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to topic '%s': %w", topic, err)
 	}
 
-	// 在 context 取消时清理订阅
-	go func() {
-		<-ctx.Done()
-		if err := sub.Unsubscribe(); err != nil {
-			logs.WarnContextf(ctx, "Failed to unsubscribe from topic '%s': %v", topic, err)
-		}
-		logs.InfoContextf(ctx, "Unsubscribed from topic: %s", topic)
-	}()
+	// 阻塞直到 context 取消。
+	<-ctx.Done()
 
-	return nil
+	if err := sub.Unsubscribe(); err != nil {
+		logs.WarnContextf(ctx, "Failed to unsubscribe from topic '%s': %v", topic, err)
+	}
+	logs.InfoContextf(ctx, "Unsubscribed from topic: %s", topic)
+
+	return ctx.Err()
 }
 
 // Publish implements the eventbus.Publisher interface

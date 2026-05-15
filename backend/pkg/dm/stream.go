@@ -7,6 +7,12 @@ const (
 	streamNameSession = "SESSION_STREAM"
 )
 
+// StreamSubjects 定义各 Stream 的 NATS subject 匹配模式，使用通配符覆盖所有动态 topic。
+var StreamSubjects = map[string][]string{
+	streamNameTask:    {"org.*.worker.*.task"},
+	streamNameSession: {"org.*.session.*.message.*"},
+}
+
 func SessionStream() string {
 	return streamNameSession
 }

@@ -16,7 +16,6 @@ import (
 
 // StartSessionCompleted subscribes to session completed events and dispatches to the service.
 func StartSessionCompleted(ctx context.Context, service contract.SessionService, eb eventbus.EventBus) {
-	return
 	topic := dm.SessionCompletedWildcardSubject()
 	logs.InfoContextf(ctx, "starting session completed runnable: %s", topic)
 
