@@ -39,12 +39,12 @@ fi
 echo ""
 echo -e "${BLUE}Starting infrastructure services...${NC}"
 cd "$SCRIPT_DIR"
-docker-compose -f docker-compose.dev.yml up -d postgresql nats redis
+docker-compose -f docker-compose.dev.yml up -d postgresql nats
 
 echo -e "${YELLOW}Waiting for services to be healthy...${NC}"
 sleep 5
 
-for service in postgresql nats redis; do
+for service in postgresql nats; do
     echo -n "Checking $service... "
     for i in {1..30}; do
         status=$(docker inspect --format='{{.State.Health.Status}}' leros-dev-$service 2>/dev/null || echo "starting")
