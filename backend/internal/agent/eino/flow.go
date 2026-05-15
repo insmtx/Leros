@@ -131,6 +131,7 @@ func (f *Flow) Stream(ctx context.Context, userInput string, emitter *events.Emi
 		if err := emitMessageChunk(ctx, emitter, chunk, &contentSnapshot, &reasoningSnapshot); err != nil {
 			return nil, err
 		}
+		logs.DebugContextf(ctx, "received message chunk: content_len=%d reasoning_len=%d tool_calls=%d", len(contentSnapshot.String()), len(reasoningSnapshot.String()), len(chunk.ToolCalls))
 	}
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("agent stream returned no messages")

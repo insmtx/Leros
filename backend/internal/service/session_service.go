@@ -338,7 +338,7 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID uint, req *co
 
 	// Only publish task if we have a worker ID
 	if session.AllocatedAssistantID > 0 {
-		topic, err := dm.WorkerTaskTopic(orgID, session.AllocatedAssistantID)
+		topic, err := dm.WorkerTaskSubject(orgID, session.AllocatedAssistantID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct worker task topic: %w", err)
 		}
@@ -462,7 +462,7 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 		return errors.New("user not authenticated or org not set")
 	}
 
-	topic, err := dm.SessionResultStreamTopic(caller.OrgID, sessionID)
+	topic, err := dm.SessionResultStreamSubject(caller.OrgID, sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to construct session result stream topic: %w", err)
 	}

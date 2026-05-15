@@ -39,9 +39,9 @@ func TestPublishWorkerTaskMessageToNATS(t *testing.T) {
 	}
 	defer bus.Close()
 
-	topic, _ := dm.WorkerTaskTopic(orgID, workerID)
-	streamTopic, _ := dm.SessionResultStreamTopic(orgID, sessionID)
-	completedTopic, _ := dm.SessionCompletedTopic(orgID, sessionID)
+	topic, _ := dm.WorkerTaskSubject(orgID, workerID)
+	streamTopic, _ := dm.SessionResultStreamSubject(orgID, sessionID)
+	completedTopic, _ := dm.SessionCompletedSubject(orgID, sessionID)
 
 	task := newTestWorkerTaskMessage(t, orgID, workerID, sessionID)
 
