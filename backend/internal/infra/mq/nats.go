@@ -227,7 +227,14 @@ func streamConfigFromTopic(streamName string, topic string) *nats.StreamConfig {
 }
 
 func isSessionResultStreamTopic(topic string) bool {
-	return strings.Contains(topic, ".session.") && strings.HasSuffix(topic, ".stream")
+	segments := strings.Split(topic, ".")
+	if len(segments) != 6 {
+		return false
+	}
+	if segments[0] != "org" || segments[2] != "session" || segments[4] != "message" || segments[5] != "stream" {
+		return false
+	}
+	return segments[1] != "" && segments[3] != ""
 }
 
 func contextWithDefaultDeadline(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {

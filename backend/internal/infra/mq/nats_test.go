@@ -36,7 +36,7 @@ func TestContextWithDefaultDeadlinePreservesExistingDeadline(t *testing.T) {
 }
 
 func TestStreamConfigFromTopicSessionStreamUsesMaxAge(t *testing.T) {
-	cfg := streamConfigFromTopic("test_stream", "org.1.session.sess_1.stream")
+	cfg := streamConfigFromTopic("test_stream", "org.1.session.sess_1.message.stream")
 	if cfg.MaxAge != defaultSessionStreamMaxAge {
 		t.Fatalf("max age = %s, want %s", cfg.MaxAge, defaultSessionStreamMaxAge)
 	}

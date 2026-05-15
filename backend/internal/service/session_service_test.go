@@ -51,11 +51,15 @@ func (m *mockEventBus) SubscribeRealtime(ctx context.Context, topic string, hand
 
 type recordingSubscriber struct {
 	topic       string
+	err         error
 	subscribeFn func()
 }
 
 func (r *recordingSubscriber) Subscribe(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
 	r.topic = topic
+	if r.err != nil {
+		return r.err
+	}
 	if r.subscribeFn != nil {
 		r.subscribeFn()
 	}
@@ -749,5 +753,19 @@ func TestStreamSessionEvents_UsesPersistentSubscriber(t *testing.T) {
 	}
 	if subscriber.topic != expectedTopic {
 		t.Fatalf("subscriber topic = %q, want %q", subscriber.topic, expectedTopic)
+	}
+}
+
+func TestStreamSessionEvents_SubscribeFailure(t *testing.T) {
+	subscriber := &recordingSubscriber{err: fmt.Errorf("subscribe failed")}
+	service := setupTestServiceWithSubscriber(t, subscriber)
+	ctx := setupTestContextWithCaller(t)
+
+	err := service.StreamSessionEvents(ctx, "test_session", 0, nil)
+	if err == nil {
+		t.Fatal("expected StreamSessionEvents to fail")
+	}
+	if err.Error() != "failed to subscribe to session result stream topic: subscribe failed" {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
