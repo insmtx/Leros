@@ -56,7 +56,7 @@ func New(cfg Config, subscriber eventbus.Subscriber, publisher ResultPublisher, 
 
 // TaskTopic returns the NATS subject consumed by this worker.
 func (c *Consumer) TaskTopic() string {
-	topic, err := dm.WorkerTaskTopic(c.cfg.OrgID, c.cfg.WorkerID)
+	topic, err := dm.WorkerTaskSubject(c.cfg.OrgID, c.cfg.WorkerID)
 	if err != nil {
 		logs.Errorf("Failed to get worker task topic for org_id=%d worker_id=%d: %v", c.cfg.OrgID, c.cfg.WorkerID, err)
 	}

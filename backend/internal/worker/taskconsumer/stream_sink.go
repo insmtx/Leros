@@ -74,10 +74,10 @@ func (s *MQStreamSink) Emit(ctx context.Context, event *events.Event) error {
 
 func (s *MQStreamSink) streamTopic() string {
 	if s.task.Route.SessionID != "" {
-		t, _ := dm.SessionResultStreamTopic(s.task.Route.OrgID, s.task.Route.SessionID)
+		t, _ := dm.SessionResultStreamSubject(s.task.Route.OrgID, s.task.Route.SessionID)
 		return t
 	}
-	t, err := dm.WorkerTaskTopic(s.task.Route.OrgID, s.task.Route.WorkerID)
+	t, err := dm.WorkerTaskSubject(s.task.Route.OrgID, s.task.Route.WorkerID)
 	if err != nil {
 		logs.Errorf("Failed to get worker task topic for stream sink: %v", err)
 		return ""
@@ -89,7 +89,7 @@ func (s *MQStreamSink) emitCompleted(ctx context.Context, msg events.MessageStre
 	if s.task.Route.SessionID == "" {
 		return
 	}
-	topic, err := dm.SessionCompletedTopic(s.task.Route.OrgID, s.task.Route.SessionID)
+	topic, err := dm.SessionCompletedSubject(s.task.Route.OrgID, s.task.Route.SessionID)
 	if err != nil {
 		logs.WarnContextf(ctx, "Failed to get session completed topic for stream sink: %v", err)
 		return

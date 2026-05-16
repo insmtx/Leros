@@ -161,7 +161,7 @@ func runTaskWorker(defaultRuntime string) {
 	})
 	lifecycle.Std().AddCloseFunc(bus.Close)
 
-	logs.Infof("Agent worker started: org_id=%s worker_id=%s topic=%s", cfg.OrgID, cfg.WorkerID, consumer.TaskTopic())
+	logs.Infof("Agent worker started: org_id=%d worker_id=%d topic=%s", cfg.OrgID, cfg.WorkerID, consumer.TaskTopic())
 	lifecycle.Std().WaitExit()
 	logs.Info("Agent worker exited")
 }

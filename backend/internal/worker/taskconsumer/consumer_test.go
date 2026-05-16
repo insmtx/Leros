@@ -39,9 +39,9 @@ func TestPublishWorkerTaskMessageToNATS(t *testing.T) {
 	}
 	defer bus.Close()
 
-	topic, _ := dm.WorkerTaskTopic(orgID, workerID)
-	streamTopic, _ := dm.SessionResultStreamTopic(orgID, sessionID)
-	completedTopic, _ := dm.SessionCompletedTopic(orgID, sessionID)
+	topic, _ := dm.WorkerTaskSubject(orgID, workerID)
+	streamTopic, _ := dm.SessionResultStreamSubject(orgID, sessionID)
+	completedTopic, _ := dm.SessionCompletedSubject(orgID, sessionID)
 
 	task := newTestWorkerTaskMessage(t, orgID, workerID, sessionID)
 
@@ -155,33 +155,36 @@ func receiveWorkerTaskReply(ctx context.Context, t *testing.T, subscriber mq.Eve
 		ready <- err
 		return err
 	}
-	err = subscriber.Subscribe(ctx, completedTopic, func(natsMsg *nats.Msg) {
-		var completedMsg events.MessageStreamMessage
-		if err := json.Unmarshal(natsMsg.Data, &completedMsg); err != nil {
-			t.Logf("\ntopic:\n【%s】\nmalformed:%v\n%s\n\n", completedTopic, err, string(natsMsg.Data))
+
+	go func() {
+		err := subscriber.Subscribe(ctx, completedTopic, func(natsMsg *nats.Msg) {
+			var completedMsg events.MessageStreamMessage
+			if err := json.Unmarshal(natsMsg.Data, &completedMsg); err != nil {
+				t.Logf("\ntopic:\n【%s】\nmalformed:%v\n%s\n\n", completedTopic, err, string(natsMsg.Data))
+				return
+			}
+			t.Logf("\ntopic:\n【%s】\n%s:%s\n%s\n\n",
+				completedTopic,
+				completedMsg.Body.Event,
+				completedMsg.Body.Payload.Content,
+				string(natsMsg.Data),
+			)
+			if completedMsg.Trace.TaskID != taskID || completedMsg.Trace.RunID != runID {
+				return
+			}
+			select {
+			case completedCh <- completedMsg:
+			case <-ctx.Done():
+			default:
+				t.Logf("drop completed message because result channel is full: event=%s seq=%d", completedMsg.Body.Event, completedMsg.Body.Seq)
+			}
+		})
+		if err != nil {
+			ready <- err
 			return
 		}
-		t.Logf("\ntopic:\n【%s】\n%s:%s\n%s\n\n",
-			completedTopic,
-			completedMsg.Body.Event,
-			completedMsg.Body.Payload.Content,
-			string(natsMsg.Data),
-		)
-		if completedMsg.Trace.TaskID != taskID || completedMsg.Trace.RunID != runID {
-			return
-		}
-		select {
-		case completedCh <- completedMsg:
-		case <-ctx.Done():
-		default:
-			t.Logf("drop completed message because result channel is full: event=%s seq=%d", completedMsg.Body.Event, completedMsg.Body.Seq)
-		}
-	})
-	if err != nil {
-		ready <- err
-		return err
-	}
-	ready <- nil
+		ready <- nil
+	}()
 
 	for {
 		select {

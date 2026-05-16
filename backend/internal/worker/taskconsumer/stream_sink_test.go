@@ -58,8 +58,8 @@ func TestMQStreamSinkPublishesCompletedEventToSessionCompletedTopic(t *testing.T
 				t.Fatalf("Emit() error = %v", err)
 			}
 
-			streamTopic, _ := dm.SessionResultStreamTopic(orgID, sessionID)
-			completedTopic, _ := dm.SessionCompletedTopic(orgID, sessionID)
+			streamTopic, _ := dm.SessionResultStreamSubject(orgID, sessionID)
+			completedTopic, _ := dm.SessionCompletedSubject(orgID, sessionID)
 			if len(publisher.realtimeCalls) != 1 {
 				t.Fatalf("expected one stream realtime publish, got %d", len(publisher.realtimeCalls))
 			}
