@@ -40,6 +40,10 @@ func (m *mockEventBus) Subscribe(ctx context.Context, topic string, handler func
 	return nil
 }
 
+func (m *mockEventBus) SubscribeFrom(ctx context.Context, topic string, startSeq int64, handler func(msg *nats.Msg)) error {
+	return nil
+}
+
 // mockInferrer 是一个简单的 Mock 实现，总是返回固定的 assistant ID
 type mockInferrer struct {
 	assistantID uint

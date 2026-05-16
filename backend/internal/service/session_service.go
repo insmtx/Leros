@@ -468,7 +468,7 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 		return fmt.Errorf("failed to construct session result stream topic: %w", err)
 	}
 
-	return s.eventbus.Subscribe(ctx, topic, func(msg *nats.Msg) {
+	return s.eventbus.SubscribeFrom(ctx, topic, lastSequence, func(msg *nats.Msg) {
 		var streamMsg events.MessageStreamMessage
 		if err := json.Unmarshal(msg.Data, &streamMsg); err != nil {
 			logs.WarnContextf(ctx, "failed to unmarshal to MessageStreamMessage: %v", err)

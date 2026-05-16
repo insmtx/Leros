@@ -237,9 +237,43 @@ func (p *natsPublisher) Publish(ctx context.Context, topic string, event any) er
 	return p.PublishWithContext(ctx, topic, event)
 }
 
-// Subscribe implements the eventbus.Subscriber interface
+// Subscribe implements the eventbus.Subscriber interface.
 func (p *natsPublisher) Subscribe(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
 	return p.SubscribeWithContext(ctx, topic, handler)
+}
+
+// SubscribeFrom implements the eventbus.Subscriber interface.
+// startSeq == 0 时使用 DeliverNew 仅投递新消息；
+// startSeq > 0 时使用 OrderedConsumer（DeliverAll），由 handler 自行过滤。
+func (p *natsPublisher) SubscribeFrom(ctx context.Context, topic string, startSeq int64, handler func(msg *nats.Msg)) error {
+	if startSeq == 0 {
+		return p.subscribeNewOnly(ctx, topic, handler)
+	}
+	return p.SubscribeWithContext(ctx, topic, handler)
+}
+
+// subscribeNewOnly 使用 JetStream DeliverNew 策略订阅，仅接收订阅之后的新消息。
+func (p *natsPublisher) subscribeNewOnly(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return fmt.Errorf("NATS client is closed")
+	}
+	p.mu.Unlock()
+
+	sub, err := p.js.Subscribe(topic, handler, nats.DeliverNew(), nats.Context(ctx))
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to topic '%s' (new only): %w", topic, err)
+	}
+
+	<-ctx.Done()
+
+	if err := sub.Unsubscribe(); err != nil {
+		logs.WarnContextf(ctx, "Failed to unsubscribe from topic '%s': %v", topic, err)
+	}
+	logs.InfoContextf(ctx, "Unsubscribed from topic: %s", topic)
+
+	return ctx.Err()
 }
 
 // Close 关闭 NATS 连接并释放资源

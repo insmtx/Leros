@@ -15,10 +15,14 @@ type Publisher interface {
 	Publish(ctx context.Context, topic string, event any) error
 }
 
-// Subscriber 是事件订阅者接口，定义了订阅指定主题事件的方法
+// Subscriber 是事件订阅者接口，定义了订阅指定主题事件的方法。
 type Subscriber interface {
-	// Subscribe 订阅指定主题的事件，并使用提供的处理函数处理收到的事件
+	// Subscribe 订阅指定主题的事件，并使用提供的处理函数处理收到的事件。
 	Subscribe(ctx context.Context, topic string, handler func(msg *nats.Msg)) error
+	// SubscribeFrom 订阅指定主题的事件，并使用提供的处理函数处理收到的事件。
+	// startSeq 指定起始序列号，小于等于 startSeq 的消息不会被投递。
+	// startSeq 为 0 时仅投递订阅之后的新消息。
+	SubscribeFrom(ctx context.Context, topic string, startSeq int64, handler func(msg *nats.Msg)) error
 }
 
 // EventBus 组合了发布和订阅能力，提供完整的事件总线功能
