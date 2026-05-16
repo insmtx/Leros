@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+
 	"gorm.io/gorm"
 
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
@@ -466,7 +467,8 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 	if err != nil {
 		return fmt.Errorf("failed to construct session result stream topic: %w", err)
 	}
-	err = s.eventbus.SubscribeRealtime(ctx, topic, func(msg *nats.Msg) {
+
+	return s.eventbus.SubscribeFrom(ctx, topic, lastSequence, func(msg *nats.Msg) {
 		var streamMsg events.MessageStreamMessage
 		if err := json.Unmarshal(msg.Data, &streamMsg); err != nil {
 			logs.WarnContextf(ctx, "failed to unmarshal to MessageStreamMessage: %v", err)
@@ -474,7 +476,6 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 		}
 		logs.DebugContextf(ctx, "received message from topic %s: session_id=%s event=%s seq=%d", topic, streamMsg.Route.SessionID, streamMsg.Body.Event, streamMsg.Body.Seq)
 
-		// 现在处理正确类型的消息
 		if streamMsg.Body.Seq <= lastSequence {
 			logs.DebugContextf(ctx, "skipping old message for session %s: seq=%d lastSequence=%d", sessionID, streamMsg.Body.Seq, lastSequence)
 			return
@@ -511,24 +512,13 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 			logs.WarnContextf(ctx, "unknown stream event type: %v", streamMsg.Body.Event)
 			return
 		}
-		err = sink.Emit(ctx, &events.Event{
+		if err := sink.Emit(ctx, &events.Event{
 			Type:    events.EventType(se.Type),
 			Content: toJSONString(se),
-		})
-		if err != nil {
+		}); err != nil {
 			logs.ErrorContextf(ctx, "failed to emit session event for session %s: %v", sessionID, err)
 		}
 	})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to session result stream topic: %w", err)
-	}
-	logs.DebugContextf(ctx, "subscribed to session result stream topic: %s", topic)
-
-	// 阻塞等待 context 结束，这样 goroutine 不会立即退出
-	<-ctx.Done()
-	logs.DebugContextf(ctx, "session event stream ended for session: %s", sessionID)
-
-	return nil
 }
 
 func convertToContractSession(session *types.Session) *contract.Session {

@@ -231,5 +231,3 @@ func firstNonEmpty(values ...string) string {
 	}
 	return ""
 }
-
-var _ events.Sink = (*MQStreamSink)(nil)
