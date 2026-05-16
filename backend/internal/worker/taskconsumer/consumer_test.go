@@ -55,7 +55,7 @@ func TestPublishWorkerTaskMessageToNATS(t *testing.T) {
 	}()
 
 	if err := <-receiveReady; err != nil {
-		t.Skipf("skip real NATS publish test: subscribe reply topics stream=%s completed=%s: %v", streamTopic, completedTopic, err)
+		t.Skipf("skip real NATS publish test: subscribe reply topics completed=%s: %v", completedTopic, err)
 	}
 
 	sendWorkerTaskMessage(ctx, t, bus, natsURL, topic, task)
@@ -133,28 +133,31 @@ func sendWorkerTaskMessage(ctx context.Context, t *testing.T, publisher mq.Publi
 }
 
 // receiveWorkerTaskReply 订阅 agent 运行回复 topic，并等待当前测试任务的完成消息。
-// stream topic 使用 Core NATS 实时订阅，completed topic 使用 JetStream 订阅以匹配最终落盘语义。
-func receiveWorkerTaskReply(ctx context.Context, t *testing.T, subscriber mq.EventBus, streamTopic string, completedTopic string, taskID string, runID string, ready chan<- error) error {
+// completed topic 使用 JetStream 订阅以匹配最终落盘语义。
+func receiveWorkerTaskReply(ctx context.Context, t *testing.T, subscriber mq.Subscriber, streamTopic string, completedTopic string, taskID string, runID string, ready chan<- error) error {
 	t.Helper()
 
 	completedCh := make(chan events.MessageStreamMessage, 1)
-	err := subscriber.SubscribeRealtime(ctx, streamTopic, func(natsMsg *nats.Msg) {
-		var streamMsg events.MessageStreamMessage
-		if err := json.Unmarshal(natsMsg.Data, &streamMsg); err != nil {
-			t.Logf("\ntopic:\n【%s】\nmalformed:%v\n%s\n\n", streamTopic, err, string(natsMsg.Data))
+
+	go func() {
+		err := subscriber.Subscribe(ctx, streamTopic, func(natsMsg *nats.Msg) {
+			var streamMsg events.MessageStreamMessage
+			if err := json.Unmarshal(natsMsg.Data, &streamMsg); err != nil {
+				t.Logf("\ntopic:\n【%s】\nmalformed:%v\n%s\n\n", streamTopic, err, string(natsMsg.Data))
+				return
+			}
+			t.Logf("\ntopic:\n【%s】\n%s:%s\n%s\n\n",
+				streamTopic,
+				streamMsg.Body.Event,
+				streamMsg.Body.Payload.Content,
+				string(natsMsg.Data),
+			)
+		})
+		if err != nil {
+			ready <- err
 			return
 		}
-		t.Logf("\ntopic:\n【%s】\n%s:%s\n%s\n\n",
-			streamTopic,
-			streamMsg.Body.Event,
-			streamMsg.Body.Payload.Content,
-			string(natsMsg.Data),
-		)
-	})
-	if err != nil {
-		ready <- err
-		return err
-	}
+	}()
 
 	go func() {
 		err := subscriber.Subscribe(ctx, completedTopic, func(natsMsg *nats.Msg) {

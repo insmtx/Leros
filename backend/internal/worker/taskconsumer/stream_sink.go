@@ -11,13 +11,12 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
-// ResultPublisher publishes worker run stream events and persisted result events.
+// ResultPublisher publishes worker run result events.
 type ResultPublisher interface {
 	eventbus.Publisher
-	eventbus.RealtimePublisher
 }
 
-// MQStreamSink publishes agent runtime events as realtime messages.
+// MQStreamSink publishes agent runtime completion events via JetStream.
 type MQStreamSink struct {
 	publisher ResultPublisher
 	task      events.WorkerTaskMessage
@@ -31,22 +30,26 @@ func NewMQStreamSink(publisher ResultPublisher, task events.WorkerTaskMessage) *
 	}
 }
 
-// Emit publishes one runtime event to the task's session stream subject.
+// Emit publishes runtime events to the session stream topic via JetStream.
 func (s *MQStreamSink) Emit(ctx context.Context, event *events.Event) error {
 	if s == nil || s.publisher == nil || event == nil {
 		return nil
 	}
 
 	topic := s.streamTopic()
+	if topic == "" {
+		return nil
+	}
+
 	msg := events.MessageStreamMessage{
-		ID:        firstNonEmpty(event.ID, fmt.Sprintf("%s:%d", event.RunID, event.Seq)),
+		ID:        fmt.Sprintf("%s:%d", event.RunID, event.Seq),
 		Type:      events.MessageTypeStream,
 		CreatedAt: time.Now().UTC(),
 		Trace: events.TraceContext{
-			TraceID:   firstNonEmpty(event.TraceID, s.task.Trace.TraceID),
+			TraceID:   event.TraceID,
 			RequestID: s.task.Trace.RequestID,
 			TaskID:    s.task.Trace.TaskID,
-			RunID:     firstNonEmpty(event.RunID, s.task.Trace.RunID),
+			RunID:     event.RunID,
 			ParentID:  s.task.Trace.ParentID,
 		},
 		Route: s.task.Route,
@@ -63,11 +66,12 @@ func (s *MQStreamSink) Emit(ctx context.Context, event *events.Event) error {
 		msg.Body.Error = &events.StreamError{Message: event.Content}
 	}
 
-	if err := s.publisher.PublishRealtime(ctx, topic, msg); err != nil {
+	if err := s.publisher.Publish(ctx, topic, msg); err != nil {
 		logs.WarnContextf(ctx, "Failed to publish worker stream event to %s: %v", topic, err)
 	}
+
 	if msg.Body.Event == events.StreamEventRunCompleted || msg.Body.Event == events.StreamEventRunFailed {
-		s.emitCompleted(ctx, msg)
+		s.emitCompleted(ctx, event)
 	}
 	return nil
 }
@@ -85,22 +89,51 @@ func (s *MQStreamSink) streamTopic() string {
 	return t
 }
 
-func (s *MQStreamSink) emitCompleted(ctx context.Context, msg events.MessageStreamMessage) {
+func (s *MQStreamSink) emitCompleted(ctx context.Context, event *events.Event) error {
 	if s.task.Route.SessionID == "" {
-		return
+		return nil
 	}
+
 	topic, err := dm.SessionCompletedSubject(s.task.Route.OrgID, s.task.Route.SessionID)
 	if err != nil {
-		logs.WarnContextf(ctx, "Failed to get session completed topic for stream sink: %v", err)
-		return
+		return fmt.Errorf("failed to get session completed subject: %w", err)
 	}
+
+	streamEvent := events.StreamEventRunCompleted
+	if event.Type == events.EventFailed || event.Type == events.EventCancelled {
+		streamEvent = events.StreamEventRunFailed
+	}
+
+	msg := events.MessageStreamMessage{
+		ID:        fmt.Sprintf("%s:%d", event.RunID, event.Seq),
+		Type:      events.MessageTypeStream,
+		CreatedAt: time.Now().UTC(),
+		Trace: events.TraceContext{
+			TraceID:   event.TraceID,
+			RequestID: s.task.Trace.RequestID,
+			TaskID:    s.task.Trace.TaskID,
+			RunID:     event.RunID,
+			ParentID:  s.task.Trace.ParentID,
+		},
+		Route: s.task.Route,
+		Body: events.StreamBody{
+			Seq:   event.Seq,
+			Event: streamEvent,
+			Payload: events.StreamPayload{
+				Role:    events.MessageRoleAssistant,
+				Content: event.Content,
+			},
+		},
+	}
+	if streamEvent == events.StreamEventRunFailed {
+		msg.Body.Error = &events.StreamError{Message: event.Content}
+	}
+
 	if err := s.publisher.Publish(ctx, topic, msg); err != nil {
 		logs.WarnContextf(ctx, "Failed to publish worker completed event to %s: %v", topic, err)
-		return
+		return err
 	}
-	if err := s.publisher.FlushRealtime(ctx); err != nil {
-		logs.WarnContextf(ctx, "Failed to flush worker completed event to %s: %v", topic, err)
-	}
+	return nil
 }
 
 func streamEventType(eventType events.EventType) events.StreamEventType {
@@ -127,3 +160,5 @@ func streamEventType(eventType events.EventType) events.StreamEventType {
 		return events.StreamEventMessageDelta
 	}
 }
+
+var _ events.Sink = (*MQStreamSink)(nil)

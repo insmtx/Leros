@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/insmtx/Leros/backend/pkg/dm"
 	"github.com/nats-io/nats.go"
@@ -24,8 +23,6 @@ type natsPublisher struct {
 	closed bool
 	mu     sync.Mutex
 }
-
-const defaultRealtimeFlushTimeout = 5 * time.Second
 
 // NewPublisher 创建一个新的 NATS JetStream 发布者实例
 // 在初始化阶段创建所有预配置的 Streams
@@ -212,27 +209,6 @@ func (p *natsPublisher) PublishWithContext(ctx context.Context, topic string, me
 	return nil
 }
 
-// PublishRealtimeWithContext 在给定上下文环境中发布实时消息，不声明 JetStream Stream。
-func (p *natsPublisher) PublishRealtimeWithContext(ctx context.Context, topic string, message any) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.closed {
-		return fmt.Errorf("NATS client is closed")
-	}
-
-	body, err := json.Marshal(message)
-	if err != nil {
-		return fmt.Errorf("failed to marshal message: %w", err)
-	}
-
-	if err := p.conn.Publish(topic, body); err != nil {
-		return fmt.Errorf("failed to publish message to subject '%s': %w", topic, err)
-	}
-
-	return nil
-}
-
 // SubscribeWithContext 在给定上下文环境中订阅特定主题的消息。
 // 该函数会阻塞直到 context 被取消或订阅返回错误。
 func (p *natsPublisher) SubscribeWithContext(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
@@ -261,61 +237,9 @@ func (p *natsPublisher) Publish(ctx context.Context, topic string, event any) er
 	return p.PublishWithContext(ctx, topic, event)
 }
 
-// PublishRealtime implements the eventbus.RealtimePublisher interface.
-func (p *natsPublisher) PublishRealtime(ctx context.Context, topic string, event any) error {
-	return p.PublishRealtimeWithContext(ctx, topic, event)
-}
-
-// FlushRealtime implements the eventbus.RealtimePublisher interface.
-func (p *natsPublisher) FlushRealtime(ctx context.Context) error {
-	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
-		return fmt.Errorf("NATS client is closed")
-	}
-	p.mu.Unlock()
-
-	flushCtx, cancel := contextWithDefaultDeadline(ctx, defaultRealtimeFlushTimeout)
-	defer cancel()
-	if err := p.conn.FlushWithContext(flushCtx); err != nil {
-		return fmt.Errorf("failed to flush realtime messages: %w", err)
-	}
-
-	return nil
-}
-
 // Subscribe implements the eventbus.Subscriber interface
 func (p *natsPublisher) Subscribe(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
 	return p.SubscribeWithContext(ctx, topic, handler)
-}
-
-// SubscribeRealtime implements the eventbus.RealtimeSubscriber interface
-func (p *natsPublisher) SubscribeRealtime(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
-	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
-		return fmt.Errorf("NATS client is closed")
-	}
-	p.mu.Unlock()
-
-	// 使用 Core NATS 订阅，不依赖 JetStream
-	sub, err := p.conn.Subscribe(topic, func(msg *nats.Msg) {
-		handler(msg)
-	})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to realtime topic '%s': %w", topic, err)
-	}
-
-	// 在 context 取消时清理订阅
-	go func() {
-		<-ctx.Done()
-		if err := sub.Unsubscribe(); err != nil {
-			logs.WarnContextf(ctx, "Failed to unsubscribe from realtime topic '%s': %v", topic, err)
-		}
-		logs.InfoContextf(ctx, "Unsubscribed from realtime topic: %s", topic)
-	}()
-
-	return nil
 }
 
 // Close 关闭 NATS 连接并释放资源
@@ -333,12 +257,4 @@ func (p *natsPublisher) Close() error {
 	return nil
 }
 
-func contextWithDefaultDeadline(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
-	if ctx == nil {
-		return context.WithTimeout(context.Background(), timeout)
-	}
-	if _, ok := ctx.Deadline(); ok {
-		return ctx, func() {}
-	}
-	return context.WithTimeout(ctx, timeout)
-}
+
