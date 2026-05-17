@@ -105,6 +105,7 @@ func (f *Flow) Generate(ctx context.Context, userInput string) (*einoschema.Mess
 				result = msg
 			}
 		}
+		logs.DebugContextf(ctx, "received message chunk: content_len=%d reasoning_len=%d tool_calls=%d", len(result.Content), len(result.ReasoningContent), len(result.ToolCalls))
 	}
 
 	if result == nil {

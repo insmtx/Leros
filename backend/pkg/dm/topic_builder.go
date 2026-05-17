@@ -1,6 +1,7 @@
 package dm
 
 import (
+	"fmt"
 	"strings"
 	"unicode"
 )
@@ -12,6 +13,10 @@ const unknownSegment = "unknown"
 
 // topicBuilder 基于有序片段构造领域消息 topic。
 type topicBuilder struct {
+	orgid     uint
+	subject   string
+	subjectid string
+
 	segments  []string
 	separator string
 }
@@ -31,17 +36,22 @@ func (b topicBuilder) Add(segments ...string) topicBuilder {
 }
 
 // Org 追加组织字段片段。
-func (b topicBuilder) Org(orgID string) topicBuilder {
-	return b.Add("org", orgID)
+func (b topicBuilder) Org(orgID uint) topicBuilder {
+	b.orgid = orgID
+	return b.Add("org", fmt.Sprintf("%d", orgID))
 }
 
 // Session 追加会话字段片段。
 func (b topicBuilder) Session(sessionID string) topicBuilder {
+	b.subject = "session"
+	b.subjectid = sessionID
 	return b.Add("session", sessionID)
 }
 
 // Worker 追加 Worker 字段片段。
 func (b topicBuilder) Worker(workerID string) topicBuilder {
+	b.subject = "worker"
+	b.subjectid = workerID
 	return b.Add("worker", workerID)
 }
 

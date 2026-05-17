@@ -96,3 +96,22 @@ type MessageList struct {
 	Page  int              `json:"page"`
 	Items []SessionMessage `json:"items"`
 }
+
+// CompleteSessionMessageRequest 处理 session 完成事件请求
+type CompleteSessionMessageRequest struct {
+	SessionID string                 `json:"session_id"`
+	Content   string                 `json:"content"`
+	ToolCalls []types.ToolCall       `json:"tool_calls,omitempty"`
+	Metadata  *types.MessageMetadata `json:"metadata,omitempty"`
+	Seq       int64                  `json:"seq"`
+	CreatedAt time.Time              `json:"created_at"`
+}
+
+// FailedSessionMessageRequest 处理 session 失败事件请求
+type FailedSessionMessageRequest struct {
+	SessionID string `json:"session_id"`
+	ErrorMsg  string `json:"error_msg"`
+	ErrorCode string `json:"error_code,omitempty"`
+	Seq       int64  `json:"seq"`
+	CreatedAt time.Time `json:"created_at"`
+}

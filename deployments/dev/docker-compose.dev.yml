@@ -39,27 +39,9 @@ services:
     networks:
       - leros-dev-network
 
-  redis:
-    image: registry.yygu.cn/library/redis:8.2
-    container_name: leros-dev-redis
-    environment:
-      - REDIS_PASSWORD=redis_dev_password
-    ports:
-      - "6380:6379"
-    volumes:
-      - dev_redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "redis_dev_password", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-    networks:
-      - leros-dev-network
-
 volumes:
   dev_postgres_data:
   dev_nats_data:
-  dev_redis_data:
 
 networks:
   leros-dev-network:

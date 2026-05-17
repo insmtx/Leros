@@ -38,7 +38,6 @@ const (
 type MemoryType string
 
 const (
-	MemoryTypeRedis    MemoryType = "redis"
 	MemoryTypePostgres MemoryType = "postgres"
 )
 

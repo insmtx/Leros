@@ -514,7 +514,6 @@ backend/
 | 网关     | Gin                                  |
 | 事件总线 | NATS JetStream                       |
 | 数据库   | PostgreSQL                           |
-| 缓存     | Redis                                |
 | 向量库   | Qdrant                               |
 | LLM      | 多模型（OpenAI / Claude / DeepSeek）|
 | 容器化   | Docker + Compose                     |

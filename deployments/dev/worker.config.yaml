@@ -8,11 +8,8 @@ database:
   debug: true
 
 nats:
-  url: "nats://localhost:4222/"
+  url: "nats://localhost:4223/"
 
-redis:
-  addr: "localhost:6379"
-  password: "redis_dev_password"
 
 log:
   level: debug

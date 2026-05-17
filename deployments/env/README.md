@@ -8,7 +8,6 @@ This setup brings up the following services:
 - **leros**: Main application server
 - **postgresql**: Database server
 - **nats**: Message broker with JetStream
-- **redis**: In-memory database for caching
 
 ## Usage
 
@@ -38,7 +37,6 @@ docker-compose logs -f
 - `5432`: PostgreSQL server
 - `4222`: NATS server (Client)
 - `8222`: NATS Monitoring
-- `6379`: Redis server
 
 ## Health Checks
 

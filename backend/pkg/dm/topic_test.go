@@ -4,7 +4,7 @@ import "testing"
 
 func TestTopicBuilderBuildsSubjectsFromSegments(t *testing.T) {
 	got := topic().
-		Org("1001").
+		Org(1001).
 		Session("sess_0").
 		Message().
 		Build()
@@ -16,7 +16,7 @@ func TestTopicBuilderBuildsSubjectsFromSegments(t *testing.T) {
 
 func TestTopicBuilderBuildsWildcardSubjects(t *testing.T) {
 	got := topic().
-		Org("1001").
+		Org(1001).
 		Add("worker").
 		Wildcard().
 		Task().
@@ -42,7 +42,7 @@ func TestTopicBuilderCleansSegments(t *testing.T) {
 }
 
 func TestTopicBuilderIsImmutable(t *testing.T) {
-	base := topic().Org("1001")
+	base := topic().Org(1001)
 	task := base.Worker("worker_1").Task()
 	stream := base.Session("sess_1").Message().Stream()
 
@@ -59,7 +59,7 @@ func TestTopicBuilderIsImmutable(t *testing.T) {
 
 func TestTopicBuilderWithSeparator(t *testing.T) {
 	got := topic().
-		Org("1001").
+		Org(1001).
 		Worker("worker_1").
 		Task().
 		WithSeparator("_").
@@ -72,7 +72,7 @@ func TestTopicBuilderWithSeparator(t *testing.T) {
 
 func TestTopicBuilderWithUnderscoreSeparator(t *testing.T) {
 	got := topic().
-		Org("1001").
+		Org(1001).
 		Worker("worker_1").
 		Task().
 		WithUnderscoreSeparator().
@@ -84,7 +84,7 @@ func TestTopicBuilderWithUnderscoreSeparator(t *testing.T) {
 }
 
 func TestTopicBuilderWithSeparatorIsImmutable(t *testing.T) {
-	base := topic().Org("1001").Worker("worker_1")
+	base := topic().Org(1001).Worker("worker_1")
 	underscore := base.WithSeparator("_").Task()
 
 	if got, want := base.Task().Build(), "org.1001.worker.worker_1.task"; got != want {

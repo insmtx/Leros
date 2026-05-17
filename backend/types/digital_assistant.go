@@ -130,7 +130,7 @@ type LLMConfig struct {
 
 // MemoryConfig 记忆配置定义了记忆功能的类型和参数
 type MemoryConfig struct {
-	// 记忆配置 - 类型，记忆存储类型标识 (如：redis, postgres等)
+	// 记忆配置 - 类型，记忆存储类型标识 (如：postgres, in_memory等)
 	Type string `json:"type"` // 建议使用 types.MemoryType 定义的常量值
 	// 记忆配置 - 配置，记忆相关的自定义配置选项
 	// TODO

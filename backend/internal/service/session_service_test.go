@@ -36,19 +36,11 @@ func (m *mockEventBus) Publish(ctx context.Context, topic string, event any) err
 	return nil
 }
 
-func (m *mockEventBus) PublishRealtime(ctx context.Context, topic string, event any) error {
-	return nil
-}
-
-func (m *mockEventBus) FlushRealtime(ctx context.Context) error {
-	return nil
-}
-
 func (m *mockEventBus) Subscribe(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
 	return nil
 }
 
-func (m *mockEventBus) SubscribeRealtime(ctx context.Context, topic string, handler func(msg *nats.Msg)) error {
+func (m *mockEventBus) SubscribeFrom(ctx context.Context, topic string, startSeq int64, handler func(msg *nats.Msg)) error {
 	return nil
 }
 
@@ -75,13 +67,9 @@ func setupTestServiceWithSubscriber(t *testing.T, subscriber mq.Subscriber) cont
 	eb := &struct {
 		mq.Publisher
 		mq.Subscriber
-		mq.RealtimePublisher
-		mq.RealtimeSubscriber
 	}{
-		RealtimeSubscriber: &mockEventBus{},
-		RealtimePublisher:  &mockEventBus{},
-		Publisher:          &mockEventBus{},
-		Subscriber:         subscriber,
+		Publisher:  &mockEventBus{},
+		Subscriber: subscriber,
 	}
 	return NewSessionService(db, eb, inferrer)
 }
@@ -719,3 +707,5 @@ func TestStreamSessionEvents_MissingCaller(t *testing.T) {
 		t.Errorf("expected 'user not authenticated or org not set' error, got %s", err.Error())
 	}
 }
+
+

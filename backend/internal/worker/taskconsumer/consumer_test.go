@@ -41,9 +41,9 @@ func TestPublishWorkerTaskMessageToNATS(t *testing.T) {
 	}
 	defer bus.Close()
 
-	topic, _ := dm.WorkerTaskTopic(orgID, workerID)
-	streamTopic, _ := dm.SessionResultStreamTopic(orgID, sessionID)
-	completedTopic, _ := dm.SessionCompletedTopic(orgID, sessionID)
+	topic, _ := dm.WorkerTaskSubject(orgID, workerID)
+	streamTopic, _ := dm.SessionResultStreamSubject(orgID, sessionID)
+	completedTopic, _ := dm.SessionCompletedSubject(orgID, sessionID)
 
 	task := newTestWorkerTaskMessage(t, orgID, workerID, sessionID)
 
@@ -57,7 +57,7 @@ func TestPublishWorkerTaskMessageToNATS(t *testing.T) {
 	}()
 
 	if err := <-receiveReady; err != nil {
-		t.Skipf("skip real NATS publish test: subscribe reply topics stream=%s completed=%s: %v", streamTopic, completedTopic, err)
+		t.Skipf("skip real NATS publish test: subscribe reply topics completed=%s: %v", completedTopic, err)
 	}
 
 	sendWorkerTaskMessage(ctx, t, bus, natsURL, topic, task)
@@ -138,55 +138,68 @@ func sendWorkerTaskMessage(ctx context.Context, t *testing.T, publisher mq.Publi
 }
 
 // receiveWorkerTaskReply 订阅 agent 运行回复 topic，并等待当前测试任务的完成消息。
-// stream topic 使用 Core NATS 实时订阅，completed topic 使用 JetStream 订阅以匹配最终落盘语义。
-func receiveWorkerTaskReply(ctx context.Context, t *testing.T, subscriber mq.EventBus, streamTopic string, completedTopic string, taskID string, runID string, ready chan<- error) error {
+// completed topic 使用 JetStream 订阅以匹配最终落盘语义。
+func receiveWorkerTaskReply(ctx context.Context, t *testing.T, subscriber mq.Subscriber, streamTopic string, completedTopic string, taskID string, runID string, ready chan<- error) error {
 	t.Helper()
 
 	completedCh := make(chan events.MessageStreamMessage, 1)
-	err := subscriber.SubscribeRealtime(ctx, streamTopic, func(natsMsg *nats.Msg) {
-		var streamMsg events.MessageStreamMessage
-		if err := json.Unmarshal(natsMsg.Data, &streamMsg); err != nil {
-			t.Logf("\ntopic:\n【%s】\nmalformed:%v\n%s\n\n", streamTopic, err, string(natsMsg.Data))
-			return
+
+	// 注意：Subscribe 是阻塞调用，会一直运行直到 context 取消。
+	// 因此在启动订阅后立即发送 ready，告知调用者订阅已启动（而非已完成）。
+	go func() {
+		// 先发送 ready，表示订阅尝试已开始
+		ready <- nil
+
+		err := subscriber.Subscribe(ctx, streamTopic, func(natsMsg *nats.Msg) {
+			var streamMsg events.MessageStreamMessage
+			if err := json.Unmarshal(natsMsg.Data, &streamMsg); err != nil {
+				t.Logf("\ntopic:\n【%s】\nmalformed:%v\n%s\n\n", streamTopic, err, string(natsMsg.Data))
+				return
+			}
+			t.Logf("\ntopic:\n【%s】\n%s:%s\n%s\n\n",
+				streamTopic,
+				streamMsg.Body.Event,
+				streamMsg.Body.Payload.Content,
+				string(natsMsg.Data),
+			)
+		})
+		// Subscribe 阻塞直到 context 取消，这里仅记录错误
+		if err != nil {
+			t.Logf("stream topic subscription error: %v", err)
 		}
-		t.Logf("\ntopic:\n【%s】\n%s:%s\n%s\n\n",
-			streamTopic,
-			streamMsg.Body.Event,
-			streamMsg.Body.Payload.Content,
-			string(natsMsg.Data),
-		)
-	})
-	if err != nil {
-		ready <- err
-		return err
-	}
-	err = subscriber.Subscribe(ctx, completedTopic, func(natsMsg *nats.Msg) {
-		var completedMsg events.MessageStreamMessage
-		if err := json.Unmarshal(natsMsg.Data, &completedMsg); err != nil {
-			t.Logf("\ntopic:\n【%s】\nmalformed:%v\n%s\n\n", completedTopic, err, string(natsMsg.Data))
-			return
+	}()
+
+	go func() {
+		// 先发送 ready，表示订阅尝试已开始
+		ready <- nil
+
+		err := subscriber.Subscribe(ctx, completedTopic, func(natsMsg *nats.Msg) {
+			var completedMsg events.MessageStreamMessage
+			if err := json.Unmarshal(natsMsg.Data, &completedMsg); err != nil {
+				t.Logf("\ntopic:\n【%s】\nmalformed:%v\n%s\n\n", completedTopic, err, string(natsMsg.Data))
+				return
+			}
+			t.Logf("\ntopic:\n【%s】\n%s:%s\n%s\n\n",
+				completedTopic,
+				completedMsg.Body.Event,
+				completedMsg.Body.Payload.Content,
+				string(natsMsg.Data),
+			)
+			if completedMsg.Trace.TaskID != taskID || completedMsg.Trace.RunID != runID {
+				return
+			}
+			select {
+			case completedCh <- completedMsg:
+			case <-ctx.Done():
+			default:
+				t.Logf("drop completed message because result channel is full: event=%s seq=%d", completedMsg.Body.Event, completedMsg.Body.Seq)
+			}
+		})
+		// Subscribe 阻塞直到 context 取消，这里仅记录错误
+		if err != nil {
+			t.Logf("completed topic subscription error: %v", err)
 		}
-		t.Logf("\ntopic:\n【%s】\n%s:%s\n%s\n\n",
-			completedTopic,
-			completedMsg.Body.Event,
-			completedMsg.Body.Payload.Content,
-			string(natsMsg.Data),
-		)
-		if completedMsg.Trace.TaskID != taskID || completedMsg.Trace.RunID != runID {
-			return
-		}
-		select {
-		case completedCh <- completedMsg:
-		case <-ctx.Done():
-		default:
-			t.Logf("drop completed message because result channel is full: event=%s seq=%d", completedMsg.Body.Event, completedMsg.Body.Seq)
-		}
-	})
-	if err != nil {
-		ready <- err
-		return err
-	}
-	ready <- nil
+	}()
 
 	for {
 		select {

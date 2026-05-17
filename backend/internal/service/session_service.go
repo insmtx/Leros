@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+
 	"gorm.io/gorm"
 
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
@@ -338,7 +339,7 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID uint, req *co
 
 	// Only publish task if we have a worker ID
 	if session.AllocatedAssistantID > 0 {
-		topic, err := dm.WorkerTaskTopic(orgID, session.AllocatedAssistantID)
+		topic, err := dm.WorkerTaskSubject(orgID, session.AllocatedAssistantID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct worker task topic: %w", err)
 		}
@@ -462,18 +463,19 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 		return errors.New("user not authenticated or org not set")
 	}
 
-	topic, err := dm.SessionResultStreamTopic(caller.OrgID, sessionID)
+	topic, err := dm.SessionResultStreamSubject(caller.OrgID, sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to construct session result stream topic: %w", err)
 	}
-	err = s.eventbus.SubscribeRealtime(ctx, topic, func(msg *nats.Msg) {
+
+	return s.eventbus.SubscribeFrom(ctx, topic, lastSequence, func(msg *nats.Msg) {
 		var streamMsg events.MessageStreamMessage
 		if err := json.Unmarshal(msg.Data, &streamMsg); err != nil {
 			logs.WarnContextf(ctx, "failed to unmarshal to MessageStreamMessage: %v", err)
 			return
 		}
+		logs.DebugContextf(ctx, "received message from topic %s: session_id=%s event=%s seq=%d", topic, streamMsg.Route.SessionID, streamMsg.Body.Event, streamMsg.Body.Seq)
 
-		// 现在处理正确类型的消息
 		if streamMsg.Body.Seq <= lastSequence {
 			logs.DebugContextf(ctx, "skipping old message for session %s: seq=%d lastSequence=%d", sessionID, streamMsg.Body.Seq, lastSequence)
 			return
@@ -511,24 +513,13 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 			logs.WarnContextf(ctx, "unknown stream event type: %v", streamMsg.Body.Event)
 			return
 		}
-		err = sink.Emit(ctx, &events.Event{
+		if err := sink.Emit(ctx, &events.Event{
 			Type:    events.EventType(se.Type),
 			Content: toJSONString(se),
-		})
-		if err != nil {
+		}); err != nil {
 			logs.ErrorContextf(ctx, "failed to emit session event for session %s: %v", sessionID, err)
 		}
 	})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to session result stream topic: %w", err)
-	}
-	logs.DebugContextf(ctx, "subscribed to session result stream topic: %s", topic)
-
-	// 阻塞等待 context 结束，这样 goroutine 不会立即退出
-	<-ctx.Done()
-	logs.DebugContextf(ctx, "session event stream ended for session: %s", sessionID)
-
-	return nil
 }
 
 func convertToContractSession(session *types.Session) *contract.Session {
@@ -562,7 +553,7 @@ func convertToContractSession(session *types.Session) *contract.Session {
 
 func convertToContractSessionMessage(message *types.SessionMessage) *contract.SessionMessage {
 	result := &contract.SessionMessage{
-		ID:          fmt.Sprintf("%d", message.ID), // 转换为 string 以匹配前端
+		ID:          fmt.Sprintf("%d", message.ID),
 		SessionID:   message.SessionID,
 		Role:        message.Role,
 		Content:     message.Content,
@@ -590,4 +581,104 @@ func convertToContractSessionMessage(message *types.SessionMessage) *contract.Se
 	}
 
 	return result
+}
+
+func (s *sessionService) CompleteSessionMessage(ctx context.Context, req *contract.CompleteSessionMessageRequest) error {
+	if req.SessionID == "" {
+		return errors.New("session_id is required")
+	}
+
+	session, err := db.GetSessionBySessionID(ctx, s.db, req.SessionID)
+	if err != nil {
+		return fmt.Errorf("find session %s: %w", req.SessionID, err)
+	}
+	if session == nil {
+		return fmt.Errorf("session %s not found", req.SessionID)
+	}
+
+	sequence, err := db.GetNextSequence(ctx, s.db, req.SessionID)
+	if err != nil {
+		return fmt.Errorf("get sequence for %s: %w", req.SessionID, err)
+	}
+
+	msgEntity := &types.SessionMessage{
+		SessionID:   req.SessionID,
+		Role:        string(types.MessageRoleAssistant),
+		Content:     req.Content,
+		MessageType: string(types.MessageTypeText),
+		Status:      string(types.MessageStatusComplete),
+		Sequence:    sequence,
+		Timestamp:   req.CreatedAt.UnixMilli(),
+	}
+
+	if req.ToolCalls != nil && len(req.ToolCalls) > 0 {
+		msgEntity.ToolCalls = req.ToolCalls
+		for i := range msgEntity.ToolCalls {
+			msgEntity.ToolCalls[i].Status = types.ToolCallStatusSuccess
+		}
+	}
+
+	if req.Metadata != nil {
+		msgEntity.Metadata = *req.Metadata
+	}
+
+	if err := db.CreateMessage(ctx, s.db, msgEntity); err != nil {
+		return fmt.Errorf("create message for %s: %w", req.SessionID, err)
+	}
+
+	now := time.Now()
+	if err := db.IncrementMessageCount(ctx, s.db, session.ID); err != nil {
+		logs.WarnContextf(ctx, "increment count for %s: %v", req.SessionID, err)
+	}
+	if err := db.UpdateLastMessageAt(ctx, s.db, session.ID, now); err != nil {
+		logs.WarnContextf(ctx, "update last_message_at for %s: %v", req.SessionID, err)
+	}
+
+	logs.DebugContextf(ctx, "persisted completed session message: session_id=%s seq=%d", req.SessionID, sequence)
+	return nil
+}
+
+func (s *sessionService) FailedSessionMessage(ctx context.Context, req *contract.FailedSessionMessageRequest) error {
+	if req.SessionID == "" {
+		return errors.New("session_id is required")
+	}
+
+	session, err := db.GetSessionBySessionID(ctx, s.db, req.SessionID)
+	if err != nil {
+		return fmt.Errorf("find session %s: %w", req.SessionID, err)
+	}
+	if session == nil {
+		return fmt.Errorf("session %s not found", req.SessionID)
+	}
+
+	sequence, err := db.GetNextSequence(ctx, s.db, req.SessionID)
+	if err != nil {
+		return fmt.Errorf("get sequence for %s: %w", req.SessionID, err)
+	}
+
+	msgEntity := &types.SessionMessage{
+		SessionID:   req.SessionID,
+		Role:        string(types.MessageRoleSystem),
+		Content:     req.ErrorMsg,
+		MessageType: string(types.MessageTypeText),
+		Status:      string(types.MessageStatusError),
+		Sequence:    sequence,
+		Timestamp:   req.CreatedAt.UnixMilli(),
+		Metadata:    types.MessageMetadata{Extra: map[string]interface{}{"error_code": req.ErrorCode}},
+	}
+
+	if err := db.CreateMessage(ctx, s.db, msgEntity); err != nil {
+		return fmt.Errorf("create message for %s: %w", req.SessionID, err)
+	}
+
+	now := time.Now()
+	if err := db.IncrementMessageCount(ctx, s.db, session.ID); err != nil {
+		logs.WarnContextf(ctx, "increment count for %s: %v", req.SessionID, err)
+	}
+	if err := db.UpdateLastMessageAt(ctx, s.db, session.ID, now); err != nil {
+		logs.WarnContextf(ctx, "update last_message_at for %s: %v", req.SessionID, err)
+	}
+
+	logs.DebugContextf(ctx, "persisted failed session message: session_id=%s seq=%d", req.SessionID, sequence)
+	return nil
 }
