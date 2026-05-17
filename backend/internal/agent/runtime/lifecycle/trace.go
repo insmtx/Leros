@@ -40,7 +40,7 @@ func (r *traceRecorder) observe(event *events.Event) {
 	switch event.Type {
 	case events.EventToolCallStarted:
 		r.toolCalls++
-		if name := toolNameFromEventContent(event.Content); name != "" {
+		if name := toolNameFromEvent(event); name != "" {
 			r.toolNames = append(r.toolNames, name)
 			if name == "skill_use" {
 				r.usedSkillTool = true
@@ -110,4 +110,19 @@ func toolNameFromEventContent(content string) string {
 		return ""
 	}
 	return strings.TrimSpace(payload.Name)
+}
+
+func toolNameFromEvent(event *events.Event) string {
+	if event == nil {
+		return ""
+	}
+	payload, err := events.DecodePayload[events.ToolCallPayload](event)
+	if err == nil && strings.TrimSpace(payload.Name) != "" {
+		return strings.TrimSpace(payload.Name)
+	}
+	resultPayload, err := events.DecodePayload[events.ToolCallResultPayload](event)
+	if err == nil && strings.TrimSpace(resultPayload.Name) != "" {
+		return strings.TrimSpace(resultPayload.Name)
+	}
+	return toolNameFromEventContent(event.Content)
 }

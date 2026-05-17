@@ -37,6 +37,7 @@ type streamEvent struct {
 }
 
 type streamMessage struct {
+	ID      string          `json:"id,omitempty"`
 	Role    string          `json:"role,omitempty"`
 	Content []streamContent `json:"content"`
 }
@@ -44,6 +45,7 @@ type streamMessage struct {
 type streamContent struct {
 	Type      string         `json:"type"`
 	Text      string         `json:"text,omitempty"`
+	Thinking  string         `json:"thinking,omitempty"`
 	ID        string         `json:"id,omitempty"`
 	Name      string         `json:"name,omitempty"`
 	Input     map[string]any `json:"input,omitempty"`
@@ -173,7 +175,7 @@ func parseClaudeLineEvents(line string, state *claudeStreamState) []events.Event
 	}
 	var event streamEvent
 	if json.Unmarshal([]byte(line), &event) != nil {
-		return []events.Event{{Type: events.EventMessageDelta, Content: line}}
+		return []events.Event{*events.NewMessageDelta("", line)}
 	}
 	switch event.Type {
 	case "system":
@@ -190,6 +192,7 @@ func parseClaudeLineEvents(line string, state *claudeStreamState) []events.Event
 		}
 		var parsed []events.Event
 		var b strings.Builder
+		messageID := event.Message.ID
 		for _, block := range event.Message.Content {
 			switch block.Type {
 			case "text":
@@ -197,16 +200,24 @@ func parseClaudeLineEvents(line string, state *claudeStreamState) []events.Event
 					state.lastAssistantText = block.Text
 					b.WriteString(block.Text)
 				}
+			case "thinking":
+				if block.Thinking != "" {
+					if b.Len() > 0 {
+						parsed = append(parsed, *events.NewMessageDelta(messageID, b.String()))
+						b.Reset()
+					}
+					parsed = append(parsed, *events.NewReasoningDelta(messageID, block.Thinking))
+				}
 			case "tool_use":
 				if b.Len() > 0 {
-					parsed = append(parsed, events.Event{Type: events.EventMessageDelta, Content: b.String()})
+					parsed = append(parsed, *events.NewMessageDelta(messageID, b.String()))
 					b.Reset()
 				}
 				parsed = append(parsed, claudeToolCallStartedEvent(block, state))
 			}
 		}
 		if b.Len() > 0 {
-			parsed = append(parsed, events.Event{Type: events.EventMessageDelta, Content: b.String()})
+			parsed = append(parsed, *events.NewMessageDelta(messageID, b.String()))
 		}
 		return parsed
 	case "user":
@@ -238,14 +249,7 @@ func claudeToolCallStartedEvent(block streamContent, state *claudeStreamState) e
 		}
 		state.toolNames[block.ID] = block.Name
 	}
-	return events.Event{
-		Type: events.EventToolCallStarted,
-		Content: eventContentJSON(map[string]any{
-			"call_id":   block.ID,
-			"name":      block.Name,
-			"arguments": block.Input,
-		}),
-	}
+	return *events.NewToolCallStarted(block.ID, block.Name, block.Input)
 }
 
 func claudeToolCallCompletedEvent(block streamContent, state *claudeStreamState) events.Event {
@@ -253,27 +257,15 @@ func claudeToolCallCompletedEvent(block streamContent, state *claudeStreamState)
 	if state != nil && state.toolNames != nil {
 		name = state.toolNames[block.ToolUseID]
 	}
-	return events.Event{
-		Type: events.EventToolCallCompleted,
-		Content: eventContentJSON(map[string]any{
-			"tool_call_id": block.ToolUseID,
-			"name":         name,
-			"result":       block.Content,
-			"is_error":     block.IsError,
-		}),
+	if block.IsError {
+		return *events.NewToolCallFailed(block.ToolUseID, name, fmt.Sprintf("%v", block.Content), 0)
 	}
-}
-
-func eventContentJSON(value interface{}) string {
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Sprintf("%v", value)
-	}
-	return string(encoded)
+	return *events.NewToolCallCompleted(block.ToolUseID, name, block.Content, 0)
 }
 
 func scanPlainOutput(ctx context.Context, r interface{ Read([]byte) (int, error) }, evtChan chan<- events.Event, eventType events.EventType) string {
 	var output strings.Builder
+	messageIDs := events.NewMessageIDMapper()
 	engines.ScanJSONLines(r, func(line string) bool {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -283,6 +275,9 @@ func scanPlainOutput(ctx context.Context, r interface{ Read([]byte) (int, error)
 			output.WriteString("\n")
 		}
 		output.WriteString(line)
+		if eventType == events.EventMessageDelta {
+			return sendEvent(ctx, evtChan, *events.NewMessageDelta(messageIDs.CurrentOrNew(), line))
+		}
 		return sendEvent(ctx, evtChan, events.Event{Type: eventType, Content: line})
 	})
 	return output.String()

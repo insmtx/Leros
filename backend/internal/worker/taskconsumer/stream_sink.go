@@ -51,16 +51,23 @@ func (s *MQStreamSink) Emit(ctx context.Context, event *events.Event) error {
 		},
 		Route: s.task.Route,
 		Body: events.StreamBody{
-			Seq:   event.Seq,
-			Event: streamEventType(event.Type),
-			Payload: events.StreamPayload{
-				Role:    events.MessageRoleAssistant,
-				Content: event.Content,
-			},
+			Seq:     event.Seq,
+			Event:   streamEventType(event.Type),
+			Payload: streamPayload(event),
 		},
 	}
 	if msg.Body.Event == events.StreamEventRunFailed {
 		msg.Body.Error = &events.StreamError{Message: event.Content}
+	}
+	if msg.Body.Event == events.StreamEventUsage {
+		usagePayload, err := events.DecodePayload[events.UsagePayload](event)
+		if err == nil {
+			msg.Body.Usage = &events.UsagePayload{
+				InputTokens:  usagePayload.InputTokens,
+				OutputTokens: usagePayload.OutputTokens,
+				TotalTokens:  usagePayload.TotalTokens,
+			}
+		}
 	}
 
 	if err := s.publisher.PublishRealtime(ctx, topic, msg); err != nil {
@@ -103,6 +110,48 @@ func (s *MQStreamSink) emitCompleted(ctx context.Context, msg events.MessageStre
 	}
 }
 
+func streamPayload(event *events.Event) events.StreamPayload {
+	if event == nil {
+		return events.StreamPayload{Role: events.MessageRoleAssistant}
+	}
+	payload := events.StreamPayload{
+		Role:    events.MessageRoleAssistant,
+		Content: event.Content,
+	}
+	switch event.Type {
+	case events.EventMessageDelta, events.EventReasoningDelta:
+		messagePayload, err := events.DecodePayload[events.MessageDeltaPayload](event)
+		if err == nil {
+			payload.MessageID = messagePayload.MessageID
+			payload.Role = events.MessageRole(messagePayload.Role)
+			payload.Content = messagePayload.Content
+			if payload.Role == "" {
+				payload.Role = events.MessageRoleAssistant
+			}
+		}
+	case events.EventToolCallStarted:
+		toolPayload, err := events.DecodePayload[events.ToolCallPayload](event)
+		if err == nil {
+			payload.ToolCall = &events.ToolCallEvent{
+				ID:        toolPayload.ToolCallID,
+				Name:      toolPayload.Name,
+				Arguments: toolPayload.Arguments,
+			}
+		}
+	case events.EventToolCallCompleted:
+		resultPayload, err := events.DecodePayload[events.ToolCallResultPayload](event)
+		if err == nil {
+			result, _ := resultPayload.Result.(map[string]any)
+			payload.ToolResult = &events.ToolResultEvent{
+				ToolCallID: resultPayload.ToolCallID,
+				Name:       resultPayload.Name,
+				Result:     result,
+			}
+		}
+	}
+	return payload
+}
+
 func streamEventType(eventType events.EventType) events.StreamEventType {
 	switch eventType {
 	case events.EventStarted:
@@ -117,12 +166,12 @@ func streamEventType(eventType events.EventType) events.StreamEventType {
 		return events.StreamEventMessageCompleted
 	case events.EventToolCallStarted:
 		return events.StreamEventToolCallStarted
-	case events.EventToolCallArguments:
-		return events.StreamEventToolCallDelta
-	case events.EventToolCallOutput, events.EventToolCallCompleted:
+	case events.EventToolCallCompleted:
 		return events.StreamEventToolCallFinished
 	case events.EventToolCallFailed:
 		return events.StreamEventToolCallFinished
+	case events.EventUsage:
+		return events.StreamEventUsage
 	default:
 		return events.StreamEventMessageDelta
 	}

@@ -3,7 +3,6 @@ package lifecycle
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/insmtx/Leros/backend/internal/agent"
@@ -42,8 +41,12 @@ func TestRunnerEmitsSuccessResultAndUsageThroughSink(t *testing.T) {
 			t.Fatalf("event %d: expected contiguous seq, got prev=%d current=%d", i, got[i-1].Seq, got[i].Seq)
 		}
 	}
-	if !strings.Contains(got[1].Content, `"total_tokens":3`) {
-		t.Fatalf("expected usage payload, got %q", got[1].Content)
+	usage, err := events.DecodePayload[events.UsagePayload](got[1])
+	if err != nil {
+		t.Fatalf("decode usage payload: %v", err)
+	}
+	if usage.TotalTokens != 3 {
+		t.Fatalf("expected usage payload, got %#v", usage)
 	}
 	if got[2].Content != "final answer" {
 		t.Fatalf("expected final result content, got %q", got[2].Content)

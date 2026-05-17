@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // TestWorkerTaskMessageJSONShape verifies the JSON structure of WorkerTaskMessage.
@@ -88,6 +90,18 @@ func TestWorkerTaskMessageJSONShape(t *testing.T) {
 	}
 	if _, ok := bodyObject["execution"].(map[string]any); !ok {
 		t.Fatalf("expected execution object in %s", body)
+	}
+}
+
+func TestMessageDeltaPayloadIncludesMessageID(t *testing.T) {
+	messageID := uuid.NewString()
+	event := NewMessageDelta(messageID, "hello")
+	payload, err := DecodePayload[MessageDeltaPayload](event)
+	if err != nil {
+		t.Fatalf("decode message payload: %v", err)
+	}
+	if payload.MessageID != messageID || payload.Content != "hello" || payload.Role != string(MessageRoleAssistant) {
+		t.Fatalf("unexpected message payload: %#v", payload)
 	}
 }
 

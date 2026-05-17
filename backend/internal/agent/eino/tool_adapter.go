@@ -219,25 +219,16 @@ func (t *invokableTool) InvokableRun(ctx context.Context, argumentsInJSON string
 	}
 
 	startedAt := time.Now()
-	_ = t.emitToolEvent(ctx, events.EventToolCallStarted, eventContentJSON(map[string]any{
-		"name":      t.tool.Name(),
-		"arguments": cloneArguments(input),
-	}))
+	toolCallID := fmt.Sprintf("tool_%d", startedAt.UnixNano())
+	_ = t.emitToolEvent(ctx, events.NewToolCallStarted(toolCallID, t.tool.Name(), cloneArguments(input)))
 
 	result, err := invokeTool(ctx, t.tool, input, t.binding.ToolContext)
 	if err != nil {
-		_ = t.emitToolEvent(ctx, events.EventToolCallFailed, eventContentJSON(map[string]any{
-			"name":       t.tool.Name(),
-			"elapsed_ms": time.Since(startedAt).Milliseconds(),
-		}))
+		_ = t.emitToolEvent(ctx, events.NewToolCallFailed(toolCallID, t.tool.Name(), err.Error(), time.Since(startedAt).Milliseconds()))
 		return errorOutput(err.Error(), t.tool.Name()), nil
 	}
 
-	_ = t.emitToolEvent(ctx, events.EventToolCallCompleted, eventContentJSON(map[string]any{
-		"name":       t.tool.Name(),
-		"result":     result.Output,
-		"elapsed_ms": time.Since(startedAt).Milliseconds(),
-	}))
+	_ = t.emitToolEvent(ctx, events.NewToolCallCompleted(toolCallID, t.tool.Name(), result.Output, time.Since(startedAt).Milliseconds()))
 
 	return result.Output, nil
 }
@@ -252,14 +243,11 @@ func errorOutput(detail, toolName string) string {
 	return errStr
 }
 
-func (t *invokableTool) emitToolEvent(ctx context.Context, eventType events.EventType, content string) error {
+func (t *invokableTool) emitToolEvent(ctx context.Context, event *events.Event) error {
 	if t == nil || t.emitter == nil {
 		return nil
 	}
-	err := t.emitter.Emit(ctx, &events.Event{
-		Type:    eventType,
-		Content: content,
-	})
+	err := t.emitter.Emit(ctx, event)
 	_ = err
 	return nil
 }

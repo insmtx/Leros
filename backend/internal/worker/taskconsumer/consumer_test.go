@@ -20,9 +20,11 @@ import (
 	"github.com/insmtx/Leros/backend/pkg/dm"
 )
 
-const AgentRuntime = "leros"
+// const AgentRuntime = "leros"
 
-// const AgentRuntime = "calude"
+const AgentRuntime = "claude"
+
+// const AgentRuntime = "codex"
 
 func TestPublishWorkerTaskMessageToNATS(t *testing.T) {
 	natsURL := getenv("LEROS_TEST_NATS_URL", "nats://localhost:4222")
@@ -99,11 +101,14 @@ func newTestWorkerTaskMessage(t *testing.T, orgID uint, workerID uint, sessionID
 			},
 			Input: events.TaskInput{
 				Type: events.InputTypeTaskInstruction,
-				Text: "选择合适的工具查询当前系统时间，先告诉我你要怎么查，再查询完毕后告诉我几点了",
+				Text: "选择合适的工具查询当前系统时间，先告诉我你要怎么查，再执行操作，查询完毕后告诉我几点了，生成一个200字的报告",
 			},
 			Runtime: events.RuntimeOptions{
 				Kind:    AgentRuntime,
 				WorkDir: ".",
+			},
+			Model: events.ModelOptions{
+				ID: 1,
 			},
 		},
 		Metadata: map[string]any{

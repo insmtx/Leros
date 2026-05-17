@@ -163,6 +163,14 @@ func TestRunnerForwardsExternalToolEvents(t *testing.T) {
 	if !hasEvent(emitted, events.EventToolCallCompleted) {
 		t.Fatalf("expected forwarded tool_call.completed, got %#v", emitted)
 	}
+	started := findEvent(emitted, events.EventToolCallStarted)
+	payload, err := events.DecodePayload[events.ToolCallPayload](started)
+	if err != nil {
+		t.Fatalf("decode forwarded tool event payload: %v", err)
+	}
+	if payload.ToolCallID != "call_123" || payload.Name != "Bash" {
+		t.Fatalf("unexpected forwarded tool event payload: %#v", payload)
+	}
 }
 
 type fakeEngine struct {
@@ -204,10 +212,14 @@ func (e *fakeEngine) Run(_ context.Context, req engines.RunRequest) (*engines.Ru
 }
 
 func hasEvent(eventList []events.Event, eventType events.EventType) bool {
-	for _, event := range eventList {
-		if event.Type == eventType {
-			return true
+	return findEvent(eventList, eventType) != nil
+}
+
+func findEvent(eventList []events.Event, eventType events.EventType) *events.Event {
+	for i := range eventList {
+		if eventList[i].Type == eventType {
+			return &eventList[i]
 		}
 	}
-	return false
+	return nil
 }

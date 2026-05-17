@@ -89,6 +89,39 @@ func TestMQStreamSinkPublishesCompletedEventToSessionCompletedTopic(t *testing.T
 	}
 }
 
+func TestMQStreamSinkPublishesMessageID(t *testing.T) {
+	task := events.WorkerTaskMessage{
+		Trace: events.TraceContext{TraceID: "trace_test", RunID: "run_test"},
+		Route: events.RouteContext{OrgID: 1, SessionID: "session_test", WorkerID: 2},
+	}
+	publisher := &recordingRealtimePublisher{}
+	sink := NewMQStreamSink(publisher, task)
+
+	messageID := "5a63f7d9-63b2-4ea0-94df-7189fbc88e7f"
+	err := sink.Emit(context.Background(), &events.Event{
+		ID:      "event_test",
+		Type:    events.EventMessageDelta,
+		RunID:   "run_test",
+		TraceID: "trace_test",
+		Seq:     1,
+		Payload: events.NewMessageDelta(messageID, "hello").Payload,
+		Content: "hello",
+	})
+	if err != nil {
+		t.Fatalf("Emit() error = %v", err)
+	}
+	if len(publisher.realtimeCalls) != 1 {
+		t.Fatalf("expected one realtime publish, got %d", len(publisher.realtimeCalls))
+	}
+	streamMsg, ok := publisher.realtimeCalls[0].event.(events.MessageStreamMessage)
+	if !ok {
+		t.Fatalf("expected stream message, got %T", publisher.realtimeCalls[0].event)
+	}
+	if streamMsg.Body.Payload.MessageID != messageID || streamMsg.Body.Payload.Content != "hello" {
+		t.Fatalf("unexpected stream payload: %#v", streamMsg.Body.Payload)
+	}
+}
+
 type recordingRealtimePublisher struct {
 	realtimeCalls   []publishCall
 	persistentCalls []publishCall

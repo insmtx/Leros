@@ -489,8 +489,9 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionID stri
 		case events.StreamEventMessageDelta:
 			se.Type = dto.SessionEventTypeMessageDelta
 			se.Payload = dto.MessageDeltaPayload{
-				Role:    string(streamMsg.Body.Payload.Role),
-				Content: streamMsg.Body.Payload.Content,
+				MessageID: streamMsg.Body.Payload.MessageID,
+				Role:      string(streamMsg.Body.Payload.Role),
+				Content:   streamMsg.Body.Payload.Content,
 			}
 		case events.StreamEventToolCallStarted:
 			se.Type = dto.SessionEventTypeToolCallStarted

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/insmtx/Leros/backend/engines"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 )
@@ -91,6 +92,28 @@ func TestParseClaudeLineTracksAssistantFallback(t *testing.T) {
 	}
 }
 
+func TestParseClaudeLineMapsMessageIDToUUID(t *testing.T) {
+	state := &claudeStreamState{}
+	parsed := parseClaudeLineEvents(`{"type":"assistant","message":{"id":"msg_provider_1","content":[{"type":"text","text":"answer"},{"type":"thinking","thinking":"reason"}]}}`, state)
+	if len(parsed) != 2 {
+		t.Fatalf("expected two events, got %+v", parsed)
+	}
+	messagePayload, err := events.DecodePayload[events.MessageDeltaPayload](&parsed[0])
+	if err != nil {
+		t.Fatalf("decode message payload: %v", err)
+	}
+	reasoningPayload, err := events.DecodePayload[events.MessageDeltaPayload](&parsed[1])
+	if err != nil {
+		t.Fatalf("decode reasoning payload: %v", err)
+	}
+	if _, err := uuid.Parse(messagePayload.MessageID); err != nil {
+		t.Fatalf("message id should be uuid, got %q: %v", messagePayload.MessageID, err)
+	}
+	if reasoningPayload.MessageID != messagePayload.MessageID {
+		t.Fatalf("expected text and reasoning to share message id, got %q and %q", messagePayload.MessageID, reasoningPayload.MessageID)
+	}
+}
+
 func TestParseClaudeLineEmitsToolCallStarted(t *testing.T) {
 	state := &claudeStreamState{}
 	event := parseClaudeLine(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"call_123","name":"Bash","input":{"command":"date","description":"查询当前系统时间"}}]}}`, state)
@@ -99,7 +122,7 @@ func TestParseClaudeLineEmitsToolCallStarted(t *testing.T) {
 	}
 
 	content := decodeEventContent(t, event.Content)
-	if content["call_id"] != "call_123" || content["name"] != "Bash" {
+	if content["tool_call_id"] != "call_123" || content["name"] != "Bash" {
 		t.Fatalf("unexpected tool call content: %#v", content)
 	}
 	args, ok := content["arguments"].(map[string]any)

@@ -35,12 +35,14 @@ type codexEvent struct {
 }
 
 type codexItem struct {
+	ID          string          `json:"id,omitempty"`
 	Type        string          `json:"type"`
 	Text        json.RawMessage `json:"text,omitempty"`
 	Command     string          `json:"command,omitempty"`
 	CommandLine string          `json:"command_line,omitempty"`
 	Name        string          `json:"name,omitempty"`
 	Output      string          `json:"output,omitempty"`
+	Aggregated  string          `json:"aggregated_output,omitempty"`
 }
 
 // Run 启动 Codex CLI 进程并将 stdout/stderr 直接转换为引擎事件。
@@ -118,8 +120,9 @@ func codexModelEnv(model engines.ModelConfig) map[string]string {
 }
 
 func scanStdout(ctx context.Context, r interface{ Read([]byte) (int, error) }, evtChan chan<- events.Event) {
+	state := &codexStreamState{}
 	engines.ScanJSONLines(r, func(line string) bool {
-		event := parseCodexLine(line)
+		event := parseCodexLineWithState(line, state)
 		if event.Type == "" {
 			return true
 		}
@@ -127,7 +130,14 @@ func scanStdout(ctx context.Context, r interface{ Read([]byte) (int, error) }, e
 	})
 }
 
+type codexStreamState struct {
+}
+
 func parseCodexLine(line string) events.Event {
+	return parseCodexLineWithState(line, &codexStreamState{})
+}
+
+func parseCodexLineWithState(line string, state *codexStreamState) events.Event {
 	logs.Infof("Parse Codex line: %s", line)
 	line = strings.TrimSpace(line)
 	if line == "" {
@@ -135,7 +145,7 @@ func parseCodexLine(line string) events.Event {
 	}
 	var event codexEvent
 	if json.Unmarshal([]byte(line), &event) != nil {
-		return events.Event{Type: events.EventMessageDelta, Content: line}
+		return *events.NewMessageDelta("", line)
 	}
 	if event.Type == "thread.started" && event.ThreadID != "" {
 		return events.Event{Type: engines.EventProviderSessionStarted, Content: event.ThreadID}
@@ -151,20 +161,28 @@ func parseCodexLine(line string) events.Event {
 		if text == "" {
 			return events.Event{}
 		}
+		messageID := item.ID
 		eventType := events.EventMessageDelta
 		if event.Type == "item.completed" {
 			eventType = events.EventResult
+		}
+		if eventType == events.EventMessageDelta {
+			return *events.NewMessageDelta(messageID, text)
 		}
 		return events.Event{Type: eventType, Content: text}
 	case "command_execution", "tool_call", "shell_command":
 		command := firstNonEmptyString(item.Command, item.CommandLine, item.Name)
 		if command != "" {
-			return events.Event{Type: events.EventMessageDelta, Content: "$ " + command}
+			return *events.NewMessageDelta(item.ID, "$ "+command)
+		}
+		output := firstNonEmptyString(item.Output, item.Aggregated, decodeCodexText(item.Text))
+		if output != "" {
+			return *events.NewMessageDelta(item.ID, truncateOutput(output, 300))
 		}
 	case "command_output", "tool_output", "shell_output":
-		output := firstNonEmptyString(item.Output, decodeCodexText(item.Text))
+		output := firstNonEmptyString(item.Output, item.Aggregated, decodeCodexText(item.Text))
 		if output != "" {
-			return events.Event{Type: events.EventMessageDelta, Content: truncateOutput(output, 300)}
+			return *events.NewMessageDelta(item.ID, truncateOutput(output, 300))
 		}
 	}
 	return events.Event{}
@@ -192,10 +210,14 @@ func decodeCodexText(raw json.RawMessage) string {
 }
 
 func scanPlainOutput(ctx context.Context, r interface{ Read([]byte) (int, error) }, evtChan chan<- events.Event, eventType events.EventType) {
+	messageIDs := events.NewMessageIDMapper()
 	engines.ScanJSONLines(r, func(line string) bool {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			return true
+		}
+		if eventType == events.EventMessageDelta {
+			return sendEvent(ctx, evtChan, *events.NewMessageDelta(messageIDs.CurrentOrNew(), line))
 		}
 		return sendEvent(ctx, evtChan, events.Event{Type: eventType, Content: line})
 	})
