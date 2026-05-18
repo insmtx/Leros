@@ -2,7 +2,6 @@ package lifecycle
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -55,7 +54,7 @@ func (e *RunEventEmitter) EmitSucceeded(ctx context.Context, req *agent.RequestC
 		return nil
 	}
 	if result.Usage != nil {
-		if err := e.emit(ctx, req, events.EventUsage, eventContentJSON(result.Usage)); err != nil {
+		if err := e.emitEvent(ctx, req, events.NewUsage(result.Usage)); err != nil {
 			return err
 		}
 	}
@@ -120,22 +119,31 @@ func (e *RunEventEmitter) EmitPanic(ctx context.Context, req *agent.RequestConte
 }
 
 func (e *RunEventEmitter) emit(ctx context.Context, req *agent.RequestContext, eventType events.EventType, message string) error {
+	return e.emitEvent(ctx, req, &events.Event{
+		Type:    eventType,
+		Content: message,
+	})
+}
+
+func (e *RunEventEmitter) emitEvent(ctx context.Context, req *agent.RequestContext, event *events.Event) error {
 	if req == nil || req.EventSink == nil {
+		return nil
+	}
+	if event == nil {
 		return nil
 	}
 	seq := int64(1)
 	if e != nil && e.nextSeq != nil {
 		seq = e.nextSeq()
 	}
-	return req.EventSink.Emit(ctx, &events.Event{
-		ID:        fmt.Sprintf("%s:%d", req.RunID, seq),
-		RunID:     req.RunID,
-		TraceID:   req.TraceID,
-		Seq:       seq,
-		Type:      eventType,
-		CreatedAt: time.Now().UTC(),
-		Content:   message,
-	})
+	event.ID = fmt.Sprintf("%s:%d", req.RunID, seq)
+	event.RunID = req.RunID
+	event.TraceID = req.TraceID
+	event.Seq = seq
+	if event.CreatedAt.IsZero() {
+		event.CreatedAt = time.Now().UTC()
+	}
+	return req.EventSink.Emit(ctx, event)
 }
 
 func failureStatus(err error) (agent.RunStatus, events.EventType) {
@@ -157,12 +165,4 @@ func metadataWithLifecyclePhase(metadata map[string]any, phase RunPhase) map[str
 	}
 	metadata["phase"] = string(phase)
 	return metadata
-}
-
-func eventContentJSON(value interface{}) string {
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Sprintf("%v", value)
-	}
-	return string(encoded)
 }

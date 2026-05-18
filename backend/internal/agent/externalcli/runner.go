@@ -3,6 +3,7 @@ package externalcli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -120,6 +121,7 @@ func consumeEvents(ctx context.Context, emitter *events.Emitter, handle *engines
 	var result strings.Builder
 	resultSeen := false
 	consumed := consumeResult{}
+	messageIDs := events.NewMessageIDMapper()
 	for event := range handle.Events {
 		switch event.Type {
 		case events.EventStarted:
@@ -146,19 +148,13 @@ func consumeEvents(ctx context.Context, emitter *events.Emitter, handle *engines
 			return consumed, fmt.Errorf("%s", event.Content)
 		case events.EventMessageDelta:
 			if strings.TrimSpace(event.Content) != "" {
-				_ = emitter.Emit(ctx, &events.Event{
-					Type:    events.EventMessageDelta,
-					Content: event.Content,
-				})
+				_ = emitter.Emit(ctx, normalizeRuntimeEvent(event, messageIDs))
 				if !resultSeen {
 					result.WriteString(event.Content)
 				}
 			}
 		case events.EventToolCallStarted, events.EventToolCallCompleted, events.EventToolCallFailed:
-			_ = emitter.Emit(ctx, &events.Event{
-				Type:    event.Type,
-				Content: event.Content,
-			})
+			_ = emitter.Emit(ctx, normalizeRuntimeEvent(event, messageIDs))
 		default:
 			if strings.TrimSpace(event.Content) != "" {
 				if !resultSeen {
@@ -169,6 +165,57 @@ func consumeEvents(ctx context.Context, emitter *events.Emitter, handle *engines
 	}
 	consumed.Message = result.String()
 	return consumed, nil
+}
+
+func normalizeRuntimeEvent(event events.Event, messageIDs *events.MessageIDMapper) *events.Event {
+	switch event.Type {
+	case events.EventMessageDelta, events.EventReasoningDelta:
+		if len(event.Payload) > 0 {
+			payload, err := events.DecodePayload[events.MessageDeltaPayload](&event)
+			if err == nil && strings.TrimSpace(payload.MessageID) != "" {
+				return events.NewMessageDelta(messageIDs.ForProvider(payload.MessageID), payload.Content)
+			}
+			if err == nil {
+				return events.NewMessageDelta(messageIDs.CurrentOrNew(), payload.Content)
+			}
+			return &event
+		}
+		return events.NewMessageDelta(messageIDs.CurrentOrNew(), event.Content)
+	case events.EventToolCallStarted:
+		payload, err := events.DecodePayload[events.ToolCallPayload](&event)
+		if err != nil {
+			return &event
+		}
+		return events.NewToolCallStarted(firstNonEmptyString(payload.ToolCallID, legacyToolCallID(event)), payload.Name, payload.Arguments)
+	case events.EventToolCallCompleted:
+		payload, err := events.DecodePayload[events.ToolCallResultPayload](&event)
+		if err != nil {
+			return &event
+		}
+		return events.NewToolCallCompleted(payload.ToolCallID, payload.Name, payload.Result, payload.ElapsedMS)
+	case events.EventToolCallFailed:
+		payload, err := events.DecodePayload[events.ToolCallResultPayload](&event)
+		if err != nil {
+			return &event
+		}
+		return events.NewToolCallFailed(payload.ToolCallID, payload.Name, payload.Error, payload.ElapsedMS)
+	default:
+		return &event
+	}
+}
+
+func legacyToolCallID(event events.Event) string {
+	var payload struct {
+		CallID     string `json:"call_id"`
+		ToolCallID string `json:"tool_call_id"`
+	}
+	if len(event.Payload) > 0 && json.Unmarshal(event.Payload, &payload) == nil {
+		return firstNonEmptyString(payload.ToolCallID, payload.CallID)
+	}
+	if strings.TrimSpace(event.Content) != "" && json.Unmarshal([]byte(event.Content), &payload) == nil {
+		return firstNonEmptyString(payload.ToolCallID, payload.CallID)
+	}
+	return ""
 }
 
 type providerSessionPlan struct {

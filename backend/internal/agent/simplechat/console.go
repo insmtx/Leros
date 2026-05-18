@@ -21,8 +21,6 @@ func (s *ConsoleSink) Emit(_ context.Context, event *events.Event) error {
 		fmt.Println()
 	case events.EventToolCallStarted:
 		fmt.Printf("\n[Tool Call Started] %s\n", event.Content)
-	case events.EventToolCallOutput:
-		fmt.Printf("\n[Tool Output] %s\n", event.Content)
 	case events.EventFailed:
 		fmt.Printf("\n[Error] %s\n", event.Content)
 	}

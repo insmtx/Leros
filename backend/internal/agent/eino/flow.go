@@ -2,27 +2,26 @@ package eino
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
 
+	"github.com/cloudwego/eino/adk"
 	einomodel "github.com/cloudwego/eino/components/model"
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
-	einoreact "github.com/cloudwego/eino/flow/agent/react"
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	"github.com/ygpkg/yg-go/logs"
 )
 
-// Flow wraps the Eino agent loop used by the Leros runtime agent.
 type Flow struct {
-	agent *einoreact.Agent
+	agent        adk.Agent
+	runner       *adk.Runner
+	streamRunner *adk.Runner
 }
 
-// FlowConfig describes the dependencies required to build an Eino flow.
 type FlowConfig struct {
 	Model        einomodel.ToolCallingChatModel
 	Tools        []einotool.BaseTool
@@ -31,7 +30,6 @@ type FlowConfig struct {
 	MaxStep      int
 }
 
-// NewFlow creates a runnable Eino flow backed by Leros tool/runtime layers.
 func NewFlow(ctx context.Context, cfg *FlowConfig) (*Flow, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("flow config is required")
@@ -42,157 +40,152 @@ func NewFlow(ctx context.Context, cfg *FlowConfig) (*Flow, error) {
 
 	maxStep := cfg.MaxStep
 	if maxStep <= 0 {
-		maxStep = 8
+		maxStep = 20
 	}
 
-	agent, err := einoreact.NewAgent(ctx, &einoreact.AgentConfig{
-		ToolCallingModel: cfg.Model,
-		ToolsConfig: compose.ToolsNodeConfig{
-			Tools: cfg.Tools,
-			UnknownToolsHandler: func(ctx context.Context, toolName, toolInput string) (string, error) {
-				logs.WarnContextf(ctx, "[WARN] unknown tool call: %s with input: %s", toolName, toolInput)
-				return fmt.Sprintf(`Tool "%s" does not exist. Please use a valid tool and retry.`, toolName), nil
+	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+		Name:        "LerosAgent",
+		Description: "Leros runtime agent",
+		Model:       cfg.Model,
+		Instruction: cfg.SystemPrompt,
+		ToolsConfig: adk.ToolsConfig{
+			ToolsNodeConfig: compose.ToolsNodeConfig{
+				Tools: cfg.Tools,
+				UnknownToolsHandler: func(ctx context.Context, toolName, toolInput string) (string, error) {
+					logs.WarnContextf(ctx, "[WARN] unknown tool call: %s with input: %s", toolName, toolInput)
+					return fmt.Sprintf(`Tool "%s" does not exist. Please use a valid tool and retry.`, toolName), nil
+				},
 			},
 		},
-		MessageModifier: buildMessageModifier(cfg.SystemPrompt),
-		StreamToolCallChecker: func(_ context.Context, sr *einoschema.StreamReader[*einoschema.Message]) (bool, error) {
-			defer sr.Close()
-			hasTool := false
-			for {
-				msg, e := sr.Recv()
-				if e != nil {
-					if e == io.EOF {
-						break
-					}
-					return false, e
-				}
-				if len(msg.ToolCalls) > 0 {
-					hasTool = true
-					// 不立刻返回，继续读到EOF以保持一致行为
-				}
-			}
-			return hasTool, nil
+		MaxIterations: maxStep,
+		ModelRetryConfig: &adk.ModelRetryConfig{
+			MaxRetries: 5,
+			IsRetryAble: func(_ context.Context, err error) bool {
+				return strings.Contains(err.Error(), "429") ||
+					strings.Contains(err.Error(), "Too Many Requests") ||
+					strings.Contains(err.Error(), "qpm limit")
+			},
 		},
-		MaxStep: maxStep,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("create eino react agent: %w", err)
+		return nil, fmt.Errorf("create eino agent: %w", err)
 	}
 
-	return &Flow{agent: agent}, nil
+	runner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: agent})
+	streamRunner := adk.NewRunner(ctx, adk.RunnerConfig{Agent: agent, EnableStreaming: true})
+
+	return &Flow{agent: agent, runner: runner, streamRunner: streamRunner}, nil
 }
 
-// Generate runs one user request through the Eino agent loop.
 func (f *Flow) Generate(ctx context.Context, userInput string) (*einoschema.Message, error) {
-	if f == nil || f.agent == nil {
+	if f == nil || f.runner == nil {
 		return nil, fmt.Errorf("flow is not initialized")
 	}
 	if strings.TrimSpace(userInput) == "" {
 		return nil, fmt.Errorf("user input is required")
 	}
 
-	return f.agent.Generate(ctx, []*einoschema.Message{
-		einoschema.UserMessage(userInput),
-	})
-}
+	iter := f.runner.Query(ctx, userInput)
+	var result *einoschema.Message
 
-// Stream runs one user request through the Eino agent loop and emits runtime events.
-func (f *Flow) Stream(ctx context.Context, userInput string, emitter *events.Emitter) (*einoschema.Message, error) {
-	if f == nil || f.agent == nil {
-		return nil, fmt.Errorf("flow is not initialized")
-	}
-	if strings.TrimSpace(userInput) == "" {
-		return nil, fmt.Errorf("user input is required")
-	}
-
-	stream, err := f.agent.Stream(ctx, []*einoschema.Message{
-		einoschema.UserMessage(userInput),
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer stream.Close()
-
-	chunks := make([]*einoschema.Message, 0)
-	var contentSnapshot strings.Builder
-	var reasoningSnapshot strings.Builder
 	for {
-		chunk, recvErr := stream.Recv()
-		if errors.Is(recvErr, io.EOF) {
+		event, ok := iter.Next()
+		if !ok {
 			break
 		}
-		if recvErr != nil {
-			return nil, recvErr
+		if event.Err != nil {
+			return nil, event.Err
 		}
-		if chunk == nil {
-			continue
+		if event.Output != nil && event.Output.MessageOutput != nil {
+			msg, err := event.Output.MessageOutput.GetMessage()
+			if err != nil {
+				return nil, err
+			}
+			if msg != nil {
+				result = msg
+			}
 		}
-		chunks = append(chunks, chunk)
-		if err := emitMessageChunk(ctx, emitter, chunk, &contentSnapshot, &reasoningSnapshot); err != nil {
-			return nil, err
-		}
-		logs.DebugContextf(ctx, "received message chunk: content_len=%d reasoning_len=%d tool_calls=%d", len(contentSnapshot.String()), len(reasoningSnapshot.String()), len(chunk.ToolCalls))
+		logs.DebugContextf(ctx, "received message chunk: content_len=%d reasoning_len=%d tool_calls=%d", len(result.Content), len(result.ReasoningContent), len(result.ToolCalls))
 	}
-	if len(chunks) == 0 {
+
+	if result == nil {
+		return nil, fmt.Errorf("agent returned no message")
+	}
+	return result, nil
+}
+
+func (f *Flow) Stream(ctx context.Context, userInput string, emitter *events.Emitter) (*einoschema.Message, error) {
+	if f == nil || f.streamRunner == nil {
+		return nil, fmt.Errorf("flow is not initialized")
+	}
+	if strings.TrimSpace(userInput) == "" {
+		return nil, fmt.Errorf("user input is required")
+	}
+
+	iter := f.streamRunner.Query(ctx, userInput)
+
+	var lastMsg *einoschema.Message
+	var currentMessageID string
+	messageIDs := events.NewMessageIDMapper()
+
+	for {
+		event, ok := iter.Next()
+		if !ok {
+			break
+		}
+		if event.Err != nil {
+			return nil, event.Err
+		}
+		if event.Output != nil && event.Output.MessageOutput != nil {
+			mv := event.Output.MessageOutput
+
+			if mv.Role == einoschema.Tool {
+				continue
+			}
+
+			currentMessageID := messageIDs.StartNew()
+
+			if mv.IsStreaming && mv.MessageStream != nil {
+				streams := mv.MessageStream.Copy(2)
+				emitStream := streams[0]
+				concatStream := streams[1]
+				emitStream.SetAutomaticClose()
+				for {
+					chunk, err := emitStream.Recv()
+					if errors.Is(err, io.EOF) {
+						break
+					}
+					if err != nil {
+						return nil, fmt.Errorf("read stream chunk: %w", err)
+					}
+					if chunk.Content != "" {
+						_ = emitter.Emit(ctx, events.NewMessageDelta(currentMessageID, chunk.Content))
+					}
+					if chunk.ReasoningContent != "" {
+						_ = emitter.Emit(ctx, events.NewReasoningDelta(currentMessageID, chunk.ReasoningContent))
+					}
+				}
+				lastMsg, _ = einoschema.ConcatMessageStream(concatStream)
+			} else {
+				msg, err := mv.GetMessage()
+				if err != nil {
+					return nil, err
+				}
+				if msg != nil {
+					lastMsg = msg
+					_ = emitter.Emit(ctx, events.NewMessageDelta(currentMessageID, msg.Content))
+				}
+			}
+
+			logs.InfoContextf(ctx, "agent msg:msgID=%s, content=%s, reasoning=%s",
+				currentMessageID, lastMsg.Content, lastMsg.ReasoningContent)
+		}
+	}
+
+	if lastMsg == nil {
 		return nil, fmt.Errorf("agent stream returned no messages")
 	}
-	return einoschema.ConcatMessages(chunks)
-}
 
-func emitMessageChunk(ctx context.Context, emitter *events.Emitter, chunk *einoschema.Message, contentSnapshot *strings.Builder, reasoningSnapshot *strings.Builder) error {
-	if emitter == nil || chunk == nil {
-		return nil
-	}
-	if chunk.Content != "" {
-		contentSnapshot.WriteString(chunk.Content)
-		_ = emitter.Emit(ctx, &events.Event{
-			Type:    events.EventMessageDelta,
-			Content: chunk.Content,
-		})
-	}
-	if chunk.ReasoningContent != "" {
-		reasoningSnapshot.WriteString(chunk.ReasoningContent)
-		_ = emitter.Emit(ctx, &events.Event{
-			Type:    events.EventReasoningDelta,
-			Content: chunk.ReasoningContent,
-		})
-	}
-	for _, toolCall := range chunk.ToolCalls {
-		args := map[string]any{}
-		if strings.TrimSpace(toolCall.Function.Arguments) != "" {
-			args["json"] = toolCall.Function.Arguments
-		}
-		_ = emitter.Emit(ctx, &events.Event{
-			Type: events.EventToolCallArguments,
-			Content: eventContentJSON(map[string]any{
-				"call_id":   toolCall.ID,
-				"name":      toolCall.Function.Name,
-				"arguments": args,
-			}),
-		})
-	}
-	return nil
-}
-
-func eventContentJSON(value interface{}) string {
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Sprintf("%v", value)
-	}
-	return string(encoded)
-}
-
-func buildMessageModifier(systemPrompt string) einoreact.MessageModifier {
-	prompt := strings.TrimSpace(systemPrompt)
-	if prompt == "" {
-		return nil
-	}
-
-	systemMessage := einoschema.SystemMessage(prompt)
-	return func(ctx context.Context, input []*einoschema.Message) []*einoschema.Message {
-		messages := make([]*einoschema.Message, 0, len(input)+1)
-		messages = append(messages, systemMessage)
-		messages = append(messages, input...)
-		return messages
-	}
+	lastMsg.Extra = map[string]any{"message_id": currentMessageID}
+	return lastMsg, nil
 }

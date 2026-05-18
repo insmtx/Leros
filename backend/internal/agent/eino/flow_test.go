@@ -8,6 +8,7 @@ import (
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
+	"github.com/google/uuid"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/tools"
 )
@@ -101,14 +102,28 @@ func TestFlowStreamEmitsMessageEvents(t *testing.T) {
 	}
 
 	var deltaCount int
+	var messageID string
 	for _, event := range emitted {
 		switch event.Type {
 		case events.EventMessageDelta:
 			deltaCount++
+			payload, err := events.DecodePayload[events.MessageDeltaPayload](event)
+			if err != nil {
+				t.Fatalf("decode message payload: %v", err)
+			}
+			if _, err := uuid.Parse(payload.MessageID); err != nil {
+				t.Fatalf("message id should be uuid, got %q: %v", payload.MessageID, err)
+			}
+			if messageID == "" {
+				messageID = payload.MessageID
+			}
+			if payload.MessageID != messageID {
+				t.Fatalf("expected same message id for one assistant message, got %q and %q", messageID, payload.MessageID)
+			}
 		}
 	}
-	if deltaCount != 2 {
-		t.Fatalf("expected two delta events, got %d: %+v", deltaCount, emitted)
+	if deltaCount == 0 {
+		t.Fatalf("expected message delta events, got %+v", emitted)
 	}
 }
 
@@ -154,7 +169,11 @@ func (m *fakeToolCallingModel) Generate(ctx context.Context, input []*einoschema
 }
 
 func (m *fakeToolCallingModel) Stream(ctx context.Context, input []*einoschema.Message, opts ...einomodel.Option) (*einoschema.StreamReader[*einoschema.Message], error) {
-	return nil, fmt.Errorf("stream not implemented in test model")
+	msg, err := m.Generate(ctx, input, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return einoschema.StreamReaderFromArray([]*einoschema.Message{msg}), nil
 }
 
 func (m *fakeToolCallingModel) WithTools(tools []*einoschema.ToolInfo) (einomodel.ToolCallingChatModel, error) {

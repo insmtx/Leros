@@ -10,8 +10,6 @@ const (
 	StreamEventMessageDelta StreamEventType = "message.delta"
 	// StreamEventToolCallStarted indicates a tool call has started.
 	StreamEventToolCallStarted StreamEventType = "tool_call.started"
-	// StreamEventToolCallDelta represents streaming tool call argument fragments.
-	StreamEventToolCallDelta StreamEventType = "tool_call.delta"
 	// StreamEventToolCallFinished indicates a tool call has finished.
 	StreamEventToolCallFinished StreamEventType = "tool_call.finished"
 	// StreamEventMessageCompleted indicates the final assistant message is generated.
@@ -20,6 +18,8 @@ const (
 	StreamEventRunCompleted StreamEventType = "run.completed"
 	// StreamEventRunFailed indicates a run failed.
 	StreamEventRunFailed StreamEventType = "run.failed"
+	// StreamEventUsage indicates token usage metadata.
+	StreamEventUsage StreamEventType = "run.usage"
 )
 
 // MessageStreamMessage is the stream message protocol from Worker to Server (forwarded to UI).
@@ -37,6 +37,7 @@ type StreamBody struct {
 
 // StreamPayload carries the specific content of streaming events.
 type StreamPayload struct {
+	MessageID  string           `json:"message_id,omitempty"`
 	Role       MessageRole      `json:"role,omitempty"`
 	Content    string           `json:"content,omitempty"`
 	ToolCall   *ToolCallEvent   `json:"tool_call,omitempty"`

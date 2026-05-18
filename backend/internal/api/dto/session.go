@@ -22,8 +22,9 @@ type SessionEvent struct {
 }
 
 type MessageDeltaPayload struct {
-	Role    string `json:"role"`
-	Content string `json:"content"` // 增量文本
+	MessageID string `json:"message_id,omitempty"`
+	Role      string `json:"role"`
+	Content   string `json:"content"` // 增量文本
 }
 
 type MessageCompletePayload struct {
