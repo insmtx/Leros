@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"sync"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/worker"
 	"github.com/insmtx/Leros/backend/internal/worker/wsproto"
 	"github.com/ygpkg/yg-go/logs"
@@ -218,88 +216,9 @@ func (s *WorkerManager) handleWorkerMessage(w *WorkerConnection, msg *wsproto.WS
 	}
 }
 
+// TODO: worker与server交互时重新实现 handleGetConfig
 func (s *WorkerManager) handleGetConfig(w *WorkerConnection, msg *wsproto.WSMessage) {
-	var reqPayload wsproto.GetConfigPayload
-	if err := msg.GetPayload(&reqPayload); err != nil {
-		resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
-			Config: nil,
-			Error:  "invalid payload",
-		})
-		select {
-		case w.Send <- resp:
-		default:
-			logs.Warnf("Config response dropped for worker %s", w.ID)
-		}
-		return
-	}
-
-	workerID := reqPayload.WorkerID
-
-	if workerID == 0 {
-		resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
-			Config: nil,
-			Error:  "worker_id is required",
-		})
-		select {
-		case w.Send <- resp:
-		default:
-			logs.Warnf("Config response dropped for worker %s", w.ID)
-		}
-		return
-	}
-
-	if s.db == nil {
-		resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
-			Config: nil,
-			Error:  "database not available",
-		})
-		select {
-		case w.Send <- resp:
-		default:
-			logs.Warnf("Config response dropped for worker %s", w.ID)
-		}
-		return
-	}
-
-	da, err := infradb.GetDigitalAssistantByID(context.Background(), s.db, workerID)
-	if err != nil {
-		logs.Errorf("Failed to get digital assistant %d: %v", workerID, err)
-		resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
-			Config: nil,
-			Error:  err.Error(),
-		})
-		select {
-		case w.Send <- resp:
-		default:
-			logs.Warnf("Config response dropped for worker %s", w.ID)
-		}
-		return
-	}
-
-	if da == nil {
-		logs.Warnf("Digital assistant %d not found", workerID)
-		resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
-			Config: nil,
-			Error:  "digital assistant not found",
-		})
-		select {
-		case w.Send <- resp:
-		default:
-			logs.Warnf("Config response dropped for worker %s", w.ID)
-		}
-		return
-	}
-
-	resp, _ := wsproto.NewPayload(wsproto.MsgTypeConfigResponse, wsproto.ConfigResponsePayload{
-		Config: &da.Config,
-		Error:  "",
-	})
-	select {
-	case w.Send <- resp:
-		logs.Infof("Config sent to worker %s for assistant ID %d", w.ID, workerID)
-	default:
-		logs.Warnf("Config response dropped for worker %s", w.ID)
-	}
+	logs.Infof("Config request for worker %s - pending implementation", w.ID)
 }
 
 func (s *WorkerManager) unregisterWorker(workerID string) {

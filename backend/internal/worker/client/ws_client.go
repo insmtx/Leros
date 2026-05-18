@@ -13,13 +13,12 @@ import (
 )
 
 type WSClient struct {
-	conn          *websocket.Conn
-	workerID      uint
-	serverAddr    string
-	send          chan *wsproto.WSMessage
-	ctx           context.Context
-	cancel        context.CancelFunc
-	onConfigReady func(config map[string]interface{})
+	conn       *websocket.Conn
+	workerID   uint
+	serverAddr string
+	send       chan *wsproto.WSMessage
+	ctx        context.Context
+	cancel     context.CancelFunc
 }
 
 type WSClientOption func(*WSClient)
@@ -27,12 +26,6 @@ type WSClientOption func(*WSClient)
 func WithWorkerID(workerID uint) WSClientOption {
 	return func(c *WSClient) {
 		c.workerID = workerID
-	}
-}
-
-func WithOnConfigReady(handler func(map[string]interface{})) WSClientOption {
-	return func(c *WSClient) {
-		c.onConfigReady = handler
 	}
 }
 
@@ -167,31 +160,8 @@ func (c *WSClient) requestConfig() {
 }
 
 func (c *WSClient) handleConfigResponse(msg *wsproto.WSMessage) {
-	var payload wsproto.ConfigResponsePayload
-	if err := msg.GetPayload(&payload); err != nil {
-		logs.Errorf("Failed to unmarshal config response payload: %v", err)
-		return
-	}
-
-	if payload.Error != "" {
-		logs.Errorf("Config response error: %s", payload.Error)
-		return
-	}
-
-	if payload.Config == nil {
-		logs.Errorf("Config not found in response")
-		return
-	}
-
-	if c.onConfigReady != nil {
-		configMap := make(map[string]interface{})
-		bytes, _ := json.Marshal(payload.Config)
-		json.Unmarshal(bytes, &configMap)
-		c.onConfigReady(configMap)
-		logs.Info("Config processed successfully")
-	} else {
-		logs.Warn("No config handler registered")
-	}
+	// TODO: worker与server交互时重新实现 config 接收
+	logs.Info("Config response received - pending implementation")
 }
 
 func (c *WSClient) sendWSMessage(msg *wsproto.WSMessage) error {

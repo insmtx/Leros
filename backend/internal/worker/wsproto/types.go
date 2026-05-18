@@ -3,8 +3,6 @@ package wsproto
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/insmtx/Leros/backend/types"
 )
 
 // WebSocket Message Type Constants
@@ -85,9 +83,9 @@ type HeartbeatAckPayload struct {
 }
 
 // ConfigResponsePayload defines the payload for config response (Server -> Client)
+// TODO: worker与server交互时重新实现 config 传输
 type ConfigResponsePayload struct {
-	Config *types.AssistantConfig `json:"config"`
-	Error  string                 `json:"error,omitempty"`
+	Error string `json:"error,omitempty"`
 }
 
 // ShutdownPayload defines the payload for shutdown message (Server -> Client)

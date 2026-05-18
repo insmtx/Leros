@@ -22,9 +22,6 @@ type DigitalAssistantService interface {
 	// 查询数字助手列表（从上下文获取权限信息）
 	ListDigitalAssistant(ctx context.Context, req *ListDigitalAssistantRequest) (*DigitalAssistantList, error)
 
-	// 更新数字助手配置（从上下文获取权限信息）
-	UpdateDigitalAssistantConfig(ctx context.Context, id uint, req *UpdateDigitalAssistantConfigRequest) (*DigitalAssistant, error)
-
 	// 更新数字助手状态（从上下文获取权限信息）
 	UpdateDigitalAssistantStatus(ctx context.Context, id uint, req *UpdateDigitalAssistantStatusRequest) error
 }

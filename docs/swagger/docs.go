@@ -35,7 +35,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/backend_internal_api_handler.AddMessageRequest"
+                            "$ref": "#/definitions/handler.AddMessageRequest"
                         }
                     }
                 ],
@@ -43,31 +43,31 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                            "$ref": "#/definitions/dto.BaseResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "资源不存在",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -93,7 +93,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/backend_internal_api_handler.ClearSessionMessagesRequest"
+                            "$ref": "#/definitions/handler.ClearSessionMessagesRequest"
                         }
                     }
                 ],
@@ -101,31 +101,31 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                            "$ref": "#/definitions/dto.BaseResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "资源不存在",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -151,7 +151,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.CreateDigitalAssistantRequest"
+                            "$ref": "#/definitions/contract.CreateDigitalAssistantRequest"
                         }
                     }
                 ],
@@ -159,25 +159,77 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse"
+                            "$ref": "#/definitions/dto.CreateDigitalAssistantResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/CreateLLMModel": {
+            "post": {
+                "description": "创建一个新的LLM模型配置",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMModel"
+                ],
+                "summary": "创建LLM模型",
+                "parameters": [
+                    {
+                        "description": "创建LLM模型请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.CreateLLMModelRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -203,7 +255,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.CreateSessionRequest"
+                            "$ref": "#/definitions/contract.CreateSessionRequest"
                         }
                     }
                 ],
@@ -211,25 +263,25 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                            "$ref": "#/definitions/dto.BaseResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -255,7 +307,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/backend_internal_api_handler.DeleteDigitalAssistantRequest"
+                            "$ref": "#/definitions/handler.DeleteDigitalAssistantRequest"
                         }
                     }
                 ],
@@ -263,37 +315,101 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                            "$ref": "#/definitions/dto.BaseResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "权限不足",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "资源不存在",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/DeleteLLMModel": {
+            "post": {
+                "description": "根据ID删除LLM模型配置",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMModel"
+                ],
+                "summary": "删除LLM模型",
+                "parameters": [
+                    {
+                        "description": "删除LLM模型请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.DeleteLLMModelRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "权限不足",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -319,7 +435,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/backend_internal_api_handler.DeleteMessageRequest"
+                            "$ref": "#/definitions/handler.DeleteMessageRequest"
                         }
                     }
                 ],
@@ -327,31 +443,31 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                            "$ref": "#/definitions/dto.BaseResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "资源不存在",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -377,7 +493,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/backend_internal_api_handler.DeleteSessionRequest"
+                            "$ref": "#/definitions/handler.DeleteSessionRequest"
                         }
                     }
                 ],
@@ -385,31 +501,72 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                            "$ref": "#/definitions/dto.BaseResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "资源不存在",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/GetDefaultLLMModel": {
+            "post": {
+                "description": "获取组织的默认LLM模型配置",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMModel"
+                ],
+                "summary": "获取默认LLM模型",
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "默认模型不存在",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -435,7 +592,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/backend_internal_api_handler.GetDigitalAssistantRequest"
+                            "$ref": "#/definitions/handler.GetDigitalAssistantRequest"
                         }
                     }
                 ],
@@ -443,37 +600,101 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse"
+                            "$ref": "#/definitions/dto.CreateDigitalAssistantResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "权限不足",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "资源不存在",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/GetLLMModel": {
+            "post": {
+                "description": "根据ID或Code获取LLM模型配置详情",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMModel"
+                ],
+                "summary": "获取LLM模型详情",
+                "parameters": [
+                    {
+                        "description": "获取LLM模型请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.GetLLMModelRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "权限不足",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -499,7 +720,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/backend_internal_api_handler.GetSessionRequest"
+                            "$ref": "#/definitions/handler.GetSessionRequest"
                         }
                     }
                 ],
@@ -507,31 +728,31 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                            "$ref": "#/definitions/dto.BaseResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "资源不存在",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -557,7 +778,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/backend_internal_api_handler.GetSessionMessagesRequest"
+                            "$ref": "#/definitions/handler.GetSessionMessagesRequest"
                         }
                     }
                 ],
@@ -565,31 +786,31 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                            "$ref": "#/definitions/dto.BaseResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "资源不存在",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -615,7 +836,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.ListDigitalAssistantRequest"
+                            "$ref": "#/definitions/contract.ListDigitalAssistantRequest"
                         }
                     }
                 ],
@@ -623,25 +844,77 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse"
+                            "$ref": "#/definitions/dto.CreateDigitalAssistantResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ListLLMModels": {
+            "post": {
+                "description": "分页查询LLM模型配置列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMModel"
+                ],
+                "summary": "查询LLM模型列表",
+                "parameters": [
+                    {
+                        "description": "查询列表请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.ListLLMModelsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -667,7 +940,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.ListSessionsRequest"
+                            "$ref": "#/definitions/contract.ListSessionsRequest"
                         }
                     }
                 ],
@@ -675,25 +948,25 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                            "$ref": "#/definitions/dto.BaseResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -719,7 +992,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/backend_internal_api_handler.SessionEventsRequest"
+                            "$ref": "#/definitions/handler.SessionEventsRequest"
                         }
                     }
                 ],
@@ -733,19 +1006,71 @@ const docTemplate = `{
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/TestLLMModel": {
+            "post": {
+                "description": "测试LLM模型配置的连通性",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMModel"
+                ],
+                "summary": "测试LLM模型",
+                "parameters": [
+                    {
+                        "description": "测试LLM模型请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.TestLLMModelRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -771,7 +1096,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/backend_internal_api_handler.UpdateDigitalAssistantRequest"
+                            "$ref": "#/definitions/handler.UpdateDigitalAssistantRequest"
                         }
                     }
                 ],
@@ -779,101 +1104,37 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse"
+                            "$ref": "#/definitions/dto.CreateDigitalAssistantResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "权限不足",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "资源不存在",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/UpdateDigitalAssistantConfig": {
-            "post": {
-                "description": "更新数字助手的配置信息",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "DigitalAssistant"
-                ],
-                "summary": "更新数字助手配置",
-                "parameters": [
-                    {
-                        "description": "更新配置请求",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/backend_internal_api_handler.UpdateDigitalAssistantConfigRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "成功响应",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "请求参数错误",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "未认证",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "权限不足",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "资源不存在",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "内部服务器错误",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -899,7 +1160,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/backend_internal_api_handler.UpdateDigitalAssistantStatusRequest"
+                            "$ref": "#/definitions/handler.UpdateDigitalAssistantStatusRequest"
                         }
                     }
                 ],
@@ -907,37 +1168,101 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                            "$ref": "#/definitions/dto.BaseResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "权限不足",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "资源不存在",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/UpdateLLMModel": {
+            "post": {
+                "description": "更新LLM模型配置信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMModel"
+                ],
+                "summary": "更新LLM模型",
+                "parameters": [
+                    {
+                        "description": "更新LLM模型请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateLLMModelRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "权限不足",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -963,7 +1288,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/backend_internal_api_handler.UpdateSessionRequest"
+                            "$ref": "#/definitions/handler.UpdateSessionRequest"
                         }
                     }
                 ],
@@ -971,31 +1296,31 @@ const docTemplate = `{
                     "200": {
                         "description": "成功响应",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse"
+                            "$ref": "#/definitions/dto.BaseResponse"
                         }
                     },
                     "400": {
                         "description": "请求参数错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "未认证",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "资源不存在",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "内部服务器错误",
                         "schema": {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1003,267 +1328,10 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "backend_internal_api_handler.AddMessageRequest": {
-            "type": "object",
-            "required": [
-                "content",
-                "role",
-                "session_id"
-            ],
-            "properties": {
-                "chunks": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "content": {
-                    "type": "string"
-                },
-                "message_type": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_types.MessageMetadata"
-                },
-                "role": {
-                    "type": "string"
-                },
-                "session_id": {
-                    "type": "integer"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "thinking": {
-                    "type": "string"
-                },
-                "tool_calls": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_insmtx_Leros_backend_types.ToolCall"
-                    }
-                }
-            }
-        },
-        "backend_internal_api_handler.ClearSessionMessagesRequest": {
-            "type": "object",
-            "required": [
-                "session_id"
-            ],
-            "properties": {
-                "session_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "backend_internal_api_handler.DeleteDigitalAssistantRequest": {
-            "type": "object",
-            "required": [
-                "id"
-            ],
-            "properties": {
-                "id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "backend_internal_api_handler.DeleteMessageRequest": {
-            "type": "object",
-            "required": [
-                "message_id"
-            ],
-            "properties": {
-                "message_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "backend_internal_api_handler.DeleteSessionRequest": {
-            "type": "object",
-            "required": [
-                "id"
-            ],
-            "properties": {
-                "id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "backend_internal_api_handler.GetDigitalAssistantRequest": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "backend_internal_api_handler.GetSessionMessagesRequest": {
-            "type": "object",
-            "required": [
-                "session_id"
-            ],
-            "properties": {
-                "page": {
-                    "type": "integer"
-                },
-                "per_page": {
-                    "type": "integer"
-                },
-                "session_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "backend_internal_api_handler.GetSessionRequest": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "integer"
-                },
-                "session_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "backend_internal_api_handler.SessionEventsRequest": {
-            "type": "object",
-            "required": [
-                "session_id"
-            ],
-            "properties": {
-                "last_sequence": {
-                    "type": "integer"
-                },
-                "session_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "backend_internal_api_handler.UpdateDigitalAssistantConfigRequest": {
-            "type": "object",
-            "required": [
-                "config",
-                "id"
-            ],
-            "properties": {
-                "config": {
-                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig"
-                },
-                "id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "backend_internal_api_handler.UpdateDigitalAssistantRequest": {
-            "type": "object",
-            "required": [
-                "id"
-            ],
-            "properties": {
-                "avatar": {
-                    "type": "string"
-                },
-                "config": {
-                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "backend_internal_api_handler.UpdateDigitalAssistantStatusRequest": {
-            "type": "object",
-            "required": [
-                "id",
-                "status"
-            ],
-            "properties": {
-                "id": {
-                    "type": "integer"
-                },
-                "status": {
-                    "type": "string"
-                }
-            }
-        },
-        "backend_internal_api_handler.UpdateSessionRequest": {
-            "type": "object",
-            "required": [
-                "id"
-            ],
-            "properties": {
-                "expired_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_types.SessionMetadata"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig": {
-            "type": "object",
-            "properties": {
-                "channels": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.ChannelRef"
-                    }
-                },
-                "knowledge": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.KnowledgeRef"
-                    }
-                },
-                "llm_config": {
-                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.LLMConfig"
-                },
-                "memory_config": {
-                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.MemoryConfig"
-                },
-                "policies_config": {
-                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.PolicyConfig"
-                },
-                "runtime_config": {
-                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.RuntimeConfig"
-                },
-                "skills": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.SkillRef"
-                    }
-                }
-            }
-        },
-        "github_com_insmtx_Leros_backend_internal_api_contract.ChannelRef": {
-            "type": "object",
-            "properties": {
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_insmtx_Leros_backend_internal_api_contract.CreateDigitalAssistantRequest": {
+        "contract.CreateDigitalAssistantRequest": {
             "type": "object",
             "required": [
                 "code",
-                "config",
                 "name"
             ],
             "properties": {
@@ -1273,44 +1341,59 @@ const docTemplate = `{
                 "code": {
                     "type": "string"
                 },
-                "config": {
-                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig"
-                },
                 "description": {
                     "type": "string"
                 },
                 "name": {
                     "type": "string"
+                },
+                "system_prompt": {
+                    "type": "string"
                 }
             }
         },
-        "github_com_insmtx_Leros_backend_internal_api_contract.CreateSessionRequest": {
+        "contract.CreateLLMModelRequest": {
             "type": "object",
             "required": [
-                "type"
+                "api_key",
+                "base_url",
+                "model"
             ],
             "properties": {
-                "assistant_id": {
-                    "type": "integer"
-                },
-                "expired_at": {
+                "api_key": {
                     "type": "string"
                 },
-                "metadata": {
-                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_types.SessionMetadata"
-                },
-                "session_id": {
+                "base_url": {
                     "type": "string"
                 },
-                "title": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "description": {
                     "type": "string"
                 },
-                "type": {
+                "is_default": {
+                    "type": "boolean"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "status": {
                     "type": "string"
                 }
             }
         },
-        "github_com_insmtx_Leros_backend_internal_api_contract.DigitalAssistant": {
+        "contract.CreateSessionRequest": {
+            "type": "object"
+        },
+        "contract.DigitalAssistant": {
             "type": "object",
             "properties": {
                 "avatar": {
@@ -1318,9 +1401,6 @@ const docTemplate = `{
                 },
                 "code": {
                     "type": "string"
-                },
-                "config": {
-                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig"
                 },
                 "created_at": {
                     "type": "string"
@@ -1343,6 +1423,9 @@ const docTemplate = `{
                 "status": {
                     "type": "string"
                 },
+                "system_prompt": {
+                    "type": "string"
+                },
                 "updated_at": {
                     "type": "string"
                 },
@@ -1351,38 +1434,19 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_insmtx_Leros_backend_internal_api_contract.KnowledgeRef": {
-            "type": "object",
-            "properties": {
-                "dataset_id": {
-                    "type": "string"
-                },
-                "repo": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_insmtx_Leros_backend_internal_api_contract.LLMConfig": {
-            "type": "object",
-            "properties": {
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_insmtx_Leros_backend_internal_api_contract.ListDigitalAssistantRequest": {
+        "contract.ListDigitalAssistantRequest": {
             "type": "object",
             "properties": {
                 "keyword": {
                     "type": "string"
                 },
-                "page": {
+                "limit": {
                     "type": "integer"
                 },
-                "per_page": {
+                "list_all": {
+                    "type": "boolean"
+                },
+                "offset": {
                     "type": "integer"
                 },
                 "status": {
@@ -1390,7 +1454,30 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_insmtx_Leros_backend_internal_api_contract.ListSessionsRequest": {
+        "contract.ListLLMModelsRequest": {
+            "type": "object",
+            "properties": {
+                "keyword": {
+                    "type": "string"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "list_all": {
+                    "type": "boolean"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ListSessionsRequest": {
             "type": "object",
             "properties": {
                 "assistant_code": {
@@ -1402,10 +1489,13 @@ const docTemplate = `{
                 "keyword": {
                     "type": "string"
                 },
-                "page": {
+                "limit": {
                     "type": "integer"
                 },
-                "per_page": {
+                "list_all": {
+                    "type": "boolean"
+                },
+                "offset": {
                     "type": "integer"
                 },
                 "status": {
@@ -1416,42 +1506,30 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_insmtx_Leros_backend_internal_api_contract.MemoryConfig": {
+        "contract.TestLLMModelRequest": {
             "type": "object",
             "properties": {
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_insmtx_Leros_backend_internal_api_contract.PolicyConfig": {
-            "type": "object",
-            "properties": {
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_insmtx_Leros_backend_internal_api_contract.RuntimeConfig": {
-            "type": "object",
-            "properties": {
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_insmtx_Leros_backend_internal_api_contract.SkillRef": {
-            "type": "object",
-            "properties": {
-                "skill_code": {
+                "api_key": {
                     "type": "string"
                 },
-                "version": {
+                "base_url": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "provider": {
                     "type": "string"
                 }
             }
         },
-        "github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse": {
+        "dto.BaseResponse": {
             "type": "object",
             "properties": {
                 "code": {
@@ -1462,21 +1540,21 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse": {
+        "dto.CreateDigitalAssistantResponse": {
             "type": "object",
             "properties": {
                 "code": {
                     "type": "integer"
                 },
                 "data": {
-                    "$ref": "#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.DigitalAssistant"
+                    "$ref": "#/definitions/contract.DigitalAssistant"
                 },
                 "message": {
                     "type": "string"
                 }
             }
         },
-        "github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse": {
+        "dto.ErrorResponse": {
             "type": "object",
             "properties": {
                 "code": {
@@ -1490,116 +1568,219 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_insmtx_Leros_backend_types.MessageMetadata": {
+        "dto.Response": {
             "type": "object",
             "properties": {
-                "extra": {
-                    "description": "其他扩展字段",
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "file_name": {
-                    "description": "文件名",
-                    "type": "string"
-                },
-                "file_url": {
-                    "description": "文件URL（当 MessageType 为 file 时）",
-                    "type": "string"
-                },
-                "image_url": {
-                    "description": "图片URL（当 MessageType 为 image 时）",
-                    "type": "string"
-                },
-                "language": {
-                    "description": "代码语言（当 MessageType 为 code 时）",
-                    "type": "string"
-                },
-                "latency": {
-                    "description": "延迟（毫秒）",
+                "code": {
                     "type": "integer"
                 },
-                "model": {
-                    "description": "LLM 模型名称",
-                    "type": "string"
-                },
-                "tokens": {
-                    "description": "Token 数量",
-                    "type": "integer"
-                }
-            }
-        },
-        "github_com_insmtx_Leros_backend_types.SessionMetadata": {
-            "type": "object",
-            "properties": {
-                "extra": {
-                    "description": "元数据 - 其他扩展字段",
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "ip_address": {
-                    "description": "元数据 - IP地址",
-                    "type": "string"
-                },
-                "tags": {
-                    "description": "元数据 - 自定义标签",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "user_agent": {
-                    "description": "元数据 - 用户代理信息",
+                "data": {},
+                "message": {
                     "type": "string"
                 }
             }
         },
-        "github_com_insmtx_Leros_backend_types.ToolCall": {
+        "handler.AddMessageRequest": {
+            "type": "object"
+        },
+        "handler.ClearSessionMessagesRequest": {
+            "type": "object",
+            "required": [
+                "session_id"
+            ],
+            "properties": {
+                "session_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.DeleteDigitalAssistantRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.DeleteLLMModelRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.DeleteMessageRequest": {
+            "type": "object",
+            "required": [
+                "message_id"
+            ],
+            "properties": {
+                "message_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.DeleteSessionRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.GetDigitalAssistantRequest": {
             "type": "object",
             "properties": {
-                "arguments": {
-                    "description": "工具参数",
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "duration": {
-                    "description": "持续时间（毫秒）",
-                    "type": "integer"
+                "code": {
+                    "type": "string"
                 },
                 "id": {
-                    "description": "工具调用ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.GetLLMModelRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.GetSessionMessagesRequest": {
+            "type": "object",
+            "required": [
+                "session_id"
+            ],
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "per_page": {
+                    "type": "integer"
+                },
+                "session_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.GetSessionRequest": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.SessionEventsRequest": {
+            "type": "object",
+            "required": [
+                "session_id"
+            ],
+            "properties": {
+                "last_sequence": {
+                    "type": "integer"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.UpdateDigitalAssistantRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "system_prompt": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.UpdateDigitalAssistantStatusRequest": {
+            "type": "object",
+            "required": [
+                "id",
+                "status"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.UpdateLLMModelRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "api_key": {
+                    "type": "string"
+                },
+                "base_url": {
+                    "type": "string"
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "model": {
                     "type": "string"
                 },
                 "name": {
-                    "description": "工具名称",
                     "type": "string"
                 },
-                "result": {
-                    "description": "工具调用结果"
+                "provider": {
+                    "type": "string"
                 },
                 "status": {
-                    "description": "工具调用状态",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/github_com_insmtx_Leros_backend_types.ToolCallStatus"
-                        }
-                    ]
+                    "type": "string"
                 }
             }
         },
-        "github_com_insmtx_Leros_backend_types.ToolCallStatus": {
-            "type": "string",
-            "enum": [
-                "pending",
-                "running",
-                "success",
-                "error"
-            ],
-            "x-enum-varnames": [
-                "ToolCallStatusPending",
-                "ToolCallStatusRunning",
-                "ToolCallStatusSuccess",
-                "ToolCallStatusError"
-            ]
+        "handler.UpdateSessionRequest": {
+            "type": "object"
         }
     }
 }`

@@ -10,7 +10,6 @@ import (
 
 	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/agent"
-	agentruntime "github.com/insmtx/Leros/backend/internal/agent/runtime"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -52,74 +51,14 @@ func NewWorker(ctx context.Context, cfg *WorkerConfig) (*WorkerClient, error) {
 		status:    "initialized",
 	}
 
+	// TODO: worker与server交互时重新实现 config 接收
 	if cfg.ServerAddr != "" {
 		w.wsClient = NewWSClient(cfg.ServerAddr, cfg.DigitalAssistantID,
 			WithWorkerID(cfg.DigitalAssistantID),
-			WithOnConfigReady(func(assistantConfig map[string]interface{}) {
-				w.handleAssistantConfig(ctx, assistantConfig)
-			}),
 		)
 	}
 
 	return w, nil
-}
-
-func (w *WorkerClient) handleAssistantConfig(ctx context.Context, assistantConfig map[string]interface{}) {
-	logs.Info("Processing assistant configuration from server")
-
-	llmConfigRaw, ok := assistantConfig["llm_config"]
-	if !ok {
-		logs.Warn("llm_config not found in assistant config, using default")
-		return
-	}
-
-	llmConfigMap, ok := llmConfigRaw.(map[string]interface{})
-	if !ok {
-		logs.Warn("llm_config is not a valid object")
-		return
-	}
-
-	llmConfig := &config.LLMConfig{}
-	if provider, ok := llmConfigMap["type"].(string); ok {
-		llmConfig.Provider = provider
-	}
-	if apiKey, ok := llmConfigMap["api_key"].(string); ok {
-		llmConfig.APIKey = apiKey
-	}
-	if model, ok := llmConfigMap["model"].(string); ok {
-		llmConfig.Model = model
-	}
-	if baseURL, ok := llmConfigMap["base_url"].(string); ok {
-		llmConfig.BaseURL = baseURL
-	}
-
-	if llmConfig.Provider == "" || llmConfig.APIKey == "" {
-		logs.Warn("incomplete llm_config, skipping runtime initialization")
-		return
-	}
-
-	runtime, err := buildDefaultRuntime(ctx, &WorkerConfig{
-		LLMConfig:    llmConfig,
-		SkillsDir:    w.config.SkillsDir,
-		ToolsEnabled: w.config.ToolsEnabled,
-	})
-	if err != nil {
-		logs.Errorf("Failed to build runtime: %v", err)
-		return
-	}
-
-	w.runtime = runtime
-	w.status = "ready"
-	logs.Infof("Worker %s initialized with assistant config", w.workerID)
-}
-func buildDefaultRuntime(ctx context.Context, cfg *WorkerConfig) (agent.Runner, error) {
-	runtimeService, err := agentruntime.NewService(ctx, agentruntime.Options{
-		ToolsEnabled: cfg.ToolsEnabled,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create runtime service: %w", err)
-	}
-	return runtimeService, nil
 }
 
 func (w *WorkerClient) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {

@@ -1,214 +1,55 @@
 basePath: /v1
 definitions:
-  backend_internal_api_handler.AddMessageRequest:
-    properties:
-      chunks:
-        items:
-          type: string
-        type: array
-      content:
-        type: string
-      message_type:
-        type: string
-      metadata:
-        $ref: '#/definitions/github_com_insmtx_Leros_backend_types.MessageMetadata'
-      role:
-        type: string
-      session_id:
-        type: integer
-      status:
-        type: string
-      thinking:
-        type: string
-      tool_calls:
-        items:
-          $ref: '#/definitions/github_com_insmtx_Leros_backend_types.ToolCall'
-        type: array
-    required:
-    - content
-    - role
-    - session_id
-    type: object
-  backend_internal_api_handler.ClearSessionMessagesRequest:
-    properties:
-      session_id:
-        type: integer
-    required:
-    - session_id
-    type: object
-  backend_internal_api_handler.DeleteDigitalAssistantRequest:
-    properties:
-      id:
-        type: integer
-    required:
-    - id
-    type: object
-  backend_internal_api_handler.DeleteMessageRequest:
-    properties:
-      message_id:
-        type: integer
-    required:
-    - message_id
-    type: object
-  backend_internal_api_handler.DeleteSessionRequest:
-    properties:
-      id:
-        type: integer
-    required:
-    - id
-    type: object
-  backend_internal_api_handler.GetDigitalAssistantRequest:
-    properties:
-      code:
-        type: string
-      id:
-        type: integer
-    type: object
-  backend_internal_api_handler.GetSessionMessagesRequest:
-    properties:
-      page:
-        type: integer
-      per_page:
-        type: integer
-      session_id:
-        type: integer
-    required:
-    - session_id
-    type: object
-  backend_internal_api_handler.GetSessionRequest:
-    properties:
-      id:
-        type: integer
-      session_id:
-        type: string
-    type: object
-  backend_internal_api_handler.SessionEventsRequest:
-    properties:
-      last_sequence:
-        type: integer
-      session_id:
-        type: string
-    required:
-    - session_id
-    type: object
-  backend_internal_api_handler.UpdateDigitalAssistantConfigRequest:
-    properties:
-      config:
-        $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig'
-      id:
-        type: integer
-    required:
-    - config
-    - id
-    type: object
-  backend_internal_api_handler.UpdateDigitalAssistantRequest:
-    properties:
-      avatar:
-        type: string
-      config:
-        $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig'
-      description:
-        type: string
-      id:
-        type: integer
-      name:
-        type: string
-    required:
-    - id
-    type: object
-  backend_internal_api_handler.UpdateDigitalAssistantStatusRequest:
-    properties:
-      id:
-        type: integer
-      status:
-        type: string
-    required:
-    - id
-    - status
-    type: object
-  backend_internal_api_handler.UpdateSessionRequest:
-    properties:
-      expired_at:
-        type: string
-      id:
-        type: integer
-      metadata:
-        $ref: '#/definitions/github_com_insmtx_Leros_backend_types.SessionMetadata'
-      title:
-        type: string
-    required:
-    - id
-    type: object
-  github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig:
-    properties:
-      channels:
-        items:
-          $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.ChannelRef'
-        type: array
-      knowledge:
-        items:
-          $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.KnowledgeRef'
-        type: array
-      llm_config:
-        $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.LLMConfig'
-      memory_config:
-        $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.MemoryConfig'
-      policies_config:
-        $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.PolicyConfig'
-      runtime_config:
-        $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.RuntimeConfig'
-      skills:
-        items:
-          $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.SkillRef'
-        type: array
-    type: object
-  github_com_insmtx_Leros_backend_internal_api_contract.ChannelRef:
-    properties:
-      type:
-        type: string
-    type: object
-  github_com_insmtx_Leros_backend_internal_api_contract.CreateDigitalAssistantRequest:
+  contract.CreateDigitalAssistantRequest:
     properties:
       avatar:
         type: string
       code:
         type: string
-      config:
-        $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig'
       description:
         type: string
       name:
+        type: string
+      system_prompt:
         type: string
     required:
     - code
-    - config
     - name
     type: object
-  github_com_insmtx_Leros_backend_internal_api_contract.CreateSessionRequest:
+  contract.CreateLLMModelRequest:
     properties:
-      assistant_id:
-        type: integer
-      expired_at:
+      api_key:
         type: string
-      metadata:
-        $ref: '#/definitions/github_com_insmtx_Leros_backend_types.SessionMetadata'
-      session_id:
+      base_url:
         type: string
-      title:
+      config:
+        additionalProperties: true
+        type: object
+      description:
         type: string
-      type:
+      is_default:
+        type: boolean
+      model:
+        type: string
+      name:
+        type: string
+      provider:
+        type: string
+      status:
         type: string
     required:
-    - type
+    - api_key
+    - base_url
+    - model
     type: object
-  github_com_insmtx_Leros_backend_internal_api_contract.DigitalAssistant:
+  contract.CreateSessionRequest:
+    type: object
+  contract.DigitalAssistant:
     properties:
       avatar:
         type: string
       code:
         type: string
-      config:
-        $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.AssistantConfig'
       created_at:
         type: string
       description:
@@ -223,37 +64,42 @@ definitions:
         type: integer
       status:
         type: string
+      system_prompt:
+        type: string
       updated_at:
         type: string
       version:
         type: integer
     type: object
-  github_com_insmtx_Leros_backend_internal_api_contract.KnowledgeRef:
-    properties:
-      dataset_id:
-        type: string
-      repo:
-        type: string
-      type:
-        type: string
-    type: object
-  github_com_insmtx_Leros_backend_internal_api_contract.LLMConfig:
-    properties:
-      type:
-        type: string
-    type: object
-  github_com_insmtx_Leros_backend_internal_api_contract.ListDigitalAssistantRequest:
+  contract.ListDigitalAssistantRequest:
     properties:
       keyword:
         type: string
-      page:
+      limit:
         type: integer
-      per_page:
+      list_all:
+        type: boolean
+      offset:
         type: integer
       status:
         type: string
     type: object
-  github_com_insmtx_Leros_backend_internal_api_contract.ListSessionsRequest:
+  contract.ListLLMModelsRequest:
+    properties:
+      keyword:
+        type: string
+      limit:
+        type: integer
+      list_all:
+        type: boolean
+      offset:
+        type: integer
+      provider:
+        type: string
+      status:
+        type: string
+    type: object
+  contract.ListSessionsRequest:
     properties:
       assistant_code:
         type: string
@@ -261,54 +107,49 @@ definitions:
         type: integer
       keyword:
         type: string
-      page:
+      limit:
         type: integer
-      per_page:
+      list_all:
+        type: boolean
+      offset:
         type: integer
       status:
         type: string
       type:
         type: string
     type: object
-  github_com_insmtx_Leros_backend_internal_api_contract.MemoryConfig:
+  contract.TestLLMModelRequest:
     properties:
-      type:
+      api_key:
+        type: string
+      base_url:
+        type: string
+      code:
+        type: string
+      id:
+        type: integer
+      model:
+        type: string
+      provider:
         type: string
     type: object
-  github_com_insmtx_Leros_backend_internal_api_contract.PolicyConfig:
-    properties:
-      type:
-        type: string
-    type: object
-  github_com_insmtx_Leros_backend_internal_api_contract.RuntimeConfig:
-    properties:
-      type:
-        type: string
-    type: object
-  github_com_insmtx_Leros_backend_internal_api_contract.SkillRef:
-    properties:
-      skill_code:
-        type: string
-      version:
-        type: string
-    type: object
-  github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse:
+  dto.BaseResponse:
     properties:
       code:
         type: integer
       message:
         type: string
     type: object
-  github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse:
+  dto.CreateDigitalAssistantResponse:
     properties:
       code:
         type: integer
       data:
-        $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.DigitalAssistant'
+        $ref: '#/definitions/contract.DigitalAssistant'
       message:
         type: string
     type: object
-  github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse:
+  dto.ErrorResponse:
     properties:
       code:
         type: integer
@@ -317,86 +158,145 @@ definitions:
       message:
         type: string
     type: object
-  github_com_insmtx_Leros_backend_types.MessageMetadata:
+  dto.Response:
     properties:
-      extra:
-        additionalProperties: true
-        description: 其他扩展字段
-        type: object
-      file_name:
-        description: 文件名
-        type: string
-      file_url:
-        description: 文件URL（当 MessageType 为 file 时）
-        type: string
-      image_url:
-        description: 图片URL（当 MessageType 为 image 时）
-        type: string
-      language:
-        description: 代码语言（当 MessageType 为 code 时）
-        type: string
-      latency:
-        description: 延迟（毫秒）
+      code:
         type: integer
-      model:
-        description: LLM 模型名称
-        type: string
-      tokens:
-        description: Token 数量
-        type: integer
-    type: object
-  github_com_insmtx_Leros_backend_types.SessionMetadata:
-    properties:
-      extra:
-        additionalProperties: true
-        description: 元数据 - 其他扩展字段
-        type: object
-      ip_address:
-        description: 元数据 - IP地址
-        type: string
-      tags:
-        description: 元数据 - 自定义标签
-        items:
-          type: string
-        type: array
-      user_agent:
-        description: 元数据 - 用户代理信息
+      data: {}
+      message:
         type: string
     type: object
-  github_com_insmtx_Leros_backend_types.ToolCall:
+  handler.AddMessageRequest:
+    type: object
+  handler.ClearSessionMessagesRequest:
     properties:
-      arguments:
-        additionalProperties: true
-        description: 工具参数
-        type: object
-      duration:
-        description: 持续时间（毫秒）
+      session_id:
         type: integer
+    required:
+    - session_id
+    type: object
+  handler.DeleteDigitalAssistantRequest:
+    properties:
       id:
-        description: 工具调用ID
+        type: integer
+    required:
+    - id
+    type: object
+  handler.DeleteLLMModelRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  handler.DeleteMessageRequest:
+    properties:
+      message_id:
+        type: integer
+    required:
+    - message_id
+    type: object
+  handler.DeleteSessionRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  handler.GetDigitalAssistantRequest:
+    properties:
+      code:
+        type: string
+      id:
+        type: integer
+    type: object
+  handler.GetLLMModelRequest:
+    properties:
+      code:
+        type: string
+      id:
+        type: integer
+    type: object
+  handler.GetSessionMessagesRequest:
+    properties:
+      page:
+        type: integer
+      per_page:
+        type: integer
+      session_id:
+        type: integer
+    required:
+    - session_id
+    type: object
+  handler.GetSessionRequest:
+    properties:
+      id:
+        type: integer
+      session_id:
+        type: string
+    type: object
+  handler.SessionEventsRequest:
+    properties:
+      last_sequence:
+        type: integer
+      session_id:
+        type: string
+    required:
+    - session_id
+    type: object
+  handler.UpdateDigitalAssistantRequest:
+    properties:
+      avatar:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      system_prompt:
+        type: string
+    required:
+    - id
+    type: object
+  handler.UpdateDigitalAssistantStatusRequest:
+    properties:
+      id:
+        type: integer
+      status:
+        type: string
+    required:
+    - id
+    - status
+    type: object
+  handler.UpdateLLMModelRequest:
+    properties:
+      api_key:
+        type: string
+      base_url:
+        type: string
+      config:
+        additionalProperties: true
+        type: object
+      description:
+        type: string
+      id:
+        type: integer
+      is_default:
+        type: boolean
+      model:
         type: string
       name:
-        description: 工具名称
         type: string
-      result:
-        description: 工具调用结果
+      provider:
+        type: string
       status:
-        allOf:
-        - $ref: '#/definitions/github_com_insmtx_Leros_backend_types.ToolCallStatus'
-        description: 工具调用状态
+        type: string
+    required:
+    - id
     type: object
-  github_com_insmtx_Leros_backend_types.ToolCallStatus:
-    enum:
-    - pending
-    - running
-    - success
-    - error
-    type: string
-    x-enum-varnames:
-    - ToolCallStatusPending
-    - ToolCallStatusRunning
-    - ToolCallStatusSuccess
-    - ToolCallStatusError
+  handler.UpdateSessionRequest:
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -415,30 +315,30 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/backend_internal_api_handler.AddMessageRequest'
+          $ref: '#/definitions/handler.AddMessageRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse'
+            $ref: '#/definitions/dto.BaseResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "404":
           description: 资源不存在
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 添加会话消息
       tags:
       - Session
@@ -453,30 +353,30 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/backend_internal_api_handler.ClearSessionMessagesRequest'
+          $ref: '#/definitions/handler.ClearSessionMessagesRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse'
+            $ref: '#/definitions/dto.BaseResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "404":
           description: 资源不存在
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 清空会话消息
       tags:
       - Session
@@ -491,29 +391,63 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.CreateDigitalAssistantRequest'
+          $ref: '#/definitions/contract.CreateDigitalAssistantRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse'
+            $ref: '#/definitions/dto.CreateDigitalAssistantResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 创建数字助手
       tags:
       - DigitalAssistant
+  /CreateLLMModel:
+    post:
+      consumes:
+      - application/json
+      description: 创建一个新的LLM模型配置
+      parameters:
+      - description: 创建LLM模型请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/contract.CreateLLMModelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: 内部服务器错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: 创建LLM模型
+      tags:
+      - LLMModel
   /CreateSession:
     post:
       consumes:
@@ -525,26 +459,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.CreateSessionRequest'
+          $ref: '#/definitions/contract.CreateSessionRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse'
+            $ref: '#/definitions/dto.BaseResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 创建会话
       tags:
       - Session
@@ -559,37 +493,79 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/backend_internal_api_handler.DeleteDigitalAssistantRequest'
+          $ref: '#/definitions/handler.DeleteDigitalAssistantRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse'
+            $ref: '#/definitions/dto.BaseResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "403":
           description: 权限不足
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "404":
           description: 资源不存在
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 删除数字助手
       tags:
       - DigitalAssistant
+  /DeleteLLMModel:
+    post:
+      consumes:
+      - application/json
+      description: 根据ID删除LLM模型配置
+      parameters:
+      - description: 删除LLM模型请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.DeleteLLMModelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: 权限不足
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: 资源不存在
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: 内部服务器错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: 删除LLM模型
+      tags:
+      - LLMModel
   /DeleteMessage:
     post:
       consumes:
@@ -601,30 +577,30 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/backend_internal_api_handler.DeleteMessageRequest'
+          $ref: '#/definitions/handler.DeleteMessageRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse'
+            $ref: '#/definitions/dto.BaseResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "404":
           description: 资源不存在
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 删除会话消息
       tags:
       - Session
@@ -639,33 +615,60 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/backend_internal_api_handler.DeleteSessionRequest'
+          $ref: '#/definitions/handler.DeleteSessionRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse'
+            $ref: '#/definitions/dto.BaseResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "404":
           description: 资源不存在
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 删除会话
       tags:
       - Session
+  /GetDefaultLLMModel:
+    post:
+      consumes:
+      - application/json
+      description: 获取组织的默认LLM模型配置
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: 默认模型不存在
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: 内部服务器错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: 获取默认LLM模型
+      tags:
+      - LLMModel
   /GetDigitalAssistant:
     post:
       consumes:
@@ -677,37 +680,79 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/backend_internal_api_handler.GetDigitalAssistantRequest'
+          $ref: '#/definitions/handler.GetDigitalAssistantRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse'
+            $ref: '#/definitions/dto.CreateDigitalAssistantResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "403":
           description: 权限不足
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "404":
           description: 资源不存在
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 获取数字助手详情
       tags:
       - DigitalAssistant
+  /GetLLMModel:
+    post:
+      consumes:
+      - application/json
+      description: 根据ID或Code获取LLM模型配置详情
+      parameters:
+      - description: 获取LLM模型请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.GetLLMModelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: 权限不足
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: 资源不存在
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: 内部服务器错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: 获取LLM模型详情
+      tags:
+      - LLMModel
   /GetSession:
     post:
       consumes:
@@ -719,30 +764,30 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/backend_internal_api_handler.GetSessionRequest'
+          $ref: '#/definitions/handler.GetSessionRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse'
+            $ref: '#/definitions/dto.BaseResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "404":
           description: 资源不存在
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 获取会话详情
       tags:
       - Session
@@ -757,30 +802,30 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/backend_internal_api_handler.GetSessionMessagesRequest'
+          $ref: '#/definitions/handler.GetSessionMessagesRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse'
+            $ref: '#/definitions/dto.BaseResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "404":
           description: 资源不存在
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 获取会话消息列表
       tags:
       - Session
@@ -795,29 +840,63 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.ListDigitalAssistantRequest'
+          $ref: '#/definitions/contract.ListDigitalAssistantRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse'
+            $ref: '#/definitions/dto.CreateDigitalAssistantResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 查询数字助手列表
       tags:
       - DigitalAssistant
+  /ListLLMModels:
+    post:
+      consumes:
+      - application/json
+      description: 分页查询LLM模型配置列表
+      parameters:
+      - description: 查询列表请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/contract.ListLLMModelsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: 内部服务器错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: 查询LLM模型列表
+      tags:
+      - LLMModel
   /ListSessions:
     post:
       consumes:
@@ -829,26 +908,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_contract.ListSessionsRequest'
+          $ref: '#/definitions/contract.ListSessionsRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse'
+            $ref: '#/definitions/dto.BaseResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 查询会话列表
       tags:
       - Session
@@ -863,7 +942,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/backend_internal_api_handler.SessionEventsRequest'
+          $ref: '#/definitions/handler.SessionEventsRequest'
       produces:
       - text/event-stream
       responses:
@@ -874,18 +953,52 @@ paths:
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 订阅会话事件流
       tags:
       - Session
+  /TestLLMModel:
+    post:
+      consumes:
+      - application/json
+      description: 测试LLM模型配置的连通性
+      parameters:
+      - description: 测试LLM模型请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/contract.TestLLMModelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: 内部服务器错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: 测试LLM模型
+      tags:
+      - LLMModel
   /UpdateDigitalAssistant:
     post:
       consumes:
@@ -897,77 +1010,35 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/backend_internal_api_handler.UpdateDigitalAssistantRequest'
+          $ref: '#/definitions/handler.UpdateDigitalAssistantRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse'
+            $ref: '#/definitions/dto.CreateDigitalAssistantResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "403":
           description: 权限不足
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "404":
           description: 资源不存在
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 更新数字助手
-      tags:
-      - DigitalAssistant
-  /UpdateDigitalAssistantConfig:
-    post:
-      consumes:
-      - application/json
-      description: 更新数字助手的配置信息
-      parameters:
-      - description: 更新配置请求
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/backend_internal_api_handler.UpdateDigitalAssistantConfigRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 成功响应
-          schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.CreateDigitalAssistantResponse'
-        "400":
-          description: 请求参数错误
-          schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
-        "401":
-          description: 未认证
-          schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
-        "403":
-          description: 权限不足
-          schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
-        "404":
-          description: 资源不存在
-          schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
-        "500":
-          description: 内部服务器错误
-          schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
-      summary: 更新数字助手配置
       tags:
       - DigitalAssistant
   /UpdateDigitalAssistantStatus:
@@ -981,37 +1052,79 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/backend_internal_api_handler.UpdateDigitalAssistantStatusRequest'
+          $ref: '#/definitions/handler.UpdateDigitalAssistantStatusRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse'
+            $ref: '#/definitions/dto.BaseResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "403":
           description: 权限不足
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "404":
           description: 资源不存在
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 更新数字助手状态
       tags:
       - DigitalAssistant
+  /UpdateLLMModel:
+    post:
+      consumes:
+      - application/json
+      description: 更新LLM模型配置信息
+      parameters:
+      - description: 更新LLM模型请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateLLMModelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: 权限不足
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: 资源不存在
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: 内部服务器错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: 更新LLM模型
+      tags:
+      - LLMModel
   /UpdateSession:
     post:
       consumes:
@@ -1023,30 +1136,30 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/backend_internal_api_handler.UpdateSessionRequest'
+          $ref: '#/definitions/handler.UpdateSessionRequest'
       produces:
       - application/json
       responses:
         "200":
           description: 成功响应
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.BaseResponse'
+            $ref: '#/definitions/dto.BaseResponse'
         "400":
           description: 请求参数错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "401":
           description: 未认证
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "404":
           description: 资源不存在
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
         "500":
           description: 内部服务器错误
           schema:
-            $ref: '#/definitions/github_com_insmtx_Leros_backend_internal_api_dto.ErrorResponse'
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: 更新会话
       tags:
       - Session

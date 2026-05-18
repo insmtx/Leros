@@ -25,7 +25,6 @@ func (h *DigitalAssistantHandler) RegisterRoutes(r gin.IRouter) {
 	r.POST("/UpdateDigitalAssistant", h.UpdateDigitalAssistant)
 	r.POST("/DeleteDigitalAssistant", h.DeleteDigitalAssistant)
 	r.POST("/ListDigitalAssistant", h.ListDigitalAssistant)
-	r.POST("/UpdateDigitalAssistantConfig", h.UpdateDigitalAssistantConfig)
 	r.POST("/UpdateDigitalAssistantStatus", h.UpdateDigitalAssistantStatus)
 }
 
@@ -218,40 +217,6 @@ func (h *DigitalAssistantHandler) ListDigitalAssistant(ctx *gin.Context) {
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
-		return
-	}
-
-	ctx.JSON(http.StatusOK, dto.Success(result))
-}
-
-type UpdateDigitalAssistantConfigRequest struct {
-	ID uint `json:"id" binding:"required"`
-	contract.UpdateDigitalAssistantConfigRequest
-}
-
-// @Summary 更新数字助手配置
-// @Description 更新数字助手的配置信息
-// @Tags DigitalAssistant
-// @Accept json
-// @Produce json
-// @Param body body UpdateDigitalAssistantConfigRequest true "更新配置请求"
-// @Success 200 {object} dto.CreateDigitalAssistantResponse "成功响应"
-// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
-// @Failure 401 {object} dto.ErrorResponse "未认证"
-// @Failure 403 {object} dto.ErrorResponse "权限不足"
-// @Failure 404 {object} dto.ErrorResponse "资源不存在"
-// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
-// @Router /UpdateDigitalAssistantConfig [post]
-func (h *DigitalAssistantHandler) UpdateDigitalAssistantConfig(ctx *gin.Context) {
-	var req UpdateDigitalAssistantConfigRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
-		return
-	}
-
-	result, err := h.service.UpdateDigitalAssistantConfig(ctx, req.ID, &req.UpdateDigitalAssistantConfigRequest)
-	if err != nil {
-		handleServiceError(ctx, err)
 		return
 	}
 
