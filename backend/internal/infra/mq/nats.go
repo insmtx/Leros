@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/insmtx/Leros/backend/pkg/dm"
 	"github.com/nats-io/nats.go"
@@ -99,22 +100,25 @@ func (p *natsPublisher) initStreams() error {
 	}
 
 	for streamName, subjects := range dm.StreamSubjects {
-		_, addErr := p.js.AddStream(&nats.StreamConfig{
-			Name:     streamName,
-			Subjects: subjects,
-			Storage:  nats.FileStorage,
-		})
+		streamCfg := &nats.StreamConfig{
+			Name:      streamName,
+			Subjects:  subjects,
+			Storage:   nats.FileStorage,
+			Retention: nats.LimitsPolicy, // 达到 MaxAge 或 MaxBytes 时删除旧消息
+			Discard:   nats.DiscardOld,   // 超出限制时丢弃旧消息
+
+			MaxAge:            time.Hour * 24, // 消息保留 24 小时，满足大多数业务场景的需求
+			MaxMsgsPerSubject: 10000,          // 每个 Stream 最多保留 10000 条消息，防止磁盘占满
+
+		}
+		_, addErr := p.js.AddStream(streamCfg)
 		if addErr == nil {
 			logs.Infof("Created JetStream stream '%s' with subjects: %v", streamName, subjects)
 			continue
 		}
 
 		// AddStream 失败，尝试 UpdateStream
-		if _, err := p.js.UpdateStream(&nats.StreamConfig{
-			Name:     streamName,
-			Subjects: subjects,
-			Storage:  nats.FileStorage,
-		}); err != nil {
+		if _, err := p.js.UpdateStream(streamCfg); err != nil {
 			return fmt.Errorf("failed to initialize stream '%s': AddStream=%v, UpdateStream=%w", streamName, addErr, err)
 		}
 		logs.Infof("Updated JetStream stream '%s' with subjects: %v", streamName, subjects)
@@ -290,5 +294,3 @@ func (p *natsPublisher) Close() error {
 
 	return nil
 }
-
-
