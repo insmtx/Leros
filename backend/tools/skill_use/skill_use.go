@@ -4,7 +4,6 @@ package skilluse
 import (
 	"context"
 	"fmt"
-	"html"
 	"strings"
 	"unicode/utf8"
 
@@ -149,9 +148,9 @@ func listSkills(catalog skillcatalog.SkillCatalog) map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"ok":     true,
-		"count":  len(skills),
-		"skills": skills,
+		"success": true,
+		"count":   len(skills),
+		"skills":  skills,
 	}
 }
 
@@ -164,42 +163,33 @@ func getSkill(catalog skillcatalog.SkillCatalog, name string) map[string]interfa
 	files, err := catalog.ListFiles(entry.Manifest.Name, defaultSkillFileListLimit)
 	if err != nil {
 		return map[string]interface{}{
-			"ok":      false,
-			"message": err.Error(),
+			"success": false,
+			"error":   err.Error(),
 		}
 	}
 
-	output := formatSkillContent(entry, files)
-	metadata := map[string]interface{}{
-		"name":            entry.Manifest.Name,
-		"dir":             entry.Dir,
-		"path":            entry.Path,
-		"files":           files,
-		"file_list_limit": defaultSkillFileListLimit,
-	}
-
+	skillDir := displaySkillDir(entry)
 	return map[string]interface{}{
-		"ok":       true,
-		"title":    fmt.Sprintf("Loaded skill: %s", entry.Manifest.Name),
-		"output":   output,
-		"metadata": metadata,
-		"skill": map[string]interface{}{
-			"name":           entry.Manifest.Name,
-			"description":    entry.Manifest.Description,
-			"version":        entry.Manifest.Version,
-			"category":       entry.Manifest.Metadata.Leros.Category,
-			"tags":           entry.Manifest.Metadata.Leros.Tags,
-			"always":         entry.Manifest.Metadata.Leros.Always,
-			"requires_tools": entry.Manifest.Metadata.Leros.RequiresTools,
-			"dir":            entry.Dir,
-			"path":           entry.Path,
-			"scope":          "catalog",
-			"skill_type":     "file",
-			"enabled":        true,
-			"files":          files,
-			"body":           entry.Body,
-			"content":        entry.Body,
-		},
+		"success":          true,
+		"name":             entry.Manifest.Name,
+		"description":      entry.Manifest.Description,
+		"version":          entry.Manifest.Version,
+		"category":         entry.Manifest.Metadata.Leros.Category,
+		"tags":             entry.Manifest.Metadata.Leros.Tags,
+		"related_skills":   []string{},
+		"content":          entry.Body,
+		"path":             entry.Path,
+		"skill_dir":        skillDir,
+		"linked_files":     optionalFiles(files),
+		"usage_hint":       usageHint(files),
+		"always":           entry.Manifest.Metadata.Leros.Always,
+		"requires_tools":   entry.Manifest.Metadata.Leros.RequiresTools,
+		"scope":            "catalog",
+		"skill_type":       "file",
+		"enabled":          true,
+		"file_list_limit":  defaultSkillFileListLimit,
+		"setup_needed":     false,
+		"readiness_status": "available",
 	}
 }
 
@@ -212,14 +202,14 @@ func readSkillFile(catalog skillcatalog.SkillCatalog, name string, relativePath 
 	content, err := catalog.ReadFile(entry.Manifest.Name, relativePath)
 	if err != nil {
 		return map[string]interface{}{
-			"ok":      false,
-			"message": err.Error(),
+			"success": false,
+			"error":   err.Error(),
 		}
 	}
 
 	displayContent, truncated := truncateFileContent(content, maxSkillFileReadBytes)
 	return map[string]interface{}{
-		"ok":              true,
+		"success":         true,
 		"name":            entry.Manifest.Name,
 		"path":            relativePath,
 		"content":         displayContent,
@@ -245,6 +235,20 @@ func summaryMap(summary skillcatalog.Summary) map[string]interface{} {
 	}
 }
 
+func optionalFiles(files []string) interface{} {
+	if len(files) == 0 {
+		return nil
+	}
+	return files
+}
+
+func usageHint(files []string) interface{} {
+	if len(files) == 0 {
+		return nil
+	}
+	return "To view linked files, call skill_use with action=read_file and path set to a linked file path."
+}
+
 func findSkill(catalog skillcatalog.SkillCatalog, name string) (*skillcatalog.Entry, error) {
 	entry, err := catalog.Get(name)
 	if err == nil {
@@ -261,39 +265,14 @@ func findSkill(catalog skillcatalog.SkillCatalog, name string) (*skillcatalog.En
 	return nil, err
 }
 
-func formatSkillContent(entry *skillcatalog.Entry, files []string) string {
-	var builder strings.Builder
-	skillName := entry.Manifest.Name
-	baseDir := entry.Dir
-	if baseDir == "" {
-		baseDir = "."
+func displaySkillDir(entry *skillcatalog.Entry) string {
+	if entry == nil {
+		return ""
 	}
-
-	builder.WriteString(`<skill_content name="`)
-	builder.WriteString(html.EscapeString(skillName))
-	builder.WriteString(`">`)
-	builder.WriteString("\n")
-	builder.WriteString("# Skill: ")
-	builder.WriteString(skillName)
-	builder.WriteString("\n\n")
-	builder.WriteString(strings.TrimSpace(entry.Body))
-	builder.WriteString("\n\n")
-	builder.WriteString("Base directory for this skill: ")
-	builder.WriteString(baseDir)
-	builder.WriteString("\n")
-	builder.WriteString("Relative paths in this skill are relative to this base directory.")
-	builder.WriteString("\n")
-	builder.WriteString(fmt.Sprintf("File list is sampled up to %d files.", defaultSkillFileListLimit))
-	builder.WriteString("\n\n")
-	builder.WriteString("<skill_files>")
-	builder.WriteString("\n")
-	builder.WriteString(strings.Join(files, "\n"))
-	builder.WriteString("\n")
-	builder.WriteString("</skill_files>")
-	builder.WriteString("\n")
-	builder.WriteString("</skill_content>")
-
-	return builder.String()
+	if entry.AbsoluteDir != "" {
+		return entry.AbsoluteDir
+	}
+	return entry.Dir
 }
 
 func truncateFileContent(content []byte, maxBytes int) (string, bool) {
@@ -316,8 +295,8 @@ func skillNotFound(name string, summaries []skillcatalog.Summary) map[string]int
 	}
 
 	return map[string]interface{}{
-		"ok":        false,
-		"message":   fmt.Sprintf("skill %q not found", name),
+		"success":   false,
+		"error":     fmt.Sprintf("skill %q not found", name),
 		"available": available,
 	}
 }

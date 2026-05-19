@@ -789,8 +789,14 @@ func (s *sessionService) FailedSessionMessage(ctx context.Context, req *contract
 		Sequence:    sequence,
 		Timestamp:   req.CreatedAt.UnixMilli(),
 	}
+	if req.Chunks != nil && len(req.Chunks) > 0 {
+		msgEntity.Chunks = req.Chunks
+	}
 	if req.Metadata != nil {
 		msgEntity.Metadata = *req.Metadata
+	}
+	if req.Usage != nil {
+		msgEntity.Usage = *req.Usage
 	}
 	if req.ErrorCode != "" {
 		if msgEntity.Metadata.Extra == nil {

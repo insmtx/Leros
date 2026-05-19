@@ -8,8 +8,8 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/ygpkg/yg-go/logs"
 
-	einoadapter "github.com/insmtx/Leros/backend/internal/agent/eino"
 	"github.com/insmtx/Leros/backend/config"
+	einoadapter "github.com/insmtx/Leros/backend/internal/agent/eino"
 )
 
 // EinoExecutor implements Executor using the Eino LLM framework.

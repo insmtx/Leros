@@ -14,57 +14,31 @@ import (
 
 const skillFileName = "SKILL.md"
 
-var defaultSkillDirs = []string{
-	"./backend/skills",
-	"/app/backend/skills",
-}
-
-// Catalog 存储已发现的文件型 Skill，用于运行时提示词组装。
+// Catalog stores discovered file-based skills for runtime prompt assembly.
 type Catalog struct {
+	rootDir string
 	fs      fs.FS
 	entryFS map[string]fs.FS
 	entries map[string]*Entry
 }
 
-// LoadDefaultCatalog 从默认 Leros Skill 目录加载 Skill。
+// LoadDefaultCatalog loads skills from the configured default directories.
 func LoadDefaultCatalog() (*Catalog, string, error) {
-	candidates := defaultSkillDirCandidates()
-
-	merged := NewEmptyCatalog()
-	loadedDirs := make([]string, 0, len(candidates))
-	var lastErr error
-	for _, dir := range candidates {
-		if _, err := os.Stat(dir); err != nil {
-			lastErr = err
-			continue
-		}
-
-		catalog, err := NewCatalog(os.DirFS(dir))
-		if err != nil {
-			lastErr = err
-			continue
-		}
-
-		merged.merge(catalog)
-		loadedDirs = append(loadedDirs, dir)
+	dir, err := defaultLerosSkillsDir()
+	if err != nil {
+		return nil, "", fmt.Errorf("resolve default skill directory: %w", err)
 	}
 
-	if len(loadedDirs) > 0 {
-		return merged, strings.Join(loadedDirs, ","), nil
+	if _, err := os.Stat(dir); err != nil {
+		return nil, "", fmt.Errorf("load skills from default directory %s: %w", dir, err)
 	}
 
-	if lastErr != nil {
-		return nil, "", fmt.Errorf("load skills from default directories: %w", lastErr)
+	catalog, err := NewCatalogFromDir(dir)
+	if err != nil {
+		return nil, "", err
 	}
-	return nil, "", fmt.Errorf("load skills from default directories: no candidates configured")
-}
 
-func defaultSkillDirCandidates() []string {
-	candidates := append([]string{}, defaultSkillDirs...)
-	if userDir, err := defaultLerosSkillsDir(); err == nil {
-		candidates = append([]string{userDir}, candidates...)
-	}
-	return candidates
+	return catalog, catalog.rootDir, nil
 }
 
 func defaultLerosSkillsDir() (string, error) {
@@ -75,7 +49,7 @@ func defaultLerosSkillsDir() (string, error) {
 	return filepath.ToSlash(skillsDir), nil
 }
 
-// NewEmptyCatalog 创建一个不加载任何 Skill 的空 Catalog。
+// NewEmptyCatalog creates a catalog without loading any skills.
 func NewEmptyCatalog() *Catalog {
 	return &Catalog{
 		entryFS: make(map[string]fs.FS),
@@ -83,8 +57,22 @@ func NewEmptyCatalog() *Catalog {
 	}
 }
 
-// NewCatalog 扫描直接子目录中的 SKILL.md 文件并创建 Catalog。
+// NewCatalog scans direct child directories in the provided filesystem for SKILL.md files.
 func NewCatalog(skillFS fs.FS) (*Catalog, error) {
+	return newCatalog(skillFS, "")
+}
+
+// NewCatalogFromDir scans a filesystem directory and preserves its absolute path for display metadata.
+func NewCatalogFromDir(rootDir string) (*Catalog, error) {
+	absolute, err := filepath.Abs(rootDir)
+	if err != nil {
+		return nil, fmt.Errorf("resolve skill root directory %s: %w", rootDir, err)
+	}
+	absolute = filepath.Clean(absolute)
+	return newCatalog(os.DirFS(absolute), filepath.ToSlash(absolute))
+}
+
+func newCatalog(skillFS fs.FS, rootDir string) (*Catalog, error) {
 	entries := make(map[string]*Entry)
 	entryFS := make(map[string]fs.FS)
 
@@ -112,10 +100,11 @@ func NewCatalog(skillFS fs.FS) (*Catalog, error) {
 		manifest.Normalize(path.Base(dir))
 
 		entry := &Entry{
-			Manifest: *manifest,
-			Body:     body,
-			Dir:      dir,
-			Path:     filePath,
+			Manifest:    *manifest,
+			Body:        body,
+			Dir:         dir,
+			Path:        filePath,
+			AbsoluteDir: absoluteSkillDir(rootDir, dir),
 		}
 		if _, exists := entries[entry.Manifest.Name]; exists {
 			return nil, fmt.Errorf("duplicate skill name %q", entry.Manifest.Name)
@@ -125,10 +114,18 @@ func NewCatalog(skillFS fs.FS) (*Catalog, error) {
 	}
 
 	return &Catalog{
+		rootDir: rootDir,
 		fs:      skillFS,
 		entryFS: entryFS,
 		entries: entries,
 	}, nil
+}
+
+func absoluteSkillDir(rootDir string, dir string) string {
+	if rootDir == "" {
+		return ""
+	}
+	return filepath.ToSlash(filepath.Join(filepath.FromSlash(rootDir), filepath.FromSlash(dir)))
 }
 
 func (c *Catalog) merge(other *Catalog) {
@@ -154,7 +151,7 @@ func (c *Catalog) merge(other *Catalog) {
 	}
 }
 
-// List 返回按名称排序的 Skill 摘要。
+// List returns skill summaries sorted by name.
 func (c *Catalog) List() []Summary {
 	if c == nil {
 		return nil
@@ -172,7 +169,7 @@ func (c *Catalog) List() []Summary {
 	return summaries
 }
 
-// Get 按名称返回完整的 Skill 条目。
+// Get returns a full skill entry by name.
 func (c *Catalog) Get(name string) (*Entry, error) {
 	if c == nil {
 		return nil, fmt.Errorf("catalog is nil")
@@ -186,7 +183,7 @@ func (c *Catalog) Get(name string) (*Entry, error) {
 	return entry, nil
 }
 
-// ReadFile 读取 Skill 目录下的附加文件。
+// ReadFile reads a supporting file from a skill directory.
 func (c *Catalog) ReadFile(name string, relativePath string) ([]byte, error) {
 	entry, err := c.Get(name)
 	if err != nil {
@@ -212,7 +209,7 @@ func (c *Catalog) ReadFile(name string, relativePath string) ([]byte, error) {
 	return content, nil
 }
 
-// ListFiles 返回 Skill 目录下除 SKILL.md 以外的附加文件。
+// ListFiles returns supporting files in a skill directory, excluding SKILL.md.
 func (c *Catalog) ListFiles(name string, limit int) ([]string, error) {
 	entry, err := c.Get(name)
 	if err != nil {

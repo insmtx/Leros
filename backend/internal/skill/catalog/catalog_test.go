@@ -110,6 +110,28 @@ func TestCatalogDerivesNameWithoutFrontmatter(t *testing.T) {
 	}
 }
 
+func TestCatalogFromDirStoresAbsoluteSkillDir(t *testing.T) {
+	rootDir := t.TempDir()
+	writeTestSkill(t, filepath.Join(rootDir, "review"), "review", "Review skill", "body")
+
+	catalog, err := NewCatalogFromDir(rootDir)
+	if err != nil {
+		t.Fatalf("load catalog from dir: %v", err)
+	}
+
+	entry, err := catalog.Get("review")
+	if err != nil {
+		t.Fatalf("get skill: %v", err)
+	}
+	if !filepath.IsAbs(filepath.FromSlash(entry.AbsoluteDir)) {
+		t.Fatalf("expected absolute skill dir, got %q", entry.AbsoluteDir)
+	}
+	expected := filepath.ToSlash(filepath.Join(rootDir, "review"))
+	if entry.AbsoluteDir != expected {
+		t.Fatalf("expected %q, got %q", expected, entry.AbsoluteDir)
+	}
+}
+
 func TestCatalogMergeKeepsFirstDuplicateSkill(t *testing.T) {
 	firstRoot := t.TempDir()
 	secondRoot := t.TempDir()

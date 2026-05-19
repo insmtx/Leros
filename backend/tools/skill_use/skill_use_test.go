@@ -23,8 +23,8 @@ func TestSkillUseToolListAndGet(t *testing.T) {
 		t.Fatalf("list skills failed: %v", err)
 	}
 	listResult := decodeSkillToolOutput(t, rawListResult)
-	if listResult["ok"] != true {
-		t.Fatalf("expected ok list result, got %#v", listResult)
+	if listResult["success"] != true {
+		t.Fatalf("expected successful list result, got %#v", listResult)
 	}
 	if listResult["count"] != float64(1) {
 		t.Fatalf("expected 1 skill, got %#v", listResult["count"])
@@ -39,35 +39,30 @@ func TestSkillUseToolListAndGet(t *testing.T) {
 	}
 	getResult := decodeSkillToolOutput(t, rawGetResult)
 
-	skill, ok := getResult["skill"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected skill object, got %#v", getResult["skill"])
+	if getResult["success"] != true {
+		t.Fatalf("expected successful skill result, got %#v", getResult)
 	}
-	if skill["name"] != "github-pr-review" {
-		t.Fatalf("unexpected skill name: %#v", skill["name"])
+	if getResult["name"] != "github-pr-review" {
+		t.Fatalf("unexpected skill name: %#v", getResult["name"])
 	}
-	if skill["body"] == "" {
-		t.Fatalf("expected skill body")
+	if getResult["content"] == "" {
+		t.Fatalf("expected skill content")
 	}
-
-	if getResult["title"] != "Loaded skill: github-pr-review" {
-		t.Fatalf("unexpected title: %#v", getResult["title"])
-	}
-	output, ok := getResult["output"].(string)
-	if !ok || !strings.Contains(output, `<skill_content name="github-pr-review">`) {
-		t.Fatalf("expected skill content output, got %#v", getResult["output"])
-	}
-	if !strings.Contains(output, "references/policy.md") {
-		t.Fatalf("expected skill file list in output, got %s", output)
-	}
-
-	metadata, ok := getResult["metadata"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected metadata object, got %#v", getResult["metadata"])
-	}
-	files, ok := metadata["files"].([]interface{})
+	files, ok := getResult["linked_files"].([]interface{})
 	if !ok || len(files) != 2 || files[0] != "references/large.md" || files[1] != "references/policy.md" {
-		t.Fatalf("unexpected metadata files: %#v", metadata["files"])
+		t.Fatalf("unexpected linked files: %#v", getResult["linked_files"])
+	}
+	dir, ok := getResult["skill_dir"].(string)
+	if !ok || !filepath.IsAbs(filepath.FromSlash(dir)) {
+		t.Fatalf("expected skill_dir to be absolute, got %#v", getResult["skill_dir"])
+	}
+	if getResult["readiness_status"] != "available" {
+		t.Fatalf("unexpected readiness status: %#v", getResult["readiness_status"])
+	}
+	for _, removedField := range []string{"ok", "title", "output", "metadata", "skill", "body", "dir", "files"} {
+		if _, exists := getResult[removedField]; exists {
+			t.Fatalf("field %q should not be returned in skill view result: %#v", removedField, getResult[removedField])
+		}
 	}
 }
 
@@ -84,8 +79,8 @@ func TestSkillUseToolReadFile(t *testing.T) {
 		t.Fatalf("read skill file failed: %v", err)
 	}
 	result := decodeSkillToolOutput(t, rawResult)
-	if result["ok"] != true {
-		t.Fatalf("expected ok read result, got %#v", result)
+	if result["success"] != true {
+		t.Fatalf("expected successful read result, got %#v", result)
 	}
 	if result["content"] != "policy content" {
 		t.Fatalf("unexpected file content: %#v", result["content"])
@@ -111,8 +106,8 @@ func TestSkillUseToolReadFileTruncatesLargeContent(t *testing.T) {
 		t.Fatalf("read large skill file failed: %v", err)
 	}
 	result := decodeSkillToolOutput(t, rawResult)
-	if result["ok"] != true {
-		t.Fatalf("expected ok read result, got %#v", result)
+	if result["success"] != true {
+		t.Fatalf("expected successful read result, got %#v", result)
 	}
 	if result["truncated"] != true {
 		t.Fatalf("expected truncated file, got %#v", result["truncated"])
@@ -138,33 +133,28 @@ func TestSkillUseToolLoadsBundledWeatherSkillForWeatherQuery(t *testing.T) {
 		t.Fatalf("get weather skill failed: %v", err)
 	}
 	result := decodeSkillToolOutput(t, rawResult)
-	if result["ok"] != true {
-		t.Fatalf("expected ok weather skill result, got %#v", result)
+	if result["success"] != true {
+		t.Fatalf("expected successful weather skill result, got %#v", result)
 	}
 
-	skill, ok := result["skill"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected skill object, got %#v", result["skill"])
+	if result["name"] != "weather" {
+		t.Fatalf("unexpected skill name: %#v", result["name"])
 	}
-	if skill["name"] != "weather" {
-		t.Fatalf("unexpected skill name: %#v", skill["name"])
-	}
-	if skill["description"] != "Get current weather and forecasts (no API key required)." {
-		t.Fatalf("unexpected weather skill description: %#v", skill["description"])
+	if result["description"] != "Get current weather and forecasts (no API key required)." {
+		t.Fatalf("unexpected weather skill description: %#v", result["description"])
 	}
 
-	output, ok := result["output"].(string)
+	content, ok := result["content"].(string)
 	if !ok {
-		t.Fatalf("expected weather skill output string, got %#v", result["output"])
+		t.Fatalf("expected weather skill content string, got %#v", result["content"])
 	}
 	for _, expected := range []string{
-		`<skill_content name="weather">`,
 		`curl -s "wttr.in/London?format=3"`,
 		"Open-Meteo",
 		"current_weather=true",
 	} {
-		if !strings.Contains(output, expected) {
-			t.Fatalf("expected weather skill output to contain %q, got %s", expected, output)
+		if !strings.Contains(content, expected) {
+			t.Fatalf("expected weather skill content to contain %q, got %s", expected, content)
 		}
 	}
 }
@@ -181,7 +171,7 @@ func TestSkillUseToolMissingSkillReturnsAvailableNames(t *testing.T) {
 		t.Fatalf("get missing skill should return structured result: %v", err)
 	}
 	result := decodeSkillToolOutput(t, rawResult)
-	if result["ok"] != false {
+	if result["success"] != false {
 		t.Fatalf("expected not found result, got %#v", result)
 	}
 
@@ -243,7 +233,7 @@ Read the pull request before reviewing.
 		t.Fatalf("write large reference failed: %v", err)
 	}
 
-	catalog, err := skillcatalog.NewCatalog(os.DirFS(rootDir))
+	catalog, err := skillcatalog.NewCatalogFromDir(rootDir)
 	if err != nil {
 		t.Fatalf("load catalog failed: %v", err)
 	}
@@ -270,7 +260,7 @@ func newBundledSkillsCatalog(t *testing.T) *skillcatalog.Catalog {
 	}
 
 	skillsDir := filepath.Join(filepath.Dir(currentFile), "..", "..", "skills")
-	catalog, err := skillcatalog.NewCatalog(os.DirFS(skillsDir))
+	catalog, err := skillcatalog.NewCatalogFromDir(skillsDir)
 	if err != nil {
 		t.Fatalf("load bundled skills catalog: %v", err)
 	}

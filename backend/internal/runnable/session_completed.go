@@ -75,9 +75,12 @@ func handleSessionCompletedMessage(ctx context.Context, service contract.Session
 		}
 		req := &contract.FailedSessionMessageRequest{
 			SessionID: sessionID,
+			Content:   errMsg,
 			ErrorMsg:  errMsg,
 			Status:    status,
+			Chunks:    runEventChunks(streamMsg.Body.RunCompleted.Events),
 			Metadata:  messageMetadataFromRunCompleted(streamMsg.Body.RunCompleted),
+			Usage:     messageUsageFromRuntime(streamMsg.Body.RunCompleted.Usage),
 			Seq:       streamMsg.Body.Seq,
 			CreatedAt: streamMsg.CreatedAt,
 		}

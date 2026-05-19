@@ -42,10 +42,11 @@ type LerosMetadata struct {
 
 // Entry 表示一个已发现并解析出元数据和正文的 Skill 文档。
 type Entry struct {
-	Manifest Manifest
-	Body     string
-	Dir      string
-	Path     string
+	Manifest    Manifest
+	Body        string
+	Dir         string
+	Path        string
+	AbsoluteDir string
 }
 
 // Summary 是注入运行时提示词的紧凑视图。

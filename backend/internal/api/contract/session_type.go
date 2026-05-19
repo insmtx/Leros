@@ -113,10 +113,13 @@ type CompleteSessionMessageRequest struct {
 // FailedSessionMessageRequest 处理 session 失败事件请求
 type FailedSessionMessageRequest struct {
 	SessionID string                 `json:"session_id"`
+	Content   string                 `json:"content,omitempty"`
+	Chunks    []string               `json:"chunks,omitempty"`
 	ErrorMsg  string                 `json:"error_msg"`
 	ErrorCode string                 `json:"error_code,omitempty"`
 	Status    string                 `json:"status,omitempty"`
 	Metadata  *types.MessageMetadata `json:"metadata,omitempty"`
+	Usage     *types.MessageUsage    `json:"usage,omitempty"`
 	Seq       int64                  `json:"seq"`
 	CreatedAt time.Time              `json:"created_at"`
 }

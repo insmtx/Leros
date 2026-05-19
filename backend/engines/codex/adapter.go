@@ -60,7 +60,7 @@ func (a *Adapter) GetSkillDir() string {
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(home, ".local", "share", "codex", "skills")
+	return filepath.Join(home, ".agents", "skills")
 }
 
 var _ engines.Engine = (*Adapter)(nil)
