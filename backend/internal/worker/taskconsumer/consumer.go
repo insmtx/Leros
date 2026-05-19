@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/pkg/dm"
+	"github.com/insmtx/Leros/backend/pkg/utils"
 	"github.com/nats-io/nats.go"
 	"github.com/ygpkg/yg-go/logs"
 )
@@ -30,11 +30,7 @@ type Consumer struct {
 	subscriber eventbus.Subscriber
 	publisher  ResultPublisher
 	runner     agent.Runner
-	mu         sync.Mutex
-	pending    map[string]events.WorkerTaskMessage
-	timers     map[string]*time.Timer
-	running    map[string]bool
-	dirty      map[string]bool
+	debouncer  *utils.TrailingDebouncer[events.WorkerTaskMessage]
 }
 
 // New creates a worker task consumer.
@@ -54,16 +50,24 @@ func New(cfg Config, subscriber eventbus.Subscriber, publisher ResultPublisher, 
 	if runner == nil {
 		return nil, fmt.Errorf("agent runner is required")
 	}
-	return &Consumer{
+	window := cfg.DebounceWindow
+	if window <= 0 {
+		window = time.Second
+	}
+	consumer := &Consumer{
 		cfg:        cfg,
 		subscriber: subscriber,
 		publisher:  publisher,
 		runner:     runner,
-		pending:    map[string]events.WorkerTaskMessage{},
-		timers:     map[string]*time.Timer{},
-		running:    map[string]bool{},
-		dirty:      map[string]bool{},
-	}, nil
+	}
+	debouncer, err := utils.NewTrailingDebouncer(window, consumer.runTask, func(ctx context.Context, err error) {
+		logs.ErrorContextf(ctx, "Failed to run worker task: %v", err)
+	})
+	if err != nil {
+		return nil, err
+	}
+	consumer.debouncer = debouncer
+	return consumer, nil
 }
 
 // TaskTopic returns the NATS subject consumed by this worker.
@@ -125,65 +129,7 @@ func (c *Consumer) schedule(ctx context.Context, taskMsg events.WorkerTaskMessag
 		return
 	}
 
-	window := c.cfg.DebounceWindow
-	if window <= 0 {
-		window = time.Second
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.pending[key] = taskMsg
-	if c.running[key] {
-		c.dirty[key] = true
-		return
-	}
-	if timer := c.timers[key]; timer != nil {
-		timer.Stop()
-	}
-	c.timers[key] = time.AfterFunc(window, func() {
-		c.flush(ctx, key)
-	})
-}
-
-func (c *Consumer) flush(ctx context.Context, key string) {
-	c.mu.Lock()
-	if c.running[key] {
-		c.dirty[key] = true
-		c.mu.Unlock()
-		return
-	}
-	taskMsg, ok := c.pending[key]
-	if !ok {
-		delete(c.timers, key)
-		c.mu.Unlock()
-		return
-	}
-	delete(c.pending, key)
-	delete(c.timers, key)
-	c.running[key] = true
-	c.mu.Unlock()
-
-	if err := c.runTask(ctx, taskMsg); err != nil {
-		logs.ErrorContextf(ctx, "Failed to run worker task: %v", err)
-	}
-
-	c.mu.Lock()
-	c.running[key] = false
-	if c.dirty[key] {
-		delete(c.dirty, key)
-		if latest, ok := c.pending[key]; ok {
-			window := c.cfg.DebounceWindow
-			if window <= 0 {
-				window = time.Second
-			}
-			c.timers[key] = time.AfterFunc(window, func() {
-				c.flush(ctx, key)
-			})
-			c.pending[key] = latest
-		}
-	}
-	c.mu.Unlock()
+	c.debouncer.Call(ctx, key, taskMsg)
 }
 
 func (c *Consumer) runTask(ctx context.Context, taskMsg events.WorkerTaskMessage) error {
