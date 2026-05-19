@@ -81,24 +81,24 @@ func TestParseClaudeLineEmitsResultEvent(t *testing.T) {
 	}
 }
 
-func TestParseClaudeLineEmitsUsageEvent(t *testing.T) {
+func TestParseClaudeLineAttachesUsageToResultEvent(t *testing.T) {
 	state := &claudeStreamState{}
 	parsed := parseClaudeLineEvents(`{"type":"result","result":"final","is_error":false,"usage":{"input_tokens":10,"cache_creation_input_tokens":2,"cache_read_input_tokens":30,"output_tokens":4}}`, state)
-	if len(parsed) != 2 {
-		t.Fatalf("expected result and usage events, got %#v", parsed)
+	if len(parsed) != 1 {
+		t.Fatalf("expected result event, got %#v", parsed)
 	}
 	if parsed[0].Type != events.EventResult {
-		t.Fatalf("expected first event result, got %#v", parsed[0])
+		t.Fatalf("expected event result, got %#v", parsed[0])
 	}
-	if parsed[1].Type != events.EventUsage {
-		t.Fatalf("expected second event usage, got %#v", parsed[1])
-	}
-	usage, err := events.DecodePayload[events.UsagePayload](&parsed[1])
+	result, err := events.DecodePayload[events.MessageResultPayload](&parsed[0])
 	if err != nil {
-		t.Fatalf("decode usage payload: %v", err)
+		t.Fatalf("decode result payload: %v", err)
 	}
-	if usage.InputTokens != 42 || usage.OutputTokens != 4 || usage.TotalTokens != 46 {
-		t.Fatalf("unexpected usage payload: %#v", usage)
+	if result.Message != "final" {
+		t.Fatalf("unexpected result message: %q", result.Message)
+	}
+	if result.Usage == nil || result.Usage.InputTokens != 42 || result.Usage.OutputTokens != 4 || result.Usage.TotalTokens != 46 {
+		t.Fatalf("unexpected usage payload: %#v", result.Usage)
 	}
 }
 

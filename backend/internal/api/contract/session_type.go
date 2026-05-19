@@ -43,6 +43,7 @@ type AddMessageRequest struct {
 	Thinking    string                 `json:"thinking,omitempty"`
 	ToolCalls   []types.ToolCall       `json:"tool_calls,omitempty"`
 	Metadata    *types.MessageMetadata `json:"metadata,omitempty"`
+	Usage       *types.MessageUsage    `json:"usage,omitempty"`
 }
 
 // Session 会话响应结构（对应前端的 Conversation）
@@ -79,6 +80,7 @@ type SessionMessage struct {
 	Thinking    string                 `json:"thinking,omitempty"` // 思维链
 	MessageType string                 `json:"message_type,omitempty"`
 	Metadata    *types.MessageMetadata `json:"metadata,omitempty"`
+	Usage       *types.MessageUsage    `json:"usage,omitempty"`
 	Sequence    int64                  `json:"sequence"`
 	CreatedAt   time.Time              `json:"created_at"`
 }
@@ -102,8 +104,10 @@ type MessageList struct {
 type CompleteSessionMessageRequest struct {
 	SessionID string                 `json:"session_id"`
 	Content   string                 `json:"content"`
+	Chunks    []string               `json:"chunks,omitempty"`
 	ToolCalls []types.ToolCall       `json:"tool_calls,omitempty"`
 	Metadata  *types.MessageMetadata `json:"metadata,omitempty"`
+	Usage     *types.MessageUsage    `json:"usage,omitempty"`
 	Seq       int64                  `json:"seq"`
 	CreatedAt time.Time              `json:"created_at"`
 }
@@ -116,9 +120,9 @@ type SessionTitleRequest struct {
 
 // FailedSessionMessageRequest 处理 session 失败事件请求
 type FailedSessionMessageRequest struct {
-	SessionID string `json:"session_id"`
-	ErrorMsg  string `json:"error_msg"`
-	ErrorCode string `json:"error_code,omitempty"`
-	Seq       int64  `json:"seq"`
+	SessionID string    `json:"session_id"`
+	ErrorMsg  string    `json:"error_msg"`
+	ErrorCode string    `json:"error_code,omitempty"`
+	Seq       int64     `json:"seq"`
 	CreatedAt time.Time `json:"created_at"`
 }

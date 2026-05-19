@@ -166,6 +166,8 @@ type SessionMessage struct {
 	// session_message - 消息元数据，JSONB，允许为空
 	Metadata MessageMetadata `gorm:"column:metadata;type:jsonb"`
 
+	Usage MessageUsage `gorm:"column:usage;type:jsonb"`
+
 	// session_message - 消息序号（用于排序），BIGINT，NOT NULL
 	Sequence int64 `gorm:"column:sequence;type:bigint;not null;index"`
 
@@ -200,6 +202,13 @@ type MessageMetadata struct {
 
 // ToolCallStatus 工具调用状态常量
 type ToolCallStatus string
+
+// MessageUsage stores model token usage for a session message.
+type MessageUsage struct {
+	InputTokens  int `json:"input_tokens,omitempty"`
+	OutputTokens int `json:"output_tokens,omitempty"`
+	TotalTokens  int `json:"total_tokens,omitempty"`
+}
 
 const (
 	ToolCallStatusPending ToolCallStatus = "pending"
@@ -305,4 +314,26 @@ func (mm *MessageMetadata) Scan(value interface{}) error {
 // Value 实现 driver.Valuer 接口
 func (mm MessageMetadata) Value() (driver.Value, error) {
 	return json.Marshal(mm)
+}
+
+// Scan 瀹炵幇 sql.Scanner 鎺ュ彛
+func (mu *MessageUsage) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("cannot scan %T into MessageUsage", value)
+	}
+
+	return json.Unmarshal(bytes, mu)
+}
+
+// Value 瀹炵幇 driver.Valuer 鎺ュ彛
+func (mu MessageUsage) Value() (driver.Value, error) {
+	if mu.InputTokens == 0 && mu.OutputTokens == 0 && mu.TotalTokens == 0 {
+		return nil, nil
+	}
+	return json.Marshal(mu)
 }

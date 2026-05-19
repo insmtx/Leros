@@ -56,6 +56,9 @@ func TestRunnerEmitsSuccessResultAndCompletedArchiveThroughSink(t *testing.T) {
 	if completed.Result.Message != "final answer" {
 		t.Fatalf("expected completed final result, got %#v", completed.Result)
 	}
+	if !completed.StartedAt.Equal(got[0].CreatedAt) {
+		t.Fatalf("expected completed started_at from started event, got payload=%s started_event=%s", completed.StartedAt, got[0].CreatedAt)
+	}
 	for _, event := range completed.Events {
 		if event.Type == events.EventCompleted {
 			t.Fatalf("completed archive should not include itself: %#v", completed.Events)
@@ -99,8 +102,24 @@ func TestRunnerEmitsFailureThroughSink(t *testing.T) {
 	if got[1].Seq != got[0].Seq+1 {
 		t.Fatalf("expected failure event seq to continue, got started=%d failed=%d", got[0].Seq, got[1].Seq)
 	}
+	if !result.StartedAt.Equal(got[0].CreatedAt) {
+		t.Fatalf("expected failed result started_at from started event, got result=%s started_event=%s", result.StartedAt, got[0].CreatedAt)
+	}
 	if got[1].Content != "runtime unavailable" {
 		t.Fatalf("expected event error content, got %q", got[1].Content)
+	}
+	completed, err := events.DecodePayload[events.RunCompletedPayload](got[1])
+	if err != nil {
+		t.Fatalf("decode failed payload: %v", err)
+	}
+	if completed.Status != string(agent.RunStatusFailed) {
+		t.Fatalf("expected failed payload status, got %q", completed.Status)
+	}
+	if completed.Result.Message != "runtime unavailable" {
+		t.Fatalf("expected failed result message, got %#v", completed.Result)
+	}
+	if len(completed.Events) == 0 || completed.Events[0].Type != events.EventStarted {
+		t.Fatalf("expected failed payload to archive intermediate events, got %#v", completed.Events)
 	}
 }
 

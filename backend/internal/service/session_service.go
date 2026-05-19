@@ -341,6 +341,9 @@ func (s *sessionService) buildMessage(req *contract.AddMessageRequest, sequence 
 	} else {
 		message.Metadata = types.MessageMetadata{}
 	}
+	if req.Usage != nil {
+		message.Usage = *req.Usage
+	}
 
 	if message.MessageType == "" {
 		message.MessageType = string(types.MessageTypeText)
@@ -651,6 +654,10 @@ func convertToContractSession(session *types.Session) *contract.Session {
 	return result
 }
 
+func hasMessageUsage(usage types.MessageUsage) bool {
+	return usage.InputTokens != 0 || usage.OutputTokens != 0 || usage.TotalTokens != 0
+}
+
 func convertToContractSessionMessage(message *types.SessionMessage) *contract.SessionMessage {
 	result := &contract.SessionMessage{
 		ID:          fmt.Sprintf("%d", message.ID),
@@ -678,6 +685,9 @@ func convertToContractSessionMessage(message *types.SessionMessage) *contract.Se
 
 	if message.Metadata.ImageURL != "" || message.Metadata.Language != "" || message.Metadata.FileURL != "" || message.Metadata.FileName != "" || message.Metadata.Model != "" || message.Metadata.Extra != nil {
 		result.Metadata = &message.Metadata
+	}
+	if hasMessageUsage(message.Usage) {
+		result.Usage = &message.Usage
 	}
 
 	return result
@@ -711,6 +721,10 @@ func (s *sessionService) CompleteSessionMessage(ctx context.Context, req *contra
 		Timestamp:   req.CreatedAt.UnixMilli(),
 	}
 
+	if req.Chunks != nil && len(req.Chunks) > 0 {
+		msgEntity.Chunks = req.Chunks
+	}
+
 	if req.ToolCalls != nil && len(req.ToolCalls) > 0 {
 		msgEntity.ToolCalls = req.ToolCalls
 		for i := range msgEntity.ToolCalls {
@@ -720,6 +734,9 @@ func (s *sessionService) CompleteSessionMessage(ctx context.Context, req *contra
 
 	if req.Metadata != nil {
 		msgEntity.Metadata = *req.Metadata
+	}
+	if req.Usage != nil {
+		msgEntity.Usage = *req.Usage
 	}
 
 	if err := db.CreateMessage(ctx, s.db, msgEntity); err != nil {

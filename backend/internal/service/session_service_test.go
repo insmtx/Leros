@@ -848,6 +848,50 @@ func TestGetSessionMessages(t *testing.T) {
 	}
 }
 
+func TestCompleteSessionMessageStoresChunksAndUsage(t *testing.T) {
+	service := setupTestService(t)
+	ctx := setupTestContextWithCaller(t)
+
+	session, err := service.CreateSession(ctx, &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	})
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	err = service.CompleteSessionMessage(ctx, &contract.CompleteSessionMessageRequest{
+		SessionID: session.SessionID,
+		Content:   "done",
+		Chunks:    []string{`{"seq":1,"type":"message.delta"}`},
+		Usage: &types.MessageUsage{
+			InputTokens:  10,
+			OutputTokens: 20,
+			TotalTokens:  30,
+		},
+	})
+	if err != nil {
+		t.Fatalf("CompleteSessionMessage failed: %v", err)
+	}
+
+	result, err := service.GetSessionMessages(ctx, session.ID, 1, 20)
+	if err != nil {
+		t.Fatalf("GetSessionMessages failed: %v", err)
+	}
+	if result.Total != 1 || len(result.Items) != 1 {
+		t.Fatalf("expected one message, got total=%d len=%d", result.Total, len(result.Items))
+	}
+	msg := result.Items[0]
+	if msg.Content != "done" {
+		t.Fatalf("expected content %q, got %q", "done", msg.Content)
+	}
+	if len(msg.Chunks) != 1 {
+		t.Fatalf("expected one chunk, got %#v", msg.Chunks)
+	}
+	if msg.Usage == nil || msg.Usage.InputTokens != 10 || msg.Usage.OutputTokens != 20 || msg.Usage.TotalTokens != 30 {
+		t.Fatalf("unexpected usage: %#v", msg.Usage)
+	}
+}
+
 func TestClearSessionMessages(t *testing.T) {
 	service := setupTestService(t)
 	ctx := setupTestContextWithCaller(t)
@@ -923,5 +967,3 @@ func TestStreamSessionEvents_MissingCaller(t *testing.T) {
 		t.Errorf("expected 'user not authenticated or org not set' error, got %s", err.Error())
 	}
 }
-
-

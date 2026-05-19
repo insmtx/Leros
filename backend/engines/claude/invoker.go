@@ -130,7 +130,7 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Pr
 			return
 		}
 		if parseState.result == "" && parseState.lastAssistantText != "" {
-			if !sendEvent(ctx, evtChan, events.Event{Type: events.EventResult, Content: parseState.lastAssistantText}) {
+			if !sendEvent(ctx, evtChan, *events.NewMessageResult(parseState.lastAssistantText, nil)) {
 				return
 			}
 		}
@@ -248,11 +248,7 @@ func parseClaudeLineEvents(line string, state *claudeStreamState) []events.Event
 		if event.IsError || event.Result == "" {
 			return nil
 		}
-		parsed := []events.Event{{Type: events.EventResult, Content: event.Result}}
-		if usage := usagePayloadFromClaudeUsage(event.Usage); usage != nil {
-			parsed = append(parsed, *events.NewUsage(usage))
-		}
-		return parsed
+		return []events.Event{*events.NewMessageResult(event.Result, usagePayloadFromClaudeUsage(event.Usage))}
 	}
 	return nil
 }

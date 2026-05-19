@@ -137,16 +137,19 @@ func consumeEvents(ctx context.Context, sink events.Sink, handle *engines.RunHan
 				consumed.ProviderSessionID = strings.TrimSpace(event.Content)
 			}
 		case events.EventResult:
-			if strings.TrimSpace(event.Content) != "" {
+			if resultPayload, err := events.DecodePayload[events.MessageResultPayload](&event); err == nil {
+				if strings.TrimSpace(resultPayload.Message) != "" {
+					result.Reset()
+					result.WriteString(resultPayload.Message)
+					resultSeen = true
+				}
+				if resultPayload.Usage != nil {
+					consumed.Usage = resultPayload.Usage
+				}
+			} else if strings.TrimSpace(event.Content) != "" {
 				result.Reset()
 				result.WriteString(event.Content)
 				resultSeen = true
-			}
-		case events.EventUsage:
-			usage, err := events.DecodePayload[events.UsagePayload](&event)
-			if err == nil {
-				consumed.Usage = &usage
-				_ = sink.Emit(ctx, events.NewUsage(&usage))
 			}
 		case events.EventCompleted:
 			consumed.Message = result.String()

@@ -29,6 +29,7 @@ type RunJournal struct {
 	traceID       string
 	next          events.Sink
 	maxSeq        int64
+	startedAt     time.Time
 	rawEvents     []events.Event
 	messageIDs    *events.MessageIDMapper
 	toolCalls     int
@@ -105,7 +106,7 @@ func (j *RunJournal) CompletedPayload(result *agent.RunResult) events.RunComplet
 	return events.RunCompletedPayload{
 		Status: string(result.Status),
 		Result: events.RunResultPayload{
-			Message: result.Message,
+			Message: resultMessage(result),
 		},
 		Usage:       result.Usage,
 		Events:      archiveEventsLocked(j.rawEvents),
@@ -113,6 +114,26 @@ func (j *RunJournal) CompletedPayload(result *agent.RunResult) events.RunComplet
 		CompletedAt: result.CompletedAt,
 		Metadata:    copyMetadata(result.Metadata),
 	}
+}
+
+// StartedAt returns the time recorded by the run.started event.
+func (j *RunJournal) StartedAt() time.Time {
+	if j == nil {
+		return time.Time{}
+	}
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.startedAt
+}
+
+func resultMessage(result *agent.RunResult) string {
+	if result == nil {
+		return ""
+	}
+	if strings.TrimSpace(result.Message) != "" {
+		return result.Message
+	}
+	return result.Error
 }
 
 func (j *RunJournal) normalizeLocked(event *events.Event) {
@@ -168,6 +189,10 @@ func (j *RunJournal) ensureMessageIDLocked(event *events.Event) {
 
 func (j *RunJournal) observeStatsLocked(event *events.Event) {
 	switch event.Type {
+	case events.EventStarted:
+		if j.startedAt.IsZero() {
+			j.startedAt = event.CreatedAt
+		}
 	case events.EventToolCallStarted:
 		j.toolCalls++
 		if name := toolNameFromEvent(event); name != "" {
@@ -198,7 +223,7 @@ func archiveEventsLocked(source []events.Event) []events.RunEventRecord {
 	records := make([]events.RunEventRecord, 0, len(source))
 	merged := map[mergeKey]int{}
 	for _, event := range source {
-		if event.Type == events.EventCompleted || event.Type == events.EventUsage || event.Type == events.EventResult {
+		if event.Type == events.EventCompleted || event.Type == events.EventResult {
 			continue
 		}
 		if event.Type == events.EventMessageDelta || event.Type == events.EventReasoningDelta {

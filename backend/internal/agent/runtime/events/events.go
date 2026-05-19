@@ -39,9 +39,6 @@ const (
 	EventToolCallCompleted EventType = "tool_call.completed"
 	// EventToolCallFailed indicates that a tool call failed.
 	EventToolCallFailed EventType = "tool_call.failed"
-
-	// EventUsage contains token usage or provider usage metadata.
-	EventUsage EventType = "run.usage"
 )
 
 // Event is the stable runtime event envelope for streaming execution.
@@ -109,6 +106,12 @@ type UsagePayload struct {
 	InputTokens  int `json:"input_tokens,omitempty"`
 	OutputTokens int `json:"output_tokens,omitempty"`
 	TotalTokens  int `json:"total_tokens,omitempty"`
+}
+
+// MessageResultPayload describes the final assistant result and optional usage metadata.
+type MessageResultPayload struct {
+	Message string        `json:"message,omitempty"`
+	Usage   *UsagePayload `json:"usage,omitempty"`
 }
 
 // RunResultPayload describes the final assistant result archived in run.completed.
@@ -188,9 +191,12 @@ func NewToolCallFailed(toolCallID string, name string, message string, elapsedMS
 	}, "")
 }
 
-// NewUsage creates a standard runtime usage event.
-func NewUsage(usage *UsagePayload) *Event {
-	return newPayloadEvent(EventUsage, usage, "")
+// NewMessageResult creates a standard final assistant result event.
+func NewMessageResult(message string, usage *UsagePayload) *Event {
+	return newPayloadEvent(EventResult, MessageResultPayload{
+		Message: message,
+		Usage:   usage,
+	}, message)
 }
 
 // NewRunCompleted creates a standard completed run archive event.

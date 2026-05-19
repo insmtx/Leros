@@ -235,17 +235,7 @@ func runCompletedPayloadFromCompletedMessage(msg events.MessageStreamMessage) (e
 	if msg.Body.RunCompleted != nil {
 		return *msg.Body.RunCompleted, nil
 	}
-
-	content := strings.TrimSpace(msg.Body.Payload.Content)
-	if content == "" {
-		return events.RunCompletedPayload{}, fmt.Errorf("run completed payload is empty")
-	}
-
-	var payload events.RunCompletedPayload
-	if err := json.Unmarshal([]byte(content), &payload); err != nil {
-		return events.RunCompletedPayload{}, err
-	}
-	return payload, nil
+	return events.RunCompletedPayload{}, fmt.Errorf("run completed payload is empty")
 }
 
 type workerHealthResponse struct {

@@ -43,19 +43,18 @@ func handleSessionCompletedMessage(ctx context.Context, service contract.Session
 
 	switch streamMsg.Body.Event {
 	case events.StreamEventRunCompleted:
+		completed := streamMsg.Body.RunCompleted
+		if completed == nil {
+			logs.WarnContextf(ctx, "run completed message missing run_completed payload: session_id=%s seq=%d", sessionID, streamMsg.Body.Seq)
+			return
+		}
 		req := &contract.CompleteSessionMessageRequest{
 			SessionID: sessionID,
-			Content:   streamMsg.Body.Payload.Content,
+			Content:   completed.Result.Message,
+			Chunks:    runEventChunks(completed.Events),
+			Usage:     messageUsageFromRuntime(completed.Usage),
 			Seq:       streamMsg.Body.Seq,
 			CreatedAt: streamMsg.CreatedAt,
-		}
-		if tc := streamMsg.Body.Payload.ToolCall; tc != nil {
-			req.ToolCalls = []types.ToolCall{{
-				ID: tc.ID, Name: tc.Name, Arguments: tc.Arguments, Status: types.ToolCallStatusSuccess,
-			}}
-		}
-		if u := streamMsg.Body.Usage; u != nil {
-			req.Metadata = &types.MessageMetadata{Tokens: u.TotalTokens}
 		}
 		if err := service.CompleteSessionMessage(ctx, req); err != nil {
 			logs.WarnContextf(ctx, "complete session message: %v", err)
@@ -63,6 +62,9 @@ func handleSessionCompletedMessage(ctx context.Context, service contract.Session
 
 	case events.StreamEventRunFailed:
 		errMsg := streamMsg.Body.Payload.Content
+		if streamMsg.Body.RunCompleted != nil && streamMsg.Body.RunCompleted.Result.Message != "" {
+			errMsg = streamMsg.Body.RunCompleted.Result.Message
+		}
 		if streamMsg.Body.Error != nil {
 			errMsg = streamMsg.Body.Error.Message
 		}
@@ -81,5 +83,31 @@ func handleSessionCompletedMessage(ctx context.Context, service contract.Session
 
 	default:
 		logs.DebugContextf(ctx, "ignoring session completed event: %s", streamMsg.Body.Event)
+	}
+}
+
+func runEventChunks(records []events.RunEventRecord) []string {
+	if len(records) == 0 {
+		return nil
+	}
+	chunks := make([]string, 0, len(records))
+	for _, record := range records {
+		body, err := json.Marshal(record)
+		if err != nil {
+			continue
+		}
+		chunks = append(chunks, string(body))
+	}
+	return chunks
+}
+
+func messageUsageFromRuntime(usage *events.UsagePayload) *types.MessageUsage {
+	if usage == nil {
+		return nil
+	}
+	return &types.MessageUsage{
+		InputTokens:  usage.InputTokens,
+		OutputTokens: usage.OutputTokens,
+		TotalTokens:  usage.TotalTokens,
 	}
 }

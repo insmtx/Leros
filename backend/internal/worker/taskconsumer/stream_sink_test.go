@@ -64,16 +64,22 @@ func TestMQStreamSinkPublishesCompletedEventToSessionCompletedTopic(t *testing.T
 		name       string
 		eventType  events.EventType
 		wantStream events.StreamEventType
+		status     string
+		message    string
 	}{
 		{
 			name:       "run completed",
 			eventType:  events.EventCompleted,
 			wantStream: events.StreamEventRunCompleted,
+			status:     "completed",
+			message:    "done",
 		},
 		{
 			name:       "run failed",
 			eventType:  events.EventFailed,
 			wantStream: events.StreamEventRunFailed,
+			status:     "failed",
+			message:    "runtime unavailable",
 		},
 	}
 
@@ -97,27 +103,30 @@ func TestMQStreamSinkPublishesCompletedEventToSessionCompletedTopic(t *testing.T
 			publisher := &recordingPublisher{}
 			sink := NewMQStreamSink(publisher, task)
 			payload := events.RunCompletedPayload{
-				Status: "completed",
+				Status: tt.status,
 				Result: events.RunResultPayload{
-					Message: "done",
+					Message: tt.message,
+				},
+				Usage: &events.UsagePayload{
+					InputTokens:  1,
+					OutputTokens: 2,
+					TotalTokens:  3,
+				},
+				Events: []events.RunEventRecord{
+					{
+						ID:   "event_started",
+						Seq:  1,
+						Type: events.EventStarted,
+					},
 				},
 				CompletedAt: time.Now().UTC(),
 			}
-			event := &events.Event{
-				ID:      "event_test",
-				Type:    tt.eventType,
-				RunID:   "run_test",
-				TraceID: "trace_test",
-				Seq:     7,
-				Content: "done",
-			}
-			if tt.eventType == events.EventCompleted {
-				event = events.NewRunCompleted(payload, "done")
-				event.ID = "event_test"
-				event.RunID = "run_test"
-				event.TraceID = "trace_test"
-				event.Seq = 7
-			}
+			event := events.NewRunCompleted(payload, tt.message)
+			event.Type = tt.eventType
+			event.ID = "event_test"
+			event.RunID = "run_test"
+			event.TraceID = "trace_test"
+			event.Seq = 7
 
 			err := sink.Emit(context.Background(), event)
 			if err != nil {
@@ -145,8 +154,41 @@ func TestMQStreamSinkPublishesCompletedEventToSessionCompletedTopic(t *testing.T
 			if completedMsg.Trace.TaskID != task.Trace.TaskID || completedMsg.Trace.RunID != task.Trace.RunID {
 				t.Fatalf("completed trace mismatch: got task_id=%q run_id=%q", completedMsg.Trace.TaskID, completedMsg.Trace.RunID)
 			}
-			if tt.eventType == events.EventCompleted && completedMsg.Body.RunCompleted == nil {
+			streamMsg, ok := publisher.calls[0].event.(events.MessageStreamMessage)
+			if !ok {
+				t.Fatalf("expected stream publish event type MessageStreamMessage, got %T", publisher.calls[0].event)
+			}
+			if streamMsg.Body.RunCompleted != nil {
+				t.Fatalf("stream topic should not include run_completed payload")
+			}
+			if streamMsg.Body.Payload.Content != tt.message {
+				t.Fatalf("expected stream payload content %q, got %q", tt.message, streamMsg.Body.Payload.Content)
+			}
+			if streamMsg.Body.Payload.Usage == nil || streamMsg.Body.Payload.Usage.TotalTokens != 3 {
+				t.Fatalf("expected stream payload usage, got %#v", streamMsg.Body.Payload.Usage)
+			}
+			if completedMsg.Body.RunCompleted == nil {
 				t.Fatalf("expected completed payload to be forwarded")
+			}
+			if completedMsg.Body.RunCompleted.Status != tt.status {
+				t.Fatalf("expected completed payload status %q, got %q", tt.status, completedMsg.Body.RunCompleted.Status)
+			}
+			if completedMsg.Body.RunCompleted.Result.Message != tt.message {
+				t.Fatalf("expected completed payload message %q, got %q", tt.message, completedMsg.Body.RunCompleted.Result.Message)
+			}
+			if len(completedMsg.Body.RunCompleted.Events) != 1 {
+				t.Fatalf("expected completed payload events, got %#v", completedMsg.Body.RunCompleted.Events)
+			}
+			if completedMsg.Body.Payload.Content != "" {
+				t.Fatalf("completed topic should not include payload content, got %q", completedMsg.Body.Payload.Content)
+			}
+			if tt.eventType == events.EventFailed {
+				if streamMsg.Body.Error == nil || streamMsg.Body.Error.Message != tt.message {
+					t.Fatalf("expected stream error message %q, got %#v", tt.message, streamMsg.Body.Error)
+				}
+				if completedMsg.Body.Error == nil || completedMsg.Body.Error.Message != tt.message {
+					t.Fatalf("expected completed error message %q, got %#v", tt.message, completedMsg.Body.Error)
+				}
 			}
 		})
 	}

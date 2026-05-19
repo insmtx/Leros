@@ -15,8 +15,7 @@ func TestRunnerAdaptsEngineResult(t *testing.T) {
 	engine := &fakeEngine{
 		events: []events.Event{
 			{Type: events.EventStarted},
-			{Type: events.EventResult, Content: "done"},
-			*events.NewUsage(&events.UsagePayload{
+			*events.NewMessageResult("done", &events.UsagePayload{
 				InputTokens:  12,
 				OutputTokens: 5,
 				TotalTokens:  17,

@@ -18,8 +18,6 @@ const (
 	StreamEventRunCompleted StreamEventType = "run.completed"
 	// StreamEventRunFailed indicates a run failed.
 	StreamEventRunFailed StreamEventType = "run.failed"
-	// StreamEventUsage indicates token usage metadata.
-	StreamEventUsage StreamEventType = "run.usage"
 )
 
 // MessageStreamMessage is the stream message protocol from Worker to Server (forwarded to UI).
@@ -31,7 +29,6 @@ type StreamBody struct {
 	Event   StreamEventType `json:"event"`
 	Payload StreamPayload   `json:"payload"`
 
-	Usage        *UsagePayload        `json:"usage,omitempty"`
 	RunCompleted *RunCompletedPayload `json:"run_completed,omitempty"`
 	Error        *StreamError         `json:"error,omitempty"`
 }
@@ -41,6 +38,7 @@ type StreamPayload struct {
 	MessageID  string           `json:"message_id,omitempty"`
 	Role       MessageRole      `json:"role,omitempty"`
 	Content    string           `json:"content,omitempty"`
+	Usage      *UsagePayload    `json:"usage,omitempty"`
 	ToolCall   *ToolCallEvent   `json:"tool_call,omitempty"`
 	ToolResult *ToolResultEvent `json:"tool_result,omitempty"`
 }

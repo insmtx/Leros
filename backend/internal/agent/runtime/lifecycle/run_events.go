@@ -30,23 +30,10 @@ func emitSucceeded(ctx context.Context, journal *RunJournal, req *agent.RequestC
 			return err
 		}
 	}
-	payload := events.RunCompletedPayload{
-		Status: string(result.Status),
-		Result: events.RunResultPayload{
-			Message: result.Message,
-		},
-		Usage:       result.Usage,
-		StartedAt:   result.StartedAt,
-		CompletedAt: result.CompletedAt,
-		Metadata:    result.Metadata,
-	}
-	if journal != nil {
-		payload = journal.CompletedPayload(result)
-	}
-	return appendEvent(ctx, journal, req, events.NewRunCompleted(payload, result.Message))
+	return emitTerminalRunEvent(ctx, journal, req, result, events.EventCompleted)
 }
 
-func emitFailed(ctx context.Context, journal *RunJournal, req *agent.RequestContext, startedAt time.Time, phase RunPhase, err error, metadata map[string]any) (*agent.RunResult, error) {
+func emitFailed(ctx context.Context, journal *RunJournal, req *agent.RequestContext, phase RunPhase, err error, metadata map[string]any) (*agent.RunResult, error) {
 	if err == nil {
 		return nil, nil
 	}
@@ -66,21 +53,63 @@ func emitFailed(ctx context.Context, journal *RunJournal, req *agent.RequestCont
 		err,
 	)
 
-	if emitErr := appendLifecycleEvent(ctx, journal, req, eventType, message); emitErr != nil {
-		logs.WarnContextf(ctx, "Agent run failure event emit failed: run_id=%s trace_id=%s phase=%s error=%v",
-			requestRunID(req), requestTraceID(req), phase, emitErr)
-	}
-
 	result := &agent.RunResult{
 		RunID:       requestRunID(req),
 		TraceID:     requestTraceID(req),
 		Status:      status,
 		Error:       message,
-		StartedAt:   startedAt,
+		StartedAt:   failureStartedAt(journal),
 		CompletedAt: time.Now().UTC(),
 		Metadata:    metadataWithLifecyclePhase(metadata, phase),
 	}
+	if emitErr := emitTerminalRunEvent(ctx, journal, req, result, eventType); emitErr != nil {
+		logs.WarnContextf(ctx, "Agent run failure event emit failed: run_id=%s trace_id=%s phase=%s error=%v",
+			requestRunID(req), requestTraceID(req), phase, emitErr)
+	}
 	return result, err
+}
+
+func emitTerminalRunEvent(ctx context.Context, journal *RunJournal, req *agent.RequestContext, result *agent.RunResult, eventType events.EventType) error {
+	if result == nil {
+		return nil
+	}
+	normalizeTerminalResult(journal, result)
+	payload := terminalRunPayload(journal, result)
+	event := events.NewRunCompleted(payload, resultMessage(result))
+	event.Type = eventType
+	return appendEvent(ctx, journal, req, event)
+}
+
+func normalizeTerminalResult(journal *RunJournal, result *agent.RunResult) {
+	if result == nil || !result.StartedAt.IsZero() {
+		return
+	}
+	if startedAt := journal.StartedAt(); !startedAt.IsZero() {
+		result.StartedAt = startedAt
+	}
+}
+
+func terminalRunPayload(journal *RunJournal, result *agent.RunResult) events.RunCompletedPayload {
+	if journal != nil {
+		return journal.CompletedPayload(result)
+	}
+	return events.RunCompletedPayload{
+		Status: string(result.Status),
+		Result: events.RunResultPayload{
+			Message: resultMessage(result),
+		},
+		Usage:       result.Usage,
+		StartedAt:   result.StartedAt,
+		CompletedAt: result.CompletedAt,
+		Metadata:    result.Metadata,
+	}
+}
+
+func failureStartedAt(journal *RunJournal) time.Time {
+	if startedAt := journal.StartedAt(); !startedAt.IsZero() {
+		return startedAt
+	}
+	return time.Now().UTC()
 }
 
 func appendLifecycleEvent(ctx context.Context, journal *RunJournal, req *agent.RequestContext, eventType events.EventType, message string) error {

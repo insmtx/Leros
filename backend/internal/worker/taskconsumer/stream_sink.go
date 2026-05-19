@@ -62,22 +62,6 @@ func (s *MQStreamSink) Emit(ctx context.Context, event *events.Event) error {
 	if msg.Body.Event == events.StreamEventRunFailed {
 		msg.Body.Error = &events.StreamError{Message: event.Content}
 	}
-	if msg.Body.Event == events.StreamEventUsage {
-		usagePayload, err := events.DecodePayload[events.UsagePayload](event)
-		if err == nil {
-			msg.Body.Usage = &events.UsagePayload{
-				InputTokens:  usagePayload.InputTokens,
-				OutputTokens: usagePayload.OutputTokens,
-				TotalTokens:  usagePayload.TotalTokens,
-			}
-		}
-	}
-	if msg.Body.Event == events.StreamEventRunCompleted {
-		completedPayload, err := events.DecodePayload[events.RunCompletedPayload](event)
-		if err == nil {
-			msg.Body.RunCompleted = &completedPayload
-		}
-	}
 
 	if err := s.publisher.Publish(ctx, topic, msg); err != nil {
 		logs.WarnContextf(ctx, "Failed to publish worker stream event to %s: %v", topic, err)
@@ -133,10 +117,6 @@ func (s *MQStreamSink) emitCompleted(ctx context.Context, event *events.Event) e
 			Seq:          event.Seq,
 			Event:        streamEvent,
 			RunCompleted: completedPayloadFromEvent(event),
-			Payload: events.StreamPayload{
-				Role:    events.MessageRoleAssistant,
-				Content: event.Content,
-			},
 		},
 	}
 	if streamEvent == events.StreamEventRunFailed {
@@ -151,7 +131,12 @@ func (s *MQStreamSink) emitCompleted(ctx context.Context, event *events.Event) e
 }
 
 func completedPayloadFromEvent(event *events.Event) *events.RunCompletedPayload {
-	if event == nil || event.Type != events.EventCompleted {
+	if event == nil {
+		return nil
+	}
+	switch event.Type {
+	case events.EventCompleted, events.EventFailed, events.EventCancelled:
+	default:
 		return nil
 	}
 	completedPayload, err := events.DecodePayload[events.RunCompletedPayload](event)
@@ -199,6 +184,12 @@ func streamPayload(event *events.Event) events.StreamPayload {
 				Result:     result,
 			}
 		}
+	case events.EventCompleted, events.EventFailed, events.EventCancelled:
+		completedPayload, err := events.DecodePayload[events.RunCompletedPayload](event)
+		if err == nil {
+			payload.Content = completedPayload.Result.Message
+			payload.Usage = completedPayload.Usage
+		}
 	}
 	return payload
 }
@@ -221,8 +212,6 @@ func streamEventType(eventType events.EventType) events.StreamEventType {
 		return events.StreamEventToolCallFinished
 	case events.EventToolCallFailed:
 		return events.StreamEventToolCallFinished
-	case events.EventUsage:
-		return events.StreamEventUsage
 	default:
 		return events.StreamEventMessageDelta
 	}

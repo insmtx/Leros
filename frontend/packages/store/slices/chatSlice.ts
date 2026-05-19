@@ -282,28 +282,6 @@ export class ChatActionImpl {
 						this.#finishStream();
 						this.#sseClient?.close();
 						this.#sseClient = null;
-					} else if (eventType === "run.usage") {
-						const payload = data.payload ?? data;
-						const msg = this.#get().messagesMap[assistantMsgId];
-						if (msg) {
-							this.#dispatchChat({
-								type: "updateMessage",
-								id: assistantMsgId,
-								value: {
-									...msg,
-									metadata: {
-										...msg.metadata,
-										tokens: (
-											payload as {
-												input_tokens?: number;
-												output_tokens?: number;
-												total_tokens?: number;
-											}
-										).total_tokens,
-									},
-								},
-							});
-						}
 					} else if (
 						eventType === "tool_call.started" ||
 						eventType === "tool_call.arguments" ||
