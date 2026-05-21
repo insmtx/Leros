@@ -34,7 +34,13 @@ export type NavItem = {
 	badge?: number;
 };
 
-export type ViewMode = "chat" | "workbench" | "digitalAssistant" | "knowledge" | "skills" | "settings";
+export type ViewMode =
+	| "chat"
+	| "workbench"
+	| "digitalAssistant"
+	| "knowledge"
+	| "skills"
+	| "settings";
 
 export type LayoutState = {
 	leftRailCollapsed: boolean;
@@ -87,23 +93,21 @@ const _initialState: LayoutState = {
 			id: "core",
 			label: "",
 			items: [
-				{ id: "ai-assistant", label: "AI 助手", icon: "IconRobot" },
-				{ id: "workbench", label: "工作台", icon: "IconCommand" },
+				{ id: "workbench", label: "工作台", icon: "IconWorkbench" },
+				{ id: "tasks", label: "任务", icon: "IconTask" },
+				{ id: "skills", label: "技能", icon: "IconSkill" },
+				{ id: "knowledge", label: "知识库", icon: "IconKnowledge" },
 			],
 		},
 		{
-			id: "ai-capability",
-			label: "AI 能力",
-			items: [
-				{ id: "ai-employee", label: "AI 员工", icon: "IconUsers" },
-				{ id: "knowledge", label: "知识库", icon: "IconBook" },
-				{ id: "skills", label: "技能管理", icon: "IconStar" },
-			],
+			id: "projects",
+			label: "项目",
+			items: [{ id: "project-1", label: "项目 1", icon: "IconProject" }],
 		},
 		{
-			id: "system",
-			label: "系统",
-			items: [{ id: "settings", label: "个人设置", icon: "IconSettings" }],
+			id: "ai-teammates",
+			label: "AI 队友",
+			items: [{ id: "ai-1", label: "AI 1", icon: "IconAITeammate" }],
 		},
 	],
 	collapsedNavGroups: new Set(),
