@@ -8,19 +8,19 @@ import (
 
 // CreateSessionRequest creates a session.
 type CreateSessionRequest struct {
-	SessionID   string                 `json:"session_id,omitempty"`
-	Type        string                 `json:"type" binding:"required"`
-	AssistantID uint                   `json:"assistant_id,omitempty"`
-	Title       string                 `json:"title,omitempty"`
-	Metadata    *types.SessionMetadata `json:"metadata,omitempty"`
-	ExpiredAt   *time.Time             `json:"expired_at,omitempty"`
+	SessionID   string                `json:"session_id,omitempty"`
+	Type        string                `json:"type" binding:"required"`
+	AssistantID uint                  `json:"assistant_id,omitempty"`
+	Title       string                `json:"title,omitempty"`
+	Metadata    *types.ObjectMetadata `json:"metadata,omitempty"`
+	ExpiredAt   *time.Time            `json:"expired_at,omitempty"`
 }
 
 // UpdateSessionRequest updates basic session fields.
 type UpdateSessionRequest struct {
-	Title     string                 `json:"title,omitempty"`
-	Metadata  *types.SessionMetadata `json:"metadata,omitempty"`
-	ExpiredAt *time.Time             `json:"expired_at,omitempty"`
+	Title     string                `json:"title,omitempty"`
+	Metadata  *types.ObjectMetadata `json:"metadata,omitempty"`
+	ExpiredAt *time.Time            `json:"expired_at,omitempty"`
 }
 
 // ListSessionsRequest queries sessions.
@@ -35,49 +35,49 @@ type ListSessionsRequest struct {
 
 // AddMessageRequest adds a message to a session.
 type AddMessageRequest struct {
-	Role        string                 `json:"role" binding:"required"`
-	Content     string                 `json:"content" binding:"required"`
-	MessageType string                 `json:"message_type,omitempty"`
-	Chunks      []types.MessageChunk   `json:"chunks,omitempty"`
-	Thinking    string                 `json:"thinking,omitempty"`
-	Metadata    *types.MessageMetadata `json:"metadata,omitempty"`
-	Usage       *types.MessageUsage    `json:"usage,omitempty"`
+	Role        string                `json:"role" binding:"required"`
+	Content     string                `json:"content" binding:"required"`
+	MessageType string                `json:"message_type,omitempty"`
+	Chunks      []types.MessageChunk  `json:"chunks,omitempty"`
+	Thinking    string                `json:"thinking,omitempty"`
+	Metadata    *types.ObjectMetadata `json:"metadata,omitempty"`
+	Usage       *types.MessageUsage   `json:"usage,omitempty"`
 }
 
 // Session is the API response shape for a conversation.
 type Session struct {
-	ID                   uint                   `json:"id"`
-	SessionID            string                 `json:"session_id"`
-	Type                 string                 `json:"type"`
-	Uin                  uint                   `json:"uin"`
-	OrgID                uint                   `json:"org_id"`
-	AssistantID          uint                   `json:"assistant_id"`
-	AllocatedAssistantID uint                   `json:"allocated_assistant_id"`
-	AssistantCode        string                 `json:"assistant_code"`
-	Status               string                 `json:"status"`
-	Title                string                 `json:"title"`
-	TitleManuallySet     bool                   `json:"title_manually_set,omitempty"`
-	Metadata             *types.SessionMetadata `json:"metadata,omitempty"`
-	MessageCount         int                    `json:"message_count"`
-	LastMessageAt        *time.Time             `json:"last_message_at,omitempty"`
-	ExpiredAt            *time.Time             `json:"expired_at,omitempty"`
-	CreatedAt            time.Time              `json:"created_at"`
-	UpdatedAt            time.Time              `json:"updated_at"`
+	ID                   uint                  `json:"id"`
+	SessionID            string                `json:"session_id"`
+	Type                 string                `json:"type"`
+	Uin                  uint                  `json:"uin"`
+	OrgID                uint                  `json:"org_id"`
+	AssistantID          uint                  `json:"assistant_id"`
+	AllocatedAssistantID uint                  `json:"allocated_assistant_id"`
+	AssistantCode        string                `json:"assistant_code"`
+	Status               string                `json:"status"`
+	Title                string                `json:"title"`
+	TitleManuallySet     bool                  `json:"title_manually_set,omitempty"`
+	Metadata             *types.ObjectMetadata `json:"metadata,omitempty"`
+	MessageCount         int                   `json:"message_count"`
+	LastMessageAt        *time.Time            `json:"last_message_at,omitempty"`
+	ExpiredAt            *time.Time            `json:"expired_at,omitempty"`
+	CreatedAt            time.Time             `json:"created_at"`
+	UpdatedAt            time.Time             `json:"updated_at"`
 }
 
 // SessionMessage is the API response shape for a persisted conversation message.
 type SessionMessage struct {
-	ID          string                 `json:"id"`
-	SessionID   string                 `json:"session_id"`
-	Role        string                 `json:"role"`
-	Content     string                 `json:"content"`
-	Chunks      []SessionEvent         `json:"chunks,omitempty"`
-	Timestamp   int64                  `json:"timestamp"`
-	MessageType string                 `json:"message_type,omitempty"`
-	Metadata    *types.MessageMetadata `json:"metadata,omitempty"`
-	Usage       *types.MessageUsage    `json:"usage,omitempty"`
-	Sequence    int64                  `json:"sequence"`
-	CreatedAt   time.Time              `json:"created_at"`
+	ID          string                `json:"id"`
+	SessionID   string                `json:"session_id"`
+	Role        string                `json:"role"`
+	Content     string                `json:"content"`
+	Chunks      []SessionEvent        `json:"chunks,omitempty"`
+	Timestamp   int64                 `json:"timestamp"`
+	MessageType string                `json:"message_type,omitempty"`
+	Metadata    *types.ObjectMetadata `json:"metadata,omitempty"`
+	Usage       *types.MessageUsage   `json:"usage,omitempty"`
+	Sequence    int64                 `json:"sequence"`
+	CreatedAt   time.Time             `json:"created_at"`
 }
 
 // SessionEvent is the public event shape embedded in persisted message chunks.
@@ -106,25 +106,25 @@ type MessageList struct {
 
 // CompleteSessionMessageRequest persists a completed assistant message.
 type CompleteSessionMessageRequest struct {
-	SessionID string                 `json:"session_id"`
-	Content   string                 `json:"content"`
-	Chunks    []types.MessageChunk   `json:"chunks,omitempty"`
-	Metadata  *types.MessageMetadata `json:"metadata,omitempty"`
-	Usage     *types.MessageUsage    `json:"usage,omitempty"`
-	Seq       int64                  `json:"seq"`
-	CreatedAt time.Time              `json:"created_at"`
+	SessionID string                `json:"session_id"`
+	Content   string                `json:"content"`
+	Chunks    []types.MessageChunk  `json:"chunks,omitempty"`
+	Metadata  *types.ObjectMetadata `json:"metadata,omitempty"`
+	Usage     *types.MessageUsage   `json:"usage,omitempty"`
+	Seq       int64                 `json:"seq"`
+	CreatedAt time.Time             `json:"created_at"`
 }
 
 // FailedSessionMessageRequest persists a failed assistant message.
 type FailedSessionMessageRequest struct {
-	SessionID string                 `json:"session_id"`
-	Content   string                 `json:"content,omitempty"`
-	Chunks    []types.MessageChunk   `json:"chunks,omitempty"`
-	ErrorMsg  string                 `json:"error_msg"`
-	ErrorCode string                 `json:"error_code,omitempty"`
-	Status    string                 `json:"status,omitempty"`
-	Metadata  *types.MessageMetadata `json:"metadata,omitempty"`
-	Usage     *types.MessageUsage    `json:"usage,omitempty"`
-	Seq       int64                  `json:"seq"`
-	CreatedAt time.Time              `json:"created_at"`
+	SessionID string                `json:"session_id"`
+	Content   string                `json:"content,omitempty"`
+	Chunks    []types.MessageChunk  `json:"chunks,omitempty"`
+	ErrorMsg  string                `json:"error_msg"`
+	ErrorCode string                `json:"error_code,omitempty"`
+	Status    string                `json:"status,omitempty"`
+	Metadata  *types.ObjectMetadata `json:"metadata,omitempty"`
+	Usage     *types.MessageUsage   `json:"usage,omitempty"`
+	Seq       int64                 `json:"seq"`
+	CreatedAt time.Time             `json:"created_at"`
 }

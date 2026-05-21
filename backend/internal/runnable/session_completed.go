@@ -124,7 +124,7 @@ func messageUsageFromRuntime(usage *events.UsagePayload) *types.MessageUsage {
 	}
 }
 
-func messageMetadataFromRunCompleted(completed *events.RunCompletedPayload) *types.MessageMetadata {
+func messageMetadataFromRunCompleted(completed *events.RunCompletedPayload) *types.ObjectMetadata {
 	if completed == nil {
 		return nil
 	}
@@ -138,7 +138,7 @@ func messageMetadataFromRunCompleted(completed *events.RunCompletedPayload) *typ
 	if err != nil {
 		return nil
 	}
-	msgMetadata := &types.MessageMetadata{}
+	msgMetadata := &types.ObjectMetadata{}
 	if err := json.Unmarshal(data, msgMetadata); err != nil {
 		return nil
 	}

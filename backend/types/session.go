@@ -13,8 +13,8 @@ import (
 type SessionType string
 
 const (
-	SessionTypeUserChat          SessionType = "chat"
-	SessionTypeTask              SessionType = "task"
+	SessionTypeUserChat SessionType = "chat"
+	SessionTypeTask     SessionType = "task"
 )
 
 // SessionStatus 会话状态常量
@@ -95,7 +95,7 @@ type Session struct {
 	TitleManuallySet bool `gorm:"column:title_manually_set;type:boolean;default:false;not null"`
 
 	// session - 元数据，JSON格式存储额外信息，JSONB，允许为空
-	Metadata SessionMetadata `gorm:"column:metadata;type:jsonb"`
+	Metadata ObjectMetadata `gorm:"column:metadata;type:jsonb"`
 
 	// session - 消息数量，INTEGER，DEFAULT 0
 	MessageCount int `gorm:"column:message_count;type:integer;default:0"`
@@ -110,37 +110,6 @@ type Session struct {
 // TableName 指定Session结构体对应的数据库表名
 func (Session) TableName() string {
 	return TableNameSession
-}
-
-// SessionMetadata 会话元数据结构
-type SessionMetadata struct {
-	// 元数据 - 用户代理信息
-	UserAgent string `json:"user_agent,omitempty"`
-	// 元数据 - IP地址
-	IPAddress string `json:"ip_address,omitempty"`
-	// 元数据 - 自定义标签
-	Tags []string `json:"tags,omitempty"`
-	// 元数据 - 其他扩展字段
-	Extra map[string]interface{} `json:"extra,omitempty"`
-}
-
-// Scan 实现 sql.Scanner 接口，用于从数据库中读取 JSON 数据
-func (sm *SessionMetadata) Scan(value interface{}) error {
-	if value == nil {
-		return nil
-	}
-
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("cannot scan %T into SessionMetadata", value)
-	}
-
-	return json.Unmarshal(bytes, sm)
-}
-
-// Value 实现 driver.Valuer 接口，用于将元数据转换为 JSON 存储
-func (sm SessionMetadata) Value() (driver.Value, error) {
-	return json.Marshal(sm)
 }
 
 // SessionMessage 会话消息结构体
@@ -165,7 +134,7 @@ type SessionMessage struct {
 	Chunks MessageChunkSlice `gorm:"column:chunks;type:jsonb"`
 
 	// session_message - 消息元数据，JSONB，允许为空
-	Metadata MessageMetadata `gorm:"column:metadata;type:jsonb"`
+	Metadata ObjectMetadata `gorm:"column:metadata;type:jsonb"`
 
 	Usage MessageUsage `gorm:"column:usage;type:jsonb"`
 
@@ -179,16 +148,6 @@ type SessionMessage struct {
 // TableName 指定SessionMessage结构体对应的数据库表名
 func (SessionMessage) TableName() string {
 	return TableNameSessionMessage
-}
-
-// MessageMetadata 消息元数据结构
-type MessageMetadata struct {
-	// LLM 模型名称
-	Model string `json:"model,omitempty"`
-	// 延迟（毫秒）
-	Latency int `json:"latency,omitempty"`
-	// 其他扩展字段
-	Extra map[string]interface{} `json:"extra,omitempty"`
 }
 
 // MessageUsage stores model token usage for a session message.
@@ -237,25 +196,6 @@ func (m MessageChunkSlice) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return json.Marshal([]MessageChunk(m))
-}
-
-// Scan 实现 sql.Scanner 接口
-func (mm *MessageMetadata) Scan(value interface{}) error {
-	if value == nil {
-		return nil
-	}
-
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("cannot scan %T into MessageMetadata", value)
-	}
-
-	return json.Unmarshal(bytes, mm)
-}
-
-// Value 实现 driver.Valuer 接口
-func (mm MessageMetadata) Value() (driver.Value, error) {
-	return json.Marshal(mm)
 }
 
 // Scan 瀹炵幇 sql.Scanner 鎺ュ彛

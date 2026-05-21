@@ -321,7 +321,7 @@ func (s *sessionService) buildMessage(req *contract.AddMessageRequest, sequence 
 	if req.Metadata != nil {
 		message.Metadata = *req.Metadata
 	} else {
-		message.Metadata = types.MessageMetadata{}
+		message.Metadata = types.ObjectMetadata{}
 	}
 	if req.Usage != nil {
 		message.Usage = *req.Usage
@@ -598,7 +598,7 @@ func convertToContractSession(session *types.Session) *contract.Session {
 		UpdatedAt:            session.UpdatedAt,
 	}
 
-	if session.Metadata.Tags != nil || session.Metadata.Extra != nil || session.Metadata.UserAgent != "" || session.Metadata.IPAddress != "" {
+	if session.Metadata.Tags != nil || session.Metadata.Extra != nil {
 		result.Metadata = &session.Metadata
 	}
 	if session.LastMessageAt != nil {
@@ -639,7 +639,7 @@ func convertToContractSessionMessage(message *types.SessionMessage, publicID str
 		}
 	}
 
-	if message.Metadata.Model != "" || message.Metadata.Latency != 0 || message.Metadata.Extra != nil {
+	if message.Metadata.Extra != nil {
 		result.Metadata = &message.Metadata
 	}
 

@@ -28,9 +28,9 @@ func TestSessionMetadataProviderSessionStoreUpsertAndGet(t *testing.T) {
 	ctx := context.Background()
 	session := &types.Session{
 		PublicID: "sess_external_cli",
-		Type:      types.SessionTypeUserChat,
-		Status:    string(types.SessionStatusActive),
-		Metadata: types.SessionMetadata{
+		Type:     types.SessionTypeUserChat,
+		Status:   string(types.SessionStatusActive),
+		Metadata: types.ObjectMetadata{
 			Extra: map[string]interface{}{
 				"source": "test",
 			},
@@ -119,8 +119,8 @@ func TestSessionMetadataProviderSessionStoreMarkFailedPreservesBinding(t *testin
 	ctx := context.Background()
 	session := &types.Session{
 		PublicID: "sess_failed_preserve",
-		Type:      types.SessionTypeUserChat,
-		Status:    string(types.SessionStatusActive),
+		Type:     types.SessionTypeUserChat,
+		Status:   string(types.SessionStatusActive),
 	}
 	if err := db.WithContext(ctx).Create(session).Error; err != nil {
 		t.Fatalf("create session: %v", err)

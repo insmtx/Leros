@@ -117,7 +117,7 @@ func getSessionByInternalSessionID(ctx context.Context, db *gorm.DB, sessionID s
 	return &session, nil
 }
 
-func providerSessionsFromMetadata(metadata types.SessionMetadata) (map[string]ProviderSessionMetadata, error) {
+func providerSessionsFromMetadata(metadata types.ObjectMetadata) (map[string]ProviderSessionMetadata, error) {
 	if metadata.Extra == nil {
 		return map[string]ProviderSessionMetadata{}, nil
 	}
