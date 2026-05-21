@@ -78,6 +78,9 @@ func runMigrations(db *gorm.DB) error {
 		&types.Session{},
 		&types.SessionMessage{},
 		&types.LLMModel{},
+		&types.Project{},
+		&types.ProjectMember{},
+		&types.Task{},
 	}
 
 	if err := dbtools.InitModel(db, models...); err != nil {

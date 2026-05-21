@@ -46,4 +46,7 @@ const (
 	TableNameProject = tablenamePrefix + "project"
 	// TableNameProjectMember 项目成员表名
 	TableNameProjectMember = tablenamePrefix + "project_member"
+
+	// TableNameTask 任务表名
+	TableNameTask = tablenamePrefix + "task"
 )

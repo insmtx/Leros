@@ -194,3 +194,24 @@ const (
 	// EventActionCommented 表示评论事件
 	EventActionCommented EventAction = "commented"
 )
+
+// TaskStatus 表示任务的当前状态
+type TaskStatus string
+
+const (
+	TaskStatusCreated           TaskStatus = "created"
+	TaskStatusPendingAssignment TaskStatus = "pending_assignment"
+	TaskStatusInProgress        TaskStatus = "in_progress"
+	TaskStatusPendingApproval   TaskStatus = "pending_approval"
+	TaskStatusCompleted         TaskStatus = "completed"
+	TaskStatusFailed            TaskStatus = "failed"
+	TaskStatusCancelled         TaskStatus = "cancelled"
+	TaskStatusPaused            TaskStatus = "paused"
+)
+
+type TaskType string
+
+const (
+	TaskTypeGeneral TaskType = "general"
+	TaskTypeCron    TaskType = "cron"
+)
