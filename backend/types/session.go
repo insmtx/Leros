@@ -13,8 +13,9 @@ import (
 type SessionType string
 
 const (
-	SessionTypeUserChat          SessionType = "user_chat"
+	SessionTypeUserChat          SessionType = "chat"
 	SessionTypeAssistantInstance SessionType = "assistant_instance"
+	SessionTypeTask              SessionType = "task"
 )
 
 // SessionStatus 会话状态常量
@@ -65,7 +66,7 @@ type Session struct {
 	PublicID string `gorm:"column:public_id;type:varchar(255);not null;uniqueIndex"`
 
 	// session - 会话类型，VARCHAR(50)，NOT NULL
-	Type string `gorm:"column:type;type:varchar(50);not null"`
+	Type SessionType `gorm:"column:type;type:varchar(50);not null"`
 
 	// session - 关联用户UIN，0表示不关联，BIGINT，DEFAULT 0
 	Uin uint `gorm:"column:uin;type:bigint;default:0;index"`
@@ -78,6 +79,12 @@ type Session struct {
 
 	// session - 分配的数字员工ID，0表示未分配，BIGINT，DEFAULT 0
 	AllocatedAssistantID uint `gorm:"column:allocated_assistant_id;type:bigint;default:0;index"`
+
+	// session - 关联任务ID，允许为空，BIGINT，INDEX（scope=task时绑定）
+	TaskID *uint `gorm:"column:task_id;type:bigint;index"`
+
+	// session - 关联项目ID，允许为空，BIGINT，INDEX（scope=project时绑定）
+	ProjectID *uint `gorm:"column:project_id;type:bigint;index"`
 
 	// session - 会话状态，VARCHAR(50)，NOT NULL，DEFAULT 'active'
 	Status string `gorm:"column:status;type:varchar(50);not null;default:'active'"`

@@ -32,9 +32,9 @@ func TestCreateSession(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "test_session_1",
-		Type:      string(types.SessionTypeUserChat),
-		Uin:       1,
-		Title:     "Test Session",
+		Type:     types.SessionTypeUserChat,
+		Uin:      1,
+		Title:    "Test Session",
 	}
 
 	err := CreateSession(ctx, db, session)
@@ -57,7 +57,7 @@ func TestCreateSession_DuplicatePublicID(t *testing.T) {
 
 	session1 := &types.Session{
 		PublicID: "duplicate_id",
-		Type:      string(types.SessionTypeUserChat),
+		Type:     types.SessionTypeUserChat,
 	}
 
 	err := CreateSession(ctx, db, session1)
@@ -67,7 +67,7 @@ func TestCreateSession_DuplicatePublicID(t *testing.T) {
 
 	session2 := &types.Session{
 		PublicID: "duplicate_id",
-		Type:      string(types.SessionTypeUserChat),
+		Type:     types.SessionTypeUserChat,
 	}
 
 	err = CreateSession(ctx, db, session2)
@@ -82,9 +82,9 @@ func TestGetSessionByID(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "get_by_id_test",
-		Type:      string(types.SessionTypeUserChat),
-		Uin:       1,
-		Title:     "Get By ID Test",
+		Type:     types.SessionTypeUserChat,
+		Uin:      1,
+		Title:    "Get By ID Test",
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -125,8 +125,8 @@ func TestGetSessionByPublicID(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "get_by_session_id_test",
-		Type:      string(types.SessionTypeUserChat),
-		Title:     "Get By PublicID Test",
+		Type:     types.SessionTypeUserChat,
+		Title:    "Get By PublicID Test",
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -153,8 +153,8 @@ func TestUpdateSession(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "update_test",
-		Type:      string(types.SessionTypeUserChat),
-		Title:     "Original Title",
+		Type:     types.SessionTypeUserChat,
+		Title:    "Original Title",
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -183,7 +183,7 @@ func TestDeleteSession(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "delete_test",
-		Type:      string(types.SessionTypeUserChat),
+		Type:     types.SessionTypeUserChat,
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -211,8 +211,8 @@ func TestActivateSession(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "activate_test",
-		Type:      string(types.SessionTypeUserChat),
-		Status:    string(types.SessionStatusEnded),
+		Type:     types.SessionTypeUserChat,
+		Status:   string(types.SessionStatusEnded),
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -240,8 +240,8 @@ func TestPauseSession(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "pause_test",
-		Type:      string(types.SessionTypeUserChat),
-		Status:    string(types.SessionStatusActive),
+		Type:     types.SessionTypeUserChat,
+		Status:   string(types.SessionStatusActive),
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -269,8 +269,8 @@ func TestEndSession(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "end_test",
-		Type:      string(types.SessionTypeUserChat),
-		Status:    string(types.SessionStatusActive),
+		Type:     types.SessionTypeUserChat,
+		Status:   string(types.SessionStatusActive),
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -298,8 +298,8 @@ func TestResumeSession(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "resume_test",
-		Type:      string(types.SessionTypeUserChat),
-		Status:    string(types.SessionStatusPaused),
+		Type:     types.SessionTypeUserChat,
+		Status:   string(types.SessionStatusPaused),
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -327,8 +327,8 @@ func TestExpireSessions(t *testing.T) {
 
 	expiredAt := time.Now().Add(-1 * time.Hour)
 	session := &types.Session{
-		PublicID: "expire_test",
-		Type:      string(types.SessionTypeUserChat),
+		PublicID:  "expire_test",
+		Type:      types.SessionTypeUserChat,
 		Status:    string(types.SessionStatusActive),
 		ExpiredAt: &expiredAt,
 	}
@@ -358,11 +358,11 @@ func TestListSessions_ByType(t *testing.T) {
 
 	session1 := &types.Session{
 		PublicID: "type_test_1",
-		Type:      string(types.SessionTypeUserChat),
+		Type:     types.SessionTypeUserChat,
 	}
 	session2 := &types.Session{
 		PublicID: "type_test_2",
-		Type:      string(types.SessionTypeAssistantInstance),
+		Type:     types.SessionTypeAssistantInstance,
 	}
 
 	if err := CreateSession(ctx, db, session1); err != nil {
@@ -372,7 +372,7 @@ func TestListSessions_ByType(t *testing.T) {
 		t.Fatalf("failed to create session2: %v", err)
 	}
 
-	typeFilter := string(types.SessionTypeUserChat)
+	typeFilter := types.SessionTypeUserChat
 	sessions, total, err := ListSessions(ctx, db, &typeFilter, nil, nil, nil, nil, nil, nil, 0, 20)
 	if err != nil {
 		t.Fatalf("ListSessions failed: %v", err)
@@ -386,7 +386,7 @@ func TestListSessions_ByType(t *testing.T) {
 		t.Errorf("expected 1 session, got %d", len(sessions))
 	}
 
-	if sessions[0].Type != string(types.SessionTypeUserChat) {
+	if sessions[0].Type != types.SessionTypeUserChat {
 		t.Errorf("expected user_chat type, got %s", sessions[0].Type)
 	}
 }
@@ -397,13 +397,13 @@ func TestListSessions_ByStatus(t *testing.T) {
 
 	session1 := &types.Session{
 		PublicID: "status_test_1",
-		Type:      string(types.SessionTypeUserChat),
-		Status:    string(types.SessionStatusActive),
+		Type:     types.SessionTypeUserChat,
+		Status:   string(types.SessionStatusActive),
 	}
 	session2 := &types.Session{
 		PublicID: "status_test_2",
-		Type:      string(types.SessionTypeUserChat),
-		Status:    string(types.SessionStatusPaused),
+		Type:     types.SessionTypeUserChat,
+		Status:   string(types.SessionStatusPaused),
 	}
 
 	if err := CreateSession(ctx, db, session1); err != nil {
@@ -434,13 +434,13 @@ func TestListSessions_ByKeyword(t *testing.T) {
 
 	session1 := &types.Session{
 		PublicID: "keyword_test_1",
-		Type:      string(types.SessionTypeUserChat),
-		Title:     "Project Alpha",
+		Type:     types.SessionTypeUserChat,
+		Title:    "Project Alpha",
 	}
 	session2 := &types.Session{
 		PublicID: "keyword_test_2",
-		Type:      string(types.SessionTypeUserChat),
-		Title:     "Project Beta",
+		Type:     types.SessionTypeUserChat,
+		Title:    "Project Beta",
 	}
 
 	if err := CreateSession(ctx, db, session1); err != nil {
@@ -472,7 +472,7 @@ func TestListSessions_Pagination(t *testing.T) {
 	for i := 1; i <= 5; i++ {
 		session := &types.Session{
 			PublicID: "pagination_test_" + string(rune(i)),
-			Type:      string(types.SessionTypeUserChat),
+			Type:     types.SessionTypeUserChat,
 		}
 		if err := CreateSession(ctx, db, session); err != nil {
 			t.Fatalf("failed to create session %d: %v", i, err)
@@ -498,8 +498,8 @@ func TestIncrementMessageCount(t *testing.T) {
 	ctx := context.Background()
 
 	session := &types.Session{
-		PublicID:    "increment_test",
-		Type:         string(types.SessionTypeUserChat),
+		PublicID:     "increment_test",
+		Type:         types.SessionTypeUserChat,
 		MessageCount: 0,
 	}
 
@@ -528,7 +528,7 @@ func TestUpdateLastMessageAt(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "last_message_test",
-		Type:      string(types.SessionTypeUserChat),
+		Type:     types.SessionTypeUserChat,
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {

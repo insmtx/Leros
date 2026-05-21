@@ -81,7 +81,7 @@ func ExpireSessions(ctx context.Context, db *gorm.DB) error {
 }
 
 // ListSessions 分页查询会话列表
-func ListSessions(ctx context.Context, db *gorm.DB, sessionType *string, status *string, userID *uint, orgID *uint, assistantID *uint, assistantCode *string, keyword *string, offset, limit int) ([]*types.Session, int64, error) {
+func ListSessions(ctx context.Context, db *gorm.DB, sessionType *types.SessionType, status *string, userID *uint, orgID *uint, assistantID *uint, assistantCode *string, keyword *string, offset, limit int) ([]*types.Session, int64, error) {
 	var entities []*types.Session
 	var total int64
 

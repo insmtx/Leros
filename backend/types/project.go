@@ -34,7 +34,7 @@ type Project struct {
 	Status string `gorm:"column:status;type:varchar(50);not null;default:'active';index"`
 
 	// project - 元数据（JSON格式存储标签等扩展信息），JSONB，允许为空
-	Metadata ProjectMetadata `gorm:"column:metadata;type:jsonb"`
+	Metadata ObjectMetadata `gorm:"column:metadata;type:jsonb"`
 }
 
 // TableName 指定Project结构体对应的数据库表名
@@ -42,8 +42,8 @@ func (Project) TableName() string {
 	return TableNameProject
 }
 
-// ProjectMetadata 项目元数据结构
-type ProjectMetadata struct {
+// ObjectMetadata 项目元数据结构
+type ObjectMetadata struct {
 	// 元数据 - 项目标签
 	Tags []string `json:"tags,omitempty"`
 	// 元数据 - 项目类型/模板标识
@@ -53,21 +53,21 @@ type ProjectMetadata struct {
 }
 
 // Scan 实现 sql.Scanner 接口
-func (pm *ProjectMetadata) Scan(value interface{}) error {
+func (pm *ObjectMetadata) Scan(value interface{}) error {
 	if value == nil {
 		return nil
 	}
 
 	bytes, ok := value.([]byte)
 	if !ok {
-		return fmt.Errorf("cannot scan %T into ProjectMetadata", value)
+		return fmt.Errorf("cannot scan %T into ObjectMetadata", value)
 	}
 
 	return json.Unmarshal(bytes, pm)
 }
 
 // Value 实现 driver.Valuer 接口
-func (pm ProjectMetadata) Value() (driver.Value, error) {
+func (pm ObjectMetadata) Value() (driver.Value, error) {
 	return json.Marshal(pm)
 }
 

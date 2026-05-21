@@ -28,7 +28,7 @@ func TestSessionMetadataProviderSessionStoreUpsertAndGet(t *testing.T) {
 	ctx := context.Background()
 	session := &types.Session{
 		PublicID: "sess_external_cli",
-		Type:      string(types.SessionTypeUserChat),
+		Type:      types.SessionTypeUserChat,
 		Status:    string(types.SessionStatusActive),
 		Metadata: types.SessionMetadata{
 			Extra: map[string]interface{}{
@@ -119,7 +119,7 @@ func TestSessionMetadataProviderSessionStoreMarkFailedPreservesBinding(t *testin
 	ctx := context.Background()
 	session := &types.Session{
 		PublicID: "sess_failed_preserve",
-		Type:      string(types.SessionTypeUserChat),
+		Type:      types.SessionTypeUserChat,
 		Status:    string(types.SessionStatusActive),
 	}
 	if err := db.WithContext(ctx).Create(session).Error; err != nil {
