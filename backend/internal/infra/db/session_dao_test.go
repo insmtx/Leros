@@ -362,7 +362,7 @@ func TestListSessions_ByType(t *testing.T) {
 	}
 	session2 := &types.Session{
 		PublicID: "type_test_2",
-		Type:     types.SessionTypeAssistantInstance,
+		Type:     types.SessionTypeTask,
 	}
 
 	if err := CreateSession(ctx, db, session1); err != nil {

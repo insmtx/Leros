@@ -14,7 +14,6 @@ type SessionType string
 
 const (
 	SessionTypeUserChat          SessionType = "chat"
-	SessionTypeAssistantInstance SessionType = "assistant_instance"
 	SessionTypeTask              SessionType = "task"
 )
 
