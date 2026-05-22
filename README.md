@@ -1,229 +1,149 @@
 # Leros
 
-## Enterprise Digital Workforce Operating System
+## AI 工作协作系统
 
-> Build, orchestrate and govern AI-powered digital assistants for enterprise.
-
----
-
-## 🚀 What is Leros?
-
-**Leros** is an enterprise-grade Multi-Agent Operating System designed to power the next generation of digital workforce.
-
-It is not a chatbot framework.
-It is not a simple workflow engine.
-
-Leros is:
-
-> A distributed, governance-first AI execution system for enterprise digital transformation.
-
-Leros enables organizations to:
-
-* Design AI-powered digital assistants
-* Orchestrate multi-agent workflows
-* Govern skills, models, and permissions
-* Run intelligent task execution pipelines
-* Operate in both private enterprise environments and SaaS sandbox mode
+> **AI Native 的 Jira + Notion + Cursor Team。**
+> 
+> 创建 AI 队友、分配任务、绑定技能、沉淀知识 — 像组织真实团队一样，让 AI 参与长期工作流，而不是一次性对话。
 
 ---
 
-## 🧠 Why Leros?
+## 🎯 问题与愿景
 
-Traditional workflow systems focus on deterministic task automation.
+### 当前的 AI 工具有什么问题？
 
-Modern enterprises require:
+你用 ChatGPT 聊需求，用 Cursor 写代码，用 Notion 记文档，用 Jira 管任务 — **AI 的工作分散在四五个工具里，没有上下文，没有记忆，没有责任人。**
 
-* Intelligent decision-making
-* Cross-system reasoning
-* Multi-agent collaboration
-* Cost-aware model routing
-* Auditable AI execution
-* Enterprise-grade governance
+每次对话都是全新的，每个任务都得从头交代背景。AI 像个失忆的实习生，你永远在重复自己。
 
-Leros is built to meet these needs.
+### Leros 在解决什么？
 
-Compared to traditional workflow engines such as DeerFlow:
+**Leros 是一个以项目为中心、以任务为驱动、以 AI 队友为执行者的协作系统。**
 
-* Leros embeds cognitive agents into workflows
-* Leros includes model routing and cost governance
-* Leros supports multi-tenant enterprise deployment
-* Leros is designed as an AI OS, not just a flow engine
+它把 AI 从一个"聊天工具"变成可以长期协同工作的"团队成员"：
+
+- 🏗️ **项目** — 长期上下文容器，承载目标、知识、规范
+- 👥 **AI 队友** — 有角色、有技能、有记忆、有边界的执行者
+- 📋 **任务** — 最小协作单位，指定谁做、做什么、输出什么
+- 🧠 **知识库** — 沉淀经验，你不必每次从头教 AI
+- 📦 **项目资产** — 所有产出物的可追溯交付
 
 ---
 
-## 🎯 Design Principles
+## 🧩 一分钟理解 Leros
 
-Leros enforces strict architectural invariants to ensure governance and reliability:
-
-1. **Agent never directly calls external systems** - All external interactions go through Tools
-2. **Skill never performs orchestration logic** - Skills compose Tools, not workflows
-3. **Control plane never executes runtime logic** - Clear separation of concerns
-4. **All workflow execution must be persisted** - Replayable and auditable
-5. **All model usage must be measurable** - Cost-aware and governable
-
-For detailed design philosophy, see [Design Philosophy](docs/DESIGN_PHILOSOPHY.md).
-
----
-
-## 🏢 Target Scenarios
-
-Leros is designed for:
-
-### Enterprise Internal Digital Transformation
-
-* Digital assistants for operations
-* Intelligent approval systems
-* Automated reporting
-* Cross-system workflow automation
-* AI-assisted decision engines
-
-### SaaS Sandbox Mode
-
-* Demonstration environments
-* Trial accounts
-* Limited skill library
-* Token quota enforcement
-* No sensitive system integration
-
----
-
-## 🔐 Enterprise-First Capabilities
-
-* Multi-tenant isolation
-* RBAC access control
-* Audit logs
-* Skill-level permission control
-* Cost tracking
-* SLA-aware execution
-* Private deployment support
-
----
-
-## 🔄 Execution Flow
-
-Leros follows a unified event-driven execution model:
+想象你有一个 AI 团队：
 
 ```
-User → Event Gateway → EventBus → Control Plane → Orchestrator 
-→ Runtime Manager → Agent/Edge Runtime → Skill → Tool → EventBus → Client
+项目：新产品后台系统
+
+  ├── AI 队友·架构师（角色：技术决策，技能：系统设计评审）
+  ├── AI 队友·开发者 1（角色：后端开发，技能：Go 编程、API 设计）
+  ├── AI 队友·开发者 2（角色：前端开发，技能：React、组件库）
+  ├── AI 队友·QA（角色：质量保障，技能：测试用例生成、回归测试）
+  └── AI 队友·PM（角色：进度管理，技能：日报生成、风险识别）
+
+  ├── 任务：设计用户权限模型 → 指派给 架构师
+  ├── 任务：实现登录接口 → 指派给 开发者 1
+  ├── 任务：构建登录页面 → 指派给 开发者 2
+  └── 任务：编写集成测试 → 指派给 QA
 ```
 
-All execution is:
+**每个 AI 队友有自己的角色、技能、权限边界和记忆。** 你创建任务、分配队友、跟踪进度 — 它们独立执行，产出代码、文档、报告。
 
-* **Replayable** - Complete execution history recorded
-* **Observable** - Full链路 tracing and monitoring
-* **Auditable** - Comprehensive audit logs
-
-For detailed architecture, see [Architecture Documentation](docs/ARCHITECTURE.md).
+执行完成后，产物沉淀进知识库，下次类似任务不需要重新交代上下文。
 
 ---
 
-## 🧩 Extensibility
+## ⚡ 协作流程
 
-Leros supports plugin-based architecture:
+```
+  💬 项目会话（讨论需求、对齐方案）
+        ↓  方向明确
+  📋 创建任务（定义目标、预期输出、指派 AI 队友）
+        ↓
+  ⚙️ AI 队友自主执行（调用技能、产出中间结果）
+        ↓
+  ✅ 人工审批 / 接管 / 补充上下文（关键节点）
+        ↓
+  📦 产出项目资产（文档 / 代码 / 报告 / 结构化数据）
+        ↓
+  🧠 沉淀知识库（下次不再重复交代）
+```
 
-* Skill plugins
-* Agent templates
-* Model providers
-* Memory backends
-* Workflow templates
-
-All plugins must be:
-
-* Versioned
-* Isolated
-* Auditable
-
----
-
-## 🛣 Roadmap
-
-### Phase 1 – Core Execution Layer
-
-* DAG execution engine
-* Agent runtime
-* Model router
-* Multi-tenant basics
-
-### Phase 2 – Enterprise Intelligence
-
-* Cross-agent collaboration
-* Cost optimization engine
-* Distributed scheduler
-* Observability suite
-
-### Phase 3 – AI OS Evolution
-
-* Agent federation
-* Autonomous optimization
-* Workflow marketplace
-* Digital workforce marketplace
+每一步全程可审计、可回溯、可中断调整。
 
 ---
 
-## ⚠ Non-Goals
+## 🆚 Leros 不是什么
 
-Leros is NOT:
+| Leros | Chatbot | 工作流引擎 | Agent 框架 |
+|-------|---------|-----------|-----------|
+| 以**任务**为驱动 | 以**对话**为驱动 | 以**流程**为驱动 | 以**Agent**为驱动 |
+| AI 有**角色+技能+记忆** | AI 无状态 | AI 被调用 | AI 自主决策 |
+| **项目**是长期容器 | 无持久化上下文 | 流程即上下文 | 无项目概念 |
+| **知识沉淀**与复用 | 次次重复交代 | 无知识管理 | 无记忆系统 |
+| 面向**团队协作** | 面向个体使用 | 面向流程自动化 | 面向开发者 |
 
-* A prompt playground
-* A simple chatbot UI
-* A research-only autonomous agent simulator
-* A decentralized AI experiment
-
----
-
-## 🧬 Philosophy
-
-Leros treats AI agents as:
-
-> First-class digital assistants with governance, accountability, and operational boundaries.
-
-We believe the future enterprise stack will include:
-
-* Human employees
-* Software systems
-* Digital assistants (AI Agents)
-
-Leros is designed to operate the third category.
+Leros 不是"又一个 AI 聊天工具" — 它是 **AI Native 的工作协作平台**。
 
 ---
 
-## 📜 License
+## 🧬 核心实体
 
-(To be determined — Apache 2.0 / Commercial Hybrid / Enterprise License)
-
----
-
----
-
-## 📚 Documentation
-
-Complete documentation is available in the `docs/` directory:
-
-| Document | Description |
-|----------|-------------|
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | AI OS architecture design (v2 - Three-Plane Model) |
-| [DESIGN_PHILOSOPHY.md](docs/DESIGN_PHILOSOPHY.md) | Core design philosophy and principles |
-| [PRD.md](docs/PRD.md) | Product requirements — AI Workspace (v3) |
-| [SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md) | System architecture design — platform engine, connectors |
-| [TECH_DESIGN.md](docs/TECH_DESIGN.md) | Technical design — skill schema, rendering engine |
-| [PLANNING.md](docs/PLANNING.md) | Roadmap — business domains (docs/dev/aiops) |
-| [GITHUB_AUTH_SETUP.md](docs/GITHUB_AUTH_SETUP.md) | GitHub OAuth integration guide |
-| [GITHUB_WEBHOOK_TROUBLESHOOTING.md](docs/GITHUB_WEBHOOK_TROUBLESHOOTING.md) | GitHub webhook troubleshooting |
-| [PR_EVENT_FLOW.md](docs/PR_EVENT_FLOW.md) | GitHub PR event processing verification |
-| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues and solutions |
+| 实体 | 定义 | 类比 |
+|------|------|------|
+| **项目** | 长期工作容器 | Jira Project + Notion Page |
+| **任务** | 最小执行单元，谁做、做什么、输出什么 | Jira Issue + GitHub Issue |
+| **AI 队友** | 人格化执行者 — 角色 + 技能 + 记忆 + 执行环境 | 团队成员（PM / Dev / QA） |
+| **技能** | 可复用的能力模块，定义输入输出和执行流程 | 工具 + API |
+| **知识库** | 持久化记忆，提供领域知识和项目上下文 | Confluence + 代码文档 |
+| **项目资产** | 所有交付物的聚合与追溯 | 交付件清单 |
 
 ---
 
-## 🤝 Contributing
+## 🔐 企业级治理
 
-We welcome:
+- **多租户隔离** — 企业间数据与执行环境完全隔离
+- **RBAC 访问控制** — 用户、AI 队友、技能三级权限
+- **执行审计** — 所有任务执行全链路可追溯、可回放
+- **成本追踪** — 模型调用成本按任务、项目、团队维度统计
+- **密钥安全** — API 密钥托管与脱敏
+- **审批工作流** — 关键操作可配置人工审批节点
+- **私有化部署** — 支持企业内部基础设施部署
 
-* Skill plugins
-* Model adapters
-* Workflow templates
-* Observability integrations
-* Security enhancements
+---
 
-Enterprise partners are welcome to collaborate.
+## 🛣 路线图
 
+| 阶段 | 重点 | 内容 |
+|------|------|------|
+| **Phase 1** · 核心执行层 | 跑通任务驱动闭环 | 项目管理、任务系统、AI 队友执行、技能系统 |
+| **Phase 2** · 企业智能 | 多队友协作与知识飞轮 | 跨队友协作编排、知识自动化沉淀、成本优化 |
+| **Phase 3** · 生态平台 | AI 工作协作市场 | 技能市场、AI 队友模板、组织级工作台 |
+
+---
+
+## 📚 文档
+
+| 文档 | 说明 |
+|------|------|
+| [PRD.md](docs/PRD.md) | 产品需求文档（v3.0 — AI 工作协作系统） |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 系统架构设计 |
+| [DESIGN_PHILOSOPHY.md](docs/DESIGN_PHILOSOPHY.md) | 设计哲学与原则 |
+| [SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md) | 平台引擎与连接器设计 |
+| [TECH_DESIGN.md](docs/TECH_DESIGN.md) | 技术方案（技能 Schema、渲染引擎） |
+| [PLANNING.md](docs/PLANNING.md) | 业务板块路线图 |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献指南 |
+
+---
+
+## 📜 许可证
+
+（待定 — Apache 2.0 / 商业混合 / 企业许可证）
+
+---
+
+## 🤝 贡献
+
+欢迎贡献技能插件、模型适配器、工作流模板和安全增强。企业合作伙伴可直接联系我们。
