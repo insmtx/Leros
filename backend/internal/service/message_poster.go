@@ -1,0 +1,372 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"gorm.io/gorm"
+
+	"github.com/insmtx/Leros/backend/internal/api/auth"
+	"github.com/insmtx/Leros/backend/internal/api/contract"
+	"github.com/insmtx/Leros/backend/internal/infra/db"
+	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/internal/worker/protocol"
+	"github.com/insmtx/Leros/backend/pkg/dm"
+	"github.com/insmtx/Leros/backend/types"
+	"github.com/ygpkg/yg-go/encryptor/snowflake"
+	"github.com/ygpkg/yg-go/logs"
+)
+
+// MessagePoster 无状态的消息投递器，负责消息创建、统计更新、事件发布、Worker 任务投递。
+// 多个 goroutine 可安全并发使用。
+type MessagePoster struct {
+	db       *gorm.DB
+	eventbus eventbus.EventBus
+	inferrer AssistantInferrer
+}
+
+// NewMessagePoster 创建 MessagePoster 实例。
+func NewMessagePoster(db *gorm.DB, eb eventbus.EventBus, inferrer AssistantInferrer) *MessagePoster {
+	return &MessagePoster{
+		db:       db,
+		eventbus: eb,
+		inferrer: inferrer,
+	}
+}
+
+// PostMessage 在已有 session 上创建一条消息并完成后续投递（统计、EventBus、WorkerTask）。
+func (p *MessagePoster) PostMessage(
+	ctx context.Context,
+	session *types.Session,
+	buildMessage func(sequence int64) *types.SessionMessage,
+) (*types.SessionMessage, error) {
+	sequence, err := db.GetNextSequence(ctx, p.db, session.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	message := buildMessage(sequence)
+	message.SessionID = session.ID
+	if message.MessageType == "" {
+		message.MessageType = string(types.MessageTypeText)
+	}
+
+	if err := db.CreateMessage(ctx, p.db, message); err != nil {
+		return nil, fmt.Errorf("create message: %w", err)
+	}
+
+	logs.DebugContextf(ctx, "created message seq=%d in session=%s", sequence, session.PublicID)
+
+	now := time.Now()
+	if err := db.IncrementMessageCount(ctx, p.db, session.ID); err != nil {
+		return nil, err
+	}
+	if err := db.UpdateLastMessageAt(ctx, p.db, session.ID, now); err != nil {
+		return nil, err
+	}
+
+	if session.OrgID > 0 {
+		topic, err := dm.SessionMessageRequestSubject(session.OrgID, session.PublicID)
+		if err != nil {
+			logs.WarnContextf(ctx, "failed to build message request subject: %v", err)
+		} else {
+			if err := p.eventbus.Publish(ctx, topic, message); err != nil {
+				logs.WarnContextf(ctx, "failed to publish message to eventbus: %v", err)
+			}
+		}
+	}
+
+	logs.DebugContextf(ctx, "published message events for session=%s", session.PublicID)
+
+	if err := p.publishWorkerTask(ctx, session, message); err != nil {
+		return nil, err
+	}
+
+	return message, nil
+}
+
+// RunNewMessage 执行 NewMessage 完整编排：Project → Task → Session → Message 原子创建链。
+func (p *MessagePoster) RunNewMessage(
+	ctx context.Context,
+	req *contract.NewMessageRequest,
+	caller *types.Caller,
+) (*contract.NewMessageResponse, error) {
+	o := &newMessageOrchestrator{
+		poster: p,
+		ctx:    ctx,
+		req:    req,
+		caller: caller,
+	}
+
+	logs.DebugContextf(ctx, "NewMessage: caller=%d org=%d assistant=%d", caller.Uin, caller.OrgID, req.AssistantID)
+
+	if err := o.resolveOrCreateProject(); err != nil {
+		logs.ErrorContextf(ctx, "NewMessage resolveOrCreateProject failed: %v", err)
+		return nil, err
+	}
+	if err := o.ensureProjectSession(); err != nil {
+		logs.ErrorContextf(ctx, "NewMessage ensureProjectSession failed: %v", err)
+		return nil, err
+	}
+	if err := o.resolveOrCreateTask(); err != nil {
+		logs.ErrorContextf(ctx, "NewMessage resolveOrCreateTask failed: %v", err)
+		return nil, err
+	}
+	if err := o.createTaskSession(); err != nil {
+		logs.ErrorContextf(ctx, "NewMessage createTaskSession failed: %v", err)
+		return nil, err
+	}
+
+	message, err := p.PostMessage(ctx, o.taskSession, func(sequence int64) *types.SessionMessage {
+		msgType := req.MessageType
+		if msgType == "" {
+			msgType = string(types.MessageTypeText)
+		}
+		return &types.SessionMessage{
+			Role:        string(types.MessageRoleUser),
+			Content:     req.Content,
+			MessageType: msgType,
+			Status:      string(types.MessageStatusPending),
+			Sequence:    sequence,
+			Timestamp:   time.Now().UnixMilli(),
+		}
+	})
+	if err != nil {
+		logs.ErrorContextf(ctx, "NewMessage PostMessage failed: %v", err)
+		return nil, err
+	}
+
+	logs.InfoContextf(ctx, "NewMessage completed: project=%s task=%s session=%s message=%d assistant=%d",
+		o.project.PublicID, o.task.PublicID, o.taskSession.PublicID, message.ID, o.taskSession.AllocatedAssistantID)
+
+	return &contract.NewMessageResponse{
+		ProjectID:   o.project.PublicID,
+		TaskID:      o.task.PublicID,
+		SessionID:   o.taskSession.PublicID,
+		MessageID:   fmt.Sprintf("%d", message.ID),
+		AssistantID: o.taskSession.AllocatedAssistantID,
+	}, nil
+}
+
+// newMessageOrchestrator 持有 NewMessage 编排过程中的临时状态。
+// 仅在 RunNewMessage 调用期间存续，不可复用。
+type newMessageOrchestrator struct {
+	poster *MessagePoster
+	ctx    context.Context
+	req    *contract.NewMessageRequest
+	caller *types.Caller
+
+	project     *types.Project
+	task        *types.Task
+	taskSession *types.Session
+}
+
+func (o *newMessageOrchestrator) resolveOrCreateProject() error {
+	if o.req.ProjectID != "" {
+		proj, err := db.GetProjectByPublicID(o.ctx, o.poster.db, o.caller.OrgID, o.req.ProjectID)
+		if err != nil {
+			return err
+		}
+		if proj == nil {
+			return errors.New("project not found")
+		}
+		o.project = proj
+		return nil
+	}
+
+	runes := []rune(o.req.Content)
+	title := string(runes)
+	if len(runes) > 50 {
+		title = string(runes[:50])
+	}
+
+	projectID := fmt.Sprintf("prj_%s", snowflake.GenerateIDBase58())
+	o.project = &types.Project{
+		PublicID:    projectID,
+		OrgID:       o.caller.OrgID,
+		OwnerID:     o.caller.Uin,
+		Name:        title,
+		Description: "",
+		Status:      string(types.ProjectStatusActive),
+	}
+	if err := db.CreateProject(o.ctx, o.poster.db, o.project); err != nil {
+		return fmt.Errorf("create project: %w", err)
+	}
+
+	logs.InfoContextf(o.ctx, "created project=%s org=%d user=%d", projectID, o.caller.OrgID, o.caller.Uin)
+
+	if err := db.CreateProjectMember(o.ctx, o.poster.db, &types.ProjectMember{
+		ProjectID:  o.project.ID,
+		MemberID:   o.caller.Uin,
+		MemberType: types.MemberTypeUser,
+		MemberRole: types.MemberRoleOwner,
+	}); err != nil {
+		logs.WarnContextf(o.ctx, "create project member failed: %v", err)
+	}
+
+	return nil
+}
+
+func (o *newMessageOrchestrator) ensureProjectSession() error {
+	projectSession, err := db.GetProjectSession(o.ctx, o.poster.db, o.project.ID)
+	if err != nil {
+		return fmt.Errorf("get project session: %w", err)
+	}
+	if projectSession != nil {
+		return nil
+	}
+
+	projectSessionID := fmt.Sprintf("sess_%s", snowflake.GenerateIDBase58())
+	projectSession = &types.Session{
+		PublicID:             projectSessionID,
+		Type:                 types.SessionTypeProject,
+		Uin:                  o.caller.Uin,
+		OrgID:                o.caller.OrgID,
+		AssistantID:          o.req.AssistantID,
+		AllocatedAssistantID: o.req.AssistantID,
+		ProjectID:            &o.project.ID,
+		Status:               string(types.SessionStatusActive),
+		Title:                "项目协作",
+	}
+	if err := db.CreateSession(o.ctx, o.poster.db, projectSession); err != nil {
+		return fmt.Errorf("create project session: %w", err)
+	}
+
+	logs.InfoContextf(o.ctx, "created project session=%s for project=%s", projectSessionID, o.project.PublicID)
+	return nil
+}
+
+func (o *newMessageOrchestrator) resolveOrCreateTask() error {
+	if o.req.TaskID != "" {
+		t, err := db.GetTaskByPublicID(o.ctx, o.poster.db, o.req.TaskID)
+		if err != nil {
+			return err
+		}
+		if t == nil {
+			return errors.New("task not found")
+		}
+		o.task = t
+		return nil
+	}
+
+	runes := []rune(o.req.Content)
+	taskTitle := string(runes)
+	if len(runes) > 50 {
+		taskTitle = string(runes[:50])
+	}
+
+	taskID := fmt.Sprintf("task_%s", snowflake.GenerateIDBase58())
+	o.task = &types.Task{
+		PublicID:    taskID,
+		OrgID:       o.caller.OrgID,
+		OwnerID:     o.caller.Uin,
+		ProjectID:   o.project.ID,
+		TaskType:    types.TaskTypeGeneral,
+		Title:       taskTitle,
+		Description: o.req.Content,
+		Status:      string(types.TaskStatusCreated),
+	}
+	if err := db.CreateTask(o.ctx, o.poster.db, o.task); err != nil {
+		return fmt.Errorf("create task: %w", err)
+	}
+
+	logs.InfoContextf(o.ctx, "created task=%s in project=%s", taskID, o.project.PublicID)
+	return nil
+}
+
+func (o *newMessageOrchestrator) createTaskSession() error {
+	taskSessionID := fmt.Sprintf("sess_%s", snowflake.GenerateIDBase58())
+	o.taskSession = &types.Session{
+		PublicID:             taskSessionID,
+		Type:                 types.SessionTypeTask,
+		Uin:                  o.caller.Uin,
+		OrgID:                o.caller.OrgID,
+		AssistantID:          o.req.AssistantID,
+		AllocatedAssistantID: o.req.AssistantID,
+		ProjectID:            &o.project.ID,
+		TaskID:               &o.task.ID,
+		Status:               string(types.SessionStatusActive),
+		Title:                o.task.Title,
+	}
+	if err := db.CreateSession(o.ctx, o.poster.db, o.taskSession); err != nil {
+		return fmt.Errorf("create task session: %w", err)
+	}
+
+	o.task.SessionID = &o.taskSession.ID
+	if err := o.poster.db.WithContext(o.ctx).Model(o.task).Update("session_id", o.taskSession.ID).Error; err != nil {
+		logs.WarnContextf(o.ctx, "update task session_id failed: %v", err)
+	}
+
+	logs.InfoContextf(o.ctx, "created task session=%s for task=%s", taskSessionID, o.task.PublicID)
+	return nil
+}
+
+func (p *MessagePoster) publishWorkerTask(ctx context.Context, session *types.Session, message *types.SessionMessage) error {
+	caller, _ := auth.FromContext(ctx)
+	orgID := session.OrgID
+	if orgID == 0 && caller != nil {
+		orgID = caller.OrgID
+	}
+
+	if session.AssistantID == 0 && session.AllocatedAssistantID == 0 && p.inferrer != nil {
+		assignedAssistantID := p.inferrer.InferAssignedAssistantID(ctx, orgID, string(session.Type))
+		if assignedAssistantID > 0 {
+			session.AllocatedAssistantID = assignedAssistantID
+			if err := db.UpdateAllocatedAssistantID(ctx, p.db, session.ID, assignedAssistantID); err != nil {
+				return fmt.Errorf("failed to update allocated_assistant_id: %w", err)
+			}
+		}
+	}
+
+	if session.AllocatedAssistantID == 0 {
+		logs.DebugContextf(ctx, "Skipping task publish: no worker allocated for session %s", session.PublicID)
+		return nil
+	}
+
+	topic, err := dm.WorkerTaskSubject(orgID, session.AllocatedAssistantID)
+	if err != nil {
+		return fmt.Errorf("failed to construct worker task topic: %w", err)
+	}
+
+	messagePayload := protocol.WorkerTaskMessage{
+		ID:        fmt.Sprintf("msg_%d_%d", session.ID, message.Sequence),
+		Type:      protocol.MessageTypeWorkerTask,
+		CreatedAt: time.Now().UTC(),
+		Trace: protocol.TraceContext{
+			TraceID:   session.PublicID,
+			RequestID: fmt.Sprintf("req_%d", message.ID),
+			TaskID:    fmt.Sprintf("task_%d", message.ID),
+		},
+		Route: protocol.RouteContext{
+			OrgID:     orgID,
+			SessionID: session.PublicID,
+			WorkerID:  session.AllocatedAssistantID,
+		},
+		Body: protocol.WorkerTaskBody{
+			TaskType: protocol.TaskTypeAgentRun,
+			Actor: protocol.ActorContext{
+				UserID:      fmt.Sprintf("%d", session.Uin),
+				DisplayName: "",
+				Channel:     "session",
+			},
+			Input: protocol.TaskInput{
+				Type: protocol.InputTypeMessage,
+			},
+		},
+		Metadata: map[string]any{
+			"session_id":   session.PublicID,
+			"message_type": message.MessageType,
+			"sequence":     message.Sequence,
+			"timestamp":    message.Timestamp,
+		},
+	}
+
+	if err := p.eventbus.Publish(ctx, topic, messagePayload); err != nil {
+		logs.ErrorContextf(ctx, "Failed to publish message to assistant %d: %v", session.AllocatedAssistantID, err)
+		return fmt.Errorf("failed to publish message to assistant: %w", err)
+	}
+	logs.DebugContextf(ctx, "Published message to topic %s: session_id=%s sequence=%d", topic, session.PublicID, message.Sequence)
+	return nil
+}
