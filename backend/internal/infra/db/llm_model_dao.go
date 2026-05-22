@@ -70,7 +70,7 @@ func DeleteLLMModel(ctx context.Context, db *gorm.DB, id uint) error {
 }
 
 // ListLLMModels 查询LLM模型配置列表
-func ListLLMModels(ctx context.Context, db *gorm.DB, opt *PageQuery) ([]*types.LLMModel, int64, error) {
+func ListLLMModels(ctx context.Context, db *gorm.DB, opt *types.PageQuery) ([]*types.LLMModel, int64, error) {
 	var entities []*types.LLMModel
 	var total int64
 

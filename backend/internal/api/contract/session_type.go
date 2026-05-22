@@ -29,8 +29,8 @@ type ListSessionsRequest struct {
 	Status        *string `json:"status,omitempty"`
 	AssistantID   *uint   `json:"assistant_id,omitempty"`
 	AssistantCode *string `json:"assistant_code,omitempty"`
-	Keyword       *string `json:"keyword,omitempty"`
-	Pagination
+	Keyword       *string          `json:"keyword,omitempty"`
+	types.Pagination
 }
 
 // AddMessageRequest adds a message to a session.

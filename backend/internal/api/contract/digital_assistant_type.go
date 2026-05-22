@@ -1,6 +1,10 @@
 package contract
 
-import "time"
+import (
+	"time"
+
+	"github.com/insmtx/Leros/backend/types"
+)
 
 // DigitalAssistantStatus 数字助手状态常量
 type DigitalAssistantStatus string
@@ -54,7 +58,7 @@ type UpdateDigitalAssistantStatusRequest struct {
 type ListDigitalAssistantRequest struct {
 	Status  *string `json:"status,omitempty"`
 	Keyword *string `json:"keyword,omitempty"`
-	Pagination
+	types.Pagination
 }
 
 // DigitalAssistantList 数字助手列表响应

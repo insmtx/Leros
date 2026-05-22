@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/insmtx/Leros/backend/internal/api/auth"
+	"github.com/insmtx/Leros/backend/types"
 )
 
 func getOrgIDFromContext(ctx context.Context) (uint, error) {
@@ -20,4 +21,12 @@ func verifyOrgPermission(daOrgID, orgID uint) error {
 		return errors.New("permission denied")
 	}
 	return nil
+}
+
+func getCallerFromContext(ctx context.Context) (*types.Caller, error) {
+	caller, _ := auth.FromContext(ctx)
+	if caller == nil || caller.Uin == 0 {
+		return nil, errors.New("user not authenticated")
+	}
+	return caller, nil
 }

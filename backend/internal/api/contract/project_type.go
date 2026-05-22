@@ -1,6 +1,10 @@
 package contract
 
-import "time"
+import (
+	"time"
+
+	"github.com/insmtx/Leros/backend/types"
+)
 
 // Project 项目响应结构
 type Project struct {
@@ -34,7 +38,7 @@ type UpdateProjectRequest struct {
 type ListProjectsRequest struct {
 	Keyword *string `json:"keyword,omitempty"`
 	Status  *string `json:"status,omitempty"`
-	Pagination
+	types.Pagination
 }
 
 // ProjectList 项目列表响应

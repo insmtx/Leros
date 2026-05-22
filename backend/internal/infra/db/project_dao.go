@@ -61,7 +61,7 @@ func GetProjectSession(ctx context.Context, db *gorm.DB, projectID uint) (*types
 }
 
 // ListProjects 查询项目列表，使用 PageQuery 作为查询参数
-func ListProjects(ctx context.Context, d *gorm.DB, opt *PageQuery) ([]*types.Project, int64, error) {
+func ListProjects(ctx context.Context, d *gorm.DB, opt *types.PageQuery) ([]*types.Project, int64, error) {
 	var entities []*types.Project
 	var total int64
 

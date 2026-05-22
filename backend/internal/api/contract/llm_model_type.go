@@ -1,6 +1,10 @@
 package contract
 
-import "time"
+import (
+	"time"
+
+	"github.com/insmtx/Leros/backend/types"
+)
 
 // LLMModel LLM模型配置响应结构
 type LLMModel struct {
@@ -55,7 +59,7 @@ type ListLLMModelsRequest struct {
 	Provider *string `json:"provider,omitempty"`
 	Status   *string `json:"status,omitempty"`
 	Keyword  *string `json:"keyword,omitempty"`
-	Pagination
+	types.Pagination
 }
 
 // LLMModelList LLM模型配置列表响应

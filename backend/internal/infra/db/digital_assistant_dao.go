@@ -68,7 +68,7 @@ func DigitalAssistantCodeExists(ctx context.Context, db *gorm.DB, code string, e
 }
 
 // ListDigitalAssistant 查询数字助手列表
-func ListDigitalAssistant(ctx context.Context, db *gorm.DB, opt *PageQuery) ([]*types.DigitalAssistant, int64, error) {
+func ListDigitalAssistant(ctx context.Context, db *gorm.DB, opt *types.PageQuery) ([]*types.DigitalAssistant, int64, error) {
 	var entities []*types.DigitalAssistant
 	var total int64
 
