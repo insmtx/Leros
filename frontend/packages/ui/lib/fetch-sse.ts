@@ -61,22 +61,22 @@ export class FetchSSEClient {
 			this.status = "open";
 			this.options.onOpen?.();
 
-			this.reader = response.body.getReader();
+			const reader = response.body.getReader();
+			this.reader = reader;
 			const decoder = new TextDecoder();
 			let buffer = "";
+			let currentEvent: { type?: string; data: string; id?: string; retry?: number } = {
+				data: "",
+			};
 
-			while (true) {
-				const { done, value } = await this.reader.read();
+			while (this.status === "open") {
+				const { done, value } = await reader.read();
 				if (done) break;
 
 				buffer += decoder.decode(value, { stream: true });
 
 				const lines = buffer.split("\n");
 				buffer = lines.pop() ?? "";
-
-				let currentEvent: { type?: string; data: string; id?: string; retry?: number } = {
-					data: "",
-				};
 
 				for (const line of lines) {
 					if (line.startsWith("event:")) {
@@ -96,8 +96,13 @@ export class FetchSSEClient {
 				}
 			}
 
-			this.close();
+			if (this.reader === reader) {
+				this.close();
+			}
 		} catch (err) {
+			if ((this.status as FetchSSEStatus) === "closed") {
+				return;
+			}
 			if ((err as Error).name === "AbortError") {
 				this.close();
 				return;
@@ -112,7 +117,9 @@ export class FetchSSEClient {
 		this.status = "closed";
 
 		if (this.reader) {
-			this.reader.cancel().catch(() => { /* ignore cancel errors */ });
+			this.reader.cancel().catch(() => {
+				/* ignore cancel errors */
+			});
 			this.reader = null;
 		}
 
