@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"path/filepath"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -64,7 +64,7 @@ func (ds *DockerCLIScheduler) execDocker(ctx context.Context, args ...string) (s
 }
 
 func (ds *DockerCLIScheduler) containerWorkingDir(workid string) string {
-	return filepath.Join(ds.config.WorkingDir, "workspace", workid)
+	return path.Join(ds.config.WorkingDir, "workspace", workid)
 }
 
 func (ds *DockerCLIScheduler) buildEnvVars(spec *worker.WorkerSpec) map[string]string {

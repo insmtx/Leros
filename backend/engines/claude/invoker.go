@@ -9,17 +9,17 @@ import (
 	"sync"
 
 	"github.com/insmtx/Leros/backend/engines"
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/runtime/events"
 	"github.com/ygpkg/yg-go/logs"
 )
 
-// Invoker 启动 Claude Code 进程。
+// Invoker starts an external CLI process.
 type Invoker struct {
 	binary  string
 	baseEnv []string
 }
 
-// NewInvoker 创建 Claude Code 调用器。
+// NewInvoker creates a CLI invoker.
 func NewInvoker(binary string, extraEnv map[string]string) *Invoker {
 	return &Invoker{
 		binary:  binary,
@@ -62,7 +62,7 @@ type streamUsage struct {
 	OutputTokens             int `json:"output_tokens,omitempty"`
 }
 
-// Run 启动 Claude Code 进程并将 stdout/stderr 直接转换为引擎事件。
+// Run starts the CLI process and converts stdout/stderr into engine events.
 func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Process, <-chan events.Event, error) {
 	args := buildArgs(req)
 

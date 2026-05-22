@@ -14,8 +14,8 @@ import (
 	"github.com/insmtx/Leros/backend/engines"
 	"github.com/insmtx/Leros/backend/engines/claude"
 	"github.com/insmtx/Leros/backend/internal/agent"
-	"github.com/insmtx/Leros/backend/internal/agent/externalcli"
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/runtime/drivers/externalcli"
+	"github.com/insmtx/Leros/backend/internal/runtime/events"
 )
 
 func TestRuntimeRouterUsesRequestedRuntime(t *testing.T) {
@@ -113,8 +113,7 @@ func TestRuntimeRouterClaudeRunnerCallsLerosEchoTool(t *testing.T) {
 		},
 		Input: agent.InputContext{
 			Type: agent.InputTypeTaskInstruction,
-			Text: `必须调用已配置的 Leros MCP 工具 leros_echo，参数 message 使用 "hello from claude runner"。
-调用完成后，在最终答案中原样返回工具结果 JSON，并说明你已经完成工具调用。`,
+			Text: `Call the configured Leros MCP tool leros_echo with message "hello from claude runner", then return the tool result JSON.`,
 		},
 		Runtime: agent.RuntimeOptions{
 			Kind:    engines.EngineClaude,
@@ -126,6 +125,9 @@ func TestRuntimeRouterClaudeRunnerCallsLerosEchoTool(t *testing.T) {
 		if result != nil {
 			resultJSON, _ := json.MarshalIndent(result, "", "  ")
 			t.Logf("failed run result:\n%s", string(resultJSON))
+		}
+		if strings.Contains(err.Error(), "Not logged in") || strings.Contains(err.Error(), "authentication_failed") {
+			t.Skipf("claude CLI is not authenticated: %v", err)
 		}
 		t.Fatalf("run claude runner: %v", err)
 	}

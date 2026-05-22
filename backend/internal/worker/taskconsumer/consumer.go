@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/insmtx/Leros/backend/internal/agent"
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	"github.com/insmtx/Leros/backend/pkg/dm"
 	"github.com/insmtx/Leros/backend/pkg/utils"
 	"github.com/nats-io/nats.go"
@@ -30,7 +30,7 @@ type Consumer struct {
 	subscriber eventbus.Subscriber
 	publisher  ResultPublisher
 	runner     agent.Runner
-	debouncer  *utils.TrailingDebouncer[events.WorkerTaskMessage]
+	debouncer  *utils.TrailingDebouncer[protocol.WorkerTaskMessage]
 }
 
 // New creates a worker task consumer.
@@ -99,7 +99,7 @@ func (c *Consumer) handleEvent(ctx context.Context, msg *nats.Msg) error {
 	if err := c.validateRoute(taskMsg); err != nil {
 		return err
 	}
-	if taskMsg.Body.TaskType != events.TaskTypeAgentRun {
+	if taskMsg.Body.TaskType != protocol.TaskTypeAgentRun {
 		return fmt.Errorf("unsupported worker task type %q", taskMsg.Body.TaskType)
 	}
 
@@ -118,7 +118,7 @@ func (c *Consumer) handleEvent(ctx context.Context, msg *nats.Msg) error {
 	return nil
 }
 
-func (c *Consumer) schedule(ctx context.Context, taskMsg events.WorkerTaskMessage) {
+func (c *Consumer) schedule(ctx context.Context, taskMsg protocol.WorkerTaskMessage) {
 	key := sessionTaskKey(taskMsg)
 	if key == "" {
 		go func() {
@@ -132,7 +132,7 @@ func (c *Consumer) schedule(ctx context.Context, taskMsg events.WorkerTaskMessag
 	c.debouncer.Call(ctx, key, taskMsg)
 }
 
-func (c *Consumer) runTask(ctx context.Context, taskMsg events.WorkerTaskMessage) error {
+func (c *Consumer) runTask(ctx context.Context, taskMsg protocol.WorkerTaskMessage) error {
 	req := RequestFromWorkerTask(taskMsg)
 	req.EventSink = NewMQStreamSink(c.publisher, taskMsg)
 
@@ -155,25 +155,25 @@ func (c *Consumer) runTask(ctx context.Context, taskMsg events.WorkerTaskMessage
 	return nil
 }
 
-func sessionTaskKey(msg events.WorkerTaskMessage) string {
+func sessionTaskKey(msg protocol.WorkerTaskMessage) string {
 	if msg.Route.OrgID == 0 || msg.Route.WorkerID == 0 || strings.TrimSpace(msg.Route.SessionID) == "" {
 		return ""
 	}
 	return fmt.Sprintf("%d:%d:%s", msg.Route.OrgID, msg.Route.WorkerID, strings.TrimSpace(msg.Route.SessionID))
 }
 
-func decodeWorkerTask(msg *nats.Msg) (events.WorkerTaskMessage, error) {
-	var taskMsg events.WorkerTaskMessage
+func decodeWorkerTask(msg *nats.Msg) (protocol.WorkerTaskMessage, error) {
+	var taskMsg protocol.WorkerTaskMessage
 	if err := json.Unmarshal(msg.Data, &taskMsg); err != nil {
 		return taskMsg, fmt.Errorf("unmarshal worker task: %w", err)
 	}
-	if taskMsg.Type != "" && taskMsg.Type != events.MessageTypeWorkerTask {
+	if taskMsg.Type != "" && taskMsg.Type != protocol.MessageTypeWorkerTask {
 		return taskMsg, fmt.Errorf("unexpected worker task message type %q", taskMsg.Type)
 	}
 	return taskMsg, nil
 }
 
-func (c *Consumer) validateRoute(msg events.WorkerTaskMessage) error {
+func (c *Consumer) validateRoute(msg protocol.WorkerTaskMessage) error {
 	if msg.Route.OrgID != 0 && msg.Route.OrgID != c.cfg.OrgID {
 		return fmt.Errorf("task org_id %q does not match worker org_id %q", msg.Route.OrgID, c.cfg.OrgID)
 	}
@@ -181,95 +181,4 @@ func (c *Consumer) validateRoute(msg events.WorkerTaskMessage) error {
 		return fmt.Errorf("task worker_id %q does not match worker_id %q", msg.Route.WorkerID, c.cfg.WorkerID)
 	}
 	return nil
-}
-
-// RequestFromWorkerTask converts the domain message protocol into the agent runtime boundary.
-func RequestFromWorkerTask(msg events.WorkerTaskMessage) *agent.RequestContext {
-	return &agent.RequestContext{
-		RunID:   firstNonEmpty(msg.Trace.RunID, msg.Trace.TaskID, msg.ID),
-		TraceID: msg.Trace.TraceID,
-		TaskID:  msg.Trace.TaskID,
-		Assistant: agent.AssistantContext{
-			ID:     msg.Body.Execution.AssistantID,
-			Skills: append([]string(nil), msg.Body.Execution.Skills...),
-			Tools:  append([]string(nil), msg.Body.Execution.Tools...),
-		},
-		Actor: agent.ActorContext{
-			UserID:      msg.Body.Actor.UserID,
-			DisplayName: msg.Body.Actor.DisplayName,
-			Channel:     msg.Body.Actor.Channel,
-			ExternalID:  msg.Body.Actor.ExternalID,
-			AccountID:   msg.Body.Actor.AccountID,
-		},
-		Conversation: agent.ConversationContext{
-			ID: msg.Route.SessionID,
-		},
-		Input: agent.InputContext{
-			Type:        agent.InputType(msg.Body.Input.Type),
-			Text:        msg.Body.Input.Text,
-			Messages:    inputMessagesFromTask(msg.Body.Input.Messages),
-			Attachments: attachmentsFromTask(msg.Body.Input.Attachments),
-		},
-		Runtime: agent.RuntimeOptions{
-			Kind:    msg.Body.Runtime.Kind,
-			WorkDir: msg.Body.Runtime.WorkDir,
-			MaxStep: msg.Body.Runtime.MaxStep,
-		},
-		Model: agent.ModelOptions{
-			ID: msg.Body.Model.ID,
-		},
-		Capability: agent.CapabilityContext{
-			AllowedTools: append([]string(nil), msg.Body.Execution.Tools...),
-		},
-		Policy: agent.PolicyContext{
-			RequireApproval: msg.Body.Policy.RequireApproval,
-		},
-		Metadata: map[string]any{
-			"message_id": msg.ID,
-			"org_id":     msg.Route.OrgID,
-			"worker_id":  msg.Route.WorkerID,
-			"session_id": msg.Route.SessionID,
-			"agent_id":   msg.Body.Execution.AgentID,
-			"metadata":   msg.Metadata,
-		},
-	}
-}
-
-func inputMessagesFromTask(messages []events.ChatMessage) []agent.InputMessage {
-	if len(messages) == 0 {
-		return nil
-	}
-	result := make([]agent.InputMessage, 0, len(messages))
-	for _, message := range messages {
-		result = append(result, agent.InputMessage{
-			Role:    string(message.Role),
-			Content: message.Content,
-		})
-	}
-	return result
-}
-
-func attachmentsFromTask(attachments []events.Attachment) []agent.Attachment {
-	if len(attachments) == 0 {
-		return nil
-	}
-	result := make([]agent.Attachment, 0, len(attachments))
-	for _, attachment := range attachments {
-		result = append(result, agent.Attachment{
-			ID:       attachment.ID,
-			Name:     attachment.Name,
-			MimeType: attachment.MimeType,
-			URL:      attachment.URL,
-		})
-	}
-	return result
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }

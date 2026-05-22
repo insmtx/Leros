@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/insmtx/Leros/backend/engines"
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/runtime/events"
 )
 
 func TestAdapterAskCurrentTime(t *testing.T) {
@@ -34,7 +34,7 @@ func TestAdapterAskCurrentTime(t *testing.T) {
 
 	handle, err := adapter.Run(ctx, engines.RunRequest{
 		WorkDir: workDir,
-		Prompt:  "请查询当前系统时间，并用一句中文回答。不要修改任何文件。",
+		Prompt:  "Answer with the current system time. Do not modify files.",
 		Model: engines.ModelConfig{
 			Provider: "anthropic",
 			APIKey:   apiKey,
@@ -166,7 +166,7 @@ func TestParseClaudeLineTracksAssistantFallback(t *testing.T) {
 
 func TestParseClaudeLineEmitsToolCallStarted(t *testing.T) {
 	state := &claudeStreamState{}
-	event := parseClaudeLine(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"call_123","name":"Bash","input":{"command":"date","description":"查询当前系统时间"}}]}}`, state)
+	event := parseClaudeLine(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"call_123","name":"Bash","input":{"command":"date","description":"鏌ヨ褰撳墠绯荤粺鏃堕棿"}}]}}`, state)
 	if event.Type != events.EventToolCallStarted {
 		t.Fatalf("unexpected event type: %#v", event)
 	}

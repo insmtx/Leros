@@ -11,10 +11,10 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/insmtx/Leros/backend/config"
-	agenteino "github.com/insmtx/Leros/backend/internal/agent/eino"
 	"github.com/insmtx/Leros/backend/internal/api/auth"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/infra/db"
+	agenteino "github.com/insmtx/Leros/backend/internal/runtime/eino"
 	"github.com/insmtx/Leros/backend/pkg/utils"
 	"github.com/insmtx/Leros/backend/types"
 	"github.com/ygpkg/yg-go/encryptor/snowflake"

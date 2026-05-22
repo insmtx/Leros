@@ -5,21 +5,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/api/dto"
+	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	"github.com/insmtx/Leros/backend/types"
 )
 
 func TestProjectStreamMessageKeepsReasoningDeltaSeparate(t *testing.T) {
-	streamMsg := events.MessageStreamMessage{
+	streamMsg := protocol.MessageStreamMessage{
 		CreatedAt: time.UnixMilli(1779243000000).UTC(),
-		Route:     events.RouteContext{SessionID: "sess_test"},
-		Body: events.StreamBody{
+		Route:     protocol.RouteContext{SessionID: "sess_test"},
+		Body: protocol.StreamBody{
 			Seq:   7,
-			Event: events.StreamEventReasoningDelta,
-			Payload: events.StreamPayload{
+			Event: protocol.StreamEventReasoningDelta,
+			Payload: protocol.StreamPayload{
 				MessageID: "msg_1",
-				Role:      events.MessageRoleAssistant,
+				Role:      protocol.MessageRoleAssistant,
 				Content:   "thinking",
 			},
 		},
@@ -72,13 +73,13 @@ func TestProjectRunEventRecordMatchesSessionEventShape(t *testing.T) {
 }
 
 func TestProjectStreamMessageProjectsTodoSnapshotPayloadAsArray(t *testing.T) {
-	streamMsg := events.MessageStreamMessage{
+	streamMsg := protocol.MessageStreamMessage{
 		CreatedAt: time.UnixMilli(1779243000000).UTC(),
-		Route:     events.RouteContext{SessionID: "sess_test"},
-		Body: events.StreamBody{
+		Route:     protocol.RouteContext{SessionID: "sess_test"},
+		Body: protocol.StreamBody{
 			Seq:   9,
-			Event: events.StreamEventTodoSnapshot,
-			Payload: events.StreamPayload{
+			Event: protocol.StreamEventTodoSnapshot,
+			Payload: protocol.StreamPayload{
 				Todos: []events.RuntimeTodoItem{
 					{ID: "t1", Title: "Inspect code", Status: "completed"},
 				},

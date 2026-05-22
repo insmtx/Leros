@@ -9,7 +9,7 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 
 	"github.com/insmtx/Leros/backend/config"
-	einoadapter "github.com/insmtx/Leros/backend/internal/agent/eino"
+	einoadapter "github.com/insmtx/Leros/backend/internal/runtime/eino"
 )
 
 // EinoExecutor implements Executor using the Eino LLM framework.

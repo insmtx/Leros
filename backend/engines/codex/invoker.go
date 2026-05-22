@@ -10,17 +10,17 @@ import (
 	"sync"
 
 	"github.com/insmtx/Leros/backend/engines"
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/runtime/events"
 	"github.com/ygpkg/yg-go/logs"
 )
 
-// Invoker 启动 Codex CLI 进程。
+// Invoker starts an external CLI process.
 type Invoker struct {
-	binary  string   // codex 可执行文件路径
-	baseEnv []string // 基础环境变量
+	binary  string
+	baseEnv []string // 鍩虹鐜鍙橀噺
 }
 
-// NewInvoker 创建 Codex CLI 调用器。
+// NewInvoker creates a CLI invoker.
 func NewInvoker(binary string, extraEnv map[string]string) *Invoker {
 	return &Invoker{
 		binary:  binary,
@@ -52,7 +52,7 @@ type codexTodoItem struct {
 	Completed bool   `json:"completed"`
 }
 
-// Run 启动 Codex CLI 进程并将 stdout/stderr 直接转换为引擎事件。
+// Run starts the CLI process and converts stdout/stderr into engine events.
 func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (engines.Process, <-chan events.Event, error) {
 	threadID, resume := resolveThread(req.SessionID, req.Resume)
 	args := buildArgs(threadID, resume, req)
@@ -290,7 +290,7 @@ func buildArgs(threadID string, resume bool, req engines.RunRequest) []string {
 	return append(args, "-", "--json", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox")
 }
 
-// ensureV1Suffix 确保 URL 以 /v1 结尾。
+// ensureV1Suffix appends /v1 when it is missing.
 func ensureV1Suffix(url string) string {
 	if url == "" {
 		return url

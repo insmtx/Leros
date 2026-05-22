@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	runtimetodo "github.com/insmtx/Leros/backend/internal/agent/runtime/todo"
+	runtimetodo "github.com/insmtx/Leros/backend/internal/runtime/todo"
 	"github.com/insmtx/Leros/backend/tools"
 )
 

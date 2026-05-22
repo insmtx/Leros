@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	"github.com/insmtx/Leros/backend/pkg/dm"
 	"github.com/ygpkg/yg-go/logs"
 )
@@ -19,11 +20,11 @@ type ResultPublisher interface {
 // MQStreamSink publishes agent runtime completion events via JetStream.
 type MQStreamSink struct {
 	publisher ResultPublisher
-	task      events.WorkerTaskMessage
+	task      protocol.WorkerTaskMessage
 }
 
 // NewMQStreamSink creates a stream sink for one worker task.
-func NewMQStreamSink(publisher ResultPublisher, task events.WorkerTaskMessage) *MQStreamSink {
+func NewMQStreamSink(publisher ResultPublisher, task protocol.WorkerTaskMessage) *MQStreamSink {
 	return &MQStreamSink{
 		publisher: publisher,
 		task:      task,
@@ -41,11 +42,11 @@ func (s *MQStreamSink) Emit(ctx context.Context, event *events.Event) error {
 		return nil
 	}
 
-	msg := events.MessageStreamMessage{
+	msg := protocol.MessageStreamMessage{
 		ID:        fmt.Sprintf("%s:%d", event.RunID, event.Seq),
-		Type:      events.MessageTypeStream,
+		Type:      protocol.MessageTypeStream,
 		CreatedAt: time.Now().UTC(),
-		Trace: events.TraceContext{
+		Trace: protocol.TraceContext{
 			TraceID:   event.TraceID,
 			RequestID: s.task.Trace.RequestID,
 			TaskID:    s.task.Trace.TaskID,
@@ -53,21 +54,21 @@ func (s *MQStreamSink) Emit(ctx context.Context, event *events.Event) error {
 			ParentID:  s.task.Trace.ParentID,
 		},
 		Route: s.task.Route,
-		Body: events.StreamBody{
+		Body: protocol.StreamBody{
 			Seq:     event.Seq,
 			Event:   streamEventType(event.Type),
 			Payload: streamPayload(event),
 		},
 	}
-	if msg.Body.Event == events.StreamEventRunFailed {
-		msg.Body.Error = &events.StreamError{Message: event.Content}
+	if msg.Body.Event == protocol.StreamEventRunFailed {
+		msg.Body.Error = &protocol.StreamError{Message: event.Content}
 	}
 
 	if err := s.publisher.Publish(ctx, topic, msg); err != nil {
 		logs.WarnContextf(ctx, "Failed to publish worker stream event to %s: %v", topic, err)
 	}
 
-	if msg.Body.Event == events.StreamEventRunCompleted || msg.Body.Event == events.StreamEventRunFailed {
+	if msg.Body.Event == protocol.StreamEventRunCompleted || msg.Body.Event == protocol.StreamEventRunFailed {
 		s.emitCompleted(ctx, event)
 	}
 	return nil
@@ -96,16 +97,16 @@ func (s *MQStreamSink) emitCompleted(ctx context.Context, event *events.Event) e
 		return fmt.Errorf("failed to get session completed subject: %w", err)
 	}
 
-	streamEvent := events.StreamEventRunCompleted
+	streamEvent := protocol.StreamEventRunCompleted
 	if event.Type == events.EventFailed || event.Type == events.EventCancelled {
-		streamEvent = events.StreamEventRunFailed
+		streamEvent = protocol.StreamEventRunFailed
 	}
 
-	msg := events.MessageStreamMessage{
+	msg := protocol.MessageStreamMessage{
 		ID:        fmt.Sprintf("%s:%d", event.RunID, event.Seq),
-		Type:      events.MessageTypeStream,
+		Type:      protocol.MessageTypeStream,
 		CreatedAt: time.Now().UTC(),
-		Trace: events.TraceContext{
+		Trace: protocol.TraceContext{
 			TraceID:   event.TraceID,
 			RequestID: s.task.Trace.RequestID,
 			TaskID:    s.task.Trace.TaskID,
@@ -113,14 +114,14 @@ func (s *MQStreamSink) emitCompleted(ctx context.Context, event *events.Event) e
 			ParentID:  s.task.Trace.ParentID,
 		},
 		Route: s.task.Route,
-		Body: events.StreamBody{
+		Body: protocol.StreamBody{
 			Seq:          event.Seq,
 			Event:        streamEvent,
 			RunCompleted: completedPayloadFromEvent(event),
 		},
 	}
-	if streamEvent == events.StreamEventRunFailed {
-		msg.Body.Error = &events.StreamError{Message: event.Content}
+	if streamEvent == protocol.StreamEventRunFailed {
+		msg.Body.Error = &protocol.StreamError{Message: event.Content}
 	}
 
 	if err := s.publisher.Publish(ctx, topic, msg); err != nil {
@@ -146,12 +147,12 @@ func completedPayloadFromEvent(event *events.Event) *events.RunCompletedPayload 
 	return &completedPayload
 }
 
-func streamPayload(event *events.Event) events.StreamPayload {
+func streamPayload(event *events.Event) protocol.StreamPayload {
 	if event == nil {
-		return events.StreamPayload{Role: events.MessageRoleAssistant}
+		return protocol.StreamPayload{Role: protocol.MessageRoleAssistant}
 	}
-	payload := events.StreamPayload{
-		Role:    events.MessageRoleAssistant,
+	payload := protocol.StreamPayload{
+		Role:    protocol.MessageRoleAssistant,
 		Content: event.Content,
 	}
 	switch event.Type {
@@ -159,10 +160,10 @@ func streamPayload(event *events.Event) events.StreamPayload {
 		messagePayload, err := events.DecodePayload[events.MessageDeltaPayload](event)
 		if err == nil {
 			payload.MessageID = messagePayload.MessageID
-			payload.Role = events.MessageRole(messagePayload.Role)
+			payload.Role = protocol.MessageRole(messagePayload.Role)
 			payload.Content = messagePayload.Content
 			if payload.Role == "" {
-				payload.Role = events.MessageRoleAssistant
+				payload.Role = protocol.MessageRoleAssistant
 			}
 		}
 	case events.EventToolCallStarted:
@@ -190,32 +191,32 @@ func streamPayload(event *events.Event) events.StreamPayload {
 	return payload
 }
 
-func streamEventType(eventType events.EventType) events.StreamEventType {
+func streamEventType(eventType events.EventType) protocol.StreamEventType {
 	switch eventType {
 	case events.EventStarted:
-		return events.StreamEventRunStarted
+		return protocol.StreamEventRunStarted
 	case events.EventCompleted:
-		return events.StreamEventRunCompleted
+		return protocol.StreamEventRunCompleted
 	case events.EventFailed, events.EventCancelled:
-		return events.StreamEventRunFailed
+		return protocol.StreamEventRunFailed
 	case events.EventMessageDelta:
-		return events.StreamEventMessageDelta
+		return protocol.StreamEventMessageDelta
 	case events.EventReasoningDelta:
-		return events.StreamEventReasoningDelta
+		return protocol.StreamEventReasoningDelta
 	case events.EventResult:
-		return events.StreamEventMessageCompleted
+		return protocol.StreamEventMessageCompleted
 	case events.EventToolCallStarted:
-		return events.StreamEventToolCallStarted
+		return protocol.StreamEventToolCallStarted
 	case events.EventToolCallCompleted:
-		return events.StreamEventToolCallFinished
+		return protocol.StreamEventToolCallFinished
 	case events.EventToolCallFailed:
-		return events.StreamEventToolCallFinished
+		return protocol.StreamEventToolCallFinished
 	case events.EventTodoSnapshot:
-		return events.StreamEventTodoSnapshot
+		return protocol.StreamEventTodoSnapshot
 	case events.EventTodoUpdated:
-		return events.StreamEventTodoUpdated
+		return protocol.StreamEventTodoUpdated
 	default:
-		return events.StreamEventMessageDelta
+		return protocol.StreamEventMessageDelta
 	}
 }
 

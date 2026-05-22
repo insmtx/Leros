@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/api/dto"
+	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	"github.com/nats-io/nats.go"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -32,7 +33,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// mockEventBus 是一个简单的 Mock 实现，用于测试
+// mockEventBus is a simple test event bus.
 type mockEventBus struct{}
 
 func (m *mockEventBus) Publish(ctx context.Context, topic string, event any) error {
@@ -47,7 +48,7 @@ func (m *mockEventBus) SubscribeFrom(ctx context.Context, topic string, startSeq
 	return nil
 }
 
-// mockInferrer 是一个简单的 Mock 实现，总是返回固定的 assistant ID
+// mockInferrer returns a fixed assistant ID.
 type mockInferrer struct {
 	assistantID uint
 }
@@ -258,7 +259,7 @@ func TestUpdateSession(t *testing.T) {
 	}
 
 	if updated.Title != "Updated Title" {
-		t.Errorf("expected title to be updated, got %s", updated.Title)
+		t.Errorf("expected title %q, got %q", "Updated Title", updated.Title)
 	}
 }
 
@@ -304,12 +305,12 @@ func TestHandleSessionTitleRequest_AfterManualRename(t *testing.T) {
 		t.Fatalf("CreateSession failed: %v", err)
 	}
 
-	_, err = service.UpdateSession(ctx, session.SessionID, &contract.UpdateSessionRequest{Title: "用户手动设置的标题"})
+	_, err = service.UpdateSession(ctx, session.SessionID, &contract.UpdateSessionRequest{Title: "Manual title"})
 	if err != nil {
 		t.Fatalf("UpdateSession failed: %v", err)
 	}
 
-	addMessage(t, service, ctx, session.SessionID, "这是一条消息")
+	addMessage(t, service, ctx, session.SessionID, "hello")
 	err = service.HandleSessionTitleRequest(ctx, session.SessionID)
 	if err != nil {
 		t.Fatalf("HandleSessionTitleRequest failed: %v", err)
@@ -319,8 +320,8 @@ func TestHandleSessionTitleRequest_AfterManualRename(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSession failed: %v", err)
 	}
-	if retrieved.Title != "用户手动设置的标题" {
-		t.Errorf("expected title to remain '用户手动设置的标题', got '%s'", retrieved.Title)
+	if retrieved.Title != "Manual title" {
+		t.Errorf("expected title %q, got %q", "Manual title", retrieved.Title)
 	}
 	if !retrieved.TitleManuallySet {
 		t.Error("expected TitleManuallySet to be true")
@@ -555,7 +556,7 @@ func TestHandleSessionTitleRequest_EmptyTitle(t *testing.T) {
 		t.Fatalf("CreateSession failed: %v", err)
 	}
 
-	addMessage(t, service, ctx, session.SessionID, "这是我的第一条消息")
+	addMessage(t, service, ctx, session.SessionID, "hello")
 	err = service.HandleSessionTitleRequest(ctx, session.SessionID)
 	if err != nil {
 		t.Fatalf("HandleSessionTitleRequest failed: %v", err)
@@ -565,8 +566,8 @@ func TestHandleSessionTitleRequest_EmptyTitle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSession failed: %v", err)
 	}
-	if retrieved.Title != "这是我的第一条消息" {
-		t.Errorf("expected title '%s', got '%s'", "这是我的第一条消息", retrieved.Title)
+	if retrieved.Title != "hello" {
+		t.Errorf("expected title %q, got %q", "hello", retrieved.Title)
 	}
 }
 
@@ -576,13 +577,13 @@ func TestHandleSessionTitleRequest_XinSessionTitle(t *testing.T) {
 
 	session, err := service.CreateSession(ctx, &contract.CreateSessionRequest{
 		Type:  string(types.SessionTypeUserChat),
-		Title: "新会话",
+		Title: "New Session",
 	})
 	if err != nil {
 		t.Fatalf("CreateSession failed: %v", err)
 	}
 
-	addMessage(t, service, ctx, session.SessionID, "我的第一条消息")
+	addMessage(t, service, ctx, session.SessionID, "hello")
 	err = service.HandleSessionTitleRequest(ctx, session.SessionID)
 	if err != nil {
 		t.Fatalf("HandleSessionTitleRequest failed: %v", err)
@@ -592,8 +593,8 @@ func TestHandleSessionTitleRequest_XinSessionTitle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSession failed: %v", err)
 	}
-	if retrieved.Title != "我的第一条消息" {
-		t.Errorf("expected title '%s', got '%s'", "我的第一条消息", retrieved.Title)
+	if retrieved.Title != "Manual title" {
+		t.Errorf("expected title %q, got %q", "hello", retrieved.Title)
 	}
 }
 
@@ -622,7 +623,7 @@ func TestHandleSessionTitleRequest_Truncated(t *testing.T) {
 		t.Fatalf("GetSession failed: %v", err)
 	}
 	if len([]rune(retrieved.Title)) != 100 {
-		t.Errorf("expected title length 100, got %d", len([]rune(retrieved.Title)))
+		t.Errorf("expected title %q, got %q", "hello", retrieved.Title)
 	}
 }
 
@@ -632,13 +633,13 @@ func TestHandleSessionTitleRequest_CustomTitleUnchanged(t *testing.T) {
 
 	session, err := service.CreateSession(ctx, &contract.CreateSessionRequest{
 		Type:  string(types.SessionTypeUserChat),
-		Title: "自定义标题",
+		Title: "New Session",
 	})
 	if err != nil {
 		t.Fatalf("CreateSession failed: %v", err)
 	}
 
-	addMessage(t, service, ctx, session.SessionID, "一条消息")
+	addMessage(t, service, ctx, session.SessionID, "hello")
 	err = service.HandleSessionTitleRequest(ctx, session.SessionID)
 	if err != nil {
 		t.Fatalf("HandleSessionTitleRequest failed: %v", err)
@@ -648,8 +649,8 @@ func TestHandleSessionTitleRequest_CustomTitleUnchanged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSession failed: %v", err)
 	}
-	if retrieved.Title != "自定义标题" {
-		t.Errorf("expected title to remain '自定义标题', got '%s'", retrieved.Title)
+	if retrieved.Title != "Manual title" {
+		t.Errorf("expected title %q, got %q", "hello", retrieved.Title)
 	}
 }
 
@@ -662,12 +663,12 @@ func TestHandleSessionTitleRequest_ManuallySetFlag(t *testing.T) {
 		t.Fatalf("CreateSession failed: %v", err)
 	}
 
-	_, err = service.UpdateSession(ctx, session.SessionID, &contract.UpdateSessionRequest{Title: "手动标题"})
+	_, err = service.UpdateSession(ctx, session.SessionID, &contract.UpdateSessionRequest{Title: "鎵嬪姩鏍囬"})
 	if err != nil {
 		t.Fatalf("UpdateSession failed: %v", err)
 	}
 
-	addMessage(t, service, ctx, session.SessionID, "新消息内容")
+	addMessage(t, service, ctx, session.SessionID, "hello")
 	err = service.HandleSessionTitleRequest(ctx, session.SessionID)
 	if err != nil {
 		t.Fatalf("HandleSessionTitleRequest failed: %v", err)
@@ -677,8 +678,8 @@ func TestHandleSessionTitleRequest_ManuallySetFlag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSession failed: %v", err)
 	}
-	if retrieved.Title != "手动标题" {
-		t.Errorf("expected title to remain '手动标题', got '%s'", retrieved.Title)
+	if retrieved.Title != "鎵嬪姩鏍囬" {
+		t.Errorf("expected title %q, got %q", "hello", retrieved.Title)
 	}
 	if !retrieved.TitleManuallySet {
 		t.Error("expected TitleManuallySet to be true")
@@ -703,13 +704,13 @@ func TestDeleteMessage_UpdatesSession(t *testing.T) {
 		Content: "Test message",
 	}
 
-	// 添加消息获取 ID
+	// 娣诲姞娑堟伅鑾峰彇 ID
 	msg, err := service.AddMessage(ctx, session.SessionID, addReq)
 	if err != nil {
 		t.Fatalf("AddMessage failed: %v", err)
 	}
 
-	// 将 string ID 转换回 uint
+	// 灏?string ID 杞崲鍥?uint
 	var messageID uint
 	fmt.Sscanf(msg.ID, "%d", &messageID)
 
@@ -863,7 +864,7 @@ func TestCompleteSessionMessageStoresChunksAndUsage(t *testing.T) {
 
 	payload, err := json.Marshal(events.MessageDeltaPayload{
 		MessageID: "msg_1",
-		Role:      string(events.MessageRoleAssistant),
+		Role:      string(protocol.MessageRoleAssistant),
 		Content:   "done",
 	})
 	if err != nil {

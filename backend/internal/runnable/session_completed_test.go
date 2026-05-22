@@ -8,21 +8,22 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
+	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 )
 
 func TestHandleSessionCompletedMessageUsesRunCompletedPayload(t *testing.T) {
 	service := &recordingSessionService{}
 	createdAt := time.Now().UTC()
-	streamMsg := events.MessageStreamMessage{
+	streamMsg := protocol.MessageStreamMessage{
 		CreatedAt: createdAt,
-		Route: events.RouteContext{
+		Route: protocol.RouteContext{
 			SessionID: "sess_test",
 		},
-		Body: events.StreamBody{
+		Body: protocol.StreamBody{
 			Seq:   9,
-			Event: events.StreamEventRunCompleted,
+			Event: protocol.StreamEventRunCompleted,
 			RunCompleted: &events.RunCompletedPayload{
 				Result: events.RunResultPayload{Message: "done"},
 				Usage: &events.UsagePayload{
@@ -67,12 +68,12 @@ func TestHandleSessionCompletedMessageUsesRunCompletedPayload(t *testing.T) {
 
 func TestHandleSessionCompletedMessageRequiresRunCompletedPayload(t *testing.T) {
 	service := &recordingSessionService{}
-	streamMsg := events.MessageStreamMessage{
+	streamMsg := protocol.MessageStreamMessage{
 		CreatedAt: time.Now().UTC(),
-		Route:     events.RouteContext{SessionID: "sess_test"},
-		Body: events.StreamBody{
+		Route:     protocol.RouteContext{SessionID: "sess_test"},
+		Body: protocol.StreamBody{
 			Seq:   9,
-			Event: events.StreamEventRunCompleted,
+			Event: protocol.StreamEventRunCompleted,
 		},
 	}
 	body, err := json.Marshal(streamMsg)
@@ -90,21 +91,21 @@ func TestHandleSessionCompletedMessageRequiresRunCompletedPayload(t *testing.T) 
 func TestHandleSessionCompletedMessageUsesFailedRunCompletedPayload(t *testing.T) {
 	service := &recordingSessionService{}
 	createdAt := time.Now().UTC()
-	streamMsg := events.MessageStreamMessage{
+	streamMsg := protocol.MessageStreamMessage{
 		CreatedAt: createdAt,
-		Route: events.RouteContext{
+		Route: protocol.RouteContext{
 			SessionID: "sess_test",
 		},
-		Body: events.StreamBody{
+		Body: protocol.StreamBody{
 			Seq:   10,
-			Event: events.StreamEventRunFailed,
+			Event: protocol.StreamEventRunFailed,
 			RunCompleted: &events.RunCompletedPayload{
 				Status: "failed",
 				Result: events.RunResultPayload{
 					Message: "runtime unavailable",
 				},
 			},
-			Error: &events.StreamError{
+			Error: &protocol.StreamError{
 				Code:    "runtime_error",
 				Message: "runtime unavailable",
 			},

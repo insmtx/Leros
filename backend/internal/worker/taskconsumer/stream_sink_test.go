@@ -5,21 +5,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	"github.com/insmtx/Leros/backend/pkg/dm"
 )
 
 func TestMQStreamSinkPublishesStreamEventToStreamTopic(t *testing.T) {
 	orgID := uint(1)
 	sessionID := "session_test"
-	task := events.WorkerTaskMessage{
-		Trace: events.TraceContext{
+	task := protocol.WorkerTaskMessage{
+		Trace: protocol.TraceContext{
 			TraceID:   "trace_test",
 			RequestID: "request_test",
 			TaskID:    "task_test",
 			RunID:     "run_test",
 		},
-		Route: events.RouteContext{
+		Route: protocol.RouteContext{
 			OrgID:     orgID,
 			SessionID: sessionID,
 			WorkerID:  2,
@@ -47,12 +48,12 @@ func TestMQStreamSinkPublishesStreamEventToStreamTopic(t *testing.T) {
 	if publisher.calls[0].topic != streamTopic {
 		t.Fatalf("expected publish to stream topic %q, got %q", streamTopic, publisher.calls[0].topic)
 	}
-	streamMsg, ok := publisher.calls[0].event.(events.MessageStreamMessage)
+	streamMsg, ok := publisher.calls[0].event.(protocol.MessageStreamMessage)
 	if !ok {
 		t.Fatalf("expected stream publish event type MessageStreamMessage, got %T", publisher.calls[0].event)
 	}
-	if streamMsg.Body.Event != events.StreamEventMessageDelta {
-		t.Fatalf("expected stream event %q, got %q", events.StreamEventMessageDelta, streamMsg.Body.Event)
+	if streamMsg.Body.Event != protocol.StreamEventMessageDelta {
+		t.Fatalf("expected stream event %q, got %q", protocol.StreamEventMessageDelta, streamMsg.Body.Event)
 	}
 	if streamMsg.Body.Payload.Content != "hello" {
 		t.Fatalf("expected content %q, got %q", "hello", streamMsg.Body.Payload.Content)
@@ -63,21 +64,21 @@ func TestMQStreamSinkPublishesCompletedEventToSessionCompletedTopic(t *testing.T
 	tests := []struct {
 		name       string
 		eventType  events.EventType
-		wantStream events.StreamEventType
+		wantStream protocol.StreamEventType
 		status     string
 		message    string
 	}{
 		{
 			name:       "run completed",
 			eventType:  events.EventCompleted,
-			wantStream: events.StreamEventRunCompleted,
+			wantStream: protocol.StreamEventRunCompleted,
 			status:     "completed",
 			message:    "done",
 		},
 		{
 			name:       "run failed",
 			eventType:  events.EventFailed,
-			wantStream: events.StreamEventRunFailed,
+			wantStream: protocol.StreamEventRunFailed,
 			status:     "failed",
 			message:    "runtime unavailable",
 		},
@@ -87,14 +88,14 @@ func TestMQStreamSinkPublishesCompletedEventToSessionCompletedTopic(t *testing.T
 		t.Run(tt.name, func(t *testing.T) {
 			orgID := uint(1)
 			sessionID := "session_test"
-			task := events.WorkerTaskMessage{
-				Trace: events.TraceContext{
+			task := protocol.WorkerTaskMessage{
+				Trace: protocol.TraceContext{
 					TraceID:   "trace_test",
 					RequestID: "request_test",
 					TaskID:    "task_test",
 					RunID:     "run_test",
 				},
-				Route: events.RouteContext{
+				Route: protocol.RouteContext{
 					OrgID:     orgID,
 					SessionID: sessionID,
 					WorkerID:  2,
@@ -143,7 +144,7 @@ func TestMQStreamSinkPublishesCompletedEventToSessionCompletedTopic(t *testing.T
 			if publisher.calls[1].topic != completedTopic {
 				t.Fatalf("expected second publish to completed topic %q, got %q", completedTopic, publisher.calls[1].topic)
 			}
-			completedMsg, ok := publisher.calls[1].event.(events.MessageStreamMessage)
+			completedMsg, ok := publisher.calls[1].event.(protocol.MessageStreamMessage)
 			if !ok {
 				t.Fatalf("expected completed publish event type %T, got %T", completedMsg, publisher.calls[1].event)
 			}
@@ -153,7 +154,7 @@ func TestMQStreamSinkPublishesCompletedEventToSessionCompletedTopic(t *testing.T
 			if completedMsg.Trace.TaskID != task.Trace.TaskID || completedMsg.Trace.RunID != task.Trace.RunID {
 				t.Fatalf("completed trace mismatch: got task_id=%q run_id=%q", completedMsg.Trace.TaskID, completedMsg.Trace.RunID)
 			}
-			streamMsg, ok := publisher.calls[0].event.(events.MessageStreamMessage)
+			streamMsg, ok := publisher.calls[0].event.(protocol.MessageStreamMessage)
 			if !ok {
 				t.Fatalf("expected stream publish event type MessageStreamMessage, got %T", publisher.calls[0].event)
 			}
@@ -196,12 +197,12 @@ func TestMQStreamSinkPublishesCompletedEventToSessionCompletedTopic(t *testing.T
 func TestMQStreamSinkPublishesTodoPayload(t *testing.T) {
 	orgID := uint(1)
 	sessionID := "session_test"
-	task := events.WorkerTaskMessage{
-		Trace: events.TraceContext{
+	task := protocol.WorkerTaskMessage{
+		Trace: protocol.TraceContext{
 			TraceID: "trace_test",
 			RunID:   "run_test",
 		},
-		Route: events.RouteContext{
+		Route: protocol.RouteContext{
 			OrgID:     orgID,
 			SessionID: sessionID,
 			WorkerID:  2,
@@ -222,12 +223,12 @@ func TestMQStreamSinkPublishesTodoPayload(t *testing.T) {
 	if len(publisher.calls) != 1 {
 		t.Fatalf("expected one stream publish, got %d", len(publisher.calls))
 	}
-	streamMsg, ok := publisher.calls[0].event.(events.MessageStreamMessage)
+	streamMsg, ok := publisher.calls[0].event.(protocol.MessageStreamMessage)
 	if !ok {
 		t.Fatalf("expected stream publish event type MessageStreamMessage, got %T", publisher.calls[0].event)
 	}
-	if streamMsg.Body.Event != events.StreamEventTodoSnapshot {
-		t.Fatalf("expected event %q, got %q", events.StreamEventTodoSnapshot, streamMsg.Body.Event)
+	if streamMsg.Body.Event != protocol.StreamEventTodoSnapshot {
+		t.Fatalf("expected event %q, got %q", protocol.StreamEventTodoSnapshot, streamMsg.Body.Event)
 	}
 	if len(streamMsg.Body.Payload.Todos) != 1 || streamMsg.Body.Payload.Todos[0].ID != "t1" {
 		t.Fatalf("unexpected todo payload: %#v", streamMsg.Body.Payload.Todos)

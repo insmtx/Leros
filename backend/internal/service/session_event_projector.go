@@ -3,14 +3,15 @@ package service
 import (
 	"encoding/json"
 
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/api/dto"
+	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	"github.com/insmtx/Leros/backend/types"
 )
 
 // ProjectStreamMessage converts a worker stream message into the public session event shape.
-func ProjectStreamMessage(streamMsg events.MessageStreamMessage) (*dto.SessionEvent, bool) {
+func ProjectStreamMessage(streamMsg protocol.MessageStreamMessage) (*dto.SessionEvent, bool) {
 	event := &dto.SessionEvent{
 		SessionID: streamMsg.Route.SessionID,
 		Sequence:  streamMsg.Body.Seq,
@@ -18,21 +19,21 @@ func ProjectStreamMessage(streamMsg events.MessageStreamMessage) (*dto.SessionEv
 	}
 
 	switch streamMsg.Body.Event {
-	case events.StreamEventMessageDelta:
+	case protocol.StreamEventMessageDelta:
 		event.Type = dto.SessionEventTypeMessageDelta
 		event.Payload = dto.MessageDeltaPayload{
 			MessageID: streamMsg.Body.Payload.MessageID,
 			Role:      string(streamMsg.Body.Payload.Role),
 			Content:   streamMsg.Body.Payload.Content,
 		}
-	case events.StreamEventReasoningDelta:
+	case protocol.StreamEventReasoningDelta:
 		event.Type = dto.SessionEventTypeReasoningDelta
 		event.Payload = dto.MessageDeltaPayload{
 			MessageID: streamMsg.Body.Payload.MessageID,
 			Role:      string(streamMsg.Body.Payload.Role),
 			Content:   streamMsg.Body.Payload.Content,
 		}
-	case events.StreamEventToolCallStarted:
+	case protocol.StreamEventToolCallStarted:
 		if streamMsg.Body.Payload.ToolCall == nil {
 			return nil, false
 		}
@@ -42,21 +43,21 @@ func ProjectStreamMessage(streamMsg events.MessageStreamMessage) (*dto.SessionEv
 			Name:       streamMsg.Body.Payload.ToolCall.Name,
 			Arguments:  streamMsg.Body.Payload.ToolCall.Arguments,
 		}
-	case events.StreamEventToolCallFinished:
+	case protocol.StreamEventToolCallFinished:
 		if streamMsg.Body.Payload.ToolResult == nil {
 			return nil, false
 		}
 		event.Type = dto.SessionEventTypeToolCallResult
 		event.Payload = toolCallResultPayload(streamMsg.Body.Payload.ToolResult)
-	case events.StreamEventTodoSnapshot:
+	case protocol.StreamEventTodoSnapshot:
 		event.Type = dto.SessionEventTypeTodoSnapshot
 		event.Payload = todoPayload(streamMsg.Body.Payload.Todos)
-	case events.StreamEventTodoUpdated:
+	case protocol.StreamEventTodoUpdated:
 		event.Type = dto.SessionEventTypeTodoUpdated
 		event.Payload = todoPayload(streamMsg.Body.Payload.Todos)
-	case events.StreamEventRunStarted:
+	case protocol.StreamEventRunStarted:
 		event.Type = dto.SessionEventTypeRunStarted
-	case events.StreamEventRunCompleted:
+	case protocol.StreamEventRunCompleted:
 		event.Type = dto.SessionEventTypeRunCompleted
 		if streamMsg.Body.RunCompleted != nil {
 			event.Payload = streamMsg.Body.RunCompleted
@@ -67,7 +68,7 @@ func ProjectStreamMessage(streamMsg events.MessageStreamMessage) (*dto.SessionEv
 				Message: streamMsg.Body.Payload.Content,
 			}
 		}
-	case events.StreamEventRunFailed:
+	case protocol.StreamEventRunFailed:
 		event.Type = dto.SessionEventTypeRunFailed
 		message := streamMsg.Body.Payload.Content
 		if streamMsg.Body.Error != nil {

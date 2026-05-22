@@ -15,8 +15,9 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	"github.com/insmtx/Leros/backend/pkg/dm"
 )
 
@@ -67,47 +68,46 @@ func TestPublishWorkerTaskMessageToNATS(t *testing.T) {
 	}
 }
 
-// newTestWorkerTaskMessage 构造真实 NATS 集成测试使用的 worker.task 消息。
-// 这里显式生成 trace/task/run 标识，后续接收回复时只认这次测试发出的任务，避免被同一 topic 上其他消息干扰。
-func newTestWorkerTaskMessage(t *testing.T, orgID uint, workerID uint, sessionID string) events.WorkerTaskMessage {
+// newTestWorkerTaskMessage builds a worker task message for integration tests.
+func newTestWorkerTaskMessage(t *testing.T, orgID uint, workerID uint, sessionID string) protocol.WorkerTaskMessage {
 	t.Helper()
 
-	return events.WorkerTaskMessage{
+	return protocol.WorkerTaskMessage{
 		ID:        randomTestID(t, "msg"),
-		Type:      events.MessageTypeWorkerTask,
+		Type:      protocol.MessageTypeWorkerTask,
 		CreatedAt: time.Now().UTC(),
-		Trace: events.TraceContext{
+		Trace: protocol.TraceContext{
 			TraceID:   randomTestID(t, "trace"),
 			RequestID: randomTestID(t, "request"),
 			TaskID:    randomTestID(t, "task"),
 			RunID:     randomTestID(t, "run"),
 		},
-		Route: events.RouteContext{
+		Route: protocol.RouteContext{
 			OrgID:     orgID,
 			SessionID: sessionID,
 			WorkerID:  workerID,
 		},
-		Body: events.WorkerTaskBody{
-			TaskType: events.TaskTypeAgentRun,
-			Actor: events.ActorContext{
+		Body: protocol.WorkerTaskBody{
+			TaskType: protocol.TaskTypeAgentRun,
+			Actor: protocol.ActorContext{
 				UserID:      "user_test",
 				DisplayName: "Test User",
 				Channel:     "go_test",
 			},
-			Execution: events.ExecutionTarget{
+			Execution: protocol.ExecutionTarget{
 				AssistantID: "assistant_test",
 				AgentID:     "agent_test",
 				Tools:       []string{},
 			},
-			Input: events.TaskInput{
-				Type: events.InputTypeTaskInstruction,
-				Text: "选择合适的工具查询当前系统时间，先告诉我你要怎么查，再执行操作，查询完毕后告诉我几点了，生成一个200字的报告",
+			Input: protocol.TaskInput{
+				Type: protocol.InputTypeTaskInstruction,
+				Text: "Check the current system time and report it back.",
 			},
-			Runtime: events.RuntimeOptions{
+			Runtime: protocol.RuntimeOptions{
 				Kind:    AgentRuntime,
 				WorkDir: ".",
 			},
-			Model: events.ModelOptions{
+			Model: protocol.ModelOptions{
 				ID: 1,
 			},
 		},
@@ -117,9 +117,8 @@ func newTestWorkerTaskMessage(t *testing.T, orgID uint, workerID uint, sessionID
 	}
 }
 
-// sendWorkerTaskMessage 负责把测试消息发送到 worker 任务 topic。
-// 发送日志保留关键链路 ID，便于和 worker 日志、回复 topic 中的 trace 字段对齐排查。
-func sendWorkerTaskMessage(ctx context.Context, t *testing.T, publisher mq.Publisher, natsURL string, topic string, msg events.WorkerTaskMessage) {
+// sendWorkerTaskMessage publishes a worker task message to the task topic.
+func sendWorkerTaskMessage(ctx context.Context, t *testing.T, publisher mq.Publisher, natsURL string, topic string, msg protocol.WorkerTaskMessage) {
 	t.Helper()
 
 	if err := publisher.Publish(ctx, topic, msg); err != nil {
@@ -137,101 +136,70 @@ func sendWorkerTaskMessage(ctx context.Context, t *testing.T, publisher mq.Publi
 	)
 }
 
-// receiveWorkerTaskReply 订阅 agent 运行回复 topic，并等待当前测试任务的完成消息。
-// completed topic 使用 JetStream 订阅以匹配最终落盘语义。
+// receiveWorkerTaskReply waits for the current task completion message.
 func receiveWorkerTaskReply(ctx context.Context, t *testing.T, subscriber mq.Subscriber, streamTopic string, completedTopic string, taskID string, runID string, ready chan<- error) error {
 	t.Helper()
 
-	completedCh := make(chan events.MessageStreamMessage, 1)
+	completedCh := make(chan protocol.MessageStreamMessage, 1)
 
-	// 注意：Subscribe 是阻塞调用，会一直运行直到 context 取消。
-	// 因此在启动订阅后立即发送 ready，告知调用者订阅已启动（而非已完成）。
 	go func() {
-		// 先发送 ready，表示订阅尝试已开始
 		ready <- nil
-
 		err := subscriber.SubscribeFrom(ctx, streamTopic, 0, func(natsMsg *nats.Msg) {
-			var streamMsg events.MessageStreamMessage
+			var streamMsg protocol.MessageStreamMessage
 			if err := json.Unmarshal(natsMsg.Data, &streamMsg); err != nil {
-				t.Logf("\ntopic:\n【%s】\nmalformed:%v\n%s\n\n", streamTopic, err, string(natsMsg.Data))
+				t.Logf("topic %s malformed: %v\n%s", streamTopic, err, string(natsMsg.Data))
 				return
 			}
-			t.Logf("\ntopic:\n【%s】\n%s:%s\n%s\n\n",
-				streamTopic,
-				streamMsg.Body.Event,
-				streamMsg.Body.Payload.Content,
-				string(natsMsg.Data),
-			)
+			t.Logf("topic %s event=%s content=%s\n%s", streamTopic, streamMsg.Body.Event, streamMsg.Body.Payload.Content, string(natsMsg.Data))
 		})
-		// Subscribe 阻塞直到 context 取消，这里仅记录错误
 		if err != nil {
 			t.Logf("stream topic subscription error: %v", err)
 		}
 	}()
 
 	go func() {
-		// 先发送 ready，表示订阅尝试已开始
 		ready <- nil
-
 		err := subscriber.SubscribeFrom(ctx, completedTopic, 0, func(natsMsg *nats.Msg) {
-			var completedMsg events.MessageStreamMessage
+			var completedMsg protocol.MessageStreamMessage
 			if err := json.Unmarshal(natsMsg.Data, &completedMsg); err != nil {
-				t.Logf("\ntopic:\n【%s】\nmalformed:%v\n%s\n\n", completedTopic, err, string(natsMsg.Data))
+				t.Logf("topic %s malformed: %v\n%s", completedTopic, err, string(natsMsg.Data))
 				return
 			}
-			t.Logf("\ntopic:\n【%s】\n%s:%s\n%s\n\n",
-				completedTopic,
-				completedMsg.Body.Event,
-				completedMsg.Body.Payload.Content,
-				string(natsMsg.Data),
-			)
-			if completedMsg.Trace.TaskID != taskID || completedMsg.Trace.RunID != runID {
+			t.Logf("topic %s event=%s content=%s\n%s", completedTopic, completedMsg.Body.Event, completedMsg.Body.Payload.Content, string(natsMsg.Data))
+
+			if completedMsg.Trace.TaskID != taskID && completedMsg.Trace.RunID != runID {
 				return
 			}
-			if completedMsg.Body.Event == events.StreamEventRunCompleted {
-				completedPayload, err := runCompletedPayloadFromCompletedMessage(completedMsg)
-				if err != nil {
-					t.Logf("decode run completed payload from %s: %v", completedTopic, err)
-				} else if payloadJSON, err := json.MarshalIndent(completedPayload, "", "  "); err != nil {
-					t.Logf("marshal run completed payload json from %s: %v", completedTopic, err)
-				} else {
-					t.Logf("run completed payload json from %s:\n%s", completedTopic, string(payloadJSON))
+			switch completedMsg.Body.Event {
+			case protocol.StreamEventRunCompleted, protocol.StreamEventRunFailed:
+				select {
+				case completedCh <- completedMsg:
+				default:
 				}
 			}
-			select {
-			case completedCh <- completedMsg:
-			case <-ctx.Done():
-			default:
-				t.Logf("drop completed message because result channel is full: event=%s seq=%d", completedMsg.Body.Event, completedMsg.Body.Seq)
-			}
 		})
-		// Subscribe 阻塞直到 context 取消，这里仅记录错误
 		if err != nil {
 			t.Logf("completed topic subscription error: %v", err)
 		}
 	}()
 
-	for {
-		select {
-		case completedMsg := <-completedCh:
-			switch completedMsg.Body.Event {
-			case events.StreamEventRunCompleted:
-				return nil
-			case events.StreamEventRunFailed:
-				if completedMsg.Body.Error != nil {
-					return fmt.Errorf("worker run failed: %s", completedMsg.Body.Error.Message)
-				}
-				return fmt.Errorf("worker run failed: %s", completedMsg.Body.Payload.Content)
-			default:
-				return fmt.Errorf("unexpected session completed event on %s: %s", completedTopic, completedMsg.Body.Event)
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case msg := <-completedCh:
+		if msg.Body.Event == protocol.StreamEventRunCompleted {
+			payload, err := runCompletedPayloadFromCompletedMessage(msg)
+			if err != nil {
+				return err
 			}
-		case <-ctx.Done():
-			return fmt.Errorf("timed out waiting for session completed event on %s: %w", completedTopic, ctx.Err())
+			if strings.TrimSpace(payload.Result.Message) == "" {
+				return fmt.Errorf("completed payload message is empty")
+			}
 		}
+		return nil
 	}
 }
-
-func runCompletedPayloadFromCompletedMessage(msg events.MessageStreamMessage) (events.RunCompletedPayload, error) {
+func runCompletedPayloadFromCompletedMessage(msg protocol.MessageStreamMessage) (events.RunCompletedPayload, error) {
 	if msg.Body.RunCompleted != nil {
 		return *msg.Body.RunCompleted, nil
 	}

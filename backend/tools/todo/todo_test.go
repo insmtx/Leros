@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
-	runtimetodo "github.com/insmtx/Leros/backend/internal/agent/runtime/todo"
+	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	runtimetodo "github.com/insmtx/Leros/backend/internal/runtime/todo"
 )
 
 func TestToolSnapshotPublishesRuntimeTodos(t *testing.T) {

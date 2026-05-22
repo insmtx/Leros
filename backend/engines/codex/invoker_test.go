@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/insmtx/Leros/backend/engines"
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/runtime/events"
 )
 
 func TestAdapterAskCurrentTime(t *testing.T) {
@@ -32,7 +32,7 @@ func TestAdapterAskCurrentTime(t *testing.T) {
 
 	handle, err := adapter.Run(ctx, engines.RunRequest{
 		WorkDir: workDir,
-		Prompt:  "用一句中文回答当前系统时间。不要修改任何文件。",
+		Prompt:  "Answer with the current system time. Do not modify files.",
 		Model: engines.ModelConfig{
 			Provider: "openai",
 			APIKey:   apiKey,

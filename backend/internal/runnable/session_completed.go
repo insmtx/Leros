@@ -6,9 +6,10 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/insmtx/Leros/backend/internal/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	"github.com/insmtx/Leros/backend/pkg/dm"
 	"github.com/insmtx/Leros/backend/types"
 	"github.com/ygpkg/yg-go/logs"
@@ -30,7 +31,7 @@ func StartSessionCompleted(ictx context.Context, service contract.SessionService
 }
 
 func handleSessionCompletedMessage(ctx context.Context, service contract.SessionService, msg *nats.Msg) {
-	var streamMsg events.MessageStreamMessage
+	var streamMsg protocol.MessageStreamMessage
 	if err := json.Unmarshal(msg.Data, &streamMsg); err != nil {
 		logs.WarnContextf(ctx, "unmarshal session completed message: %v", err)
 		return
@@ -42,7 +43,7 @@ func handleSessionCompletedMessage(ctx context.Context, service contract.Session
 	}
 
 	switch streamMsg.Body.Event {
-	case events.StreamEventRunCompleted:
+	case protocol.StreamEventRunCompleted:
 		completed := streamMsg.Body.RunCompleted
 		if completed == nil {
 			logs.WarnContextf(ctx, "run completed message missing run_completed payload: session_id=%s seq=%d", sessionID, streamMsg.Body.Seq)
@@ -61,7 +62,7 @@ func handleSessionCompletedMessage(ctx context.Context, service contract.Session
 			logs.WarnContextf(ctx, "complete session message: %v", err)
 		}
 
-	case events.StreamEventRunFailed:
+	case protocol.StreamEventRunFailed:
 		errMsg := streamMsg.Body.Payload.Content
 		status := string(types.MessageStatusFailed)
 		if streamMsg.Body.RunCompleted != nil && streamMsg.Body.RunCompleted.Result.Message != "" {
@@ -133,7 +134,7 @@ func messageMetadataFromRunCompleted(completed *events.RunCompletedPayload) *typ
 		return nil
 	}
 
-	// 直接序列化为 MessageMetadata，不匹配的字段会被忽略
+	// 鐩存帴搴忓垪鍖栦负 MessageMetadata锛屼笉鍖归厤鐨勫瓧娈典細琚拷鐣?
 	data, err := json.Marshal(src)
 	if err != nil {
 		return nil
