@@ -19,6 +19,7 @@
     "@electron-toolkit/utils": "^4.0.0",
     "@leros/ui": "workspace:*",
     "@leros/store": "workspace:*",
+    "@leros/app-ui": "workspace:*",
     "react-router-dom": "^7.6.0",
     "react": "catalog:",
     "react-dom": "catalog:",

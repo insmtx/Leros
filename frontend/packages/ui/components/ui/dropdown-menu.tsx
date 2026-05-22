@@ -13,6 +13,10 @@ function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
 	return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />;
 }
 
+function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
+	return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />;
+}
+
 function DropdownMenuContent({
 	align = "start",
 	alignOffset = 0,
@@ -59,10 +63,7 @@ function DropdownMenuLabel({
 		<MenuPrimitive.GroupLabel
 			data-slot="dropdown-menu-label"
 			data-inset={inset}
-			className={cn(
-				"px-2 py-1.5 text-xs font-semibold text-muted-foreground",
-				className,
-			)}
+			className={cn("px-2 py-1.5 text-xs font-semibold text-muted-foreground", className)}
 			{...props}
 		/>
 	);
@@ -226,6 +227,7 @@ export {
 	DropdownMenuGroup,
 	DropdownMenuItem,
 	DropdownMenuLabel,
+	DropdownMenuPortal,
 	DropdownMenuRadioGroup,
 	DropdownMenuRadioItem,
 	DropdownMenuSeparator,

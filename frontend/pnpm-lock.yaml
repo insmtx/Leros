@@ -71,6 +71,9 @@ importers:
       '@electron-toolkit/utils':
         specifier: ^4.0.0
         version: 4.0.0(electron@39.8.9)
+      '@leros/app-ui':
+        specifier: workspace:*
+        version: link:../../packages/app-ui
       '@leros/store':
         specifier: workspace:*
         version: link:../../packages/store
@@ -144,6 +147,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@leros/app-ui':
+        specifier: workspace:*
+        version: link:../../packages/app-ui
       '@leros/store':
         specifier: workspace:*
         version: link:../../packages/store
@@ -202,6 +208,43 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.5(@types/node@25.6.0)(jsdom@29.1.0(@noble/hashes@1.8.0))(msw@2.14.2(@types/node@25.6.0)(typescript@5.9.3))(vite@8.0.10(@types/node@25.6.0)(jiti@2.6.1))
+
+  packages/app-ui:
+    dependencies:
+      '@leros/store':
+        specifier: workspace:*
+        version: link:../store
+      '@leros/ui':
+        specifier: workspace:*
+        version: link:../ui
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.14.0(react@19.2.3)
+      react:
+        specifier: 'catalog:'
+        version: 19.2.3
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.3(react@19.2.3)
+      react-markdown:
+        specifier: ^10.1.0
+        version: 10.1.0(@types/react@19.2.14)(react@19.2.3)
+      remark-gfm:
+        specifier: ^4.0.1
+        version: 4.0.1
+    devDependencies:
+      '@leros/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.3(@types/react@19.2.14)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
 
   packages/biome: {}
 

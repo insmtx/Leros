@@ -6,12 +6,12 @@ import { CenterCanvas } from "./CenterCanvas";
 import { LeftRail } from "./LeftRail";
 import { WorkbenchPanel } from "./WorkbenchPanel";
 
-export function Shell() {
+export function Shell({ logoSrc }: { logoSrc?: string }) {
 	const currentView = useLayoutStore((s) => s.currentView);
 
 	return (
 		<div className="leros-app-shell">
-			<LeftRail />
+			<LeftRail logoSrc={logoSrc} />
 			{currentView === "chat" && <CenterCanvas />}
 			{currentView === "workbench" && <WorkbenchPanel />}
 			{currentView === "digitalAssistant" && <AssistantListView />}

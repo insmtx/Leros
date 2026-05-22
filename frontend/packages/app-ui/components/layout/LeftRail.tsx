@@ -24,7 +24,6 @@ import {
 	Settings,
 	UserRound,
 } from "lucide-react";
-import logoUrl from "@/assets/logo.svg";
 
 const iconMap: Record<string, React.ReactNode> = {
 	IconWorkbench: <LayoutGrid className="size-5" />,
@@ -43,7 +42,7 @@ const navIdToView: Record<string, ViewMode> = {
 	"ai-1": "digitalAssistant",
 };
 
-export function LeftRail() {
+export function LeftRail({ logoSrc = "/logo.svg" }: { logoSrc?: string }) {
 	const { navGroups, currentView, switchView } = useLayoutStore((s) => s);
 
 	const handleNavClick = (item: NavItem) => {
@@ -61,7 +60,7 @@ export function LeftRail() {
 			<div className="leros-brand">
 				<div className="leros-logo-placeholder" aria-hidden="true">
 					<img
-						src={logoUrl}
+						src={logoSrc}
 						alt=""
 						className="leros-logo-image"
 						onError={(event) => {
