@@ -4,6 +4,7 @@ import { sessionApi } from "../api/sessionApi";
 import type {
 	BackendMessage,
 	BackendMessageChunk,
+	BackendRuntimeTodoItem,
 	BackendSessionEventPayload,
 	BackendToolCall,
 	SSEMessageEvent,
@@ -16,6 +17,8 @@ import type {
 	MessageMetadata,
 	MessageRole,
 	ModelOption,
+	RuntimeTodoItem,
+	TodoStatus,
 	ToolCall,
 	ToolCallStatus,
 } from "../types/chat";
@@ -122,6 +125,19 @@ function normalizeToolCallStatus(status?: string): ToolCallStatus {
 	}
 }
 
+function normalizeTodoStatus(status?: string): TodoStatus {
+	switch (status) {
+		case "in_progress":
+			return "in_progress";
+		case "completed":
+			return "completed";
+		case "cancelled":
+			return "cancelled";
+		default:
+			return "pending";
+	}
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
 }
@@ -144,7 +160,13 @@ function normalizeSessionEvent(event: SessionEventLike): NormalizedSessionEvent 
 }
 
 function getEventPayload(event: NormalizedSessionEvent): BackendSessionEventPayload {
-	return (event.payload ?? event) as BackendSessionEventPayload;
+	if (Array.isArray(event.payload)) {
+		return { todos: event.payload };
+	}
+	if (isRecord(event.payload)) {
+		return event.payload as BackendSessionEventPayload;
+	}
+	return event as BackendSessionEventPayload;
 }
 
 function getEventContent(
@@ -180,6 +202,39 @@ function metadataFromPayload(payload: BackendSessionEventPayload): MessageMetada
 
 function mergeToolCalls(current: ToolCall[] | undefined, updates: ToolCall[]): ToolCall[] {
 	return updates.reduce((acc, update) => upsertToolCall(acc, update), current ?? []);
+}
+
+function getTodoItemsFromValue(value: unknown): BackendRuntimeTodoItem[] | undefined {
+	if (!Array.isArray(value)) return undefined;
+	if (!value.every(isRecord)) return undefined;
+	return value as BackendRuntimeTodoItem[];
+}
+
+function mapTodoItems(items: BackendRuntimeTodoItem[]): RuntimeTodoItem[] {
+	return items.map((item, index) => ({
+		id: item.id?.trim() || `todo-${index + 1}`,
+		title: item.title?.trim() || `待办 ${index + 1}`,
+		status: normalizeTodoStatus(item.status),
+		priority: item.priority,
+	}));
+}
+
+function getTodoItems(
+	event: NormalizedSessionEvent,
+	payload: BackendSessionEventPayload,
+): RuntimeTodoItem[] | undefined {
+	const payloadTodos = getTodoItemsFromValue(payload.todos);
+	if (payloadTodos) return mapTodoItems(payloadTodos);
+
+	if ("todos" in event) {
+		const eventTodos = getTodoItemsFromValue(event.todos);
+		if (eventTodos) return mapTodoItems(eventTodos);
+	}
+
+	const rawPayloadTodos = getTodoItemsFromValue(event.payload);
+	if (rawPayloadTodos) return mapTodoItems(rawPayloadTodos);
+
+	return undefined;
 }
 
 function upsertToolCall(current: ToolCall[] | undefined, update: ToolCall): ToolCall[] {
@@ -255,6 +310,12 @@ function applySessionEventToMessage(
 	}
 
 	switch (normalizedEventType) {
+		case "todo.snapshot":
+		case "todo.updated": {
+			const todos = getTodoItems(normalizedEvent, payload);
+			if (!todos) return message;
+			return { ...message, todos };
+		}
 		case "message.delta":
 		case "message.result": {
 			const content = getEventContent(normalizedEvent, payload);

@@ -40,6 +40,8 @@ export type {
 	MessageMetadata,
 	MessageRole,
 	ModelOption,
+	RuntimeTodoItem,
+	TodoStatus,
 	ToolCall,
 	ToolCallStatus,
 } from "./types/chat";

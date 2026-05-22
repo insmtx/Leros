@@ -4,6 +4,7 @@ export { AIMessageBubble } from "./AIMessageBubble";
 export { ChatHeader } from "./ChatHeader";
 export { DateDivider } from "./DateDivider";
 export { MessageTimeline } from "./MessageTimeline";
+export { TodoListBlock } from "./TodoListBlock";
 export { ToolCallBlock } from "./ToolCallBlock";
 export { TypingIndicator } from "./TypingIndicator";
 export { UserMessageBubble } from "./UserMessageBubble";

@@ -61,7 +61,7 @@ export type BackendSessionEvent = {
 	session_id?: string;
 	sequence?: number;
 	timestamp?: number;
-	payload?: BackendSessionEventPayload;
+	payload?: BackendSessionEventPayloadLike;
 };
 
 export type BackendMessageChunk = BackendSessionEvent | string;
@@ -84,6 +84,15 @@ export type BackendToolCall = {
 	status: string;
 	result?: unknown;
 	duration?: number;
+};
+
+export type BackendTodoStatus = "pending" | "in_progress" | "completed" | "cancelled";
+
+export type BackendRuntimeTodoItem = {
+	id?: string;
+	title?: string;
+	status?: BackendTodoStatus | string;
+	priority?: string;
 };
 
 export type BackendDigitalAssistant = {
@@ -152,6 +161,7 @@ export type SSEMessageEvent = BackendSessionEvent & {
 	status?: string;
 	thinking?: string;
 	tool_calls?: BackendToolCall[];
+	todos?: BackendRuntimeTodoItem[];
 	metadata?: BackendMessageMetadata;
 };
 
@@ -163,6 +173,7 @@ export type BackendSessionEventPayload = {
 	content?: string;
 	thinking?: string;
 	tool_calls?: BackendToolCall[];
+	todos?: BackendRuntimeTodoItem[];
 	name?: string;
 	arguments?: Record<string, unknown>;
 	result?: unknown;
@@ -186,4 +197,6 @@ export type BackendSessionEventPayload = {
 	model?: string;
 };
 
-export type SSEEventPayload = BackendSessionEventPayload;
+export type BackendSessionEventPayloadLike = BackendSessionEventPayload | BackendRuntimeTodoItem[];
+
+export type SSEEventPayload = BackendSessionEventPayloadLike;

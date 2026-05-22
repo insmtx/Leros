@@ -8,6 +8,7 @@ import { Check, Copy, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { TodoListBlock } from "./TodoListBlock";
 import { ToolCallBlock } from "./ToolCallBlock";
 
 function CopyButton({ text }: { text: string }) {
@@ -40,6 +41,7 @@ export function AIMessageBubble({
 	const content = message.content;
 	const hasContent = content.trim().length > 0;
 	const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
+	const hasTodos = message.todos && message.todos.length > 0;
 
 	return (
 		<div data-slot="ai-message" className="group flex items-start gap-3">
@@ -59,6 +61,12 @@ export function AIMessageBubble({
 					</div>
 				)}
 
+				{hasTodos && message.todos && (
+					<div className="mb-3">
+						<TodoListBlock todos={message.todos} />
+					</div>
+				)}
+
 				{hasContent && (
 					<div className="w-fit max-w-[min(780px,92%)] rounded-2xl rounded-tl-md bg-white/90 px-4 py-3 text-sm leading-7 text-slate-700 shadow-sm ring-1 ring-slate-200/50">
 						<div className="prose prose-slate prose-sm max-w-none prose-p:my-1.5 prose-pre:my-2 prose-ul:my-1.5 prose-ol:my-1.5">
@@ -70,7 +78,7 @@ export function AIMessageBubble({
 					</div>
 				)}
 
-				{!hasContent && !hasToolCalls && isStreaming && (
+				{!hasContent && !hasToolCalls && !hasTodos && isStreaming && (
 					<div className="w-fit rounded-2xl rounded-tl-md bg-white/90 px-4 py-3 shadow-sm ring-1 ring-slate-200/50">
 						<div className="flex items-center gap-1">
 							<span className="size-1.5 rounded-full bg-slate-400 animate-pulse" />

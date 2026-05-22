@@ -2,6 +2,8 @@ export type MessageRole = "user" | "assistant" | "system" | "tool";
 
 export type ToolCallStatus = "pending" | "running" | "success" | "error";
 
+export type TodoStatus = "pending" | "in_progress" | "completed" | "cancelled";
+
 export type ToolCall = {
 	id: string;
 	name: string;
@@ -9,6 +11,13 @@ export type ToolCall = {
 	status: ToolCallStatus;
 	result?: unknown;
 	duration?: number;
+};
+
+export type RuntimeTodoItem = {
+	id: string;
+	title: string;
+	status: TodoStatus;
+	priority?: string;
 };
 
 export type MessageMetadata = {
@@ -24,6 +33,7 @@ export type Message = {
 	content: string;
 	timestamp: number;
 	toolCalls?: ToolCall[];
+	todos?: RuntimeTodoItem[];
 	thinking?: string;
 	metadata?: MessageMetadata;
 };
