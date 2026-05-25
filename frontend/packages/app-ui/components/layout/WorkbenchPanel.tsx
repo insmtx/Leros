@@ -2,8 +2,10 @@
 
 import { useLayoutStore } from "@leros/store";
 import { Button } from "@leros/ui/components/ui/button";
-import { Bell, ChevronDown, Folder, Plus, Search, SendHorizonal } from "lucide-react";
-import { useState } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@leros/ui/components/ui/popover";
+import { cn } from "@leros/ui/lib/utils";
+import { Bell, Check, ChevronDown, Folder, Plus, Search, SendHorizonal } from "lucide-react";
+import { useMemo, useState } from "react";
 
 const mockActivities = [
 	{
@@ -30,6 +32,8 @@ export function WorkbenchPanel() {
 	const { projects, activeProjectId, selectWorkbenchProject, sendWorkbenchMessage, switchProject } =
 		useLayoutStore((s) => s);
 	const [input, setInput] = useState("");
+	const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+	const [projectSearch, setProjectSearch] = useState("");
 
 	const handleSend = () => {
 		if (!input.trim()) return;
@@ -38,6 +42,17 @@ export function WorkbenchPanel() {
 	};
 	const activeProject = projects.find((project) => project.id === activeProjectId);
 	const latestProject = projects[0];
+	const filteredProjects = useMemo(() => {
+		const keyword = projectSearch.trim().toLowerCase();
+		if (!keyword) return projects;
+		return projects.filter((project) => project.name.toLowerCase().includes(keyword));
+	}, [projectSearch, projects]);
+
+	const handleSelectProject = (projectId: string | null) => {
+		selectWorkbenchProject(projectId);
+		setProjectMenuOpen(false);
+		setProjectSearch("");
+	};
 
 	return (
 		<div
@@ -102,23 +117,79 @@ export function WorkbenchPanel() {
 									>
 										<Plus className="size-5" />
 									</button>
-									<div className="relative">
-										<Folder className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--leros-text-muted)]" />
-										<select
-											value={activeProjectId ?? ""}
-											onChange={(event) => selectWorkbenchProject(event.target.value || null)}
-											className="h-8 min-w-[140px] appearance-none rounded-full border border-[var(--leros-control-border)] bg-[var(--leros-surface)] pl-9 pr-8 text-xs font-semibold text-[var(--leros-text)] outline-none transition-colors hover:border-[var(--leros-focus-ring)]"
-											aria-label="新项目"
+									<Popover open={projectMenuOpen} onOpenChange={setProjectMenuOpen}>
+										<PopoverTrigger
+											type="button"
+											className="flex h-8 min-w-[140px] items-center gap-2 rounded-full border border-[var(--leros-control-border)] bg-[var(--leros-surface)] px-3 text-xs font-semibold text-[var(--leros-text)] outline-none transition-colors hover:border-[var(--leros-focus-ring)] data-[open]:border-[var(--leros-primary)]"
+											aria-label="选择项目"
 										>
-											<option value="">选择项目</option>
-											{projects.map((project) => (
-												<option key={project.id} value={project.id}>
-													{project.name}
-												</option>
-											))}
-										</select>
-										<ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-[var(--leros-text-subtle)]" />
-									</div>
+											<Folder className="size-4 shrink-0 text-[var(--leros-text-muted)]" />
+											<span className="max-w-[120px] truncate">
+												{activeProject?.name ?? "选择项目"}
+											</span>
+											<ChevronDown className="ml-auto size-3.5 shrink-0 text-[var(--leros-text-subtle)]" />
+										</PopoverTrigger>
+										<PopoverContent
+											align="start"
+											side="bottom"
+											sideOffset={10}
+											className="w-[260px] gap-0 rounded-2xl border border-[var(--leros-control-border)] bg-[var(--leros-surface)] p-2.5 shadow-[0_18px_45px_rgba(30,41,59,0.18)] ring-0"
+										>
+											<div className="flex h-10 items-center gap-2 rounded-xl border border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-3 text-[var(--leros-text-muted)]">
+												<Search className="size-4 shrink-0" />
+												<input
+													value={projectSearch}
+													onChange={(event) => setProjectSearch(event.target.value)}
+													placeholder="搜索项目"
+													className="h-full min-w-0 flex-1 bg-transparent text-sm text-[var(--leros-text)] outline-none placeholder:text-[var(--leros-text-subtle)]"
+												/>
+											</div>
+
+											<div className="mt-2.5 max-h-[200px] space-y-1 overflow-y-auto pr-1">
+												<button
+													type="button"
+													onClick={() => handleSelectProject(null)}
+													className="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-semibold text-[var(--leros-text)] transition-colors hover:bg-[var(--leros-chat-control-bg)]"
+												>
+													<span className="flex size-4 shrink-0 items-center justify-center">
+														{activeProjectId === null && (
+															<Check className="size-4 text-[var(--leros-primary)]" />
+														)}
+													</span>
+													<span className="truncate">新项目</span>
+												</button>
+
+												{filteredProjects.map((project) => {
+													const selected = activeProjectId === project.id;
+
+													return (
+														<button
+															key={project.id}
+															type="button"
+															onClick={() => handleSelectProject(project.id)}
+															className={cn(
+																"flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-semibold transition-colors",
+																selected
+																	? "bg-[var(--leros-primary)] text-white"
+																	: "text-[var(--leros-text)] hover:bg-[var(--leros-chat-control-bg)]",
+															)}
+														>
+															<span className="flex size-4 shrink-0 items-center justify-center">
+																{selected && <Check className="size-4" />}
+															</span>
+															<span className="truncate">{project.name}</span>
+														</button>
+													);
+												})}
+
+												{filteredProjects.length === 0 && (
+													<div className="px-3 py-6 text-center text-sm text-[var(--leros-text-muted)]">
+														没有匹配的项目
+													</div>
+												)}
+											</div>
+										</PopoverContent>
+									</Popover>
 									{activeProject && (
 										<button
 											type="button"

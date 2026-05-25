@@ -109,14 +109,12 @@ export function ProjectPage() {
 					{activeProjectTab === "memory" && <ProjectMemories project={project} />}
 				</main>
 
-				<aside className="flex w-[280px] shrink-0 flex-col border-l border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-6 py-6">
-					<div className="min-h-0 flex-1 space-y-8 overflow-y-auto">
+				<aside className="flex w-[300px] shrink-0 flex-col border-l border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-5 py-6">
+					<div className="min-h-0 flex-1 space-y-8 overflow-y-auto pr-1">
 						<section>
-							<div className="mb-4 flex items-center justify-between">
-								<h2 className="text-xs font-bold uppercase tracking-wider text-[var(--leros-text-muted)]">
-									任务
-								</h2>
-								<span className="rounded bg-[var(--leros-primary-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--leros-primary)]">
+							<div className="mx-auto mb-4 flex w-full max-w-[250px] items-center justify-between">
+								<h2 className="text-xs font-semibold text-[var(--leros-text-muted)]">任务</h2>
+								<span className="rounded-md bg-[var(--leros-primary-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--leros-primary)]">
 									{project.tasks.length} 项
 								</span>
 							</div>
@@ -124,15 +122,13 @@ export function ProjectPage() {
 						</section>
 
 						<section>
-							<div className="mb-4 flex items-center justify-between">
-								<h2 className="text-xs font-bold uppercase tracking-wider text-[var(--leros-text-muted)]">
-									产物
-								</h2>
-								<span className="rounded bg-[var(--leros-chat-control-bg)] px-2 py-0.5 text-xs font-semibold text-[var(--leros-text)]">
+							<div className="mx-auto mb-4 flex w-full max-w-[250px] items-center justify-between">
+								<h2 className="text-xs font-semibold text-[var(--leros-text-muted)]">产物</h2>
+								<span className="rounded-md bg-[var(--leros-chat-control-bg)] px-2 py-0.5 text-xs font-semibold text-[var(--leros-text)]">
 									{project.artifacts.length} 个
 								</span>
 							</div>
-							<ProjectArtifactList artifacts={project.artifacts} />
+							<ProjectArtifactList artifacts={project.artifacts} compact />
 						</section>
 					</div>
 				</aside>
@@ -171,9 +167,9 @@ function ProjectEmptyState() {
 
 function ProjectTasks({ tasks }: { tasks: ProjectTask[] }) {
 	return (
-		<div className="max-w-3xl">
-			<h2 className="text-2xl font-bold text-[var(--leros-text-strong)]">任务</h2>
-			<div className="mt-6">
+		<div className="mx-auto w-full max-w-[720px]">
+			<h2 className="text-lg font-semibold text-[var(--leros-text-strong)]">任务</h2>
+			<div className="mt-4">
 				<ProjectTaskList tasks={tasks} />
 			</div>
 		</div>
@@ -182,26 +178,30 @@ function ProjectTasks({ tasks }: { tasks: ProjectTask[] }) {
 
 function ProjectTaskList({ tasks, compact = false }: { tasks: ProjectTask[]; compact?: boolean }) {
 	return (
-		<div className="space-y-4">
+		<div className={cn("w-full", compact ? "mx-auto max-w-[250px] space-y-3" : "space-y-3")}>
 			{tasks.map((task) => (
 				<div
 					key={task.id}
 					className={cn(
-						"flex items-start gap-4 rounded-xl border border-[var(--leros-control-border)] bg-[var(--leros-surface)] shadow-sm",
-						compact ? "px-4 py-4" : "px-5 py-5",
+						"flex items-start border border-[var(--leros-control-border)] bg-[var(--leros-surface)] shadow-sm",
+						compact ? "gap-3 rounded-lg px-3.5 py-3" : "gap-3.5 rounded-lg px-4 py-3.5",
 					)}
 				>
 					<CheckCircle2
 						className={cn(
-							"mt-1 size-5",
+							"mt-0.5 size-4 shrink-0",
 							task.status === "done"
 								? "text-[var(--leros-primary)]"
 								: "text-[var(--leros-text-muted)]",
 						)}
 					/>
 					<div className="min-w-0">
-						<div className="font-semibold text-[var(--leros-text-strong)]">{task.title}</div>
-						<div className="mt-1 text-sm text-[var(--leros-text-muted)]">{task.meta}</div>
+						<div className="truncate text-sm font-semibold leading-5 text-[var(--leros-text-strong)]">
+							{task.title}
+						</div>
+						<div className="mt-1 truncate text-xs leading-4 text-[var(--leros-text-muted)]">
+							{task.meta}
+						</div>
 					</div>
 				</div>
 			))}
@@ -211,9 +211,9 @@ function ProjectTaskList({ tasks, compact = false }: { tasks: ProjectTask[]; com
 
 function ProjectFiles({ files }: { files: ProjectArtifact[] }) {
 	return (
-		<div className="max-w-3xl">
-			<h2 className="text-2xl font-bold text-[var(--leros-text-strong)]">文件</h2>
-			<div className="mt-6">
+		<div className="mx-auto w-full max-w-[720px]">
+			<h2 className="text-lg font-semibold text-[var(--leros-text-strong)]">文件</h2>
+			<div className="mt-4">
 				<ProjectArtifactList artifacts={files} emptyText="暂无文件" />
 			</div>
 		</div>
@@ -222,20 +222,26 @@ function ProjectFiles({ files }: { files: ProjectArtifact[] }) {
 
 function ProjectMemories({ project }: { project: Project }) {
 	return (
-		<div className="max-w-3xl">
-			<h2 className="text-2xl font-bold text-[var(--leros-text-strong)]">记忆</h2>
-			<div className="mt-6 space-y-4">
+		<div className="mx-auto w-full max-w-[720px]">
+			<h2 className="text-lg font-semibold text-[var(--leros-text-strong)]">记忆</h2>
+			<div className="mt-4 space-y-3">
 				{project.memories.map((memory) => (
 					<div
 						key={memory.id}
-						className="rounded-xl border border-[var(--leros-control-border)] bg-[var(--leros-surface)] px-5 py-5 shadow-sm"
+						className="rounded-lg border border-[var(--leros-control-border)] bg-[var(--leros-surface)] px-4 py-3.5 shadow-sm"
 					>
-						<div className="font-semibold text-[var(--leros-text-strong)]">{memory.title}</div>
-						<p className="mt-2 text-sm leading-6 text-[var(--leros-text)]">{memory.content}</p>
+						<div className="text-sm font-semibold leading-5 text-[var(--leros-text-strong)]">
+							{memory.title}
+						</div>
+						<p className="mt-1.5 text-xs leading-5 text-[var(--leros-text-muted)]">
+							{memory.content}
+						</p>
 					</div>
 				))}
 				{project.memories.length === 0 && (
-					<div className="text-sm text-[var(--leros-text-muted)]">暂无记忆</div>
+					<div className="rounded-lg border border-dashed border-[var(--leros-control-border)] px-4 py-8 text-center text-xs text-[var(--leros-text-muted)]">
+						暂无记忆
+					</div>
 				)}
 			</div>
 		</div>
@@ -245,33 +251,38 @@ function ProjectMemories({ project }: { project: Project }) {
 function ProjectArtifactList({
 	artifacts,
 	emptyText = "暂无产物",
+	compact = false,
 }: {
 	artifacts: ProjectArtifact[];
 	emptyText?: string;
+	compact?: boolean;
 }) {
 	if (artifacts.length === 0) {
 		return (
-			<div className="rounded-xl border border-dashed border-[var(--leros-control-border)] px-5 py-8 text-center text-sm text-[var(--leros-text-muted)]">
+			<div className="rounded-lg border border-dashed border-[var(--leros-control-border)] px-4 py-8 text-center text-xs text-[var(--leros-text-muted)]">
 				{emptyText}
 			</div>
 		);
 	}
 
 	return (
-		<div className="space-y-4">
+		<div className={cn("w-full", compact ? "mx-auto max-w-[250px] space-y-3" : "space-y-3")}>
 			{artifacts.map((artifact) => (
 				<div
 					key={artifact.id}
-					className="flex items-center gap-4 rounded-xl border border-[var(--leros-control-border)] bg-[var(--leros-surface)] px-4 py-4 shadow-sm"
+					className={cn(
+						"flex items-center border border-[var(--leros-control-border)] bg-[var(--leros-surface)] shadow-sm",
+						compact ? "gap-3 rounded-lg px-3.5 py-3" : "gap-3.5 rounded-lg px-4 py-3.5",
+					)}
 				>
-					<div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-[var(--leros-primary-softer)] text-[var(--leros-text)]">
+					<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--leros-primary-softer)] text-[var(--leros-text)]">
 						<ArtifactIcon type={artifact.type} />
 					</div>
 					<div className="min-w-0">
-						<div className="truncate font-semibold text-[var(--leros-text-strong)]">
+						<div className="truncate text-sm font-semibold leading-5 text-[var(--leros-text-strong)]">
 							{artifact.name}
 						</div>
-						<div className="mt-1 text-sm text-[var(--leros-text-muted)]">
+						<div className="mt-1 truncate text-xs leading-4 text-[var(--leros-text-muted)]">
 							{artifact.size} · {artifact.updatedAt}
 						</div>
 					</div>
@@ -282,12 +293,14 @@ function ProjectArtifactList({
 }
 
 function ArtifactIcon({ type }: { type: ProjectArtifact["type"] }) {
+	const className = "size-4";
+
 	switch (type) {
 		case "spreadsheet":
-			return <Table2 className="size-5" />;
+			return <Table2 className={className} />;
 		case "image":
-			return <FileImage className="size-5" />;
+			return <FileImage className={className} />;
 		default:
-			return <FileText className="size-5" />;
+			return <FileText className={className} />;
 	}
 }
