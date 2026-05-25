@@ -4,7 +4,7 @@ import { useLayoutStore } from "@leros/store";
 import { Button } from "@leros/ui/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@leros/ui/components/ui/popover";
 import { cn } from "@leros/ui/lib/utils";
-import { Bell, Check, ChevronDown, Folder, Plus, Search, SendHorizonal } from "lucide-react";
+import { Bell, Check, ChevronDown, Folder, Plus, Search, SendHorizonal, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 const mockActivities = [
@@ -121,12 +121,24 @@ export function WorkbenchPanel() {
 										<PopoverTrigger
 											type="button"
 											className="flex h-8 min-w-[140px] items-center gap-2 rounded-full border border-[var(--leros-control-border)] bg-[var(--leros-surface)] px-3 text-xs font-semibold text-[var(--leros-text)] outline-none transition-colors hover:border-[var(--leros-focus-ring)] data-[open]:border-[var(--leros-primary)]"
-											aria-label="选择项目"
+											aria-label="新项目"
 										>
 											<Folder className="size-4 shrink-0 text-[var(--leros-text-muted)]" />
 											<span className="max-w-[120px] truncate">
-												{activeProject?.name ?? "选择项目"}
+												{activeProject?.name ?? "新项目"}
 											</span>
+											{activeProject && (
+												<button
+													type="button"
+													onClick={(e) => {
+														e.stopPropagation();
+														handleSelectProject(null);
+													}}
+													className="shrink-0 rounded-full p-0.5 text-[var(--leros-text-subtle)] hover:bg-[var(--leros-chat-control-bg)] hover:text-[var(--leros-text)]"
+												>
+													<X className="size-3.5" />
+												</button>
+											)}
 											<ChevronDown className="ml-auto size-3.5 shrink-0 text-[var(--leros-text-subtle)]" />
 										</PopoverTrigger>
 										<PopoverContent
@@ -146,19 +158,6 @@ export function WorkbenchPanel() {
 											</div>
 
 											<div className="mt-2.5 max-h-[200px] space-y-1 overflow-y-auto pr-1">
-												<button
-													type="button"
-													onClick={() => handleSelectProject(null)}
-													className="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-semibold text-[var(--leros-text)] transition-colors hover:bg-[var(--leros-chat-control-bg)]"
-												>
-													<span className="flex size-4 shrink-0 items-center justify-center">
-														{activeProjectId === null && (
-															<Check className="size-4 text-[var(--leros-primary)]" />
-														)}
-													</span>
-													<span className="truncate">新项目</span>
-												</button>
-
 												{filteredProjects.map((project) => {
 													const selected = activeProjectId === project.id;
 
