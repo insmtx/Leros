@@ -240,7 +240,7 @@ func (o *newMessageOrchestrator) ensureProjectSession() error {
 
 func (o *newMessageOrchestrator) resolveOrCreateTask() error {
 	if o.req.TaskID != "" {
-		t, err := db.GetTaskByPublicID(o.ctx, o.poster.db, o.req.TaskID)
+		t, err := db.GetTaskByPublicID(o.ctx, o.poster.db, o.caller.OrgID, o.req.TaskID)
 		if err != nil {
 			return err
 		}
