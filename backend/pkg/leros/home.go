@@ -56,6 +56,11 @@ func MemoryDir() (string, error) {
 	return JoinWorkspace("memory")
 }
 
+// TempDir returns the fallback workspace directory used when a run has no project workspace.
+func TempDir() (string, error) {
+	return JoinWorkspace("temp")
+}
+
 func defaultWorkspaceRoot(goos string) (string, error) {
 	if goos != "windows" {
 		return defaultWorkspaceRootUnix, nil

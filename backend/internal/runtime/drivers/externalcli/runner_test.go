@@ -2,12 +2,14 @@ package externalcli
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/insmtx/Leros/backend/engines"
 	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	"github.com/insmtx/Leros/backend/pkg/leros"
 )
 
 func TestRunnerAdaptsEngineResult(t *testing.T) {
@@ -60,6 +62,33 @@ func TestRunnerAdaptsEngineResult(t *testing.T) {
 	}
 	if strings.Contains(engine.runReq.Prompt, "system only") {
 		t.Fatalf("expected prompt not to contain system prompt, got %q", engine.runReq.Prompt)
+	}
+}
+
+func TestRunnerDefaultsEmptyWorkDirToWorkspaceTemp(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	t.Setenv(leros.EnvWorkspaceRoot, workspaceRoot)
+	SetDefaultProviderSessionStore(NewInMemoryProviderSessionStore())
+	engine := &fakeEngine{result: "done"}
+	runner, err := NewRunner("fake", engine)
+	if err != nil {
+		t.Fatalf("new runner: %v", err)
+	}
+
+	expected := filepath.Join(workspaceRoot, "temp")
+	_, err = runner.Run(context.Background(), &agent.RequestContext{
+		RunID: "run_temp",
+		Input: agent.InputContext{
+			Type: agent.InputTypeMessage,
+			Text: "hello",
+		},
+		Runtime: agent.RuntimeOptions{WorkDir: expected},
+	})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if engine.runReq.WorkDir != expected {
+		t.Fatalf("work dir = %q, want %q", engine.runReq.WorkDir, expected)
 	}
 }
 

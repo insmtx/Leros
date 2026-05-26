@@ -166,6 +166,7 @@ func (r *Runner) buildRunState(req *agent.RequestContext) (*runState, error) {
 	}
 
 	eventSink := sinkForRequest(req)
+	workDir := strings.TrimSpace(req.Runtime.WorkDir)
 	toolCtx := tools.ToolContext{
 		RunID:          req.RunID,
 		TraceID:        req.TraceID,
@@ -176,6 +177,7 @@ func (r *Runner) buildRunState(req *agent.RequestContext) (*runState, error) {
 		ChatID:         req.Conversation.ID,
 		ConversationID: req.Conversation.ID,
 		ExternalID:     req.Actor.ExternalID,
+		WorkDir:        workDir,
 		Metadata:       req.Metadata,
 	}
 	return &runState{

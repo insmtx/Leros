@@ -13,6 +13,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
 	runtimetodo "github.com/insmtx/Leros/backend/internal/runtime/todo"
+	agentworkspace "github.com/insmtx/Leros/backend/internal/workspace"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -59,9 +60,7 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 	eventSink := sinkForRequest(req)
 
 	workDir := strings.TrimSpace(req.Runtime.WorkDir)
-	if workDir == "" {
-		workDir = "."
-	}
+	workspaceEnv := workspaceEnvForRequest(ctx, req)
 	if err := r.engine.Prepare(ctx, engines.PrepareRequest{WorkDir: workDir}); err != nil {
 		return r.failedResult(req, startedAt, err, failureMetadata(workDir)), err
 	}
@@ -77,6 +76,7 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 		SystemPrompt: strings.TrimSpace(req.SystemPrompt),
 		Prompt:       prompt,
 		Model:        modelForRequest(req),
+		ExtraEnv:     workspaceEnv,
 	})
 	if err != nil {
 		return r.failedResult(req, startedAt, err, failureMetadata(workDir)), err
@@ -110,6 +110,18 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 		},
 	}
 	return result, nil
+}
+
+func workspaceEnvForRequest(ctx context.Context, req *agent.RequestContext) []string {
+	plan, ok, err := agentworkspace.FromAgentRequest(req)
+	if err != nil {
+		logs.WarnContextf(ctx, "Resolve task workspace env failed: %v", err)
+		return nil
+	}
+	if !ok {
+		return nil
+	}
+	return plan.ArtifactEnv()
 }
 
 type consumeResult struct {
@@ -327,31 +339,7 @@ func internalSessionIDFromRequest(req *agent.RequestContext) string {
 	if req == nil {
 		return ""
 	}
-	if strings.TrimSpace(req.Conversation.ID) != "" {
-		return strings.TrimSpace(req.Conversation.ID)
-	}
-	if value := metadataString(req.Metadata, "session_id"); value != "" {
-		return value
-	}
-	return metadataString(req.Metadata, "sessionId")
-}
-
-func metadataString(metadata map[string]any, key string) string {
-	if len(metadata) == 0 {
-		return ""
-	}
-	value, ok := metadata[key]
-	if !ok {
-		return ""
-	}
-	switch typed := value.(type) {
-	case string:
-		return strings.TrimSpace(typed)
-	case fmt.Stringer:
-		return strings.TrimSpace(typed.String())
-	default:
-		return strings.TrimSpace(fmt.Sprint(typed))
-	}
+	return strings.TrimSpace(req.Conversation.ID)
 }
 
 func firstNonEmptyString(values ...string) string {

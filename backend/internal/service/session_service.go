@@ -610,8 +610,20 @@ func (s *sessionService) CompleteSessionMessage(ctx context.Context, req *contra
 		msgEntity.Usage = *req.Usage
 	}
 
-	if err := db.CreateMessage(ctx, s.db, msgEntity); err != nil {
-		return fmt.Errorf("create message for %s: %w", req.SessionID, err)
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := db.CreateMessage(ctx, tx, msgEntity); err != nil {
+			return fmt.Errorf("create message for %s: %w", req.SessionID, err)
+		}
+		artifacts, err := buildCompletedArtifacts(req.Artifacts, session, msgEntity)
+		if err != nil {
+			return err
+		}
+		if err := db.CreateArtifacts(ctx, tx, artifacts); err != nil {
+			return fmt.Errorf("create artifacts for %s: %w", req.SessionID, err)
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	now := time.Now()
@@ -621,6 +633,67 @@ func (s *sessionService) CompleteSessionMessage(ctx context.Context, req *contra
 
 	logs.DebugContextf(ctx, "persisted completed session message: session_id=%s seq=%d", req.SessionID, sequence)
 	return nil
+}
+
+func buildCompletedArtifacts(inputs []contract.CompleteSessionArtifact, session *types.Session, message *types.SessionMessage) ([]*types.Artifact, error) {
+	if len(inputs) == 0 {
+		return nil, nil
+	}
+	if session == nil || message == nil {
+		return nil, errors.New("session and message are required for artifacts")
+	}
+	if session.ProjectID == nil || *session.ProjectID == 0 {
+		return nil, errors.New("session project_id is required for artifacts")
+	}
+	if session.TaskID == nil || *session.TaskID == 0 {
+		return nil, errors.New("session task_id is required for artifacts")
+	}
+	artifacts := make([]*types.Artifact, 0, len(inputs))
+	for _, input := range inputs {
+		title := strings.TrimSpace(input.Title)
+		if title == "" {
+			title = strings.TrimSpace(input.RelativePath)
+		}
+		if title == "" {
+			return nil, errors.New("artifact title is required")
+		}
+		artifactType := strings.TrimSpace(input.ArtifactType)
+		if artifactType == "" {
+			artifactType = string(types.ArtifactTypeFile)
+		}
+		status := strings.TrimSpace(input.Status)
+		if status == "" {
+			status = string(types.ArtifactStatusCompleted)
+		}
+		source := strings.TrimSpace(input.Source)
+		if source == "" {
+			source = string(types.ArtifactSourceAgentDeclared)
+		}
+		messageID := message.ID
+		sessionID := session.ID
+		publicID := fmt.Sprintf("art_%s", snowflake.GenerateIDBase58())
+		artifacts = append(artifacts, &types.Artifact{
+			PublicID:     publicID,
+			OrgID:        session.OrgID,
+			OwnerID:      session.Uin,
+			TaskID:       *session.TaskID,
+			ProjectID:    *session.ProjectID,
+			SessionID:    &sessionID,
+			MessageID:    &messageID,
+			Title:        title,
+			Description:  strings.TrimSpace(input.Description),
+			ArtifactType: artifactType,
+			FileURL:      "/v1/artifacts/" + publicID + "/download",
+			MimeType:     strings.TrimSpace(input.MimeType),
+			FileSize:     input.FileSize,
+			RelativePath: strings.TrimSpace(input.RelativePath),
+			StorageKey:   strings.TrimSpace(input.StorageKey),
+			Sha256:       strings.TrimSpace(input.Sha256),
+			Source:       source,
+			Status:       status,
+		})
+	}
+	return artifacts, nil
 }
 
 func (s *sessionService) FailedSessionMessage(ctx context.Context, req *contract.FailedSessionMessageRequest) error {

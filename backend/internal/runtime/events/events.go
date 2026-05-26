@@ -115,13 +115,28 @@ type RunEventRecord struct {
 
 // RunCompletedPayload 归档完整的成功运行时运行。
 type RunCompletedPayload struct {
-	Status      string           `json:"status"`
-	Result      RunResultPayload `json:"result"`
-	Usage       *UsagePayload    `json:"usage,omitempty"`
-	Events      []RunEventRecord `json:"events,omitempty"`
-	StartedAt   time.Time        `json:"started_at,omitempty"`
-	CompletedAt time.Time        `json:"completed_at,omitempty"`
-	Metadata    map[string]any   `json:"metadata,omitempty"`
+	Status      string            `json:"status"`
+	Result      RunResultPayload  `json:"result"`
+	Artifacts   []ArtifactPayload `json:"artifacts,omitempty"`
+	Usage       *UsagePayload     `json:"usage,omitempty"`
+	Events      []RunEventRecord  `json:"events,omitempty"`
+	StartedAt   time.Time         `json:"started_at,omitempty"`
+	CompletedAt time.Time         `json:"completed_at,omitempty"`
+	Metadata    map[string]any    `json:"metadata,omitempty"`
+}
+
+// ArtifactPayload describes a finalized file produced by one run.
+type ArtifactPayload struct {
+	Title        string `json:"title,omitempty"`
+	Description  string `json:"description,omitempty"`
+	ArtifactType string `json:"artifact_type,omitempty"`
+	RelativePath string `json:"relative_path,omitempty"`
+	StorageKey   string `json:"storage_key,omitempty"`
+	MimeType     string `json:"mime_type,omitempty"`
+	FileSize     int64  `json:"file_size,omitempty"`
+	Sha256       string `json:"sha256,omitempty"`
+	Source       string `json:"source,omitempty"`
+	Status       string `json:"status,omitempty"`
 }
 
 // NewMessageDelta 创建标准的助手消息增量事件。

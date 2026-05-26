@@ -32,7 +32,6 @@ func TestWorkerTaskMessageJSONShape(t *testing.T) {
 			},
 			Execution: ExecutionTarget{
 				AssistantID: "assistant_1",
-				AgentID:     "agent_1",
 			},
 			Input: TaskInput{
 				Type: InputTypeMessage,
@@ -71,6 +70,10 @@ func TestWorkerTaskMessageJSONShape(t *testing.T) {
 	}
 	if _, ok := bodyObject["execution"].(map[string]any); !ok {
 		t.Fatalf("expected execution object in %s", body)
+	}
+	executionObject := bodyObject["execution"].(map[string]any)
+	if _, ok := executionObject["agent_id"]; ok {
+		t.Fatalf("agent_id should not be part of execution target in %s", body)
 	}
 }
 

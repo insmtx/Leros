@@ -29,7 +29,7 @@ type ListSessionsRequest struct {
 	Status        *string `json:"status,omitempty"`
 	AssistantID   *uint   `json:"assistant_id,omitempty"`
 	AssistantCode *string `json:"assistant_code,omitempty"`
-	Keyword       *string          `json:"keyword,omitempty"`
+	Keyword       *string `json:"keyword,omitempty"`
 	types.Pagination
 }
 
@@ -106,13 +106,14 @@ type MessageList struct {
 
 // CompleteSessionMessageRequest persists a completed assistant message.
 type CompleteSessionMessageRequest struct {
-	SessionID string                `json:"session_id"`
-	Content   string                `json:"content"`
-	Chunks    []types.MessageChunk  `json:"chunks,omitempty"`
-	Metadata  *types.ObjectMetadata `json:"metadata,omitempty"`
-	Usage     *types.MessageUsage   `json:"usage,omitempty"`
-	Seq       int64                 `json:"seq"`
-	CreatedAt time.Time             `json:"created_at"`
+	SessionID string                    `json:"session_id"`
+	Content   string                    `json:"content"`
+	Chunks    []types.MessageChunk      `json:"chunks,omitempty"`
+	Artifacts []CompleteSessionArtifact `json:"artifacts,omitempty"`
+	Metadata  *types.ObjectMetadata     `json:"metadata,omitempty"`
+	Usage     *types.MessageUsage       `json:"usage,omitempty"`
+	Seq       int64                     `json:"seq"`
+	CreatedAt time.Time                 `json:"created_at"`
 }
 
 // FailedSessionMessageRequest persists a failed assistant message.

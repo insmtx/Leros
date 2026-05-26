@@ -11,6 +11,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/agent"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/internal/worker/protocol"
+	agentworkspace "github.com/insmtx/Leros/backend/internal/workspace"
 	"github.com/insmtx/Leros/backend/pkg/dm"
 	"github.com/insmtx/Leros/backend/pkg/utils"
 	"github.com/nats-io/nats.go"
@@ -134,15 +135,18 @@ func (c *Consumer) schedule(ctx context.Context, taskMsg protocol.WorkerTaskMess
 
 func (c *Consumer) runTask(ctx context.Context, taskMsg protocol.WorkerTaskMessage) error {
 	req := RequestFromWorkerTask(taskMsg)
-	req.EventSink = NewMQStreamSink(c.publisher, taskMsg)
+	workspacePlan, err := c.prepareWorkspace(ctx, taskMsg, req)
+	if err != nil {
+		return err
+	}
+	req.EventSink = newArtifactStreamSink(NewMQStreamSink(c.publisher, taskMsg), workspacePlan)
 
 	logs.InfoContextf(ctx,
-		"Starting worker task run: task_id=%s run_id=%s runtime=%s assistant_id=%s agent_id=%s",
+		"Starting worker task run: task_id=%s run_id=%s runtime=%s assistant_id=%s",
 		req.TaskID,
 		req.RunID,
 		req.Runtime.Kind,
 		req.Assistant.ID,
-		taskMsg.Body.Execution.AgentID,
 	)
 
 	result, err := c.runner.Run(ctx, req)
@@ -153,6 +157,34 @@ func (c *Consumer) runTask(ctx context.Context, taskMsg protocol.WorkerTaskMessa
 		logs.InfoContextf(ctx, "Worker task completed: task_id=%s run_id=%s status=%s", req.TaskID, result.RunID, result.Status)
 	}
 	return nil
+}
+
+func (c *Consumer) prepareWorkspace(ctx context.Context, taskMsg protocol.WorkerTaskMessage, req *agent.RequestContext) (*agentworkspace.TaskWorkspace, error) {
+	projectID := strings.TrimSpace(taskMsg.Body.Workspace.ProjectID)
+	if projectID == "" {
+		workDir, err := agentworkspace.PrepareTempWorkspace()
+		if err != nil {
+			return nil, err
+		}
+		req.Runtime.WorkDir = workDir
+		return nil, nil
+	}
+	requestID := strings.TrimSpace(taskMsg.Trace.RequestID)
+	if requestID == "" {
+		requestID = strings.TrimSpace(taskMsg.ID)
+	}
+	plan, err := agentworkspace.PrepareTaskWorkspace(ctx, agentworkspace.TaskWorkspaceRequest{
+		OrgID:            taskMsg.Route.OrgID,
+		ProjectID:        projectID,
+		TaskID:           taskMsg.Trace.TaskID,
+		RequestID:        requestID,
+		RequestedWorkDir: taskMsg.Body.Runtime.WorkDir,
+	})
+	if err != nil {
+		return nil, err
+	}
+	req.Runtime.WorkDir = plan.EffectiveWorkDir
+	return plan, nil
 }
 
 func sessionTaskKey(msg protocol.WorkerTaskMessage) string {

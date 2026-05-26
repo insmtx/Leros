@@ -90,6 +90,7 @@ type ToolContext struct {
 	ConversationID string
 	ExternalID     string
 	WorkNodeID     string
+	WorkDir        string
 	Metadata       map[string]any
 }
 

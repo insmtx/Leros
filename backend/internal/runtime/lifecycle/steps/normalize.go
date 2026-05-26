@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/insmtx/Leros/backend/internal/agent"
+	agentworkspace "github.com/insmtx/Leros/backend/internal/workspace"
 )
 
 type NormalizeStep struct{}
@@ -32,5 +33,11 @@ func NormalizeRequest(req *agent.RequestContext) {
 	}
 	if req.Input.Type == "" {
 		req.Input.Type = agent.InputTypeMessage
+	}
+	if req.Runtime.WorkDir == "" {
+		workDir, err := agentworkspace.PrepareTempWorkspace()
+		if err == nil {
+			req.Runtime.WorkDir = workDir
+		}
 	}
 }

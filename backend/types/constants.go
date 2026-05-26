@@ -241,3 +241,11 @@ const (
 	// ArtifactStatusFailed 产出物生成失败
 	ArtifactStatusFailed ArtifactStatus = "failed"
 )
+
+// ArtifactSource 表示产出物记录来源。
+type ArtifactSource string
+
+const (
+	// ArtifactSourceAgentDeclared 表示 Agent 通过 manifest 显式声明的产物。
+	ArtifactSourceAgentDeclared ArtifactSource = "agent_declared"
+)

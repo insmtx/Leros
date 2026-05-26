@@ -3,7 +3,6 @@ package nodetools
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -89,12 +88,10 @@ func (t *NodeShellTool) Execute(ctx context.Context, input map[string]interface{
 	}
 
 	workingDir := util.StringValue(input, "working_dir")
-	if workingDir != "" {
-		absPath, err := filepath.Abs(workingDir)
-		if err != nil {
-			return "", fmt.Errorf("resolve working directory: %w", err)
-		}
-		workingDir = absPath
+	var err error
+	workingDir, err = resolveToolWorkDir(ctx, workingDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve working directory: %w", err)
 	}
 
 	timeoutSeconds, _ := util.IntValue(input["timeout"])

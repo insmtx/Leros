@@ -72,7 +72,7 @@ func TestWorkspaceRootDefaultsToPlatformWorkspace(t *testing.T) {
 	}
 }
 
-func TestSkillsAndMemoryDirs(t *testing.T) {
+func TestWorkspaceSubdirs(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv(EnvWorkspaceRoot, root)
 
@@ -90,5 +90,13 @@ func TestSkillsAndMemoryDirs(t *testing.T) {
 	}
 	if memoryDir != filepath.Join(root, "memory") {
 		t.Fatalf("unexpected memory dir: %s", memoryDir)
+	}
+
+	tempDir, err := TempDir()
+	if err != nil {
+		t.Fatalf("temp dir: %v", err)
+	}
+	if tempDir != filepath.Join(root, "temp") {
+		t.Fatalf("unexpected temp dir: %s", tempDir)
 	}
 }
