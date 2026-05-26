@@ -1,6 +1,6 @@
 "use client";
 
-import type { Project, ProjectArtifact, ProjectTask } from "@leros/store";
+import type { ProjectArtifact, ProjectTask } from "@leros/store";
 import { useLayoutStore } from "@leros/store";
 import { cn } from "@leros/ui/lib/utils";
 import {
@@ -20,7 +20,6 @@ const projectTabs = [
 	{ id: "chat" as const, label: "会话" },
 	{ id: "tasks" as const, label: "任务" },
 	{ id: "files" as const, label: "文件" },
-	{ id: "memory" as const, label: "记忆" },
 ];
 
 export function ProjectPage() {
@@ -105,8 +104,7 @@ export function ProjectPage() {
 				>
 					{activeProjectTab === "chat" && <ProjectChat />}
 					{activeProjectTab === "tasks" && <ProjectTasks tasks={project.tasks} />}
-					{activeProjectTab === "files" && <ProjectFiles files={project.files} />}
-					{activeProjectTab === "memory" && <ProjectMemories project={project} />}
+				{activeProjectTab === "files" && <ProjectFiles files={project.files} />}
 				</main>
 
 				<aside className="flex w-[300px] shrink-0 flex-col border-l border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-5 py-6">
@@ -215,34 +213,6 @@ function ProjectFiles({ files }: { files: ProjectArtifact[] }) {
 			<h2 className="text-lg font-semibold text-[var(--leros-text-strong)]">文件</h2>
 			<div className="mt-4">
 				<ProjectArtifactList artifacts={files} emptyText="暂无文件" />
-			</div>
-		</div>
-	);
-}
-
-function ProjectMemories({ project }: { project: Project }) {
-	return (
-		<div className="mx-auto w-full max-w-[720px]">
-			<h2 className="text-lg font-semibold text-[var(--leros-text-strong)]">记忆</h2>
-			<div className="mt-4 space-y-3">
-				{project.memories.map((memory) => (
-					<div
-						key={memory.id}
-						className="rounded-lg border border-[var(--leros-control-border)] bg-[var(--leros-surface)] px-4 py-3.5 shadow-sm"
-					>
-						<div className="text-sm font-semibold leading-5 text-[var(--leros-text-strong)]">
-							{memory.title}
-						</div>
-						<p className="mt-1.5 text-xs leading-5 text-[var(--leros-text-muted)]">
-							{memory.content}
-						</p>
-					</div>
-				))}
-				{project.memories.length === 0 && (
-					<div className="rounded-lg border border-dashed border-[var(--leros-control-border)] px-4 py-8 text-center text-xs text-[var(--leros-text-muted)]">
-						暂无记忆
-					</div>
-				)}
 			</div>
 		</div>
 	);

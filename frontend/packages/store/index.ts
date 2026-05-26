@@ -19,7 +19,6 @@ export type {
 	NavItem,
 	Project,
 	ProjectArtifact,
-	ProjectMemory,
 	ProjectMessage,
 	ProjectTask,
 	ProjectTaskStatus,
