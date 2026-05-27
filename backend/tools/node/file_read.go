@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/insmtx/Leros/backend/tools"
-	"github.com/insmtx/Leros/backend/tools/node/security"
 	"github.com/insmtx/Leros/backend/tools/node/util"
 )
 
@@ -74,10 +73,8 @@ func (t *NodeFileReadTool) Validate(input map[string]interface{}) error {
 
 // Execute reads a file from the worker workspace.
 func (t *NodeFileReadTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
-	_ = ctx
-
 	path := util.StringValue(input, "path")
-	resolvedPath, err := security.ResolveExistingWorkspacePath(path)
+	resolvedPath, err := resolveToolPath(ctx, path)
 	if err != nil {
 		return "", err
 	}
@@ -105,6 +102,10 @@ func (t *NodeFileReadTool) Execute(ctx context.Context, input map[string]interfa
 			"exists":  false,
 			"message": fmt.Sprintf("path is not a regular file: %s", path),
 		})
+	}
+	resolvedPath, err = resolveExistingToolPath(ctx, path)
+	if err != nil {
+		return "", err
 	}
 
 	shownStart := offset

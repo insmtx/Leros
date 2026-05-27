@@ -2,6 +2,7 @@
 
 worker_id: 1
 org_id: 1
+workspace_root: 
 
 database:
   url: "postgres://leros_dev_user:leros_dev_password@localhost:5433/leros_dev_db?sslmode=disable"

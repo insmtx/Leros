@@ -14,8 +14,10 @@ import (
 	einoadapter "github.com/insmtx/Leros/backend/internal/runtime/eino"
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
 	runtimetodo "github.com/insmtx/Leros/backend/internal/runtime/todo"
+	"github.com/insmtx/Leros/backend/internal/workspace"
 	"github.com/insmtx/Leros/backend/prompts"
 	"github.com/insmtx/Leros/backend/tools"
+	artifactdeclare "github.com/insmtx/Leros/backend/tools/artifact_declare"
 	memorytools "github.com/insmtx/Leros/backend/tools/memory"
 	nodetools "github.com/insmtx/Leros/backend/tools/node"
 	skillmanagetools "github.com/insmtx/Leros/backend/tools/skill_manage"
@@ -32,6 +34,7 @@ var defaultToolNames = []string{
 	nodetools.ToolNameNodeShell,
 	nodetools.ToolNameNodeFileRead,
 	nodetools.ToolNameNodeFileWrite,
+	artifactdeclare.ToolNameArtifactDeclare,
 }
 
 // DefaultSystemPrompt 返回 Leros 内置 Agent 的基础系统提示词。
@@ -52,6 +55,11 @@ func NewRunner(ctx context.Context, env *deps.Container) (*Runner, error) {
 	}
 	if env.ToolRegistry() == nil {
 		return nil, fmt.Errorf("tool registry is required")
+	}
+
+	registry := env.ToolRegistry()
+	if err := registry.Register(artifactdeclare.NewTool()); err != nil {
+		return nil, fmt.Errorf("register artifact_declare tool: %w", err)
 	}
 
 	return &Runner{
@@ -166,6 +174,7 @@ func (r *Runner) buildRunState(req *agent.RequestContext) (*runState, error) {
 	}
 
 	eventSink := sinkForRequest(req)
+	workDir := strings.TrimSpace(req.Runtime.WorkDir)
 	toolCtx := tools.ToolContext{
 		RunID:          req.RunID,
 		TraceID:        req.TraceID,
@@ -176,7 +185,15 @@ func (r *Runner) buildRunState(req *agent.RequestContext) (*runState, error) {
 		ChatID:         req.Conversation.ID,
 		ConversationID: req.Conversation.ID,
 		ExternalID:     req.Actor.ExternalID,
+		WorkDir:        workDir,
 		Metadata:       req.Metadata,
+	}
+	if ws, ok, wsErr := workspace.FromAgentRequest(req); ok && wsErr == nil {
+		if toolCtx.Metadata == nil {
+			toolCtx.Metadata = make(map[string]any)
+		}
+		toolCtx.Metadata["artifact_manifest_path"] = ws.ArtifactManifestPath
+		toolCtx.Metadata["repo_dir"] = ws.RepoDir
 	}
 	return &runState{
 		req:          req,

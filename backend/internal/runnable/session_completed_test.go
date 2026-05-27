@@ -31,6 +31,9 @@ func TestHandleSessionCompletedMessageUsesRunCompletedPayload(t *testing.T) {
 					OutputTokens: 22,
 					TotalTokens:  33,
 				},
+				Artifacts: []events.ArtifactPayload{
+					{ArtifactID: "art_test", Title: "Report", Filename: "report.md", MimeType: "text/markdown", ArtifactType: "file"},
+				},
 				Events: []events.RunEventRecord{
 					{
 						Seq:       1,
@@ -63,6 +66,12 @@ func TestHandleSessionCompletedMessageUsesRunCompletedPayload(t *testing.T) {
 	}
 	if service.completeReq.Usage == nil || service.completeReq.Usage.TotalTokens != 33 {
 		t.Fatalf("expected usage to be forwarded, got %#v", service.completeReq.Usage)
+	}
+	if len(service.completeReq.Artifacts) != 1 ||
+		service.completeReq.Artifacts[0].ArtifactID != "art_test" ||
+		service.completeReq.Artifacts[0].Filename != "report.md" ||
+		service.completeReq.Artifacts[0].MimeType != "text/markdown" {
+		t.Fatalf("expected artifacts to be forwarded, got %#v", service.completeReq.Artifacts)
 	}
 }
 

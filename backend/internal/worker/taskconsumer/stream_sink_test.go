@@ -235,6 +235,51 @@ func TestMQStreamSinkPublishesTodoPayload(t *testing.T) {
 	}
 }
 
+func TestMQStreamSinkPublishesArtifactDeclaredPayload(t *testing.T) {
+	task := protocol.WorkerTaskMessage{
+		Trace: protocol.TraceContext{
+			TraceID: "trace_test",
+			RunID:   "run_test",
+		},
+		Route: protocol.RouteContext{
+			OrgID:     1,
+			SessionID: "session_test",
+			WorkerID:  2,
+		},
+	}
+	publisher := &recordingPublisher{}
+	sink := NewMQStreamSink(publisher, task)
+	event := events.NewArtifactDeclared(events.ArtifactPayload{
+		ArtifactID: "art_test",
+		Title:      "Report",
+		Filename:   "report.md",
+		MimeType:   "text/markdown",
+	})
+	event.RunID = "run_test"
+	event.TraceID = "trace_test"
+	event.Seq = 5
+
+	if err := sink.Emit(context.Background(), event); err != nil {
+		t.Fatalf("Emit() error = %v", err)
+	}
+	if len(publisher.calls) != 1 {
+		t.Fatalf("expected one stream publish, got %d", len(publisher.calls))
+	}
+	streamMsg, ok := publisher.calls[0].event.(protocol.MessageStreamMessage)
+	if !ok {
+		t.Fatalf("expected stream publish event type MessageStreamMessage, got %T", publisher.calls[0].event)
+	}
+	if streamMsg.Body.Event != protocol.StreamEventArtifactDeclared {
+		t.Fatalf("expected event %q, got %q", protocol.StreamEventArtifactDeclared, streamMsg.Body.Event)
+	}
+	if streamMsg.Body.Payload.Artifact == nil ||
+		streamMsg.Body.Payload.Artifact.ArtifactID != "art_test" ||
+		streamMsg.Body.Payload.Artifact.Filename != "report.md" ||
+		streamMsg.Body.Payload.Artifact.MimeType != "text/markdown" {
+		t.Fatalf("unexpected artifact payload: %#v", streamMsg.Body.Payload.Artifact)
+	}
+}
+
 type recordingPublisher struct {
 	calls []publishCall
 }

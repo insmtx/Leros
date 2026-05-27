@@ -28,6 +28,12 @@ func RequestFromWorkerTask(msg protocol.WorkerTaskMessage) *agent.RequestContext
 		Conversation: agent.ConversationContext{
 			ID: msg.Route.SessionID,
 		},
+		Workspace: agent.WorkspaceContext{
+			OrgID:     msg.Route.OrgID,
+			ProjectID: msg.Body.Workspace.ProjectID,
+			TaskID:    msg.Trace.TaskID,
+			RequestID: msg.Trace.RequestID,
+		},
 		Input: agent.InputContext{
 			Type:        agent.InputType(msg.Body.Input.Type),
 			Text:        msg.Body.Input.Text,
@@ -50,10 +56,6 @@ func RequestFromWorkerTask(msg protocol.WorkerTaskMessage) *agent.RequestContext
 		},
 		Metadata: map[string]any{
 			"message_id": msg.ID,
-			"org_id":     msg.Route.OrgID,
-			"worker_id":  msg.Route.WorkerID,
-			"session_id": msg.Route.SessionID,
-			"agent_id":   msg.Body.Execution.AgentID,
 			"metadata":   msg.Metadata,
 		},
 	}

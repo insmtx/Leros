@@ -59,6 +59,9 @@ const (
 	EventTodoSnapshot EventType = "todo.snapshot"
 	// EventTodoUpdated 包含更新后的完整运行时待办列表。
 	EventTodoUpdated EventType = "todo.updated"
+
+	// EventArtifactDeclared indicates a generated artifact was declared and persisted.
+	EventArtifactDeclared EventType = "artifact.declared"
 )
 
 // MessageDeltaPayload 是助手文本增量的标准负载。
@@ -115,13 +118,23 @@ type RunEventRecord struct {
 
 // RunCompletedPayload 归档完整的成功运行时运行。
 type RunCompletedPayload struct {
-	Status      string           `json:"status"`
-	Result      RunResultPayload `json:"result"`
-	Usage       *UsagePayload    `json:"usage,omitempty"`
-	Events      []RunEventRecord `json:"events,omitempty"`
-	StartedAt   time.Time        `json:"started_at,omitempty"`
-	CompletedAt time.Time        `json:"completed_at,omitempty"`
-	Metadata    map[string]any   `json:"metadata,omitempty"`
+	Status      string            `json:"status"`
+	Result      RunResultPayload  `json:"result"`
+	Artifacts   []ArtifactPayload `json:"artifacts,omitempty"`
+	Usage       *UsagePayload     `json:"usage,omitempty"`
+	Events      []RunEventRecord  `json:"events,omitempty"`
+	StartedAt   time.Time         `json:"started_at,omitempty"`
+	CompletedAt time.Time         `json:"completed_at,omitempty"`
+	Metadata    map[string]any    `json:"metadata,omitempty"`
+}
+
+// ArtifactPayload references a persisted artifact produced by one run.
+type ArtifactPayload struct {
+	ArtifactID   string `json:"artifact_id,omitempty"`
+	Title        string `json:"title,omitempty"`
+	Filename     string `json:"filename,omitempty"`
+	MimeType     string `json:"mime_type,omitempty"`
+	ArtifactType string `json:"artifact_type,omitempty"`
 }
 
 // NewMessageDelta 创建标准的助手消息增量事件。
@@ -171,6 +184,11 @@ func NewToolCallFailed(toolCallID string, name string, message string, elapsedMS
 		IsError:    true,
 		ElapsedMS:  elapsedMS,
 	}, "")
+}
+
+// NewArtifactDeclared creates a semantic artifact declaration event.
+func NewArtifactDeclared(payload ArtifactPayload) *Event {
+	return newPayloadEvent(EventArtifactDeclared, payload, "")
 }
 
 // NewMessageResult 创建标准的最终助手结果事件。

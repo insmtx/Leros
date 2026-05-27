@@ -131,7 +131,9 @@ func (s *Service) buildRouter(ctx context.Context, opts Options) (agent.Runner, 
 	router.SetDefault(selectedDefault)
 
 	modelResolver := steps.NewDBModelResolver(infradb.GetDB(), identity.OrgID())
-	return lifecycle.NewRunner(router, lifecycleBuilder, s.env, modelResolver), nil
+	runner := lifecycle.NewRunner(router, lifecycleBuilder, s.env, modelResolver)
+	runner.SetArtifactRecorder(steps.NewDBArtifactRecorder(infradb.GetDB()))
+	return runner, nil
 }
 
 var _ agent.Runner = (*Service)(nil)

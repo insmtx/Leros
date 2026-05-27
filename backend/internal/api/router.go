@@ -96,6 +96,10 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		handler.RegisterTaskRoutes(v1, taskService)
 		logs.Info("Task routes registered successfully")
 
+		artifactService := service.NewArtifactService(db)
+		handler.RegisterArtifactRoutes(v1, artifactService)
+		logs.Info("Artifact routes registered successfully")
+
 		// Start background consumers
 		go runnable.StartSessionCompleted(context.Background(), sessionService, eventbus)
 		logs.Info("Session completed runnable started")

@@ -71,14 +71,14 @@ func (t *NodeFileWriteTool) Execute(ctx context.Context, input map[string]interf
 
 	path := util.StringValue(input, "path")
 
-	resolvedPath, err := security.ResolveWorkspacePath(path)
+	resolvedPath, err := resolveToolPath(ctx, path)
 	if err != nil {
 		return "", err
 	}
 	if err := security.IsWriteDenied(resolvedPath); err != nil {
 		return "", err
 	}
-	if err := security.ValidateWritableWorkspacePath(resolvedPath); err != nil {
+	if err := validateWritableToolPath(ctx, resolvedPath); err != nil {
 		return "", err
 	}
 	content := input["content"].(string)

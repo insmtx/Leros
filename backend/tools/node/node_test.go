@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/insmtx/Leros/backend/tools"
 )
 
 type fakeNodeExecutor struct {
@@ -67,6 +69,34 @@ func TestNodeShellToolExecute(t *testing.T) {
 	}
 	if call.WorkingDir != workspaceRoot {
 		t.Fatalf("unexpected working dir: %s", call.WorkingDir)
+	}
+}
+
+func TestNodeShellToolDefaultsToRuntimeWorkDir(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	t.Setenv("LEROS_WORKSPACE_ROOT", workspaceRoot)
+	projectDir := filepath.Join(workspaceRoot, "projects", "42", "project_1", "repo")
+	if err := os.MkdirAll(projectDir, 0755); err != nil {
+		t.Fatalf("create project dir: %v", err)
+	}
+
+	executor := &fakeNodeExecutor{
+		results: []nodeExecResult{{
+			Stdout:   "ok\n",
+			ExitCode: 0,
+		}},
+	}
+	tool := newNodeShellToolWithExecutor(executor)
+	ctx := tools.ContextWithToolContext(context.Background(), tools.ToolContext{WorkDir: projectDir})
+
+	_, err := tool.Execute(ctx, map[string]interface{}{
+		"command": "pwd",
+	})
+	if err != nil {
+		t.Fatalf("execute node shell tool: %v", err)
+	}
+	if got := executor.calls[0].WorkingDir; got != projectDir {
+		t.Fatalf("working dir = %q, want %q", got, projectDir)
 	}
 }
 
@@ -142,6 +172,48 @@ func TestNodeFileReadToolExecute(t *testing.T) {
 	}
 	if !output["has_more"].(bool) {
 		t.Fatalf("expected has_more to be true")
+	}
+}
+
+func TestNodeFileToolsResolveRelativeToRuntimeWorkDir(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	t.Setenv("LEROS_WORKSPACE_ROOT", workspaceRoot)
+	projectDir := filepath.Join(workspaceRoot, "projects", "42", "project_1", "repo")
+	if err := os.MkdirAll(projectDir, 0755); err != nil {
+		t.Fatalf("create project dir: %v", err)
+	}
+	ctx := tools.ContextWithToolContext(context.Background(), tools.ToolContext{WorkDir: projectDir})
+
+	writeTool := newNodeFileWriteToolWithExecutor(nil)
+	_, err := writeTool.Execute(ctx, map[string]interface{}{
+		"path":    "app/main.go",
+		"content": "package main\n",
+	})
+	if err != nil {
+		t.Fatalf("write relative to project dir: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(projectDir, "app", "main.go")); err != nil {
+		t.Fatalf("expected project file to be written: %v", err)
+	}
+
+	readTool := newNodeFileReadToolWithExecutor(nil)
+	rawOutput, err := readTool.Execute(ctx, map[string]interface{}{
+		"path": "app/main.go",
+	})
+	if err != nil {
+		t.Fatalf("read relative to project dir: %v", err)
+	}
+	output := decodeNodeToolOutput(t, rawOutput)
+	if output["content"] != "package main" {
+		t.Fatalf("unexpected content: %#v", output["content"])
+	}
+
+	_, err = writeTool.Execute(ctx, map[string]interface{}{
+		"path":    "../outside.txt",
+		"content": "nope",
+	})
+	if err == nil {
+		t.Fatal("expected path outside runtime work dir to be rejected")
 	}
 }
 

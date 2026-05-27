@@ -108,12 +108,38 @@ func (j *RunJournal) CompletedPayload(result *agent.RunResult) events.RunComplet
 		Result: events.RunResultPayload{
 			Message: resultMessage(result),
 		},
+		Artifacts:   artifactPayloadsLocked(j.rawEvents),
 		Usage:       result.Usage,
 		Events:      archiveEventsLocked(j.rawEvents),
 		StartedAt:   result.StartedAt,
 		CompletedAt: result.CompletedAt,
 		Metadata:    copyMetadata(result.Metadata),
 	}
+}
+
+func artifactPayloadsLocked(source []events.Event) []events.ArtifactPayload {
+	artifacts := make([]events.ArtifactPayload, 0)
+	seen := map[string]struct{}{}
+	for _, event := range source {
+		if event.Type != events.EventArtifactDeclared {
+			continue
+		}
+		payload, err := events.DecodePayload[events.ArtifactPayload](&event)
+		if err != nil {
+			continue
+		}
+		artifactID := strings.TrimSpace(payload.ArtifactID)
+		if artifactID == "" {
+			continue
+		}
+		if _, ok := seen[artifactID]; ok {
+			continue
+		}
+		payload.ArtifactID = artifactID
+		artifacts = append(artifacts, payload)
+		seen[artifactID] = struct{}{}
+	}
+	return artifacts
 }
 
 // StartedAt 返回 run.started 事件所记录的时间。

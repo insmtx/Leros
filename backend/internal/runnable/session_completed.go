@@ -53,6 +53,7 @@ func handleSessionCompletedMessage(ctx context.Context, service contract.Session
 			SessionID: sessionID,
 			Content:   completed.Result.Message,
 			Chunks:    runEventChunks(completed.Events),
+			Artifacts: messageArtifactsFromRunCompleted(completed.Artifacts),
 			Metadata:  messageMetadataFromRunCompleted(completed),
 			Usage:     messageUsageFromRuntime(completed.Usage),
 			Seq:       streamMsg.Body.Seq,
@@ -112,6 +113,23 @@ func runEventChunks(records []events.RunEventRecord) []types.MessageChunk {
 		})
 	}
 	return chunks
+}
+
+func messageArtifactsFromRunCompleted(artifacts []events.ArtifactPayload) []types.MessageArtifact {
+	if len(artifacts) == 0 {
+		return nil
+	}
+	result := make([]types.MessageArtifact, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		result = append(result, types.MessageArtifact{
+			ArtifactID:   artifact.ArtifactID,
+			Title:        artifact.Title,
+			Filename:     artifact.Filename,
+			MimeType:     artifact.MimeType,
+			ArtifactType: artifact.ArtifactType,
+		})
+	}
+	return result
 }
 
 func messageUsageFromRuntime(usage *events.UsagePayload) *types.MessageUsage {

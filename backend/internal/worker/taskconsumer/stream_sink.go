@@ -181,6 +181,11 @@ func streamPayload(event *events.Event) protocol.StreamPayload {
 		if err == nil {
 			payload.Todos = todos
 		}
+	case events.EventArtifactDeclared:
+		artifact, err := events.DecodePayload[events.ArtifactPayload](event)
+		if err == nil {
+			payload.Artifact = &artifact
+		}
 	case events.EventCompleted, events.EventFailed, events.EventCancelled:
 		completedPayload, err := events.DecodePayload[events.RunCompletedPayload](event)
 		if err == nil {
@@ -215,6 +220,8 @@ func streamEventType(eventType events.EventType) protocol.StreamEventType {
 		return protocol.StreamEventTodoSnapshot
 	case events.EventTodoUpdated:
 		return protocol.StreamEventTodoUpdated
+	case events.EventArtifactDeclared:
+		return protocol.StreamEventArtifactDeclared
 	default:
 		return protocol.StreamEventMessageDelta
 	}

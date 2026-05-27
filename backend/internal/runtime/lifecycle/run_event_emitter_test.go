@@ -124,6 +124,52 @@ func TestRunnerEmitsFailureThroughSink(t *testing.T) {
 	}
 }
 
+func TestRunnerEmitsArtifactsBeforeCompletedArchive(t *testing.T) {
+	sink := &recordingSink{}
+	runner := NewRunner(successRuntime{}, lifecyclecontext.NewContextBuilder(lifecyclecontext.ContextBuilder{
+		BaseSystemPrompt: "base",
+	}), nil, nil)
+	runner.SetArtifactRecorder(fakeArtifactRecorder{
+		artifacts: []events.ArtifactPayload{
+			{ArtifactID: "art_test", Title: "Report", Filename: "report.md", MimeType: "text/markdown", ArtifactType: "file"},
+		},
+	})
+
+	_, err := runner.Run(context.Background(), lifecycleTestRequest(sink))
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	got := sink.Events()
+	if len(got) != 4 {
+		t.Fatalf("expected started, artifact, result, completed events, got %d", len(got))
+	}
+	expectedTypes := []events.EventType{
+		events.EventStarted,
+		events.EventArtifactDeclared,
+		events.EventResult,
+		events.EventCompleted,
+	}
+	for i, expected := range expectedTypes {
+		if got[i].Type != expected {
+			t.Fatalf("event %d: expected %s, got %s", i, expected, got[i].Type)
+		}
+	}
+	completed, err := events.DecodePayload[events.RunCompletedPayload](got[3])
+	if err != nil {
+		t.Fatalf("decode completed payload: %v", err)
+	}
+	if len(completed.Events) != 2 || completed.Events[1].Type != events.EventArtifactDeclared {
+		t.Fatalf("expected completed archive to include artifact before result, got %#v", completed.Events)
+	}
+	if len(completed.Artifacts) != 1 ||
+		completed.Artifacts[0].ArtifactID != "art_test" ||
+		completed.Artifacts[0].Filename != "report.md" ||
+		completed.Artifacts[0].MimeType != "text/markdown" {
+		t.Fatalf("expected completed payload artifacts, got %#v", completed.Artifacts)
+	}
+}
+
 func TestRunnerEmitsCancelledThroughSink(t *testing.T) {
 	sink := &recordingSink{}
 	runner := NewRunner(&errorRuntime{err: context.DeadlineExceeded}, lifecyclecontext.NewContextBuilder(lifecyclecontext.ContextBuilder{
@@ -226,6 +272,14 @@ type panicRuntime struct{}
 
 func (panicRuntime) Run(context.Context, *agent.RequestContext) (*agent.RunResult, error) {
 	panic("runtime exploded")
+}
+
+type fakeArtifactRecorder struct {
+	artifacts []events.ArtifactPayload
+}
+
+func (r fakeArtifactRecorder) Record(context.Context, *agent.RequestContext) ([]events.ArtifactPayload, error) {
+	return r.artifacts, nil
 }
 
 type recordingSink struct {

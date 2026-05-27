@@ -102,3 +102,52 @@ func TestProjectStreamMessageProjectsTodoSnapshotPayloadAsArray(t *testing.T) {
 		t.Fatalf("unexpected todo payload: %#v", payload)
 	}
 }
+
+func TestProjectArtifactDeclaredEvents(t *testing.T) {
+	payload := events.ArtifactPayload{
+		ArtifactID: "art_test",
+		Title:      "Report",
+		Filename:   "report.md",
+		MimeType:   "text/markdown",
+	}
+	streamMsg := protocol.MessageStreamMessage{
+		CreatedAt: time.UnixMilli(1779243000000).UTC(),
+		Route:     protocol.RouteContext{SessionID: "sess_test"},
+		Body: protocol.StreamBody{
+			Seq:   10,
+			Event: protocol.StreamEventArtifactDeclared,
+			Payload: protocol.StreamPayload{
+				Artifact: &payload,
+			},
+		},
+	}
+	event, ok := ProjectStreamMessage(streamMsg)
+	if !ok {
+		t.Fatal("expected artifact event to project")
+	}
+	if event.Type != events.EventArtifactDeclared {
+		t.Fatalf("got type %q, want %q", event.Type, events.EventArtifactDeclared)
+	}
+	projected, ok := event.Payload.(events.ArtifactPayload)
+	if !ok || projected.ArtifactID != "art_test" || projected.Filename != "report.md" || projected.MimeType != "text/markdown" {
+		t.Fatalf("unexpected realtime payload: %#v", event.Payload)
+	}
+
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	historical, ok := ProjectRunEventRecord("sess_test", types.MessageChunk{
+		Seq:       10,
+		Type:      string(events.EventArtifactDeclared),
+		Timestamp: 1779243000000,
+		Payload:   raw,
+	})
+	if !ok {
+		t.Fatal("expected historical artifact event to project")
+	}
+	historicalPayload, ok := historical.Payload.(events.ArtifactPayload)
+	if !ok || historicalPayload.ArtifactID != "art_test" || historicalPayload.Filename != "report.md" || historicalPayload.MimeType != "text/markdown" {
+		t.Fatalf("unexpected historical payload: %#v", historical.Payload)
+	}
+}

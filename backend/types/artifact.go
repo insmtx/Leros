@@ -20,17 +20,23 @@ type Artifact struct {
 	// ProjectID 关联项目（冗余字段，便于项目资产聚合查询）
 	ProjectID uint  `gorm:"column:project_id;type:bigint;not null;index"`
 	SessionID *uint `gorm:"column:session_id;type:bigint;index"`
+	MessageID *uint `gorm:"column:message_id;type:bigint;index"`
 
 	Title       string `gorm:"column:title;type:varchar(500);not null"`
+	Filename    string `gorm:"column:filename;type:varchar(500)"`
 	Description string `gorm:"column:description;type:text"`
 
 	// ArtifactType 产出物类型，使用 ArtifactType 常量值
 	ArtifactType string `gorm:"column:artifact_type;type:varchar(50);not null;index"`
 
 	// FileURL 文件链接或路径
-	FileURL  string `gorm:"column:file_url;type:varchar(2000);not null"`
-	MimeType string `gorm:"column:mime_type;type:varchar(100)"`
-	FileSize int64  `gorm:"column:file_size;type:bigint"`
+	FileURL      string `gorm:"column:file_url;type:varchar(2000);not null"`
+	MimeType     string `gorm:"column:mime_type;type:varchar(100)"`
+	FileSize     int64  `gorm:"column:file_size;type:bigint"`
+	RelativePath string `gorm:"column:relative_path;type:varchar(2000)"`
+	StorageKey   string `gorm:"column:storage_key;type:varchar(2000);index"`
+	Sha256       string `gorm:"column:sha256;type:varchar(64);index"`
+	Source       string `gorm:"column:source;type:varchar(50);not null;default:'agent_declared';index"`
 
 	// ExportFormat 导出格式：markdown / pdf / word / html
 	ExportFormat string `gorm:"column:export_format;type:varchar(50)"`

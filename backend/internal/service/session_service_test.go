@@ -26,7 +26,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("failed to open test database: %v", err)
 	}
 
-	if err := db.AutoMigrate(&types.Session{}, &types.SessionMessage{}); err != nil {
+	if err := db.AutoMigrate(&types.Session{}, &types.SessionMessage{}, &types.Artifact{}); err != nil {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}
 
@@ -924,6 +924,148 @@ func TestCompleteSessionMessageStoresChunksAndUsage(t *testing.T) {
 	}
 	if _, ok := raw["tool_calls"]; ok {
 		t.Fatalf("history message should not include top-level tool_calls: %s", body)
+	}
+}
+
+func TestCompleteSessionMessageBindsExistingDeclaredArtifact(t *testing.T) {
+	database := setupTestDB(t)
+	service := NewSessionService(database, &mockEventBus{}, &mockInferrer{assistantID: 1})
+	ctx := setupTestContextWithCaller(t)
+	projectID := uint(10)
+	taskID := uint(20)
+	session := &types.Session{
+		PublicID:  "sess_artifact",
+		Type:      types.SessionTypeTask,
+		Uin:       1,
+		OrgID:     1,
+		ProjectID: &projectID,
+		TaskID:    &taskID,
+		Status:    string(types.SessionStatusActive),
+	}
+	if err := database.Create(session).Error; err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	artifact := &types.Artifact{
+		PublicID:     "art_existing",
+		OrgID:        1,
+		OwnerID:      1,
+		TaskID:       taskID,
+		ProjectID:    projectID,
+		SessionID:    &session.ID,
+		Title:        "Report",
+		Filename:     "report.md",
+		ArtifactType: string(types.ArtifactTypeFile),
+		MimeType:     "text/markdown",
+		FileURL:      "/v1/artifacts/art_existing/download",
+		RelativePath: "docs/report.md",
+		StorageKey:   "projects/1/project_10/repo/docs/report.md",
+		Source:       string(types.ArtifactSourceAgentDeclared),
+		Status:       string(types.ArtifactStatusCompleted),
+	}
+	if err := database.Create(artifact).Error; err != nil {
+		t.Fatalf("create artifact: %v", err)
+	}
+
+	chunkPayload, err := json.Marshal(events.ArtifactPayload{
+		ArtifactID:   artifact.PublicID,
+		Title:        artifact.Title,
+		Filename:     artifact.Filename,
+		MimeType:     artifact.MimeType,
+		ArtifactType: artifact.ArtifactType,
+	})
+	if err != nil {
+		t.Fatalf("marshal artifact chunk: %v", err)
+	}
+	messageArtifacts := []types.MessageArtifact{
+		{ArtifactID: artifact.PublicID, Title: artifact.Title, Filename: artifact.Filename, MimeType: artifact.MimeType, ArtifactType: artifact.ArtifactType},
+	}
+	err = service.CompleteSessionMessage(ctx, &contract.CompleteSessionMessageRequest{
+		SessionID: session.PublicID,
+		Content:   "done",
+		Artifacts: messageArtifacts,
+		Chunks: []types.MessageChunk{
+			{Seq: 1, Type: string(events.EventArtifactDeclared), Timestamp: 1779243000000, Payload: chunkPayload},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CompleteSessionMessage failed: %v", err)
+	}
+
+	var artifacts []types.Artifact
+	if err := database.Find(&artifacts).Error; err != nil {
+		t.Fatalf("list artifacts: %v", err)
+	}
+	if len(artifacts) != 1 {
+		t.Fatalf("expected existing artifact to be reused, got %d rows", len(artifacts))
+	}
+	if artifacts[0].MessageID == nil || *artifacts[0].MessageID == 0 {
+		t.Fatalf("expected artifact message_id to be bound: %#v", artifacts[0].MessageID)
+	}
+	result, err := service.GetSessionMessages(ctx, session.PublicID, 1, 20)
+	if err != nil {
+		t.Fatalf("GetSessionMessages failed: %v", err)
+	}
+	if len(result.Items) != 1 ||
+		len(result.Items[0].Artifacts) != 1 ||
+		result.Items[0].Artifacts[0].ArtifactID != artifact.PublicID ||
+		result.Items[0].Artifacts[0].Filename != "report.md" ||
+		result.Items[0].Artifacts[0].MimeType != "text/markdown" {
+		t.Fatalf("expected message artifacts to be persisted, got %#v", result.Items)
+	}
+}
+
+func TestGetSessionMessagesFiltersTodoChunks(t *testing.T) {
+	service := setupTestService(t)
+	ctx := setupTestContextWithCaller(t)
+
+	session, err := service.CreateSession(ctx, &contract.CreateSessionRequest{
+		Type: string(types.SessionTypeUserChat),
+	})
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	deltaPayload, err := json.Marshal(events.MessageDeltaPayload{
+		MessageID: "msg_1",
+		Role:      string(protocol.MessageRoleAssistant),
+		Content:   "done",
+	})
+	if err != nil {
+		t.Fatalf("marshal delta payload: %v", err)
+	}
+	todoPayload, err := json.Marshal([]events.RuntimeTodoItem{
+		{ID: "todo_1", Title: "Inspect code", Status: "completed"},
+	})
+	if err != nil {
+		t.Fatalf("marshal todo payload: %v", err)
+	}
+
+	err = service.CompleteSessionMessage(ctx, &contract.CompleteSessionMessageRequest{
+		SessionID: session.SessionID,
+		Content:   "done",
+		Chunks: []types.MessageChunk{
+			{Seq: 1, Type: string(events.EventMessageDelta), Timestamp: 1779243000000, Payload: deltaPayload},
+			{Seq: 2, Type: string(events.EventTodoSnapshot), Timestamp: 1779243000001, Payload: todoPayload},
+			{Seq: 3, Type: string(events.EventTodoUpdated), Timestamp: 1779243000002, Payload: todoPayload},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CompleteSessionMessage failed: %v", err)
+	}
+
+	result, err := service.GetSessionMessages(ctx, session.SessionID, 1, 20)
+	if err != nil {
+		t.Fatalf("GetSessionMessages failed: %v", err)
+	}
+	if result.Total != 1 || len(result.Items) != 1 {
+		t.Fatalf("expected one message, got total=%d len=%d", result.Total, len(result.Items))
+	}
+	chunks := result.Items[0].Chunks
+	if len(chunks) != 1 {
+		t.Fatalf("expected only non-todo chunk, got %#v", chunks)
+	}
+	if chunks[0].Type != string(events.EventMessageDelta) || chunks[0].Sequence != 1 {
+		t.Fatalf("unexpected remaining chunk: %#v", chunks[0])
 	}
 }
 

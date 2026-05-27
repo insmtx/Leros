@@ -12,14 +12,20 @@ const (
 	authorizationHeader = "Authorization"
 	apiKeyHeader        = "X-API-Key"
 	bearerPrefix        = "Bearer "
-
-	// TODO: 将此固定开发令牌替换为基于数据库的令牌验证。
-	defaultAuthToken = "leros-mcp-token"
 )
+
+// globalAuthToken 存储从配置加载的 MCP 授权令牌。
+// 默认令牌为空字符串，表示不启用认证。
+var globalAuthToken string
 
 // DefaultAuthToken 返回当前 MCP 授权令牌。
 func DefaultAuthToken() string {
-	return defaultAuthToken
+	return globalAuthToken
+}
+
+// SetAuthToken 设置 MCP 授权令牌。
+func SetAuthToken(token string) {
+	globalAuthToken = token
 }
 
 func requireToken() gin.HandlerFunc {
@@ -39,8 +45,11 @@ func requireToken() gin.HandlerFunc {
 }
 
 func validateToken(token string) bool {
-	// TODO: 将此固定开发令牌替换为基于数据库的令牌验证。
-	return tokenMatches(token, defaultAuthToken)
+	// 如果全局令牌未设置（为空），则不进行认证，允许所有请求通过。
+	if globalAuthToken == "" {
+		return true
+	}
+	return tokenMatches(token, globalAuthToken)
 }
 
 func tokenFromRequest(c *gin.Context) string {

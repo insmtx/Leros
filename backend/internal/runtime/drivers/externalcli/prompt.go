@@ -26,14 +26,13 @@ func buildPrompt(req *agent.RequestContext) string {
 		sections = append(sections, formatJSONSection("Conversation Context", req.Conversation))
 	}
 	sections = append(sections, formatCurrentUserTaskSection(req.Input))
-	// if req.Policy.RequireApproval {
-	// 	sections = append(sections, formatJSONSection("Policy", req.Policy))
-	// }
 
 	sections = append(sections, `## Output Contract
 - 使用中文输出最终结果。
 - 不要编造未实际执行的命令、文件、链接、ID 或状态。
-- 如果需要执行真实环境操作，请使用 runtime 已配置的工具或 MCP 能力。`)
+- 如果需要执行真实环境操作，请使用 runtime 已配置的工具或 MCP 能力。
+- 如果本轮创建了需要用户查看、下载或复用的文件，请在文件创建完成后调用 artifact_declare 声明最终产物，path 使用该文件的完整路径。
+- 最终回复只说明完成结果和文件名，不要输出本地绝对路径或下载链接。`)
 
 	return strings.Join(sections, "\n\n")
 }

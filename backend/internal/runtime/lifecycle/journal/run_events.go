@@ -99,6 +99,7 @@ func terminalRunPayload(journal *RunJournal, result *agent.RunResult) events.Run
 		Result: events.RunResultPayload{
 			Message: resultMessage(result),
 		},
+		Artifacts:   nil,
 		Usage:       result.Usage,
 		StartedAt:   result.StartedAt,
 		CompletedAt: result.CompletedAt,

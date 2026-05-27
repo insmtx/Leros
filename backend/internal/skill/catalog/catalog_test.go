@@ -175,6 +175,27 @@ func TestDefaultLerosSkillsDirUsesWorkspaceRoot(t *testing.T) {
 	}
 }
 
+func TestLoadDefaultCatalogCreatesMissingSkillsDir(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	t.Setenv(leros.EnvWorkspaceRoot, workspaceRoot)
+
+	catalog, rootDir, err := LoadDefaultCatalog()
+	if err != nil {
+		t.Fatalf("load default catalog: %v", err)
+	}
+
+	expected := filepath.ToSlash(filepath.Join(workspaceRoot, "skills"))
+	if rootDir != expected {
+		t.Fatalf("expected root dir %s, got %s", expected, rootDir)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceRoot, "skills")); err != nil {
+		t.Fatalf("expected skills dir to be created: %v", err)
+	}
+	if summaries := catalog.List(); len(summaries) != 0 {
+		t.Fatalf("expected empty catalog, got %#v", summaries)
+	}
+}
+
 func TestCatalogRejectsPathTraversal(t *testing.T) {
 	rootDir := t.TempDir()
 	skillDir := filepath.Join(rootDir, "safe-skill")

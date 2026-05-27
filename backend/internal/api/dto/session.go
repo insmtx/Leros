@@ -28,3 +28,5 @@ type ToolCallResultPayload struct {
 }
 
 type RuntimeTodoItemPayload = events.RuntimeTodoItem
+
+type ArtifactPayload = events.ArtifactPayload

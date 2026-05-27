@@ -39,9 +39,10 @@ type WorkerTaskMessage = Envelope[WorkerTaskBody]
 type WorkerTaskBody struct {
 	TaskType TaskType `json:"task_type"`
 
-	Actor     ActorContext    `json:"actor"`
-	Execution ExecutionTarget `json:"execution"`
-	Input     TaskInput       `json:"input"`
+	Actor     ActorContext     `json:"actor"`
+	Execution ExecutionTarget  `json:"execution"`
+	Workspace WorkspaceOptions `json:"workspace,omitempty"`
+	Input     TaskInput        `json:"input"`
 
 	Model   ModelOptions   `json:"model,omitempty"`
 	Runtime RuntimeOptions `json:"runtime,omitempty"`
@@ -60,9 +61,13 @@ type ActorContext struct {
 // ExecutionTarget describes the execution target and capability scope for this task.
 type ExecutionTarget struct {
 	AssistantID string   `json:"assistant_id,omitempty"`
-	AgentID     string   `json:"agent_id,omitempty"`
 	Skills      []string `json:"skills,omitempty"`
 	Tools       []string `json:"tools,omitempty"`
+}
+
+// WorkspaceOptions identifies the isolated project workspace for a task run.
+type WorkspaceOptions struct {
+	ProjectID string `json:"project_id,omitempty"`
 }
 
 // TaskInput is the standardized task input consumed by Worker Runtime.

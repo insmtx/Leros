@@ -29,8 +29,8 @@ func LoadDefaultCatalog() (*Catalog, string, error) {
 		return nil, "", fmt.Errorf("resolve default skill directory: %w", err)
 	}
 
-	if _, err := os.Stat(dir); err != nil {
-		return nil, "", fmt.Errorf("load skills from default directory %s: %w", dir, err)
+	if err := os.MkdirAll(filepath.FromSlash(dir), 0o755); err != nil {
+		return nil, "", fmt.Errorf("create default skill directory %s: %w", dir, err)
 	}
 
 	catalog, err := NewCatalogFromDir(dir)

@@ -303,17 +303,36 @@ func (e *openAIChatEncoder) encodeMessages(ir *IRRequest) []map[string]interface
 			continue
 		}
 
-		em := map[string]interface{}{}
+		baseRole := "user"
 		switch m.Role {
-		case IRRoleUser:
-			em["role"] = "user"
 		case IRRoleAssistant:
-			em["role"] = "assistant"
+			baseRole = "assistant"
 		case IRRoleTool:
-			em["role"] = "tool"
+			baseRole = "tool"
 		}
 
+		em := map[string]interface{}{"role": baseRole}
+		hasContent := false
+
 		var toolCalls []map[string]interface{}
+		flushMessage := func() {
+			if len(toolCalls) > 0 {
+				em["tool_calls"] = toolCalls
+				if _, ok := em["content"]; !ok {
+					em["content"] = nil
+				}
+			}
+			if _, ok := em["content"]; !ok && len(toolCalls) == 0 && baseRole != "tool" {
+				em["content"] = ""
+			}
+			if hasContent || len(toolCalls) > 0 || baseRole != "tool" {
+				msgs = append(msgs, em)
+			}
+			em = map[string]interface{}{"role": baseRole}
+			toolCalls = nil
+			hasContent = false
+		}
+
 		for _, block := range m.Content {
 			switch block.Type {
 			case IRBlockText:
@@ -322,6 +341,7 @@ func (e *openAIChatEncoder) encodeMessages(ir *IRRequest) []map[string]interface
 				} else {
 					em["content"] = block.Text
 				}
+				hasContent = true
 			case IRBlockToolUse:
 				args := "{}"
 				if block.ToolUseInput != nil {
@@ -338,24 +358,20 @@ func (e *openAIChatEncoder) encodeMessages(ir *IRRequest) []map[string]interface
 					},
 				})
 			case IRBlockToolResult:
-				em["role"] = "tool"
-				em["tool_call_id"] = block.ToolResultToolUseID
-				em["content"] = block.ToolResultContent
+				if hasContent || len(toolCalls) > 0 {
+					flushMessage()
+				}
+				msgs = append(msgs, map[string]interface{}{
+					"role":         "tool",
+					"tool_call_id": block.ToolResultToolUseID,
+					"content":      block.ToolResultContent,
+				})
 			}
 		}
 
-		if len(toolCalls) > 0 {
-			em["tool_calls"] = toolCalls
-			if _, ok := em["content"]; !ok {
-				em["content"] = nil
-			}
+		if hasContent || len(toolCalls) > 0 || (len(m.Content) == 0 && baseRole != "tool") {
+			flushMessage()
 		}
-
-		if _, ok := em["content"]; !ok && len(toolCalls) == 0 && m.Role != IRRoleTool {
-			em["content"] = ""
-		}
-
-		msgs = append(msgs, em)
 	}
 
 	return msgs

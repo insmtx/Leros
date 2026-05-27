@@ -23,12 +23,13 @@ type Config struct {
 		Port string    `yaml:"port,omitempty"` // 服务器端口
 		JWT  JWTConfig `yaml:"jwt,omitempty"`  // JWT 认证配置
 	} `yaml:"server,omitempty"` // 服务器地址
-	Github    *GithubAppConfig `yaml:"github,omitempty"`
-	Gitlab    *GitlabAppConfig `yaml:"gitlab,omitempty"`
-	NATS      *NATSConfig      `yaml:"nats,omitempty"`
-	Database  *DatabaseConfig  `yaml:"database,omitempty"`
-	LLM       *LLMConfig       `yaml:"llm,omitempty"`
-	Scheduler *SchedulerConfig `yaml:"scheduler,omitempty"`
+	WorkspaceRoot string           `yaml:"workspace_root,omitempty" json:"workspace_root,omitempty"`
+	Github        *GithubAppConfig `yaml:"github,omitempty"`
+	Gitlab        *GitlabAppConfig `yaml:"gitlab,omitempty"`
+	NATS          *NATSConfig      `yaml:"nats,omitempty"`
+	Database      *DatabaseConfig  `yaml:"database,omitempty"`
+	LLM           *LLMConfig       `yaml:"llm,omitempty"`
+	Scheduler     *SchedulerConfig `yaml:"scheduler,omitempty"`
 }
 
 // JWTConfig JWT 认证配置

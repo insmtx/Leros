@@ -30,6 +30,8 @@ const (
 	StreamEventTodoSnapshot StreamEventType = "todo.snapshot"
 	// StreamEventTodoUpdated indicates the runtime todo list changed.
 	StreamEventTodoUpdated StreamEventType = "todo.updated"
+	// StreamEventArtifactDeclared indicates a generated artifact was declared.
+	StreamEventArtifactDeclared StreamEventType = "artifact.declared"
 )
 
 // MessageStreamMessage is the stream message protocol from Worker to Server (forwarded to UI).
@@ -54,6 +56,7 @@ type StreamPayload struct {
 	ToolCall   *events.ToolCallPayload       `json:"tool_call,omitempty"`
 	ToolResult *events.ToolCallResultPayload `json:"tool_result,omitempty"`
 	Todos      []events.RuntimeTodoItem      `json:"todos,omitempty"`
+	Artifact   *events.ArtifactPayload       `json:"artifact,omitempty"`
 }
 
 // StreamError describes terminal or recoverable errors in streaming execution.

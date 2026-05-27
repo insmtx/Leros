@@ -330,14 +330,24 @@ func (p *MessagePoster) publishWorkerTask(ctx context.Context, session *types.Se
 		return fmt.Errorf("failed to construct worker task topic: %w", err)
 	}
 
+	projectPublicID, taskPublicID, err := p.resolveWorkspaceIDs(ctx, session)
+	if err != nil {
+		return err
+	}
+	if taskPublicID == "" {
+		taskPublicID = fmt.Sprintf("task_%d", message.ID)
+	}
+	requestID := fmt.Sprintf("req_%d", message.ID)
+
 	messagePayload := protocol.WorkerTaskMessage{
 		ID:        fmt.Sprintf("msg_%d_%d", session.ID, message.Sequence),
 		Type:      protocol.MessageTypeWorkerTask,
 		CreatedAt: time.Now().UTC(),
 		Trace: protocol.TraceContext{
 			TraceID:   session.PublicID,
-			RequestID: fmt.Sprintf("req_%d", message.ID),
-			TaskID:    fmt.Sprintf("task_%d", message.ID),
+			RequestID: requestID,
+			TaskID:    taskPublicID,
+			RunID:     requestID,
 		},
 		Route: protocol.RouteContext{
 			OrgID:     orgID,
@@ -351,8 +361,12 @@ func (p *MessagePoster) publishWorkerTask(ctx context.Context, session *types.Se
 				DisplayName: "",
 				Channel:     "session",
 			},
+			Workspace: protocol.WorkspaceOptions{
+				ProjectID: projectPublicID,
+			},
 			Input: protocol.TaskInput{
 				Type: protocol.InputTypeMessage,
+				Text: message.Content,
 			},
 		},
 		Metadata: map[string]any{
@@ -369,4 +383,24 @@ func (p *MessagePoster) publishWorkerTask(ctx context.Context, session *types.Se
 	}
 	logs.DebugContextf(ctx, "Published message to topic %s: session_id=%s sequence=%d", topic, session.PublicID, message.Sequence)
 	return nil
+}
+
+func (p *MessagePoster) resolveWorkspaceIDs(ctx context.Context, session *types.Session) (string, string, error) {
+	var projectPublicID string
+	var taskPublicID string
+	if session.ProjectID != nil && *session.ProjectID > 0 {
+		var project types.Project
+		if err := p.db.WithContext(ctx).Select("public_id").First(&project, *session.ProjectID).Error; err != nil {
+			return "", "", fmt.Errorf("resolve session project: %w", err)
+		}
+		projectPublicID = project.PublicID
+	}
+	if session.TaskID != nil && *session.TaskID > 0 {
+		var task types.Task
+		if err := p.db.WithContext(ctx).Select("public_id").First(&task, *session.TaskID).Error; err != nil {
+			return "", "", fmt.Errorf("resolve session task: %w", err)
+		}
+		taskPublicID = task.PublicID
+	}
+	return projectPublicID, taskPublicID, nil
 }

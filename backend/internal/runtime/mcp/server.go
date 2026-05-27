@@ -8,9 +8,9 @@ import (
 	"net/http"
 
 	"github.com/insmtx/Leros/backend/tools"
+	artifactdeclaretools "github.com/insmtx/Leros/backend/tools/artifact_declare"
 	memorytools "github.com/insmtx/Leros/backend/tools/memory"
 	skillmanagetools "github.com/insmtx/Leros/backend/tools/skill_manage"
-	testtools "github.com/insmtx/Leros/backend/tools/test"
 	mcpsdk "github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 )
@@ -34,9 +34,10 @@ func NewServer() *Server {
 // NewTools 返回当前通过 MCP 暴露的 Leros 工具。
 func NewTools() []tools.Tool {
 	return []tools.Tool{
-		testtools.NewEchoTool(),
+		// testtools.NewEchoTool(),
 		memorytools.NewTool(),
 		skillmanagetools.NewTool(),
+		artifactdeclaretools.NewTool(),
 	}
 }
 

@@ -1,4 +1,5 @@
 # Leros Development Configuration - Server
+workspace_root: 
 
 server:
   port: 8080

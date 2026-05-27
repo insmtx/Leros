@@ -96,7 +96,6 @@ func newTestWorkerTaskMessage(t *testing.T, orgID uint, workerID uint, sessionID
 			},
 			Execution: protocol.ExecutionTarget{
 				AssistantID: "assistant_test",
-				AgentID:     "agent_test",
 				Tools:       []string{},
 			},
 			Input: protocol.TaskInput{

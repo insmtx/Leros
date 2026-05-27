@@ -134,6 +134,9 @@ type SessionMessage struct {
 	// session_message - 流式片段（JSON数组），JSONB，允许为空
 	Chunks MessageChunkSlice `gorm:"column:chunks;type:jsonb"`
 
+	// session_message - assistant message artifact references.
+	Artifacts MessageArtifactSlice `gorm:"column:artifacts;type:jsonb"`
+
 	// session_message - 消息元数据，JSONB，允许为空
 	Metadata ObjectMetadata `gorm:"column:metadata;type:jsonb"`
 
@@ -167,8 +170,49 @@ type MessageChunk struct {
 	Payload   json.RawMessage `json:"payload,omitempty" swaggertype:"object"`
 }
 
+// MessageArtifact stores one lightweight artifact reference for a session message.
+type MessageArtifact struct {
+	ArtifactID   string `json:"artifact_id,omitempty"`
+	Title        string `json:"title,omitempty"`
+	Filename     string `json:"filename,omitempty"`
+	MimeType     string `json:"mime_type,omitempty"`
+	ArtifactType string `json:"artifact_type,omitempty"`
+}
+
+// MessageArtifactSlice stores artifact references in JSONB.
+type MessageArtifactSlice []MessageArtifact
+
 // MessageChunkSlice stores structured message chunks in JSONB.
 type MessageChunkSlice []MessageChunk
+
+// Scan implements sql.Scanner.
+func (m *MessageArtifactSlice) Scan(value interface{}) error {
+	if value == nil {
+		*m = MessageArtifactSlice{}
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("cannot scan %T into MessageArtifactSlice", value)
+	}
+
+	var result []MessageArtifact
+	if err := json.Unmarshal(bytes, &result); err != nil {
+		return err
+	}
+
+	*m = MessageArtifactSlice(result)
+	return nil
+}
+
+// Value implements driver.Valuer.
+func (m MessageArtifactSlice) Value() (driver.Value, error) {
+	if len(m) == 0 {
+		return nil, nil
+	}
+	return json.Marshal([]MessageArtifact(m))
+}
 
 // Scan 实现 sql.Scanner 接口
 func (m *MessageChunkSlice) Scan(value interface{}) error {

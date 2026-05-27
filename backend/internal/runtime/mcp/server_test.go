@@ -105,6 +105,11 @@ func TestRegisterRoutesRequiresTokenWhenConfigured(t *testing.T) {
 	group := router.Group("/v1")
 	RegisterRoutes(group, NewServer())
 
+	// 设置临时的 token 以测试认证逻辑
+	originalToken := globalAuthToken
+	globalAuthToken = "test-auth-token"
+	defer func() { globalAuthToken = originalToken }()
+
 	req := httptest.NewRequest(http.MethodPost, "/v1/mcp", strings.NewReader("not-json"))
 	req.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
@@ -121,6 +126,11 @@ func TestRegisterRoutesAcceptsBearerToken(t *testing.T) {
 	router := gin.New()
 	group := router.Group("/v1")
 	RegisterRoutes(group, NewServer())
+
+	// 设置临时的 token 以测试认证逻辑
+	originalToken := globalAuthToken
+	globalAuthToken = "test-auth-token"
+	defer func() { globalAuthToken = originalToken }()
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mcp", strings.NewReader("not-json"))
 	req.Header.Set("Content-Type", "application/json")
@@ -139,6 +149,11 @@ func TestRegisterRoutesAcceptsAPIKeyHeader(t *testing.T) {
 	router := gin.New()
 	group := router.Group("/v1")
 	RegisterRoutes(group, NewServer())
+
+	// 设置临时的 token 以测试认证逻辑
+	originalToken := globalAuthToken
+	globalAuthToken = "test-auth-token"
+	defer func() { globalAuthToken = originalToken }()
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mcp", strings.NewReader("not-json"))
 	req.Header.Set("Content-Type", "application/json")

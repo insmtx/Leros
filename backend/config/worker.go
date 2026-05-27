@@ -5,9 +5,7 @@ type WorkerConfig struct {
 	WorkerID uint `yaml:"worker_id" json:"worker_id"`
 
 	ServerAddr    string `yaml:"server_addr,omitempty" json:"server_addr,omitempty"`
-	SkillsDir     string `yaml:"skills_dir,omitempty" json:"skills_dir,omitempty"`
-	ToolsEnabled  bool   `yaml:"tools_enabled,omitempty" json:"tools_enabled,omitempty"`
-	WriteSafeRoot string `yaml:"write_safe_root,omitempty" json:"write_safe_root,omitempty"`
+	WorkspaceRoot string `yaml:"workspace_root,omitempty" json:"workspace_root,omitempty"`
 
 	NATS     *NATSConfig       `yaml:"nats,omitempty"`
 	Database *DatabaseConfig   `yaml:"database,omitempty"`

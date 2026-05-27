@@ -539,6 +539,9 @@ func convertToContractSessionMessage(message *types.SessionMessage, publicID str
 	if message.Chunks != nil && len(message.Chunks) > 0 {
 		result.Chunks = make([]contract.SessionEvent, 0, len(message.Chunks))
 		for _, chunk := range message.Chunks {
+			if isHiddenSessionHistoryChunk(chunk.Type) {
+				continue
+			}
 			event, ok := ProjectRunEventRecord(publicID, chunk)
 			if !ok {
 				logs.Warnf("skipping unknown or invalid session message chunk: public_id=%s message_id=%d type=%s seq=%d", publicID, message.ID, chunk.Type, chunk.Seq)
@@ -546,6 +549,9 @@ func convertToContractSessionMessage(message *types.SessionMessage, publicID str
 			}
 			result.Chunks = append(result.Chunks, *event)
 		}
+	}
+	if len(message.Artifacts) > 0 {
+		result.Artifacts = append([]types.MessageArtifact{}, message.Artifacts...)
 	}
 
 	if message.Metadata.Extra != nil {
@@ -557,6 +563,15 @@ func convertToContractSessionMessage(message *types.SessionMessage, publicID str
 	}
 
 	return result
+}
+
+func isHiddenSessionHistoryChunk(eventType string) bool {
+	switch events.EventType(eventType) {
+	case events.EventTodoSnapshot, events.EventTodoUpdated:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *sessionService) CompleteSessionMessage(ctx context.Context, req *contract.CompleteSessionMessageRequest) error {
@@ -590,6 +605,9 @@ func (s *sessionService) CompleteSessionMessage(ctx context.Context, req *contra
 	if req.Chunks != nil && len(req.Chunks) > 0 {
 		msgEntity.Chunks = req.Chunks
 	}
+	if len(req.Artifacts) > 0 {
+		msgEntity.Artifacts = req.Artifacts
+	}
 
 	if req.Metadata != nil {
 		msgEntity.Metadata = *req.Metadata
@@ -598,8 +616,14 @@ func (s *sessionService) CompleteSessionMessage(ctx context.Context, req *contra
 		msgEntity.Usage = *req.Usage
 	}
 
-	if err := db.CreateMessage(ctx, s.db, msgEntity); err != nil {
-		return fmt.Errorf("create message for %s: %w", req.SessionID, err)
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := db.CreateMessage(ctx, tx, msgEntity); err != nil {
+			return fmt.Errorf("create message for %s: %w", req.SessionID, err)
+		}
+		bindDeclaredArtifacts(ctx, tx, req.Artifacts, session, msgEntity)
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	now := time.Now()
@@ -609,6 +633,29 @@ func (s *sessionService) CompleteSessionMessage(ctx context.Context, req *contra
 
 	logs.DebugContextf(ctx, "persisted completed session message: session_id=%s seq=%d", req.SessionID, sequence)
 	return nil
+}
+
+func bindDeclaredArtifacts(ctx context.Context, tx *gorm.DB, artifacts []types.MessageArtifact, session *types.Session, message *types.SessionMessage) {
+	if len(artifacts) == 0 || session == nil || message == nil {
+		return
+	}
+	for _, item := range artifacts {
+		artifactID := strings.TrimSpace(item.ArtifactID)
+		if artifactID == "" {
+			continue
+		}
+		artifact, err := db.GetArtifactByPublicID(ctx, tx, session.OrgID, artifactID)
+		if err != nil {
+			logs.WarnContextf(ctx, "find declared artifact %s failed: %v", artifactID, err)
+			continue
+		}
+		if artifact == nil {
+			continue
+		}
+		if err := db.BindArtifactMessage(ctx, tx, artifact.ID, session.ID, message.ID); err != nil {
+			logs.WarnContextf(ctx, "bind declared artifact %s to message failed: %v", artifactID, err)
+		}
+	}
 }
 
 func (s *sessionService) FailedSessionMessage(ctx context.Context, req *contract.FailedSessionMessageRequest) error {

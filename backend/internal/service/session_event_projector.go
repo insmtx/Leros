@@ -55,6 +55,12 @@ func ProjectStreamMessage(streamMsg protocol.MessageStreamMessage) (*dto.Session
 	case protocol.StreamEventTodoUpdated:
 		event.Type = events.EventTodoUpdated
 		event.Payload = todoPayload(streamMsg.Body.Payload.Todos)
+	case protocol.StreamEventArtifactDeclared:
+		if streamMsg.Body.Payload.Artifact == nil {
+			return nil, false
+		}
+		event.Type = events.EventArtifactDeclared
+		event.Payload = *streamMsg.Body.Payload.Artifact
 	case protocol.StreamEventRunStarted:
 		event.Type = events.EventStarted
 	case protocol.StreamEventRunCompleted:
@@ -161,6 +167,13 @@ func ProjectRunEventRecord(sessionID string, chunk types.MessageChunk) (*contrac
 		}
 		event.Type = string(events.EventTodoUpdated)
 		event.Payload = todoPayload(payload)
+	case events.EventArtifactDeclared:
+		payload, ok := decodeChunkPayload[events.ArtifactPayload](chunk)
+		if !ok {
+			return nil, false
+		}
+		event.Type = string(events.EventArtifactDeclared)
+		event.Payload = payload
 	default:
 		return nil, false
 	}

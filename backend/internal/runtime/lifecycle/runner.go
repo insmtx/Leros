@@ -17,6 +17,7 @@ type Runner struct {
 	builder          *lifecyclecontext.ContextBuilder
 	toolAvailability ToolAvailability
 	modelResolver    ModelResolver
+	artifactRecorder steps.ArtifactRecorder
 	learning         *steps.LearningService
 	pipeline         Pipeline
 }
@@ -53,10 +54,20 @@ func (r *Runner) defaultPipeline() Pipeline {
 		steps.StartEventStep{},
 		steps.ModelStep{Resolver: r.modelResolver},
 		steps.ExecuteStep{Delegate: r.delegate},
+		steps.ArtifactStep{Recorder: r.artifactRecorder},
 		steps.PersistStep{},
 		steps.LearningStep{Service: r.learning},
 		steps.SessionCompleteStep{Provider: sessionMessages},
 	}
+}
+
+// SetArtifactRecorder configures manifest artifact recording for future runs.
+func (r *Runner) SetArtifactRecorder(recorder steps.ArtifactRecorder) {
+	if r == nil {
+		return
+	}
+	r.artifactRecorder = recorder
+	r.pipeline = r.defaultPipeline()
 }
 
 func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (result *agent.RunResult, runErr error) {

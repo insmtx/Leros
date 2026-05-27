@@ -17,6 +17,7 @@ type RequestContext struct {
 	Assistant    AssistantContext    `json:"assistant"`
 	Actor        ActorContext        `json:"actor"`
 	Conversation ConversationContext `json:"conversation,omitempty"`
+	Workspace    WorkspaceContext    `json:"workspace,omitempty"`
 	Input        InputContext        `json:"input"`
 	Runtime      RuntimeOptions      `json:"runtime,omitempty"`
 	Model        ModelOptions        `json:"model,omitempty"`
@@ -51,6 +52,14 @@ type ActorContext struct {
 type ConversationContext struct {
 	ID       string         `json:"id,omitempty"`
 	Messages []InputMessage `json:"messages,omitempty"`
+}
+
+// WorkspaceContext identifies the project workspace owned by this run.
+type WorkspaceContext struct {
+	OrgID     uint   `json:"org_id,omitempty"`
+	ProjectID string `json:"project_id,omitempty"`
+	TaskID    string `json:"task_id,omitempty"`
+	RequestID string `json:"request_id,omitempty"`
 }
 
 // InputContext is the normalized input passed to the agent.

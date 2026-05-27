@@ -15,6 +15,7 @@ import (
 	einoadapter "github.com/insmtx/Leros/backend/internal/runtime/eino"
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
 	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
+	"github.com/insmtx/Leros/backend/pkg/leros"
 	"github.com/insmtx/Leros/backend/tools"
 	memorytools "github.com/insmtx/Leros/backend/tools/memory"
 	nodetools "github.com/insmtx/Leros/backend/tools/node"
@@ -115,6 +116,56 @@ func TestRunnerBuildRunStateMergesDefaultAndRequestTools(t *testing.T) {
 	}
 	if got := strings.Join(state.toolBinding.AllowedTools, ","); got != strings.Join(expected, ",") {
 		t.Fatalf("unexpected allowed tools:\nwant: %v\n got: %v", expected, state.toolBinding.AllowedTools)
+	}
+}
+
+func TestRunnerBuildRunStateUsesWorkspaceTempWhenWorkDirMissing(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	t.Setenv(leros.EnvWorkspaceRoot, workspaceRoot)
+
+	runner := &Runner{}
+	expected := filepath.Join(workspaceRoot, "temp")
+	state, err := runner.buildRunState(&agent.RequestContext{
+		RunID: "run_temp",
+		Input: agent.InputContext{
+			Type: agent.InputTypeMessage,
+			Text: "hello",
+		},
+		Runtime: agent.RuntimeOptions{WorkDir: expected},
+	})
+	if err != nil {
+		t.Fatalf("build run state: %v", err)
+	}
+	if state.toolBinding.ToolContext.WorkDir != expected {
+		t.Fatalf("tool work dir = %q, want %q", state.toolBinding.ToolContext.WorkDir, expected)
+	}
+	if state.req.Runtime.WorkDir != expected {
+		t.Fatalf("request work dir = %q, want %q", state.req.Runtime.WorkDir, expected)
+	}
+}
+
+func TestRunnerBuildRunStateUsesRequestWorkDir(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	t.Setenv(leros.EnvWorkspaceRoot, workspaceRoot)
+	projectDir := filepath.Join(workspaceRoot, "projects", "42", "project_1", "repo")
+	if err := os.MkdirAll(projectDir, 0755); err != nil {
+		t.Fatalf("create project dir: %v", err)
+	}
+
+	runner := &Runner{}
+	state, err := runner.buildRunState(&agent.RequestContext{
+		RunID: "run_project",
+		Input: agent.InputContext{
+			Type: agent.InputTypeMessage,
+			Text: "hello",
+		},
+		Runtime: agent.RuntimeOptions{WorkDir: projectDir},
+	})
+	if err != nil {
+		t.Fatalf("build run state: %v", err)
+	}
+	if state.toolBinding.ToolContext.WorkDir != projectDir {
+		t.Fatalf("tool work dir = %q, want %q", state.toolBinding.ToolContext.WorkDir, projectDir)
 	}
 }
 

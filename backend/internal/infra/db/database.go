@@ -81,6 +81,7 @@ func runMigrations(db *gorm.DB) error {
 		&types.Project{},
 		&types.ProjectMember{},
 		&types.Task{},
+		&types.Artifact{},
 	}
 
 	if err := dbtools.InitModel(db, models...); err != nil {

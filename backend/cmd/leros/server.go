@@ -10,11 +10,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/api"
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/pkg/leros"
 	"github.com/spf13/cobra"
 	"github.com/ygpkg/yg-go/lifecycle"
 	"github.com/ygpkg/yg-go/logs"
@@ -23,7 +25,8 @@ import (
 )
 
 var (
-	serverConfigPath string
+	serverConfigPath    string
+	serverWorkspaceRoot string
 )
 
 var serverCmd = &cobra.Command{
@@ -34,6 +37,14 @@ var serverCmd = &cobra.Command{
 		cfg, err := loadConfig(serverConfigPath)
 		if err != nil {
 			logs.Fatalf("Failed to load config: %v", err)
+			return
+		}
+		if strings.TrimSpace(serverWorkspaceRoot) != "" {
+			cfg.WorkspaceRoot = serverWorkspaceRoot
+			logs.Infof("Using workspace root from flag: %s", serverWorkspaceRoot)
+		}
+		if err := applyServerWorkspaceRoot(cfg); err != nil {
+			logs.Fatalf("Invalid server workspace config: %v", err)
 			return
 		}
 
@@ -95,7 +106,23 @@ var serverCmd = &cobra.Command{
 
 func init() {
 	serverCmd.Flags().StringVar(&serverConfigPath, "config", "", "Configuration file path")
+	serverCmd.Flags().StringVar(&serverWorkspaceRoot, "workspace-root", "", "Default server workspace root for worker mounts")
 	rootCmd.AddCommand(serverCmd)
+}
+
+func applyServerWorkspaceRoot(cfg *config.Config) error {
+	if cfg == nil {
+		return fmt.Errorf("config is required")
+	}
+	root := strings.TrimSpace(cfg.WorkspaceRoot)
+	if root == "" {
+		return nil
+	}
+	if err := os.Setenv(leros.EnvWorkspaceRoot, root); err != nil {
+		return fmt.Errorf("set %s: %w", leros.EnvWorkspaceRoot, err)
+	}
+	logs.Infof("Using server workspace root from config: %s", root)
+	return nil
 }
 
 func loadConfig(configPath string) (*config.Config, error) {

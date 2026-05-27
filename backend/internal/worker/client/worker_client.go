@@ -26,8 +26,6 @@ type WorkerClient struct {
 type WorkerConfig struct {
 	Runtime            agent.Runner
 	LLMConfig          *config.LLMConfig
-	SkillsDir          string
-	ToolsEnabled       bool
 	ServerAddr         string
 	DigitalAssistantID uint
 	WorkerID           uint
