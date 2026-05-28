@@ -46,7 +46,11 @@ func RequestFromWorkerTask(msg protocol.WorkerTaskMessage) *agent.RequestContext
 			MaxStep: msg.Body.Runtime.MaxStep,
 		},
 		Model: agent.ModelOptions{
-			ID: msg.Body.Model.ID,
+			Provider:     msg.Body.Model.Provider,
+			Model:        msg.Body.Model.Model,
+			APIKey:       msg.Body.Model.APIKey,
+			BaseURL:      msg.Body.Model.BaseURL,
+			BaseURLHasV1: msg.Body.Model.BaseURLHasV1,
 		},
 		Capability: agent.CapabilityContext{
 			AllowedTools: append([]string(nil), msg.Body.Execution.Tools...),

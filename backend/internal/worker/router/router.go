@@ -11,7 +11,6 @@ import (
 	"github.com/insmtx/Leros/backend/internal/modelrouter"
 	runtimemcp "github.com/insmtx/Leros/backend/internal/runtime/mcp"
 	"github.com/insmtx/Leros/backend/internal/worker/identity"
-	"gorm.io/gorm"
 )
 
 // SetupRouter 创建 worker HTTP 服务的 Gin 引擎并注册所有路由。
@@ -22,16 +21,16 @@ import (
 //   - /v1/chat/completions — OpenAI Chat Completions 模型路由
 //   - /v1/messages — Anthropic Messages 模型路由
 //   - /v1/responses — OpenAI Responses 模型路由
-func SetupRouter(db *gorm.DB) *gin.Engine {
+func SetupRouter(modelStore *modelrouter.Store) *gin.Engine {
 	r := gin.New()
 
 	r.GET("/health", workerHealth)
 
 	v1 := r.Group("/v1")
 	runtimemcp.RegisterRoutes(v1, runtimemcp.NewServer())
-	modelrouter.RegisterRoutes(v1, db)
+	modelrouter.RegisterRoutes(v1, modelStore)
 
-	logs.Infof("Worker router initialized: health, /v1/mcp, /v1/models, /v1/chat/completions, /v1/messages, /v1/responses")
+	logs.Infof("Worker router initialized: health, /v1/mcp, /v1/chat/completions, /v1/messages, /v1/responses")
 	return r
 }
 

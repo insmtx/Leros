@@ -10,6 +10,7 @@ import (
 
 	"github.com/insmtx/Leros/backend/internal/agent"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/internal/modelrouter"
 	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	agentworkspace "github.com/insmtx/Leros/backend/internal/workspace"
 	"github.com/insmtx/Leros/backend/pkg/dm"
@@ -23,6 +24,7 @@ type Config struct {
 	OrgID          uint
 	WorkerID       uint
 	DebounceWindow time.Duration
+	ModelStore     *modelrouter.Store
 }
 
 // Consumer subscribes to one worker task topic and dispatches tasks to an agent runtime.
@@ -50,6 +52,9 @@ func New(cfg Config, subscriber eventbus.Subscriber, publisher ResultPublisher, 
 	}
 	if runner == nil {
 		return nil, fmt.Errorf("agent runner is required")
+	}
+	if cfg.ModelStore == nil {
+		return nil, fmt.Errorf("model store is required")
 	}
 	window := cfg.DebounceWindow
 	if window <= 0 {
@@ -103,6 +108,10 @@ func (c *Consumer) handleEvent(ctx context.Context, msg *nats.Msg) error {
 	if taskMsg.Body.TaskType != protocol.TaskTypeAgentRun {
 		return fmt.Errorf("unsupported worker task type %q", taskMsg.Body.TaskType)
 	}
+	if err := validateModelConfig(taskMsg.Body.Model); err != nil {
+		return err
+	}
+	c.cfg.ModelStore.Put(modelConfigFromTask(taskMsg.Body.Model))
 
 	logs.InfoContextf(ctx,
 		"Received worker task: msg_id=%s task_id=%s run_id=%s org_id=%s worker_id=%s session_id=%s task_type=%s",
@@ -117,6 +126,30 @@ func (c *Consumer) handleEvent(ctx context.Context, msg *nats.Msg) error {
 
 	c.schedule(ctx, taskMsg)
 	return nil
+}
+
+func validateModelConfig(model protocol.ModelOptions) error {
+	if strings.TrimSpace(model.Provider) == "" {
+		return fmt.Errorf("llm provider is required")
+	}
+	if strings.TrimSpace(model.Model) == "" {
+		return fmt.Errorf("llm model is required")
+	}
+	if strings.TrimSpace(model.APIKey) == "" {
+		return fmt.Errorf("llm api_key is required")
+	}
+	return nil
+}
+
+func modelConfigFromTask(model protocol.ModelOptions) modelrouter.UpstreamConfig {
+	return modelrouter.UpstreamConfig{
+		ModelName:    strings.TrimSpace(model.Model),
+		Provider:     strings.TrimSpace(model.Provider),
+		BaseURL:      strings.TrimSpace(model.BaseURL),
+		BaseURLHasV1: model.BaseURLHasV1,
+		APIKey:       strings.TrimSpace(model.APIKey),
+		Protocol:     modelrouter.DefaultProtocolForProvider(model.Provider),
+	}
 }
 
 func (c *Consumer) schedule(ctx context.Context, taskMsg protocol.WorkerTaskMessage) {

@@ -14,6 +14,7 @@ import (
 	"github.com/insmtx/Leros/backend/engines/builtin"
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/internal/modelrouter"
 	agentruntime "github.com/insmtx/Leros/backend/internal/runtime"
 	runtimemcp "github.com/insmtx/Leros/backend/internal/runtime/mcp"
 	"github.com/insmtx/Leros/backend/internal/worker/identity"
@@ -127,7 +128,8 @@ func runTaskWorker(defaultRuntime string) {
 		runtimemcp.SetAuthToken(cfg.CLI.MCP.BearerToken)
 	}
 
-	httpServer, err := startWorkerHTTPServer(workerListenAddr, db)
+	modelStore := modelrouter.NewStore()
+	httpServer, err := startWorkerHTTPServer(workerListenAddr, modelStore)
 	if err != nil {
 		logs.Fatalf("Failed to start worker HTTP server: %v", err)
 		return
@@ -183,8 +185,9 @@ func runTaskWorker(defaultRuntime string) {
 	}
 
 	consumer, err := taskconsumer.New(taskconsumer.Config{
-		OrgID:    cfg.OrgID,
-		WorkerID: cfg.WorkerID,
+		OrgID:      cfg.OrgID,
+		WorkerID:   cfg.WorkerID,
+		ModelStore: modelStore,
 	}, bus, bus, runtimeService)
 	if err != nil {
 		cancel()
@@ -246,7 +249,7 @@ func applyWorkerWorkspaceRoot(cfg *config.WorkerConfig) error {
 	return nil
 }
 
-func startWorkerHTTPServer(addr string, db *gorm.DB) (*http.Server, error) {
+func startWorkerHTTPServer(addr string, modelStore *modelrouter.Store) (*http.Server, error) {
 	if strings.TrimSpace(addr) == "" {
 		addr = ":8081"
 	}
@@ -256,7 +259,7 @@ func startWorkerHTTPServer(addr string, db *gorm.DB) (*http.Server, error) {
 		return nil, fmt.Errorf("listen on %s: %w", addr, err)
 	}
 
-	r := router.SetupRouter(db)
+	r := router.SetupRouter(modelStore)
 
 	server := &http.Server{
 		Addr:    addr,

@@ -12,100 +12,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ygpkg/yg-go/logs"
 
-	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/worker/identity"
-	"github.com/insmtx/Leros/backend/types"
-	"gorm.io/gorm"
 )
 
-func RegisterRoutes(r gin.IRouter, db *gorm.DB) {
-	r.GET("/models", handleListModels(db))
-
-	if db == nil {
-		logs.Warn("modelrouter: no database provided, model routing disabled except /v1/models")
-		return
-	}
-
-	resolver := NewResolver(db)
+func RegisterRoutes(r gin.IRouter, store *Store) {
+	resolver := NewResolver(store)
 
 	r.POST("/chat/completions", handleModelRoute(resolver, ProtocolOpenAIChat))
 	r.POST("/messages", handleModelRoute(resolver, ProtocolAnthropicMessages))
 	r.POST("/responses", handleModelRoute(resolver, ProtocolOpenAIResponses))
 
-	logs.Info("modelrouter: model routing endpoints registered at /v1/models, /v1/chat/completions, /v1/messages, /v1/responses")
-}
-
-type openAIModelsResponse struct {
-	Object string                `json:"object"`
-	Data   []openAIModelResponse `json:"data"`
-	Models []openAIModelResponse `json:"models"`
-}
-
-type openAIModelResponse struct {
-	ID      string `json:"id"`
-	Slug    string `json:"slug"`
-	Object  string `json:"object"`
-	Created int64  `json:"created"`
-	OwnedBy string `json:"owned_by"`
-}
-
-func handleListModels(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if db == nil {
-			empty := []openAIModelResponse{}
-			c.JSON(http.StatusOK, openAIModelsResponse{
-				Object: "list",
-				Data:   empty,
-				Models: empty,
-			})
-			return
-		}
-
-		orgID := identity.OrgID()
-		if orgID == 0 {
-			c.JSON(http.StatusBadRequest, newEntryError(ProtocolOpenAIChat, "organization not configured"))
-			return
-		}
-
-		opt := types.NewPageQuery(types.Caller{OrgID: orgID}, 0, types.PageMaxCount)
-		opt.AddFilter("status", string(types.LLMModelStatusActive))
-		models, _, err := infradb.ListLLMModels(c.Request.Context(), db, opt)
-		if err != nil {
-			logs.Warnf("modelrouter: list models failed: %v", err)
-			c.JSON(http.StatusInternalServerError, newEntryError(ProtocolOpenAIChat, "failed to list models"))
-			return
-		}
-
-		c.JSON(http.StatusOK, newOpenAIModelsResponse(models))
-	}
-}
-
-func newOpenAIModelsResponse(models []*types.LLMModel) openAIModelsResponse {
-	seen := make(map[string]struct{}, len(models))
-	data := make([]openAIModelResponse, 0, len(models))
-	for _, model := range models {
-		id := strings.TrimSpace(model.ModelName)
-		if id == "" {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		data = append(data, openAIModelResponse{
-			ID:      id,
-			Slug:    id,
-			Object:  "model",
-			Created: 0,
-			OwnedBy: "",
-		})
-	}
-
-	return openAIModelsResponse{
-		Object: "list",
-		Data:   data,
-		Models: data,
-	}
+	logs.Info("modelrouter: model routing endpoints registered at /v1/chat/completions, /v1/messages, /v1/responses")
 }
 
 func handleModelRoute(resolver *Resolver, entryProtocol Protocol) gin.HandlerFunc {

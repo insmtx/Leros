@@ -93,12 +93,12 @@ type RuntimeOptions struct {
 
 // ModelOptions lets callers override model behavior when supported.
 type ModelOptions struct {
-	ID          uint    `json:"id,omitempty"`
-	Provider    string  `json:"provider,omitempty"`
-	Model       string  `json:"model,omitempty"`
-	APIKey      string  `json:"-"`
-	BaseURL     string  `json:"base_url,omitempty"`
-	Temperature float64 `json:"temperature,omitempty"`
+	Provider     string  `json:"provider,omitempty"`
+	Model        string  `json:"model,omitempty"`
+	APIKey       string  `json:"-"`
+	BaseURL      string  `json:"base_url,omitempty"`
+	BaseURLHasV1 bool    `json:"base_url_has_v1,omitempty"`
+	Temperature  float64 `json:"temperature,omitempty"`
 }
 
 // CapabilityContext describes allowed capabilities for one run.

@@ -107,7 +107,11 @@ func newTestWorkerTaskMessage(t *testing.T, orgID uint, workerID uint, sessionID
 				WorkDir: ".",
 			},
 			Model: protocol.ModelOptions{
-				ID: 1,
+				Provider:     "openai",
+				Model:        "gpt-4.1",
+				BaseURL:      "https://api.openai.com",
+				BaseURLHasV1: true,
+				APIKey:       "sk-test",
 			},
 		},
 		Metadata: map[string]any{

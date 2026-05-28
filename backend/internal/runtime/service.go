@@ -15,7 +15,6 @@ import (
 	"github.com/insmtx/Leros/backend/internal/runtime/lifecycle"
 	lifecyclecontext "github.com/insmtx/Leros/backend/internal/runtime/lifecycle/context"
 	"github.com/insmtx/Leros/backend/internal/runtime/lifecycle/steps"
-	"github.com/insmtx/Leros/backend/internal/worker/identity"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -130,8 +129,7 @@ func (s *Service) buildRouter(ctx context.Context, opts Options) (agent.Runner, 
 	}
 	router.SetDefault(selectedDefault)
 
-	modelResolver := steps.NewDBModelResolver(infradb.GetDB(), identity.OrgID())
-	runner := lifecycle.NewRunner(router, lifecycleBuilder, s.env, modelResolver)
+	runner := lifecycle.NewRunner(router, lifecycleBuilder, s.env, nil)
 	runner.SetArtifactRecorder(steps.NewDBArtifactRecorder(infradb.GetDB()))
 	return runner, nil
 }

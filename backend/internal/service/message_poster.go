@@ -340,6 +340,10 @@ func (p *MessagePoster) publishWorkerTask(ctx context.Context, session *types.Se
 		taskPublicID = fmt.Sprintf("task_%d", message.ID)
 	}
 	requestID := fmt.Sprintf("req_%d", message.ID)
+	modelOptions, err := p.resolveWorkerTaskModel(ctx, orgID)
+	if err != nil {
+		return err
+	}
 
 	messagePayload := protocol.WorkerTaskMessage{
 		ID:        fmt.Sprintf("msg_%d_%d", session.ID, message.Sequence),
@@ -370,6 +374,7 @@ func (p *MessagePoster) publishWorkerTask(ctx context.Context, session *types.Se
 				Type: protocol.InputTypeMessage,
 				Text: message.Content,
 			},
+			Model: modelOptions,
 		},
 		Metadata: map[string]any{
 			"session_id":   session.PublicID,
@@ -385,6 +390,29 @@ func (p *MessagePoster) publishWorkerTask(ctx context.Context, session *types.Se
 	}
 	logs.DebugContextf(ctx, "Published message to topic %s: session_id=%s sequence=%d", topic, session.PublicID, message.Sequence)
 	return nil
+}
+
+func (p *MessagePoster) resolveWorkerTaskModel(ctx context.Context, orgID uint) (protocol.ModelOptions, error) {
+	if p == nil || p.db == nil {
+		return protocol.ModelOptions{}, errors.New("database is required to resolve worker task llm model")
+	}
+	model, err := db.GetDefaultLLMModel(ctx, p.db, orgID)
+	if err != nil {
+		return protocol.ModelOptions{}, fmt.Errorf("get default llm model: %w", err)
+	}
+	if model == nil {
+		return protocol.ModelOptions{}, errors.New("default llm model not found")
+	}
+	if strings.TrimSpace(model.Provider) == "" || strings.TrimSpace(model.ModelName) == "" || strings.TrimSpace(model.APIKeyEncrypted) == "" {
+		return protocol.ModelOptions{}, errors.New("default llm model config is incomplete")
+	}
+	return protocol.ModelOptions{
+		Provider:     model.Provider,
+		Model:        model.ModelName,
+		BaseURL:      model.BaseURL,
+		BaseURLHasV1: model.BaseURLHasV1,
+		APIKey:       model.APIKeyEncrypted,
+	}, nil
 }
 
 func (p *MessagePoster) resolveWorkspaceIDs(ctx context.Context, session *types.Session) (string, string, error) {

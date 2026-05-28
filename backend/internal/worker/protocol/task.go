@@ -93,9 +93,13 @@ type Attachment struct {
 	URL      string `json:"url,omitempty"`
 }
 
-// ModelOptions carries the requested persisted model configuration.
+// ModelOptions carries the LLM call configuration for one worker task.
 type ModelOptions struct {
-	ID uint `json:"id,omitempty"`
+	Provider     string `json:"provider,omitempty"`
+	Model        string `json:"model,omitempty"`
+	BaseURL      string `json:"base_url,omitempty"`
+	BaseURLHasV1 bool   `json:"base_url_has_v1,omitempty"`
+	APIKey       string `json:"api_key,omitempty"`
 }
 
 // RuntimeOptions controls the execution parameters for Worker Runtime.
