@@ -27,10 +27,12 @@ var (
 )
 
 type taskDetailOutput struct {
-	Task      *contract.Task                   `json:"task,omitempty"`
-	Project   *contract.Project                `json:"project,omitempty"`
-	Artifacts []contract.Artifact              `json:"artifacts,omitempty"`
-	Assignee  *contract.DigitalAssistantDetail `json:"assignee,omitempty"`
+	Task         *contract.Task                   `json:"task,omitempty"`
+	Project      *contract.Project                `json:"project,omitempty"`
+	Artifacts    []contract.Artifact              `json:"artifacts,omitempty"`
+	Assignee     *contract.DigitalAssistantDetail `json:"assignee,omitempty"`
+	OwnerName    string                           `json:"owner_name,omitempty"`
+	AssigneeName string                           `json:"assignee_name,omitempty"`
 }
 
 var taskCmd = &cobra.Command{
@@ -100,6 +102,10 @@ var taskGetCmd = &cobra.Command{
 
 			out := taskDetailOutput{Task: task}
 
+			if task.OwnerID > 0 {
+				out.OwnerName = cli.ResolveUserName(ctx, taskServerAddr, task.OwnerID)
+			}
+
 			if task.ProjectID != "" {
 				prj, err := cli.GetProject(ctx, taskServerAddr, task.ProjectID)
 				if err != nil {
@@ -119,7 +125,7 @@ var taskGetCmd = &cobra.Command{
 			if task.AssigneeID != nil && *task.AssigneeID > 0 {
 				ast, err := cli.GetDigitalAssistantByID(ctx, taskServerAddr, *task.AssigneeID)
 				if err != nil {
-					logs.Warnf("get assignee: %v", err)
+					out.AssigneeName = cli.ResolveUserName(ctx, taskServerAddr, *task.AssigneeID)
 				} else {
 					out.Assignee = ast
 				}
@@ -173,7 +179,11 @@ func printTaskDetail(out *taskDetailOutput) {
 	fmt.Fprintf(w, "Status:\t%s\n", t.Status)
 	fmt.Fprintf(w, "TaskType:\t%s\n", t.TaskType)
 	fmt.Fprintf(w, "OrgID:\t%d\n", t.OrgID)
-	fmt.Fprintf(w, "OwnerID:\t%d\n", t.OwnerID)
+	if out.OwnerName != "" {
+		fmt.Fprintf(w, "Owner:\t%s (id=%d)\n", out.OwnerName, t.OwnerID)
+	} else {
+		fmt.Fprintf(w, "OwnerID:\t%d\n", t.OwnerID)
+	}
 
 	if out.Project != nil {
 		fmt.Fprintf(w, "Project:\t%s (%s)\n", out.Project.Name, t.ProjectID)
@@ -183,6 +193,8 @@ func printTaskDetail(out *taskDetailOutput) {
 
 	if out.Assignee != nil {
 		fmt.Fprintf(w, "Assignee:\t%s (ID=%d, Code=%s)\n", out.Assignee.Name, out.Assignee.ID, out.Assignee.Code)
+	} else if out.AssigneeName != "" {
+		fmt.Fprintf(w, "Assignee:\t%s (id=%d)\n", out.AssigneeName, *t.AssigneeID)
 	} else if t.AssigneeID != nil {
 		fmt.Fprintf(w, "AssigneeID:\t%d\n", *t.AssigneeID)
 	}

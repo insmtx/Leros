@@ -76,6 +76,43 @@ func GetDigitalAssistantByID(ctx context.Context, serverAddr string, id uint) (*
 	return &result, nil
 }
 
+// ResolveUserName 通过 Uin 解析用户名称，优先使用 GetUserOrg，回退到 GetOrgMember。
+func ResolveUserName(ctx context.Context, serverAddr string, uin uint) string {
+	org, err := getUserOrgByUin(ctx, serverAddr, uin)
+	if err == nil {
+		if org.UserName != "" {
+			return org.UserName
+		}
+		return org.UserLogin
+	}
+	member, err := getOrgMemberByUin(ctx, serverAddr, uin)
+	if err == nil {
+		if member.UserName != "" {
+			return member.UserName
+		}
+		return member.UserLogin
+	}
+	return ""
+}
+
+func getUserOrgByUin(ctx context.Context, serverAddr string, uin uint) (*contract.UserOrg, error) {
+	var result contract.UserOrg
+	if err := doPostRequest(ctx, serverAddr, "GetUserOrg",
+		map[string]interface{}{"uin": uin}, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func getOrgMemberByUin(ctx context.Context, serverAddr string, uin uint) (*contract.OrgMember, error) {
+	var result contract.OrgMember
+	if err := doPostRequest(ctx, serverAddr, "GetOrgMember",
+		map[string]interface{}{"uin": uin}, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // ListTaskArtifacts 调用服务端 ListTaskArtifacts API 并返回解析后的结果。
 func ListTaskArtifacts(ctx context.Context, serverAddr, taskID string) ([]contract.Artifact, error) {
 	var result []contract.Artifact

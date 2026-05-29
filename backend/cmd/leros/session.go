@@ -30,6 +30,7 @@ type sessionDetailOutput struct {
 	Assistant *contract.DigitalAssistantDetail `json:"assistant,omitempty"`
 	Allocated *contract.DigitalAssistantDetail `json:"allocated_assistant,omitempty"`
 	Messages  *contract.MessageList            `json:"messages,omitempty"`
+	UserName  string                           `json:"user_name,omitempty"`
 }
 
 var sessionCmd = &cobra.Command{
@@ -95,6 +96,10 @@ var sessionGetCmd = &cobra.Command{
 			}
 
 			out := sessionDetailOutput{Session: sess}
+
+			if sess.Uin > 0 {
+				out.UserName = cli.ResolveUserName(ctx, sessionServerAddr, sess.Uin)
+			}
 
 			if sess.AssistantID > 0 {
 				ast, err := cli.GetDigitalAssistantByID(ctx, sessionServerAddr, sess.AssistantID)
@@ -167,7 +172,11 @@ func printSessionDetail(out *sessionDetailOutput) {
 	fmt.Fprintf(w, "Status:\t%s\n", s.Status)
 	fmt.Fprintf(w, "Title:\t%s\n", s.Title)
 	fmt.Fprintf(w, "TitleManuallySet:\t%v\n", s.TitleManuallySet)
-	fmt.Fprintf(w, "Uin:\t%d\n", s.Uin)
+	if out.UserName != "" {
+		fmt.Fprintf(w, "User:\t%s (uin=%d)\n", out.UserName, s.Uin)
+	} else {
+		fmt.Fprintf(w, "Uin:\t%d\n", s.Uin)
+	}
 	fmt.Fprintf(w, "OrgID:\t%d\n", s.OrgID)
 
 	if out.Assistant != nil {
