@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ygpkg/yg-go/dbtools"
+	"github.com/ygpkg/yg-go/encryptor/snowflake"
 	"github.com/ygpkg/yg-go/logs"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -119,10 +120,11 @@ func InitDevData(db *gorm.DB, llmCfg *config.LLMConfig) error {
 	db.Model(&types.Organization{}).Count(&orgCount)
 	if orgCount == 0 {
 		defaultOrg := &types.Organization{
-			Code:   "default_org",
-			Name:   "默认组织",
-			Type:   "company",
-			Status: "active",
+			PublicID: fmt.Sprintf("org_%s", snowflake.GenerateIDBase58()),
+			Code:     "default_org",
+			Name:     "默认组织",
+			Type:     "company",
+			Status:   "active",
 		}
 		if err := db.Create(defaultOrg).Error; err != nil {
 			return fmt.Errorf("failed to create default org: %w", err)
@@ -140,6 +142,7 @@ func InitDevData(db *gorm.DB, llmCfg *config.LLMConfig) error {
 		}
 
 		defaultUser := &types.User{
+			PublicID:    fmt.Sprintf("usr_%s", snowflake.GenerateIDBase58()),
 			GithubID:    0,
 			GithubLogin: "admin",
 			Name:        "Admin User",
