@@ -76,15 +76,8 @@ func GetDigitalAssistantByID(ctx context.Context, serverAddr string, id uint) (*
 	return &result, nil
 }
 
-// ResolveUserName 通过 Uin 解析用户名称，优先使用 GetUserOrg，回退到 GetOrgMember。
+// ResolveUserName 通过 Uin 解析用户名称。
 func ResolveUserName(ctx context.Context, serverAddr string, uin uint) string {
-	org, err := getUserOrgByUin(ctx, serverAddr, uin)
-	if err == nil {
-		if org.UserName != "" {
-			return org.UserName
-		}
-		return org.UserLogin
-	}
 	member, err := getOrgMemberByUin(ctx, serverAddr, uin)
 	if err == nil {
 		if member.UserName != "" {
@@ -93,15 +86,6 @@ func ResolveUserName(ctx context.Context, serverAddr string, uin uint) string {
 		return member.UserLogin
 	}
 	return ""
-}
-
-func getUserOrgByUin(ctx context.Context, serverAddr string, uin uint) (*contract.UserOrg, error) {
-	var result contract.UserOrg
-	if err := doPostRequest(ctx, serverAddr, "GetUserOrg",
-		map[string]interface{}{"uin": uin}, &result); err != nil {
-		return nil, err
-	}
-	return &result, nil
 }
 
 func getOrgMemberByUin(ctx context.Context, serverAddr string, uin uint) (*contract.OrgMember, error) {
