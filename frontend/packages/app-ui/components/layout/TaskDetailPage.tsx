@@ -33,7 +33,7 @@ export function TaskDetailPage() {
 		switchProject,
 	} = useLayoutStore((s) => s);
 
-	const { setActiveSession, loadConversationMessages, clearMessages } = useChatStore((s) => s);
+	const { setActiveSession, loadConversationMessages, resetLocalMessages } = useChatStore((s) => s);
 
 	const [task, setTask] = useState<ProjectTask | null>(null);
 
@@ -69,9 +69,9 @@ export function TaskDetailPage() {
 
 	useEffect(() => {
 		return () => {
-			clearMessages();
+			resetLocalMessages();
 		};
-	}, [clearMessages]);
+	}, [resetLocalMessages]);
 
 	if (!activeTaskDetailProjectId || !activeTaskDetailTaskId || !activeTaskDetailSessionId) {
 		return (

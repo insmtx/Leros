@@ -8,10 +8,11 @@ import "gorm.io/gorm"
 // 多个用户可以关联到同一个组织。
 type Organization struct {
 	gorm.Model
-	Type   string `gorm:"column:type;type:varchar(50);default:'company'"`      // 组织类型: company/team/project
-	Code   string `gorm:"column:code;type:varchar(255);unique_index;not null"` // 组织代码（唯一）
-	Name   string `gorm:"column:name;type:varchar(255);not null"`              // 组织名称
-	Status string `gorm:"column:status;type:varchar(20);default:'active'"`     // 状态: active/inactive
+	PublicID string `gorm:"column:public_id;type:varchar(64);uniqueIndex;not null"` // 组织公开ID
+	Type     string `gorm:"column:type;type:varchar(50);default:'company'"`          // 组织类型: company/team/project
+	Code     string `gorm:"column:code;type:varchar(255);unique_index;not null"`     // 组织代码（唯一）
+	Name     string `gorm:"column:name;type:varchar(255);not null"`                  // 组织名称
+	Status   string `gorm:"column:status;type:varchar(20);default:'active'"`         // 状态: active/inactive
 }
 
 // TableName 重写表名

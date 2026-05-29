@@ -33,7 +33,7 @@ export function ProjectPage() {
 	const { projects, activeProjectId, activeProjectTab, projectDetailLoading, projectDetailError, activeProjectSessionId, projectSessionId, switchView, setActiveProjectTab, fetchProjectDetail } =
 		useLayoutStore((s) => s);
 
-	const { setActiveSession, loadConversationMessages, clearMessages } = useChatStore((s) => s);
+	const { setActiveSession, loadConversationMessages, resetLocalMessages } = useChatStore((s) => s);
 
 	const project = projects.find((item) => item.id === activeProjectId) ?? projects[0];
 
@@ -57,9 +57,9 @@ export function ProjectPage() {
 
 	useEffect(() => {
 		return () => {
-			clearMessages();
+			resetLocalMessages();
 		};
-	}, [clearMessages]);
+	}, [resetLocalMessages]);
 
 	if (!project) {
 		return (

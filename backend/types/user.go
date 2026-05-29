@@ -14,6 +14,7 @@ import (
 // 个人资料、头像等。
 type User struct {
 	gorm.Model
+	PublicID    string `gorm:"column:public_id;type:varchar(64);uniqueIndex;not null"`   // 用户公开ID
 	GithubID    int64  `gorm:"column:github_id;type:bigint;unique_index"`                   // GitHub 用户 ID
 	GithubLogin string `gorm:"column:github_login;type:varchar(255);not null;unique_index"` // GitHub 登录名
 	Password    string `gorm:"column:password;type:varchar(255)"`                           // 密码（本地认证用）

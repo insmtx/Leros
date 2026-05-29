@@ -571,7 +571,7 @@ export class ChatActionImpl {
 		}
 	};
 
-	clearMessages = () => {
+	resetLocalMessages = () => {
 		this.#set({ messagesMap: {}, messageIds: [], activeSessionId: null });
 	};
 
