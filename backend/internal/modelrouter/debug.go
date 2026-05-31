@@ -178,6 +178,8 @@ func (dl *DebugLogger) writeEvent(event string, data map[string]interface{}) {
 		record[k] = v
 	}
 
+	summary := eventSummary(event, data)
+
 	b, err := json.Marshal(record)
 	if err != nil {
 		return
@@ -185,7 +187,40 @@ func (dl *DebugLogger) writeEvent(event string, data map[string]interface{}) {
 
 	dl.mu.Lock()
 	defer dl.mu.Unlock()
+	dl.file.Write(append([]byte(summary+" "), '\n'))
 	dl.file.Write(append(b, '\n'))
+}
+
+func eventSummary(event string, data map[string]interface{}) string {
+	switch event {
+	case "meta":
+		return fmt.Sprintf("[模型路由] 入口=%v → 上游=%v, 模型=%v, 流式=%v",
+			data["entry_protocol"], data["upstream_protocol"], data["model"], data["stream"])
+	case "request_original":
+		return "[原始请求]"
+	case "ir_decoded":
+		return "[IR 解码]"
+	case "ir_normalized":
+		return "[IR 归一化]"
+	case "request_upstream":
+		return "[上游请求]"
+	case "response_upstream":
+		return "[上游响应]"
+	case "response_upstream_error":
+		return "[上游错误响应]"
+	case "response_entry":
+		return "[入口响应]"
+	case "stream_upstream_chunk":
+		return "[上游流数据]"
+	case "stream_entry_chunk":
+		return "[入口流数据]"
+	case "error":
+		return fmt.Sprintf("[错误] %v: %v", data["stage"], data["message"])
+	case "done":
+		return fmt.Sprintf("[完成] %vms, %v", data["duration_ms"], data["file_path"])
+	default:
+		return event
+	}
 }
 
 // writeJSONEvent 将 body 解码为 JSON 后以内联对象写入日志记录。

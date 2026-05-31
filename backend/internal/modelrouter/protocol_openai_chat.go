@@ -662,21 +662,26 @@ func decodeOpenAIChatMessages(raw []interface{}) []IRMessage {
 			})
 		}
 
-		// Tool result → IRPartToolResult
+		// Tool result — content goes into IRPartToolResult.Content.
+		// Use continue to skip the generic content decode below.
 		if role == "tool" {
-			msg.Parts = append(msg.Parts, IRContentPart{
-				Type: IRPartToolResult,
-				ToolResult: &IRToolResultPart{
-					ToolCallID: getString(m, "tool_call_id"),
-					Status:     "completed",
-				},
-			})
-			// Also grab content if present
+			toolResult := &IRToolResultPart{
+				ToolCallID: getString(m, "tool_call_id"),
+				Status:     "completed",
+			}
 			if content := m["content"]; content != nil {
-				if s, ok := content.(string); ok {
-					msg.Parts = append(msg.Parts, IRContentPart{Type: IRPartText, Text: s})
+				if s, ok := content.(string); ok && s != "" {
+					toolResult.Content = []IRContentPart{{Type: IRPartText, Text: s}}
+				} else if parts := decodeOpenAIChatContent(content); len(parts) > 0 {
+					toolResult.Content = parts
 				}
 			}
+			msg.Parts = append(msg.Parts, IRContentPart{
+				Type:       IRPartToolResult,
+				ToolResult: toolResult,
+			})
+			msgs = append(msgs, msg)
+			continue
 		}
 
 		// Content (string or array) → IRPartText / IRPartRefusal

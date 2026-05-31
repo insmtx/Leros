@@ -8,12 +8,12 @@ import (
 type Capability string
 
 const (
-	CapText             Capability = "text"
-	CapToolCall         Capability = "tool_call"
-	CapReasoning        Capability = "reasoning"
-	CapImage            Capability = "image"
-	CapAudio            Capability = "audio"
-	CapFile             Capability = "file"
+	CapText              Capability = "text"
+	CapToolCall          Capability = "tool_call"
+	CapReasoning         Capability = "reasoning"
+	CapImage             Capability = "image"
+	CapAudio             Capability = "audio"
+	CapFile              Capability = "file"
 	CapParallelToolCalls Capability = "parallel_tool_calls"
 )
 
@@ -48,7 +48,6 @@ var (
 		CapToolCall:          true,
 		CapReasoning:         true,
 		CapImage:             true,
-		CapFile:              true,
 		CapParallelToolCalls: true,
 	}
 
@@ -58,6 +57,7 @@ var (
 		CapToolCall:          true,
 		CapReasoning:         true,
 		CapImage:             true,
+		CapFile:              true,
 		CapParallelToolCalls: true,
 	}
 
@@ -65,6 +65,7 @@ var (
 	GeminiCapabilities = CapabilitySet{
 		CapText:              true,
 		CapToolCall:          true,
+		CapReasoning:         true,
 		CapImage:             true,
 		CapAudio:             true,
 		CapFile:              true,
@@ -72,25 +73,9 @@ var (
 	}
 )
 
-// NormalizeRequest validates an IRRequest against target capabilities,
-// returning a modified request, warnings for degradations, or an error
-// for fatal incompatibilities.
-//
-// Fatal errors: the request fundamentally cannot be satisfied
-// (e.g., required tool use but target lacks tool_call support).
-// Warnings: the request can still succeed with degraded content
-// (e.g., removing image parts when target lacks image support).
+// NormalizeRequest adapts an IR request to the constraints of a target protocol.
 func NormalizeRequest(ir *IRRequest, targetCaps CapabilitySet) (*IRRequest, []Warning, error) {
-	// --- Fatal checks ---
-
-	// Tool choice required/auto/any but target lacks tool_call capability.
-	if ir.ToolChoice != nil && !targetCaps.Has(CapToolCall) {
-		return nil, nil, fmt.Errorf(
-			"target protocol does not support tool calls (tool_choice=%q)",
-			ir.ToolChoice.Type,
-		)
-	}
-
+	// --- Hard blocks ---
 	// Tools defined but target lacks tool_call capability.
 	if len(ir.Tools) > 0 && !targetCaps.Has(CapToolCall) {
 		return nil, nil, fmt.Errorf(
@@ -102,9 +87,15 @@ func NormalizeRequest(ir *IRRequest, targetCaps CapabilitySet) (*IRRequest, []Wa
 	// --- Degradable checks ---
 	// Walk messages and remove unsupported content parts.
 
-	var warnings []Warning
+	// Normalize tool messages first — merge orphan text parts into ToolResult.Content.
+	// This is a defensive layer; well-formed IR should not need it.
+	normalizedMsgs, toolWarnings, toolChanged := normalizeToolMessages(ir)
+	if toolChanged {
+		ir.Messages = normalizedMsgs
+	}
+	warnings := append([]Warning{}, toolWarnings...)
 	var newMessages []IRMessage
-	needsCopy := false
+	needsCopy := toolChanged
 
 	for msgIdx, msg := range ir.Messages {
 		var newParts []IRContentPart
@@ -170,4 +161,64 @@ func NormalizeRequest(ir *IRRequest, targetCaps CapabilitySet) (*IRRequest, []Wa
 	result := *ir
 	result.Messages = newMessages
 	return &result, warnings, nil
+}
+
+// normalizeToolMessages cleans up IRRoleTool messages whose parts contain
+// orphan text content outside IRPartToolResult.Content.  This can happen
+// when an upstream protocol adapter constructs tool messages incorrectly.
+func normalizeToolMessages(ir *IRRequest) ([]IRMessage, []Warning, bool) {
+	var warnings []Warning
+	changed := false
+	messages := ir.Messages
+
+	for i, msg := range messages {
+		if msg.Role != IRRoleTool {
+			continue
+		}
+		if len(msg.Parts) <= 1 {
+			continue
+		}
+
+		var toolResultIdx int = -1
+		var orphanTexts []string
+		for j, part := range msg.Parts {
+			if part.Type == IRPartToolResult && toolResultIdx < 0 {
+				toolResultIdx = j
+			} else if part.Type == IRPartText {
+				orphanTexts = append(orphanTexts, part.Text)
+			}
+		}
+
+		if toolResultIdx < 0 || len(orphanTexts) == 0 {
+			if len(msg.Parts) > 1 {
+				warnings = append(warnings, Warning{
+					Field:   fmt.Sprintf("messages[%d]", i),
+					Message: fmt.Sprintf("tool message has %d parts but no ToolResult — cannot normalize", len(msg.Parts)),
+				})
+			}
+			continue
+		}
+
+		warnings = append(warnings, Warning{
+			Field:   fmt.Sprintf("messages[%d]", i),
+			Message: fmt.Sprintf("merged %d orphan text parts into ToolResult.Content", len(orphanTexts)),
+		})
+
+		toolResult := msg.Parts[toolResultIdx].ToolResult
+		if toolResult == nil {
+			toolResult = &IRToolResultPart{Status: "completed"}
+		}
+		for _, t := range orphanTexts {
+			toolResult.Content = append(toolResult.Content, IRContentPart{Type: IRPartText, Text: t})
+		}
+
+		if !changed {
+			messages = make([]IRMessage, len(ir.Messages))
+			copy(messages, ir.Messages)
+			changed = true
+		}
+		messages[i].Parts = []IRContentPart{{Type: IRPartToolResult, ToolResult: toolResult}}
+	}
+
+	return messages, warnings, changed
 }
