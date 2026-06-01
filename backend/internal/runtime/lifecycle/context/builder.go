@@ -240,28 +240,6 @@ func buildSessionSummaryContext(req *agent.RequestContext) string {
 	return strings.Join(lines, "\n")
 }
 
-// BuildUserInput 将请求中的用户输入消息拼接为格式化文本。
-func BuildUserInput(req *agent.RequestContext) string {
-	if req == nil {
-		return ""
-	}
-	if len(req.Input.Messages) > 0 {
-		lines := make([]string, 0, len(req.Input.Messages))
-		for _, message := range req.Input.Messages {
-			if strings.TrimSpace(message.Content) == "" {
-				continue
-			}
-			role := message.Role
-			if role == "" {
-				role = "user"
-			}
-			lines = append(lines, fmt.Sprintf("%s: %s", role, message.Content))
-		}
-		return strings.Join(lines, "\n")
-	}
-	return ""
-}
-
 // CloneRequest 深拷贝一份 RequestContext，防止 Prepare 过程污染原始请求。
 func CloneRequest(req *agent.RequestContext) *agent.RequestContext {
 	if req == nil {
