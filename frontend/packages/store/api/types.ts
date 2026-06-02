@@ -44,7 +44,8 @@ export type BackendSessionMetadata = {
 
 export type BackendMessage = {
 	id: string;
-	conversation_id: string;
+	session_id?: string;
+	conversation_id?: string;
 	role: string;
 	content: string;
 	timestamp: number;

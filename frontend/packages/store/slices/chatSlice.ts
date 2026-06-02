@@ -76,10 +76,11 @@ type FullStoreGet = () => Record<string, unknown>;
 function mapBackendMessage(msg: BackendMessage): Message {
 	const message: Message = {
 		id: String(msg.id),
-		conversationId: msg.conversation_id,
+		conversationId: msg.session_id ?? msg.conversation_id ?? "",
 		role: msg.role as MessageRole,
 		content: msg.content ?? "",
 		timestamp: msg.timestamp ?? new Date(msg.created_at).getTime(),
+		sequence: msg.sequence,
 		metadata: mapMetadata(msg.metadata),
 	};
 
@@ -432,6 +433,76 @@ function applySessionEventsToMessage(
 	);
 }
 
+function isOptimisticMessage(message: Message): boolean {
+	return message.id.startsWith("msg-user-") || message.id.startsWith("msg-assistant-");
+}
+
+function normalizedMessageContent(message: Message): string {
+	return message.content.trim().replace(/\s+/g, " ");
+}
+
+function messageMergeKey(message: Message): string | undefined {
+	const content = normalizedMessageContent(message);
+	if (!content) return undefined;
+	return `${message.role}:${content}`;
+}
+
+function countMatchingMessages(
+	messages: Message[],
+	target: Message,
+	targetIndex?: number,
+): number {
+	const key = messageMergeKey(target);
+	if (!key) return 0;
+
+	let count = 0;
+	const end = targetIndex ?? messages.length - 1;
+	for (let index = 0; index <= end; index += 1) {
+		const message = messages[index];
+		if (message && messageMergeKey(message) === key) {
+			count += 1;
+		}
+	}
+	return count;
+}
+
+function shouldKeepLocalMessage(
+	persistedMessages: Message[],
+	localMessages: Message[],
+	localMessage: Message,
+	localIndex: number,
+): boolean {
+	if (persistedMessages.some((message) => message.id === localMessage.id)) return false;
+	if (!isOptimisticMessage(localMessage)) return true;
+	if (!messageMergeKey(localMessage)) return true;
+
+	const localOccurrence = countMatchingMessages(localMessages, localMessage, localIndex);
+	const persistedOccurrence = countMatchingMessages(persistedMessages, localMessage);
+	return persistedOccurrence < localOccurrence;
+}
+
+function compareMessages(a: Message, b: Message): number {
+	if (a.sequence !== undefined && b.sequence !== undefined) {
+		return a.sequence - b.sequence;
+	}
+	return a.timestamp - b.timestamp;
+}
+
+function mergeSessionMessages(
+	persistedMessages: Message[],
+	localMessages: Message[],
+): Message[] {
+	const merged = [...persistedMessages];
+	localMessages.forEach((localMessage, index) => {
+		if (!shouldKeepLocalMessage(persistedMessages, localMessages, localMessage, index)) {
+			return;
+		}
+		if (merged.some((message) => message.id === localMessage.id)) return;
+		merged.push(localMessage);
+	});
+	return merged.sort(compareMessages);
+}
+
 export class ChatActionImpl {
 	readonly #set: SetState;
 	readonly #get: () => ChatStore;
@@ -582,6 +653,45 @@ export class ChatActionImpl {
 		}
 	};
 
+	startSessionResponseStream = (sessionId: string, content: string) => {
+		const trimmed = content.trim();
+		if (!sessionId || !trimmed) return;
+
+		const state = this.#get();
+		if (state.activeSessionId === sessionId && state.isGenerating) return;
+
+		const now = Date.now();
+		const userMsg: Message = {
+			id: `msg-user-${now}`,
+			conversationId: sessionId,
+			role: "user",
+			content: trimmed,
+			timestamp: now,
+		};
+		const assistantMsg: Message = {
+			id: `msg-assistant-${now}`,
+			conversationId: sessionId,
+			role: "assistant",
+			content: "",
+			timestamp: now + 100,
+		};
+
+		this.#set({
+			activeSessionId: sessionId,
+			messagesMap: {
+				[userMsg.id]: userMsg,
+				[assistantMsg.id]: assistantMsg,
+			},
+			messageIds: [userMsg.id, assistantMsg.id],
+			streamingMessageId: assistantMsg.id,
+			isGenerating: true,
+			inputText: "",
+			inputAttachments: [],
+		});
+
+		this.#startSSE(sessionId, assistantMsg.id);
+	};
+
 	#startSSE = (sessionId: string, assistantMsgId: string) => {
 		if (this.#sseClient) {
 			this.#sseClient.close();
@@ -671,7 +781,17 @@ export class ChatActionImpl {
 		try {
 			const res = await sessionApi.getMessages(sessionId, 1, 100);
 			const items = res.data.data?.items ?? [];
-			const messages = items.map(mapBackendMessage);
+			const persistedMessages = items.map(mapBackendMessage);
+			const state = this.#get();
+			const localSessionMessages =
+				state.activeSessionId === sessionId
+					? state.messageIds
+							.map((id) => state.messagesMap[id])
+							.filter((message): message is Message => message?.conversationId === sessionId)
+					: [];
+			const messages = localSessionMessages.length
+				? mergeSessionMessages(persistedMessages, localSessionMessages)
+				: persistedMessages;
 
 			const maps: Record<string, Message> = {};
 			const ids: string[] = [];
@@ -683,12 +803,25 @@ export class ChatActionImpl {
 			this.#set({ messagesMap: maps, messageIds: ids });
 		} catch (err) {
 			console.error("loadConversationMessages error:", err);
-			this.#set({ messagesMap: {}, messageIds: [] });
+			if (this.#get().activeSessionId !== sessionId) {
+				this.#set({ messagesMap: {}, messageIds: [] });
+			}
 		}
 	};
 
 	resetLocalMessages = () => {
-		this.#set({ messagesMap: {}, messageIds: [], activeSessionId: null });
+		if (this.#sseClient) {
+			this.#sseClient.close();
+			this.#sseClient = null;
+		}
+		this.#set({
+			messagesMap: {},
+			messageIds: [],
+			activeSessionId: null,
+			streamingMessageId: null,
+			isGenerating: false,
+			streamCancelRef: null,
+		});
 	};
 
 	setInputText = (text: string) => {

@@ -56,7 +56,6 @@ export function TaskDetailPage({
 		isGenerating,
 		setActiveSession,
 		loadConversationMessages,
-		resetLocalMessages,
 	} = useChatStore((s) => s);
 
 	const [task, setTask] = useState<ProjectTask | null>(null);
@@ -131,12 +130,6 @@ export function TaskDetailPage({
 		if (!resolvedTaskId || isGenerating) return;
 		fetchArtifacts(resolvedTaskId);
 	}, [resolvedTaskId, fetchArtifacts, isGenerating]);
-
-	useEffect(() => {
-		return () => {
-			resetLocalMessages();
-		};
-	}, [resetLocalMessages]);
 
 	if (!resolvedProjectId || !resolvedTaskId) {
 		return (

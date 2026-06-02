@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutStore } from "@leros/store";
+import { useChatStore, useLayoutStore } from "@leros/store";
 import { Button } from "@leros/ui/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@leros/ui/components/ui/popover";
 import { cn } from "@leros/ui/lib/utils";
@@ -50,6 +50,7 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 		fetchProjects,
 		switchProject,
 	} = useLayoutStore((s) => s);
+	const { startSessionResponseStream } = useChatStore((s) => s);
 	const [input, setInput] = useState("");
 	const [projectMenuOpen, setProjectMenuOpen] = useState(false);
 	const [projectSearch, setProjectSearch] = useState("");
@@ -61,8 +62,12 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 	}, [fetchProjects]);
 
 	const handleSend = async () => {
-		if (!input.trim()) return;
-		const data = await sendWorkbenchMessage(input, activeProjectId);
+		const content = input.trim();
+		if (!content) return;
+		const data = await sendWorkbenchMessage(content, activeProjectId);
+		if (data?.session_id) {
+			startSessionResponseStream(data.session_id, content);
+		}
 		if (navigation && data?.project_id && data?.task_id && data?.session_id) {
 			navigation.goToTaskDetail(data.project_id, data.task_id, data.session_id);
 		}

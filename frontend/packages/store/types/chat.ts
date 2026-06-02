@@ -46,6 +46,7 @@ export type Message = {
 	role: MessageRole;
 	content: string;
 	timestamp: number;
+	sequence?: number;
 	toolCalls?: ToolCall[];
 	todos?: RuntimeTodoItem[];
 	artifacts?: MessageArtifact[];
