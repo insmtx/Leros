@@ -21,10 +21,20 @@ type streamEvent struct {
 	Result    string         `json:"result,omitempty"`
 	IsError   bool           `json:"is_error,omitempty"`
 	Usage     *streamUsage   `json:"usage,omitempty"`
-	// control_request 相关字段
+	// control_request 相关字段（位于顶层和 request 嵌套对象）
+	RequestID string         `json:"request_id,omitempty"`
 	ToolUseID string         `json:"tool_use_id,omitempty"`
 	Name      string         `json:"name,omitempty"`
 	Input     map[string]any `json:"input,omitempty"`
+	Request   *controlReq    `json:"request,omitempty"`
+}
+
+type controlReq struct {
+	Subtype  string         `json:"subtype"`
+	ToolName string         `json:"tool_name"`
+	Name     string         `json:"name,omitempty"`
+	Input    map[string]any `json:"input"`
+	ToolUseID string        `json:"tool_use_id"`
 }
 
 type streamMessage struct {
@@ -60,6 +70,7 @@ type claudeStreamState struct {
 	lastAssistantText  string
 	toolNames          map[string]string
 	pendingTaskCreates map[string]events.RuntimeTodoItem
+	closeStdin         func() // result 事件时调用，关闭 stdin 让 Claude 进程退出
 }
 
 // ——— stdout 扫描 ———
@@ -114,6 +125,9 @@ func parseClaudeLineEvents(line string, state *claudeStreamState) []events.Event
 	case "result":
 		state.result = event.Result
 		state.isError = event.IsError
+		if state.closeStdin != nil {
+			state.closeStdin()
+		}
 		if event.IsError || event.Result == "" {
 			return nil
 		}
@@ -182,18 +196,35 @@ func parseUserEvent(event *streamEvent, state *claudeStreamState) []events.Event
 }
 
 func parseControlRequest(event *streamEvent) []events.Event {
-	if event.ToolUseID == "" || event.Name == "" {
+	// 从 request 嵌套对象提取字段（新版 claude CLI 格式）
+	toolUseID := event.ToolUseID
+	toolName := event.Name
+	input := event.Input
+	if event.Request != nil {
+		if toolUseID == "" {
+			toolUseID = event.Request.ToolUseID
+		}
+		if toolName == "" {
+			toolName = firstNonEmptyString(event.Request.ToolName, event.Request.Name)
+		}
+		if len(input) == 0 {
+			input = event.Request.Input
+		}
+	}
+	if toolUseID == "" || toolName == "" {
 		return nil
 	}
-	desc := fmt.Sprintf("%s: %s", event.Name, summarizeInput(event.Input))
+	// request_id 用于 control_response 回写匹配，必须是 UUID 格式
+	reqID := firstNonEmptyString(event.RequestID, toolUseID)
+	desc := fmt.Sprintf("%s: %s", toolName, summarizeInput(input))
 	payload := events.ApprovalRequestPayload{
-		RequestID:   event.ToolUseID,
+		RequestID:   reqID,
 		Engine:      "claude",
 		ActionType:  "tool_use",
 		Description: desc,
-		ToolCallID:  event.ToolUseID,
-		ToolName:    event.Name,
-		Arguments:   event.Input,
+		ToolCallID:  toolUseID,
+		ToolName:    toolName,
+		Arguments:   input,
 	}
 	return []events.Event{*events.NewApprovalRequested(payload)}
 }

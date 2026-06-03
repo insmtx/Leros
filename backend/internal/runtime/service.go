@@ -102,6 +102,8 @@ func (s *Service) buildRouter(ctx context.Context, opts Options) (agent.Runner, 
 			if err != nil {
 				return nil, err
 			}
+			// 注入 mock 审批处理器（自动批准 + 日志打印）
+			runner.SetApprovalHandler(&autoApprovalHandler{})
 			if err := router.Register(name, runner); err != nil {
 				return nil, err
 			}

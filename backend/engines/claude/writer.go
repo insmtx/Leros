@@ -31,17 +31,25 @@ type claudeApprovalResponder struct {
 }
 
 // WriteDecision 将审批决策转换为 claude control_response JSON 并写入 stdin。
+// Claude CLI 的 Zod schema：
+//
+//	allow → {behavior: "allow", updatedInput: {...}}
+//	deny  → {behavior: "deny",  message: "reason"}
 func (r *claudeApprovalResponder) WriteDecision(requestID string, action string) error {
 	if r.stdinW == nil {
 		return fmt.Errorf("claude stdin writer is nil")
 	}
-	behavior := "deny"
+	var responseBody map[string]any
 	if action == "approved" {
-		behavior = "allow"
-	}
-	responseBody := map[string]any{"behavior": behavior}
-	if behavior == "deny" {
-		responseBody["message"] = "Permission denied by user"
+		responseBody = map[string]any{
+			"behavior":     "allow",
+			"updatedInput": map[string]any{},
+		}
+	} else {
+		responseBody = map[string]any{
+			"behavior": "deny",
+			"message":  "Permission denied by user",
+		}
 	}
 	payload := map[string]any{
 		"type": "control_response",

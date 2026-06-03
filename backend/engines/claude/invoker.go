@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/insmtx/Leros/backend/engines"
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
@@ -30,6 +29,9 @@ func NewInvoker(binary string, extraEnv map[string]string) *Invoker {
 
 // Run 启动 CLI 进程并将 stdout/stderr 转换为引擎事件。
 func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (*engines.RunHandle, error) {
+	// TODO: 测试用强制改写，测试完毕后移除
+	req.PermissionMode = engines.PermissionModeOnRequest
+
 	args := buildArgs(req)
 
 	// 写入 settings.leros.{sessionId}.json，通过 --settings 覆盖用户级 ~/.claude/settings.json
@@ -43,13 +45,11 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (*engines.R
 		}
 	}
 
-	execCtx, cancel := execContext(ctx, req.Timeout)
-	defer func() {
-		if cancel != nil {
-			// cancel is replaced below; this protects against early-return leaks
-			cancel()
-		}
-	}()
+	execCtx := ctx
+	cancel := func() {}
+	if req.Timeout > 0 {
+		execCtx, cancel = context.WithTimeout(ctx, req.Timeout)
+	}
 
 	cmd := exec.CommandContext(execCtx, inv.binary, args...)
 	cmd.Dir = req.WorkDir
@@ -75,33 +75,48 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (*engines.R
 		stdinPipe.Close()
 		return nil, fmt.Errorf("start claude: %w", err)
 	}
-	cancel() // cancel is no longer needed after successful start
-	cancel = nil
 
-	// 以 stream-json 格式写入初始用户消息，写完关闭 stdin 发送 EOF
-	if prompt := strings.TrimSpace(req.Prompt); prompt != "" {
-		if _, err := fmt.Fprintln(stdinPipe, buildStreamUserMessage(prompt)); err != nil {
-			stdinPipe.Close()
-			return nil, fmt.Errorf("write initial prompt to claude stdin: %w", err)
-		}
-	}
-	stdinPipe.Close()
+	// 与 buildArgs 保持一致：on-request / auto 需要 stdin 保持打开以供审批回包
+	needsApproval := req.PermissionMode == engines.PermissionModeOnRequest ||
+		req.PermissionMode == engines.PermissionModeAuto
 
 	evtChan := make(chan events.Event, 32)
 	proc := engines.NewCmdProcess(cmd)
 	evtChan <- events.Event{Type: events.EventStarted}
 
+	var responder engines.ApprovalResponder
+	if needsApproval {
+		responder = &claudeApprovalResponder{stdinW: stdinPipe}
+	}
+
 	go func() {
 		defer close(evtChan)
-		if cancel != nil {
-			defer cancel()
-		}
+		defer cancel()
+		closeStdinOnce := &sync.Once{}
+	closeStdin := func() { closeStdinOnce.Do(func() { stdinPipe.Close() }) }
+	defer closeStdin()
 		// 清理 settings 文件
 		if settingsPath != "" {
 			defer func() { _ = os.Remove(settingsPath) }()
 		}
 
+		// 写入初始用户消息
+		if prompt := strings.TrimSpace(req.Prompt); prompt != "" {
+			if _, err := fmt.Fprintln(stdinPipe, buildStreamUserMessage(prompt)); err != nil {
+				evtChan <- events.Event{Type: events.EventFailed, Content: fmt.Sprintf("write prompt: %v", err)}
+				return
+			}
+		}
+		// bypass 模式：写完即关发送 EOF；审批模式：保持 stdin 打开等待 control_response 写入
+		if !needsApproval {
+			closeStdin()
+		}
+
 		parseState := &claudeStreamState{}
+		// 审批模式：收到 result 时关闭 stdin，让进程退出
+		if needsApproval {
+			parseState.closeStdin = closeStdin
+		}
 		var stderrText string
 		var wg sync.WaitGroup
 		wg.Add(2)
@@ -136,16 +151,10 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (*engines.R
 	}()
 
 	return &engines.RunHandle{
-		Process: proc,
-		Events:  evtChan,
+		Process:   proc,
+		Events:    evtChan,
+		Responder: responder,
 	}, nil
-}
-
-func execContext(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
-	if timeout > 0 {
-		return context.WithTimeout(ctx, timeout)
-	}
-	return context.WithCancel(ctx)
 }
 
 // scanPlainOutput 读取纯文本输出并转为事件。
