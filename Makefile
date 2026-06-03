@@ -1,5 +1,6 @@
 PROJECT := leros
-REGISTRY ?= registry.yygu.cn/insmtx/
+REGISTRY_HOST ?= registry.yygu.cn
+REGISTRY_NAMESPACE ?= insmtx
 
 .PHONY: build docker-build-base docker-push-base docker-build docker-dev-build docker-push docker-compose-up docker-compose-down run run-foreground run-detached stop logs swagger swagger-clean dev-setup dev-server dev-worker dev-frontend
 
@@ -7,26 +8,32 @@ build:
 	go build -v -o ./bundles/leros ./backend/cmd/leros/
 
 docker-build-base:
-	docker build -t $(REGISTRY)$(PROJECT)-base:latest -f deployments/build/Dockerfile.base .
+	docker build -t $(REGISTRY_HOST)/$(REGISTRY_NAMESPACE)/$(PROJECT)-base:latest -f deployments/build/Dockerfile.base .
 
 docker-push-base: docker-build-base
-	docker push $(REGISTRY)$(PROJECT)-base:latest
+	docker push $(REGISTRY_HOST)/$(REGISTRY_NAMESPACE)/$(PROJECT)-base:latest
 
 docker-build:
-	docker build -t $(REGISTRY)$(PROJECT):latest -f deployments/build/Dockerfile.leros .
+	docker build -t $(REGISTRY_HOST)/$(REGISTRY_NAMESPACE)/$(PROJECT):latest -f deployments/build/Dockerfile.leros .
+
+docker-build-tag:
+	docker build -t $(REGISTRY_HOST)/$(REGISTRY_NAMESPACE)/$(PROJECT):$(TAG) -f deployments/build/Dockerfile.leros .
 
 docker-dev-build:
-	docker build -t $(REGISTRY)$(PROJECT)-dev:latest -f deployments/build/Dockerfile.leros-dev .
+	docker build -t $(REGISTRY_HOST)/$(REGISTRY_NAMESPACE)/$(PROJECT)-dev:latest -f deployments/build/Dockerfile.leros-dev .
 
 docker-push: docker-build
-	docker push $(REGISTRY)$(PROJECT):latest
+	docker push $(REGISTRY_HOST)/$(REGISTRY_NAMESPACE)/$(PROJECT):latest
+
+docker-push-tag:
+	docker push $(REGISTRY_HOST)/$(REGISTRY_NAMESPACE)/$(PROJECT):$(TAG)
 
 docker-run-leros:
 	-docker rm -f $(PROJECT)-leros-dev
-	docker run -d --name $(PROJECT)-leros-dev -p 8080:8080 $(REGISTRY)$(PROJECT):latest
+	docker run -d --name $(PROJECT)-leros-dev -p 8080:8080 $(REGISTRY_HOST)/$(REGISTRY_NAMESPACE)/$(PROJECT):latest
 
 docker-compose-up: docker-build
-	docker tag $(REGISTRY)$(PROJECT):latest localhost/env_$(PROJECT):latest
+	docker tag $(REGISTRY_HOST)/$(REGISTRY_NAMESPACE)/$(PROJECT):latest localhost/env_$(PROJECT):latest
 	docker-compose -f deployments/env/docker-compose.yml up -d
 
 docker-compose-down:
