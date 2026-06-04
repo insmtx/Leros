@@ -418,14 +418,14 @@ func (st *runState) ensureThread(ctx context.Context, req engines.RunRequest) (s
 	if resume {
 		threadID := strings.TrimSpace(req.SessionID)
 		if st.srv.ThreadID() != threadID {
-			if err := st.srv.ResumeThread(ctx, threadID, req.Model); err != nil {
+			if err := st.srv.ResumeThread(ctx, threadID, req.Model, req.SystemPrompt); err != nil {
 				return "", fmt.Errorf("resume thread %s: %w", threadID, err)
 			}
 		}
 		sendEventTo(st.evtChan, engines.EventProviderSessionStarted, threadID)
 		return threadID, nil
 	}
-	tid, err := st.srv.StartThread(ctx, req.Model)
+	tid, err := st.srv.StartThread(ctx, req.Model, req.SystemPrompt)
 	if err != nil {
 		return "", fmt.Errorf("start thread: %w", err)
 	}

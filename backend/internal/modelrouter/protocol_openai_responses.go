@@ -48,6 +48,24 @@ func (a *openAIResponsesAdapter) DecodeRequest(raw map[string]interface{}) (*IRR
 
 	if input, ok := raw["input"]; ok {
 		ir.Messages = decodeResponsesInput(input)
+		// 将 developer/system 消息的内容合并到 ir.System，
+		// 避免 Chat 编码时被跳过（encodeOpenAIChatMessages 只保留 ir.System）。
+		var kept []IRMessage
+		for _, msg := range ir.Messages {
+			if msg.Role == IRRoleSystem {
+				for _, part := range msg.Parts {
+					if part.Type == IRPartText && part.Text != "" {
+						if ir.System != "" {
+							ir.System += "\n\n"
+						}
+						ir.System += part.Text
+					}
+				}
+			} else {
+				kept = append(kept, msg)
+			}
+		}
+		ir.Messages = kept
 	}
 
 	if t, ok := getFloat(raw, "temperature"); ok {

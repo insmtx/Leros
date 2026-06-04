@@ -154,8 +154,8 @@ func (s *AppServer) writeLine(data []byte) error {
 // Thread / Turn 操作
 // ============================================================================
 
-func (s *AppServer) StartThread(ctx context.Context, modelCfg engines.ModelConfig) (string, error) {
-	params := s.threadParams(modelCfg)
+func (s *AppServer) StartThread(ctx context.Context, modelCfg engines.ModelConfig, systemPrompt string) (string, error) {
+	params := s.threadParams(modelCfg, systemPrompt)
 	var resp struct {
 		Thread struct {
 			ID string `json:"id"`
@@ -174,8 +174,8 @@ func (s *AppServer) StartThread(ctx context.Context, modelCfg engines.ModelConfi
 	return threadID, nil
 }
 
-func (s *AppServer) ResumeThread(ctx context.Context, threadID string, modelCfg engines.ModelConfig) error {
-	params := s.resumeThreadParams(threadID, modelCfg)
+func (s *AppServer) ResumeThread(ctx context.Context, threadID string, modelCfg engines.ModelConfig, systemPrompt string) error {
+	params := s.resumeThreadParams(threadID, modelCfg, systemPrompt)
 	var resp struct {
 		Thread struct {
 			ID string `json:"id"`
@@ -213,7 +213,7 @@ func (s *AppServer) StartTurn(ctx context.Context, threadID string, prompt strin
 	return turnID, nil
 }
 
-func (s *AppServer) threadParams(modelCfg engines.ModelConfig) map[string]any {
+func (s *AppServer) threadParams(modelCfg engines.ModelConfig, systemPrompt string) map[string]any {
 	params := map[string]any{
 		"cwd":                   s.workDir,
 		"serviceName":           "Leros",
@@ -225,16 +225,22 @@ func (s *AppServer) threadParams(modelCfg engines.ModelConfig) map[string]any {
 	if modelCfg.Model != "" {
 		params["model"] = modelCfg.Model
 	}
+	if strings.TrimSpace(systemPrompt) != "" {
+		params["developerInstructions"] = systemPrompt
+	}
 	return params
 }
 
-func (s *AppServer) resumeThreadParams(threadID string, modelCfg engines.ModelConfig) map[string]any {
+func (s *AppServer) resumeThreadParams(threadID string, modelCfg engines.ModelConfig, systemPrompt string) map[string]any {
 	params := map[string]any{
 		"threadId": threadID,
 		"cwd":      s.workDir,
 	}
 	if modelCfg.Model != "" {
 		params["model"] = modelCfg.Model
+	}
+	if strings.TrimSpace(systemPrompt) != "" {
+		params["developerInstructions"] = systemPrompt
 	}
 	return params
 }
