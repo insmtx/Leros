@@ -1,7 +1,7 @@
 package claude
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"strings"
 
@@ -246,7 +246,7 @@ func decodedJSONValue(content any) (any, bool) {
 			return nil, false
 		}
 		var value any
-		if err := json.Unmarshal([]byte(text), &value); err != nil {
+		if err := sonic.Unmarshal([]byte(text), &value); err != nil {
 			return nil, false
 		}
 		return value, true

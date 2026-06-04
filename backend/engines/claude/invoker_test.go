@@ -2,7 +2,7 @@ package claude
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"errors"
 	"os"
 	"os/exec"
@@ -313,7 +313,7 @@ func containsArg(args []string, value string) bool {
 func decodeEventContent(t *testing.T, content string) map[string]any {
 	t.Helper()
 	var decoded map[string]any
-	if err := json.Unmarshal([]byte(content), &decoded); err != nil {
+	if err := sonic.Unmarshal([]byte(content), &decoded); err != nil {
 		t.Fatalf("decode event content: %v", err)
 	}
 	return decoded

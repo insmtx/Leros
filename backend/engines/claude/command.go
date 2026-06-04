@@ -1,7 +1,7 @@
 package claude
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"os"
 	"path/filepath"
 	"strings"
@@ -92,7 +92,7 @@ func writeLerosSettings(path string, settings *lerosSettings) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(settings, "", "  ")
+	data, err := sonic.MarshalIndent(settings, "", "  ")
 	if err != nil {
 		return err
 	}

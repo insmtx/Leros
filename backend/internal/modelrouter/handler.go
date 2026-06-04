@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 )
 
@@ -119,7 +119,7 @@ func handleModelRoute(store *ModelStore, entryProtocol Protocol) gin.HandlerFunc
 
 		// ── Normalize request against target capabilities ──
 		var raw map[string]interface{}
-		if err := json.Unmarshal(body, &raw); err != nil {
+		if err := sonic.Unmarshal(body, &raw); err != nil {
 			c.JSON(http.StatusBadRequest, newEntryError(entryProtocol, "invalid JSON request body"))
 			return
 		}
@@ -198,7 +198,7 @@ func handleNonStreamResponse(
 	dl.LogUpstreamResponse(respBody)
 
 	var rawResp map[string]interface{}
-	if err := json.Unmarshal(respBody, &rawResp); err != nil {
+	if err := sonic.Unmarshal(respBody, &rawResp); err != nil {
 		c.JSON(http.StatusBadGateway, newEntryError(entryProtocol, "invalid upstream response"))
 		return
 	}
@@ -345,7 +345,7 @@ func pipeConvertedSSE(
 		currentData.Reset()
 
 		var rawUpstream map[string]interface{}
-		if err := json.Unmarshal([]byte(dataStr), &rawUpstream); err != nil {
+		if err := sonic.Unmarshal([]byte(dataStr), &rawUpstream); err != nil {
 			return
 		}
 
@@ -575,7 +575,7 @@ func parseAndEncodeError(body []byte, statusCode int, entryProtocol Protocol) in
 
 	if len(body) > 0 {
 		var raw map[string]interface{}
-		if err := json.Unmarshal(body, &raw); err == nil {
+		if err := sonic.Unmarshal(body, &raw); err == nil {
 			// Anthropic format: {"type": "error", "error": {"type": "...", "message": "..."}}
 			if getString(raw, "type") == "error" {
 				if errObj, ok := raw["error"].(map[string]interface{}); ok {
@@ -636,7 +636,7 @@ func extractModelField(body []byte) string {
 	var raw struct {
 		Model string `json:"model"`
 	}
-	if err := json.Unmarshal(body, &raw); err != nil {
+	if err := sonic.Unmarshal(body, &raw); err != nil {
 		return ""
 	}
 	return strings.TrimSpace(raw.Model)
@@ -657,7 +657,7 @@ func isStreamRequest(body []byte) bool {
 	var raw struct {
 		Stream bool `json:"stream"`
 	}
-	if err := json.Unmarshal(body, &raw); err != nil {
+	if err := sonic.Unmarshal(body, &raw); err != nil {
 		return false
 	}
 	return raw.Stream

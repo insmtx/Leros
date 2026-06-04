@@ -3,13 +3,13 @@ package codex
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
 
+	"github.com/bytedance/sonic"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -18,14 +18,14 @@ type rpcRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      int64           `json:"id,omitempty"`
 	Method  string          `json:"method,omitempty"`
-	Params  json.RawMessage `json:"params,omitempty"`
+	Params  sonic.NoCopyRawMessage `json:"params,omitempty"`
 }
 
 // rpcResponse 是 JSON-RPC 2.0 响应。
 type rpcResponse struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      int64           `json:"id"`
-	Result  json.RawMessage `json:"result,omitempty"`
+	Result  sonic.NoCopyRawMessage `json:"result,omitempty"`
 	Error   *rpcError       `json:"error,omitempty"`
 }
 
@@ -42,18 +42,18 @@ func (e *rpcError) Error() string {
 // rpcMessage 用于解析收到的消息（统一入口）。
 type rpcMessage struct {
 	JSONRPC string          `json:"jsonrpc"`
-	ID      json.RawMessage `json:"id,omitempty"`
+	ID      sonic.NoCopyRawMessage `json:"id,omitempty"`
 	Method  string          `json:"method,omitempty"`
-	Params  json.RawMessage `json:"params,omitempty"`
-	Result  json.RawMessage `json:"result,omitempty"`
+	Params  sonic.NoCopyRawMessage `json:"params,omitempty"`
+	Result  sonic.NoCopyRawMessage `json:"result,omitempty"`
 	Error   *rpcError       `json:"error,omitempty"`
 }
 
 // ServerRequest 表示来自 Codex app-server 的请求（需要客户端响应）。
 type ServerRequest struct {
-	ID     json.RawMessage
+	ID     sonic.NoCopyRawMessage
 	Method string
-	Params json.RawMessage
+	Params sonic.NoCopyRawMessage
 }
 
 // Client 是 JSON-RPC 2.0 客户端，基于独立的 reader/writer 进行行分隔的 JSON 通信。
@@ -69,7 +69,7 @@ type Client struct {
 	bufferCalled bool // scanner.Buffer() 是否已调用过（防止 panic）
 
 	// 回调：由上层设置
-	OnNotification   func(method string, params json.RawMessage)
+	OnNotification   func(method string, params sonic.NoCopyRawMessage)
 	OnServerRequest  func(req ServerRequest)
 }
 
@@ -103,7 +103,7 @@ func (c *Client) Call(ctx context.Context, method string, params any, result any
 	if c == nil {
 		return errors.New("jsonrpc client is nil")
 	}
-	paramsRaw, err := json.Marshal(params)
+	paramsRaw, err := sonic.Marshal(params)
 	if err != nil {
 		return fmt.Errorf("marshal params for %s: %w", method, err)
 	}
@@ -115,7 +115,7 @@ func (c *Client) Call(ctx context.Context, method string, params any, result any
 		Method:  method,
 		Params:  paramsRaw,
 	}
-	reqBytes, err := json.Marshal(req)
+	reqBytes, err := sonic.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("marshal request %s: %w", method, err)
 	}
@@ -150,7 +150,7 @@ func (c *Client) Call(ctx context.Context, method string, params any, result any
 			return resp.Error
 		}
 		if result != nil && len(resp.Result) > 0 {
-			if err := json.Unmarshal(resp.Result, result); err != nil {
+			if err := sonic.Unmarshal(resp.Result, result); err != nil {
 				return fmt.Errorf("unmarshal result for %s: %w", method, err)
 			}
 		}
@@ -163,7 +163,7 @@ func (c *Client) Notify(method string, params any) error {
 	if c == nil {
 		return errors.New("jsonrpc client is nil")
 	}
-	paramsRaw, err := json.Marshal(params)
+	paramsRaw, err := sonic.Marshal(params)
 	if err != nil {
 		return fmt.Errorf("marshal params for notify %s: %w", method, err)
 	}
@@ -173,7 +173,7 @@ func (c *Client) Notify(method string, params any) error {
 		Method:  method,
 		Params:  paramsRaw,
 	}
-	reqBytes, err := json.Marshal(req)
+	reqBytes, err := sonic.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("marshal notify %s: %w", method, err)
 	}
@@ -182,7 +182,7 @@ func (c *Client) Notify(method string, params any) error {
 }
 
 // Respond 响应来自 app-server 的请求（如审批决策）。
-func (c *Client) Respond(id json.RawMessage, result any) error {
+func (c *Client) Respond(id sonic.NoCopyRawMessage, result any) error {
 	if c == nil {
 		return errors.New("jsonrpc client is nil")
 	}
@@ -190,7 +190,7 @@ func (c *Client) Respond(id json.RawMessage, result any) error {
 		return errors.New("respond requires a non-empty id")
 	}
 
-	resultRaw, err := json.Marshal(result)
+	resultRaw, err := sonic.Marshal(result)
 	if err != nil {
 		return fmt.Errorf("marshal respond result: %w", err)
 	}
@@ -198,24 +198,24 @@ func (c *Client) Respond(id json.RawMessage, result any) error {
 	resp := map[string]any{
 		"jsonrpc": "2.0",
 		"id":      id,
-		"result":  json.RawMessage(resultRaw),
+		"result":  sonic.NoCopyRawMessage(resultRaw),
 	}
-	respBytes, err := json.Marshal(resp)
+	respBytes, err := sonic.Marshal(resp)
 	if err != nil {
 		return fmt.Errorf("marshal response: %w", err)
 	}
 
-	// id 本身是 json.RawMessage（带引号的字符串），需要做一次解析才能正确序列化
+	// id 本身是 sonic.NoCopyRawMessage（带引号的字符串），需要做一次解析才能正确序列化
 	var rawID any
-	if err := json.Unmarshal(id, &rawID); err != nil {
+	if err := sonic.Unmarshal(id, &rawID); err != nil {
 		return fmt.Errorf("unmarshal response id: %w", err)
 	}
 	resp = map[string]any{
 		"jsonrpc": "2.0",
 		"id":      rawID,
-		"result":  json.RawMessage(resultRaw),
+		"result":  sonic.NoCopyRawMessage(resultRaw),
 	}
-	respBytes, err = json.Marshal(resp)
+	respBytes, err = sonic.Marshal(resp)
 	if err != nil {
 		return fmt.Errorf("marshal response: %w", err)
 	}
@@ -225,7 +225,7 @@ func (c *Client) Respond(id json.RawMessage, result any) error {
 }
 
 // RespondError 响应给 app-server 返回错误。
-func (c *Client) RespondError(id json.RawMessage, code int, message string) error {
+func (c *Client) RespondError(id sonic.NoCopyRawMessage, code int, message string) error {
 	if c == nil {
 		return errors.New("jsonrpc client is nil")
 	}
@@ -234,7 +234,7 @@ func (c *Client) RespondError(id json.RawMessage, code int, message string) erro
 	}
 
 	var rawID any
-	if err := json.Unmarshal(id, &rawID); err != nil {
+	if err := sonic.Unmarshal(id, &rawID); err != nil {
 		return fmt.Errorf("unmarshal error response id: %w", err)
 	}
 	resp := map[string]any{
@@ -245,7 +245,7 @@ func (c *Client) RespondError(id json.RawMessage, code int, message string) erro
 			"message": message,
 		},
 	}
-	respBytes, err := json.Marshal(resp)
+	respBytes, err := sonic.Marshal(resp)
 	if err != nil {
 		return fmt.Errorf("marshal error response: %w", err)
 	}
@@ -275,7 +275,7 @@ func (c *Client) ReadLoop(ctx context.Context) error {
 		}
 
 		var msg rpcMessage
-		if err := json.Unmarshal(line, &msg); err != nil {
+		if err := sonic.Unmarshal(line, &msg); err != nil {
 			logs.Warnf("JSON-RPC parse error: %v, line=%s", err, string(line))
 			continue
 		}
@@ -298,7 +298,7 @@ func (c *Client) ReadLoop(ctx context.Context) error {
 		case len(msg.ID) > 0 && msg.Method == "":
 			// 客户端响应：有 id，无 method（包含 result 或 error）
 			var id int64
-			if err := json.Unmarshal(msg.ID, &id); err != nil {
+			if err := sonic.Unmarshal(msg.ID, &id); err != nil {
 				logs.Warnf("JSON-RPC unmarshal response id: %v", err)
 				continue
 			}

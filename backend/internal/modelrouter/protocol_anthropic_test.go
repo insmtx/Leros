@@ -2,7 +2,7 @@ package modelrouter
 
 import (
 	"bufio"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"os"
 	"strings"
 	"testing"
@@ -1235,8 +1235,8 @@ func TestAnthropicStreamLifecycle(t *testing.T) {
 			continue
 		}
 		var raw map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
-			t.Fatalf("json.Unmarshal: %v, line=%q", err, line)
+		if err := sonic.Unmarshal([]byte(line), &raw); err != nil {
+			t.Fatalf("sonic.Unmarshal: %v, line=%q", err, line)
 		}
 		evts, err := adapter.DecodeStreamEvent(raw, st)
 		if err != nil {

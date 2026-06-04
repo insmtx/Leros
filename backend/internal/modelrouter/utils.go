@@ -1,8 +1,9 @@
 package modelrouter
 
 import (
-	"encoding/json"
 	"time"
+
+	"github.com/bytedance/sonic"
 )
 
 // getString safely extracts a string from a map.
@@ -128,12 +129,12 @@ func contentToString(v interface{}) string {
 
 // parseJSONString parses a JSON string into a target.
 func parseJSONString(s string, target interface{}) error {
-	return json.Unmarshal([]byte(s), target)
+	return sonic.Unmarshal([]byte(s), target)
 }
 
 // marshalJSON marshals to JSON bytes.
 func marshalJSON(v interface{}) ([]byte, error) {
-	return json.Marshal(v)
+	return sonic.Marshal(v)
 }
 
 // now returns current Unix timestamp.
@@ -155,10 +156,10 @@ func compactJSON(body []byte) string {
 		return ""
 	}
 	var v interface{}
-	if err := json.Unmarshal(body, &v); err != nil {
+	if err := sonic.Unmarshal(body, &v); err != nil {
 		return string(body)
 	}
-	b, err := json.Marshal(v)
+	b, err := sonic.Marshal(v)
 	if err != nil {
 		return string(body)
 	}
