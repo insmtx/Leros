@@ -1,7 +1,7 @@
 package modelrouter
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"testing"
 )
 
@@ -1448,7 +1448,7 @@ func TestOpenAIResponsesStreamLifecycle_GoldenFile(t *testing.T) {
 	}
 
 	// Count deltas (excluding skipped events)
-	j, _ := json.MarshalIndent(irEvents, "", "  ")
+	j, _ := sonic.MarshalIndent(irEvents, "", "  ")
 	t.Logf("IR events: %s", string(j))
 
 	// Phase 2: Re-encode all IR events (IR -> upstream)

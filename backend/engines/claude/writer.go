@@ -1,7 +1,7 @@
 package claude
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"io"
 	"strings"
@@ -19,7 +19,7 @@ func buildStreamUserMessage(prompt string) string {
 			"content": prompt,
 		},
 	}
-	encoded, _ := json.Marshal(payload)
+	encoded, _ := sonic.Marshal(payload)
 	return string(encoded)
 }
 
@@ -60,7 +60,7 @@ func (r *claudeApprovalResponder) WriteDecision(requestID string, action string)
 			"response":   responseBody,
 		},
 	}
-	encoded, _ := json.Marshal(payload)
+	encoded, _ := sonic.Marshal(payload)
 	_, err := fmt.Fprintln(r.stdinW, string(encoded))
 	return err
 }

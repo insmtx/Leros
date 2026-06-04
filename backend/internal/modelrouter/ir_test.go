@@ -1,7 +1,7 @@
 package modelrouter
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"testing"
 )
 
@@ -55,14 +55,14 @@ func TestIRRequestJSONRoundTrip(t *testing.T) {
 		},
 	}
 
-	b, err := json.Marshal(orig)
+	b, err := sonic.Marshal(orig)
 	if err != nil {
-		t.Fatalf("json.Marshal(IRRequest) error = %v", err)
+		t.Fatalf("sonic.Marshal(IRRequest) error = %v", err)
 	}
 
 	var got IRRequest
-	if err := json.Unmarshal(b, &got); err != nil {
-		t.Fatalf("json.Unmarshal(IRRequest) error = %v", err)
+	if err := sonic.Unmarshal(b, &got); err != nil {
+		t.Fatalf("sonic.Unmarshal(IRRequest) error = %v", err)
 	}
 
 	if got.ID != orig.ID {
@@ -152,14 +152,14 @@ func TestIRResponseJSONRoundTrip(t *testing.T) {
 		},
 	}
 
-	b, err := json.Marshal(orig)
+	b, err := sonic.Marshal(orig)
 	if err != nil {
-		t.Fatalf("json.Marshal(IRResponse) error = %v", err)
+		t.Fatalf("sonic.Marshal(IRResponse) error = %v", err)
 	}
 
 	var got IRResponse
-	if err := json.Unmarshal(b, &got); err != nil {
-		t.Fatalf("json.Unmarshal(IRResponse) error = %v", err)
+	if err := sonic.Unmarshal(b, &got); err != nil {
+		t.Fatalf("sonic.Unmarshal(IRResponse) error = %v", err)
 	}
 
 	if got.ID != orig.ID {
@@ -302,13 +302,13 @@ func TestIRContentPartTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b, err := json.Marshal(tt.part)
+			b, err := sonic.Marshal(tt.part)
 			if err != nil {
-				t.Fatalf("json.Marshal error = %v", err)
+				t.Fatalf("sonic.Marshal error = %v", err)
 			}
 			var got IRContentPart
-			if err := json.Unmarshal(b, &got); err != nil {
-				t.Fatalf("json.Unmarshal error = %v, json=%s", err, string(b))
+			if err := sonic.Unmarshal(b, &got); err != nil {
+				t.Fatalf("sonic.Unmarshal error = %v, json=%s", err, string(b))
 			}
 			if got.Type != tt.part.Type {
 				t.Errorf("Type = %q, want %q", got.Type, tt.part.Type)
@@ -357,13 +357,13 @@ func TestIRStreamEventConstruction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b, err := json.Marshal(tt.event)
+			b, err := sonic.Marshal(tt.event)
 			if err != nil {
-				t.Fatalf("json.Marshal error = %v", err)
+				t.Fatalf("sonic.Marshal error = %v", err)
 			}
 			var got IRStreamEvent
-			if err := json.Unmarshal(b, &got); err != nil {
-				t.Fatalf("json.Unmarshal error = %v, json=%s", err, string(b))
+			if err := sonic.Unmarshal(b, &got); err != nil {
+				t.Fatalf("sonic.Unmarshal error = %v, json=%s", err, string(b))
 			}
 			if got.Type != tt.event.Type {
 				t.Errorf("Type = %q, want %q", got.Type, tt.event.Type)
@@ -435,13 +435,13 @@ func TestIRUsageTokens(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b, err := json.Marshal(tt.usage)
+			b, err := sonic.Marshal(tt.usage)
 			if err != nil {
-				t.Fatalf("json.Marshal error = %v", err)
+				t.Fatalf("sonic.Marshal error = %v", err)
 			}
 			var got IRUsage
-			if err := json.Unmarshal(b, &got); err != nil {
-				t.Fatalf("json.Unmarshal error = %v, json=%s", err, string(b))
+			if err := sonic.Unmarshal(b, &got); err != nil {
+				t.Fatalf("sonic.Unmarshal error = %v, json=%s", err, string(b))
 			}
 			if got.InputTokens != tt.usage.InputTokens {
 				t.Errorf("InputTokens = %d, want %d", got.InputTokens, tt.usage.InputTokens)
@@ -530,9 +530,9 @@ func TestIRExtensionsIsolation(t *testing.T) {
 		},
 	}
 
-	b, err := json.Marshal(req)
+	b, err := sonic.Marshal(req)
 	if err != nil {
-		t.Fatalf("json.Marshal error = %v", err)
+		t.Fatalf("sonic.Marshal error = %v", err)
 	}
 
 	// Verify Extensions key is NOT in JSON
@@ -553,8 +553,8 @@ func TestIRExtensionsIsolation(t *testing.T) {
 
 	// Unmarshal JSON that does NOT have Extensions (since it wasn't serialized)
 	var got IRRequest
-	if err := json.Unmarshal(b, &got); err != nil {
-		t.Fatalf("json.Unmarshal error = %v", err)
+	if err := sonic.Unmarshal(b, &got); err != nil {
+		t.Fatalf("sonic.Unmarshal error = %v", err)
 	}
 
 	// After unmarshal, Extensions should be nil (not present in JSON)
@@ -565,14 +565,14 @@ func TestIRExtensionsIsolation(t *testing.T) {
 
 func TestIRRequestEmpty(t *testing.T) {
 	req := IRRequest{}
-	b, err := json.Marshal(req)
+	b, err := sonic.Marshal(req)
 	if err != nil {
-		t.Fatalf("json.Marshal empty IRRequest error = %v", err)
+		t.Fatalf("sonic.Marshal empty IRRequest error = %v", err)
 	}
 
 	var got IRRequest
-	if err := json.Unmarshal(b, &got); err != nil {
-		t.Fatalf("json.Unmarshal empty IRRequest error = %v", err)
+	if err := sonic.Unmarshal(b, &got); err != nil {
+		t.Fatalf("sonic.Unmarshal empty IRRequest error = %v", err)
 	}
 
 	// All zero-value fields should remain zero
@@ -615,14 +615,14 @@ func TestIRResponseNilSlices(t *testing.T) {
 		Extensions: nil,
 	}
 
-	b, err := json.Marshal(resp)
+	b, err := sonic.Marshal(resp)
 	if err != nil {
-		t.Fatalf("json.Marshal error = %v", err)
+		t.Fatalf("sonic.Marshal error = %v", err)
 	}
 
 	var got IRResponse
-	if err := json.Unmarshal(b, &got); err != nil {
-		t.Fatalf("json.Unmarshal error = %v", err)
+	if err := sonic.Unmarshal(b, &got); err != nil {
+		t.Fatalf("sonic.Unmarshal error = %v", err)
 	}
 
 	if got.Content != nil {
@@ -636,8 +636,8 @@ func TestIRResponseNilSlices(t *testing.T) {
 // containsJSONKey checks if a marshaled JSON contains a specific key.
 func containsJSONKey(t *testing.T, data []byte, key string) bool {
 	t.Helper()
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
+	var raw map[string]interface{}
+	if err := sonic.Unmarshal(data, &raw); err != nil {
 		t.Fatalf("failed to unmarshal into map: %v", err)
 	}
 	_, ok := raw[key]

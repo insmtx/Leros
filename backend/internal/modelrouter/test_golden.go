@@ -1,7 +1,7 @@
 package modelrouter
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,22 +30,22 @@ func assertJSONEqual(t *testing.T, name string, got, want []byte) {
 
 	var gotV, wantV interface{}
 
-	if err := json.Unmarshal(got, &gotV); err != nil {
+	if err := sonic.Unmarshal(got, &gotV); err != nil {
 		t.Fatalf("%s: failed to unmarshal 'got' JSON: %v\n%s", name, err, string(got))
 	}
-	if err := json.Unmarshal(want, &wantV); err != nil {
+	if err := sonic.Unmarshal(want, &wantV); err != nil {
 		t.Fatalf("%s: failed to unmarshal 'want' JSON: %v\n%s", name, err, string(want))
 	}
 
 	normalizeJSONForComparison(&gotV)
 	normalizeJSONForComparison(&wantV)
 
-	gotNorm, _ := json.Marshal(gotV)
-	wantNorm, _ := json.Marshal(wantV)
+	gotNorm, _ := sonic.Marshal(gotV)
+	wantNorm, _ := sonic.Marshal(wantV)
 
 	if string(gotNorm) != string(wantNorm) {
-		gotPretty, _ := json.MarshalIndent(gotV, "", "  ")
-		wantPretty, _ := json.MarshalIndent(wantV, "", "  ")
+		gotPretty, _ := sonic.MarshalIndent(gotV, "", "  ")
+		wantPretty, _ := sonic.MarshalIndent(wantV, "", "  ")
 		t.Errorf("%s: output does not match golden file\n=== GOT ===\n%s\n=== EXPECTED (golden) ===\n%s",
 			name, string(gotPretty), string(wantPretty))
 	}
@@ -97,7 +97,7 @@ func TestGolden_ChatToAnthropic_RoundTrip(t *testing.T) {
 	// Test: decode as Anthropic input, encode back → should match itself.
 	input := mustReadTestdataFile(t, "chat_to_anthropic_request.json")
 	var raw map[string]interface{}
-	if err := json.Unmarshal(input, &raw); err != nil {
+	if err := sonic.Unmarshal(input, &raw); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
@@ -118,7 +118,7 @@ func TestGolden_ChatToAnthropic_RoundTrip(t *testing.T) {
 		t.Fatalf("encode anthropic: %v", err)
 	}
 
-	resultBytes, _ := json.Marshal(result)
+	resultBytes, _ := sonic.Marshal(result)
 	assertJSONEqual(t, "chat→anthropic round-trip", resultBytes, input)
 }
 
@@ -128,7 +128,7 @@ func TestGolden_ChatToResponses_RoundTrip(t *testing.T) {
 	// We verify decode+encode within Responses domain, not cross-protocol.
 	input := mustReadTestdataFile(t, "chat_to_responses_request.json")
 	var raw map[string]interface{}
-	if err := json.Unmarshal(input, &raw); err != nil {
+	if err := sonic.Unmarshal(input, &raw); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
@@ -161,7 +161,7 @@ func TestGolden_ChatToGemini_RoundTrip(t *testing.T) {
 	// chat_to_gemini_request.json is the Gemini-format output.
 	input := mustReadTestdataFile(t, "chat_to_gemini_request.json")
 	var raw map[string]interface{}
-	if err := json.Unmarshal(input, &raw); err != nil {
+	if err := sonic.Unmarshal(input, &raw); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
@@ -176,7 +176,7 @@ func TestGolden_ChatToGemini_RoundTrip(t *testing.T) {
 		t.Fatalf("encode gemini: %v", err)
 	}
 
-	resultBytes, _ := json.Marshal(result)
+	resultBytes, _ := sonic.Marshal(result)
 	assertJSONEqual(t, "chat→gemini round-trip", resultBytes, input)
 }
 
@@ -184,7 +184,7 @@ func TestGolden_AnthropicToChat_RoundTrip(t *testing.T) {
 	// anthropic_to_chat_request.json is the Chat-format output.
 	input := mustReadTestdataFile(t, "anthropic_to_chat_request.json")
 	var raw map[string]interface{}
-	if err := json.Unmarshal(input, &raw); err != nil {
+	if err := sonic.Unmarshal(input, &raw); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
@@ -199,7 +199,7 @@ func TestGolden_AnthropicToChat_RoundTrip(t *testing.T) {
 		t.Fatalf("encode chat: %v", err)
 	}
 
-	resultBytes, _ := json.Marshal(result)
+	resultBytes, _ := sonic.Marshal(result)
 	assertJSONEqual(t, "anthropic→chat round-trip", resultBytes, input)
 }
 
@@ -207,7 +207,7 @@ func TestGolden_ResponsesToChat_RoundTrip(t *testing.T) {
 	// responses_to_chat_request.json is the Chat-format output.
 	input := mustReadTestdataFile(t, "responses_to_chat_request.json")
 	var raw map[string]interface{}
-	if err := json.Unmarshal(input, &raw); err != nil {
+	if err := sonic.Unmarshal(input, &raw); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
@@ -222,7 +222,7 @@ func TestGolden_ResponsesToChat_RoundTrip(t *testing.T) {
 		t.Fatalf("encode chat: %v", err)
 	}
 
-	resultBytes, _ := json.Marshal(result)
+	resultBytes, _ := sonic.Marshal(result)
 	assertJSONEqual(t, "responses→chat round-trip", resultBytes, input)
 }
 
@@ -230,7 +230,7 @@ func TestGolden_GeminiToChat_RoundTrip(t *testing.T) {
 	// gemini_to_chat_request.json is the Chat-format output.
 	input := mustReadTestdataFile(t, "gemini_to_chat_request.json")
 	var raw map[string]interface{}
-	if err := json.Unmarshal(input, &raw); err != nil {
+	if err := sonic.Unmarshal(input, &raw); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
@@ -245,7 +245,7 @@ func TestGolden_GeminiToChat_RoundTrip(t *testing.T) {
 		t.Fatalf("encode chat: %v", err)
 	}
 
-	resultBytes, _ := json.Marshal(result)
+	resultBytes, _ := sonic.Marshal(result)
 	assertJSONEqual(t, "gemini→chat round-trip", resultBytes, input)
 }
 
@@ -256,7 +256,7 @@ func TestGolden_GeminiToChat_RoundTrip(t *testing.T) {
 func TestGolden_AnthropicToChat_ResponseRoundTrip(t *testing.T) {
 	input := mustReadTestdataFile(t, "anthropic_to_chat_response.json")
 	var raw map[string]interface{}
-	if err := json.Unmarshal(input, &raw); err != nil {
+	if err := sonic.Unmarshal(input, &raw); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
@@ -271,23 +271,23 @@ func TestGolden_AnthropicToChat_ResponseRoundTrip(t *testing.T) {
 		t.Fatalf("encode chat response: %v", err)
 	}
 
-	resultBytes, _ := json.Marshal(result)
+	resultBytes, _ := sonic.Marshal(result)
 	// Note: created timestamp is re-generated, so we compare only structural fields
 	var gotV, wantV map[string]interface{}
-	json.Unmarshal(resultBytes, &gotV)
-	json.Unmarshal(input, &wantV)
+	sonic.Unmarshal(resultBytes, &gotV)
+	sonic.Unmarshal(input, &wantV)
 
 	// Normalize created to match
 	if _, ok := gotV["created"]; ok {
 		wantV["created"] = gotV["created"]
 	}
 
-	gotNorm, _ := json.Marshal(gotV)
-	wantNorm, _ := json.Marshal(wantV)
+	gotNorm, _ := sonic.Marshal(gotV)
+	wantNorm, _ := sonic.Marshal(wantV)
 
 	if string(gotNorm) != string(wantNorm) {
-		gotPretty, _ := json.MarshalIndent(gotV, "", "  ")
-		wantPretty, _ := json.MarshalIndent(wantV, "", "  ")
+		gotPretty, _ := sonic.MarshalIndent(gotV, "", "  ")
+		wantPretty, _ := sonic.MarshalIndent(wantV, "", "  ")
 		t.Errorf("anthropic→chat response round-trip mismatch\n=== GOT ===\n%s\n=== EXPECTED ===\n%s",
 			string(gotPretty), string(wantPretty))
 	}
@@ -296,7 +296,7 @@ func TestGolden_AnthropicToChat_ResponseRoundTrip(t *testing.T) {
 func TestGolden_ChatToResponses_ResponseRoundTrip(t *testing.T) {
 	input := mustReadTestdataFile(t, "chat_to_responses_response.json")
 	var raw map[string]interface{}
-	if err := json.Unmarshal(input, &raw); err != nil {
+	if err := sonic.Unmarshal(input, &raw); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
@@ -311,10 +311,10 @@ func TestGolden_ChatToResponses_ResponseRoundTrip(t *testing.T) {
 		t.Fatalf("encode responses response: %v", err)
 	}
 
-	resultBytes, _ := json.Marshal(result)
+	resultBytes, _ := sonic.Marshal(result)
 	var gotV, wantV map[string]interface{}
-	json.Unmarshal(resultBytes, &gotV)
-	json.Unmarshal(input, &wantV)
+	sonic.Unmarshal(resultBytes, &gotV)
+	sonic.Unmarshal(input, &wantV)
 
 	// Responses responses don't have created_at drift since they use maybeNow
 	// But the id: "msg_001" may differ from auto-generated "msg_resp_N"
@@ -322,12 +322,12 @@ func TestGolden_ChatToResponses_ResponseRoundTrip(t *testing.T) {
 	normalizeResponsesMsgID(gotV)
 	normalizeResponsesMsgID(wantV)
 
-	gotNorm, _ := json.Marshal(gotV)
-	wantNorm, _ := json.Marshal(wantV)
+	gotNorm, _ := sonic.Marshal(gotV)
+	wantNorm, _ := sonic.Marshal(wantV)
 
 	if string(gotNorm) != string(wantNorm) {
-		gotPretty, _ := json.MarshalIndent(gotV, "", "  ")
-		wantPretty, _ := json.MarshalIndent(wantV, "", "  ")
+		gotPretty, _ := sonic.MarshalIndent(gotV, "", "  ")
+		wantPretty, _ := sonic.MarshalIndent(wantV, "", "  ")
 		t.Errorf("chat→responses response round-trip mismatch\n=== GOT ===\n%s\n=== EXPECTED ===\n%s",
 			string(gotPretty), string(wantPretty))
 	}
@@ -352,7 +352,7 @@ func normalizeResponsesMsgID(v map[string]interface{}) {
 func TestGolden_ResponsesToChat_ResponseRoundTrip(t *testing.T) {
 	input := mustReadTestdataFile(t, "responses_to_chat_response.json")
 	var raw map[string]interface{}
-	if err := json.Unmarshal(input, &raw); err != nil {
+	if err := sonic.Unmarshal(input, &raw); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
@@ -367,21 +367,21 @@ func TestGolden_ResponsesToChat_ResponseRoundTrip(t *testing.T) {
 		t.Fatalf("encode chat response: %v", err)
 	}
 
-	resultBytes, _ := json.Marshal(result)
+	resultBytes, _ := sonic.Marshal(result)
 	var gotV, wantV map[string]interface{}
-	json.Unmarshal(resultBytes, &gotV)
-	json.Unmarshal(input, &wantV)
+	sonic.Unmarshal(resultBytes, &gotV)
+	sonic.Unmarshal(input, &wantV)
 
 	if _, ok := gotV["created"]; ok {
 		wantV["created"] = gotV["created"]
 	}
 
-	gotNorm, _ := json.Marshal(gotV)
-	wantNorm, _ := json.Marshal(wantV)
+	gotNorm, _ := sonic.Marshal(gotV)
+	wantNorm, _ := sonic.Marshal(wantV)
 
 	if string(gotNorm) != string(wantNorm) {
-		gotPretty, _ := json.MarshalIndent(gotV, "", "  ")
-		wantPretty, _ := json.MarshalIndent(wantV, "", "  ")
+		gotPretty, _ := sonic.MarshalIndent(gotV, "", "  ")
+		wantPretty, _ := sonic.MarshalIndent(wantV, "", "  ")
 		t.Errorf("responses→chat response round-trip mismatch\n=== GOT ===\n%s\n=== EXPECTED ===\n%s",
 			string(gotPretty), string(wantPretty))
 	}
@@ -390,7 +390,7 @@ func TestGolden_ResponsesToChat_ResponseRoundTrip(t *testing.T) {
 func TestGolden_GeminiToChat_ResponseRoundTrip(t *testing.T) {
 	input := mustReadTestdataFile(t, "gemini_to_chat_response.json")
 	var raw map[string]interface{}
-	if err := json.Unmarshal(input, &raw); err != nil {
+	if err := sonic.Unmarshal(input, &raw); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
@@ -405,21 +405,21 @@ func TestGolden_GeminiToChat_ResponseRoundTrip(t *testing.T) {
 		t.Fatalf("encode chat response: %v", err)
 	}
 
-	resultBytes, _ := json.Marshal(result)
+	resultBytes, _ := sonic.Marshal(result)
 	var gotV, wantV map[string]interface{}
-	json.Unmarshal(resultBytes, &gotV)
-	json.Unmarshal(input, &wantV)
+	sonic.Unmarshal(resultBytes, &gotV)
+	sonic.Unmarshal(input, &wantV)
 
 	if _, ok := gotV["created"]; ok {
 		wantV["created"] = gotV["created"]
 	}
 
-	gotNorm, _ := json.Marshal(gotV)
-	wantNorm, _ := json.Marshal(wantV)
+	gotNorm, _ := sonic.Marshal(gotV)
+	wantNorm, _ := sonic.Marshal(wantV)
 
 	if string(gotNorm) != string(wantNorm) {
-		gotPretty, _ := json.MarshalIndent(gotV, "", "  ")
-		wantPretty, _ := json.MarshalIndent(wantV, "", "  ")
+		gotPretty, _ := sonic.MarshalIndent(gotV, "", "  ")
+		wantPretty, _ := sonic.MarshalIndent(wantV, "", "  ")
 		t.Errorf("gemini→chat response round-trip mismatch\n=== GOT ===\n%s\n=== EXPECTED ===\n%s",
 			string(gotPretty), string(wantPretty))
 	}

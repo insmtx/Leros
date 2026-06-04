@@ -1,7 +1,7 @@
 package modelrouter
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"io"
 	"net/http"
@@ -144,7 +144,7 @@ func TestHandler_ChatToChat_NonStream(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+	if err := sonic.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("invalid response JSON: %v", err)
 	}
 
@@ -254,7 +254,7 @@ func TestHandler_ChatToAnthropic_NonStream(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+	if err := sonic.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("invalid response JSON: %v", err)
 	}
 
@@ -307,7 +307,7 @@ func TestHandler_AnthropicToChat_NonStream(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+	if err := sonic.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("invalid response JSON: %v", err)
 	}
 
@@ -350,7 +350,7 @@ func TestHandler_ResponsesToChat_NonStream(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+	if err := sonic.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("invalid response JSON: %v", err)
 	}
 
@@ -434,7 +434,7 @@ func TestHandler_UpstreamError(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+	if err := sonic.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 	errObj := resp["error"].(map[string]interface{})

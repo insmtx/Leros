@@ -1,7 +1,7 @@
 package modelrouter
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"strings"
 	"testing"
 )
@@ -334,7 +334,7 @@ func TestIntegration_ChatToAnthropic_StreamText(t *testing.T) {
 
 	for _, line := range chatLines {
 		var raw map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
+		if err := sonic.Unmarshal([]byte(line), &raw); err != nil {
 			continue
 		}
 		irEvents, err := chatAdapter.DecodeStreamEvent(raw, chatState)
@@ -380,7 +380,7 @@ func TestIntegration_AnthropicToChat_StreamText(t *testing.T) {
 
 	for _, line := range antLines {
 		var raw map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
+		if err := sonic.Unmarshal([]byte(line), &raw); err != nil {
 			continue
 		}
 		irEvents, err := antAdapter.DecodeStreamEvent(raw, antState)
@@ -425,7 +425,7 @@ func TestIntegration_ResponsesToChat_StreamText(t *testing.T) {
 
 	for _, line := range respLines {
 		var raw map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
+		if err := sonic.Unmarshal([]byte(line), &raw); err != nil {
 			continue
 		}
 		irEvents, err := respAdapter.DecodeStreamEvent(raw, respState)
@@ -466,7 +466,7 @@ func TestIntegration_GeminiToChat_StreamText(t *testing.T) {
 
 	for _, line := range geminiLines {
 		var raw map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
+		if err := sonic.Unmarshal([]byte(line), &raw); err != nil {
 			continue
 		}
 		irEvents, err := geminiAdapter.DecodeStreamEvent(raw, geminiState)

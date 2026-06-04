@@ -1,7 +1,7 @@
 package modelrouter
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"os"
 	"strings"
 	"testing"
@@ -14,7 +14,7 @@ func loadJSON(t *testing.T, path string) map[string]interface{} {
 		t.Fatalf("failed to read %s: %v", path, err)
 	}
 	var m map[string]interface{}
-	if err := json.Unmarshal(data, &m); err != nil {
+	if err := sonic.Unmarshal(data, &m); err != nil {
 		t.Fatalf("failed to unmarshal %s: %v", path, err)
 	}
 	return m
@@ -34,7 +34,7 @@ func loadJSONL(t *testing.T, path string) []map[string]interface{} {
 			continue
 		}
 		var m map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &m); err != nil {
+		if err := sonic.Unmarshal([]byte(line), &m); err != nil {
 			t.Fatalf("failed to unmarshal line in %s: %v\nline: %s", path, err, line)
 		}
 		result = append(result, m)

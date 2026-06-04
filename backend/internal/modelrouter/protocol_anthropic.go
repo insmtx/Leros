@@ -1,8 +1,9 @@
 package modelrouter
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"github.com/bytedance/sonic"
 )
 
 // ensureContentArray returns a non-nil content array for Anthropic protocol compliance.
@@ -148,7 +149,7 @@ func decodeAnthropicContent(content interface{}) []IRContentPart {
 				})
 			case "tool_use":
 				input, _ := m["input"].(map[string]interface{})
-				inputJSON, _ := json.Marshal(input)
+				inputJSON, _ := sonic.Marshal(input)
 				parts = append(parts, IRContentPart{
 					ID:   getString(m, "id"),
 					Type: IRPartToolCall,
@@ -349,7 +350,7 @@ func encodeAnthropicParts(parts []IRContentPart) []map[string]interface{} {
 			if part.ToolCall.ArgumentsJSON != nil {
 				input = part.ToolCall.ArgumentsJSON
 			} else if part.ToolCall.ArgumentsRaw != "" {
-				_ = json.Unmarshal([]byte(part.ToolCall.ArgumentsRaw), &input)
+				_ = sonic.Unmarshal([]byte(part.ToolCall.ArgumentsRaw), &input)
 			}
 			content = append(content, map[string]interface{}{
 				"type":  "tool_use",
