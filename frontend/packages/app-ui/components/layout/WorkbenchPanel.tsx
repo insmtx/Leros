@@ -15,7 +15,7 @@ import {
 	SendHorizonal,
 	X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { AppNavigation } from "./LeftRail";
 
 const mockActivities = [
@@ -42,15 +42,16 @@ const mockActivities = [
 export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 	const {
 		projects,
-		activeProjectId,
+		activeWorkbenchProjectId,
 		activeWorkbenchTaskId,
 		selectWorkbenchProject,
 		selectWorkbenchTask,
 		sendWorkbenchMessage,
 		fetchProjects,
 		switchProject,
+		clearTaskDetailRoute,
 	} = useLayoutStore((s) => s);
-	const { startSessionResponseStream } = useChatStore((s) => s);
+	const { startSessionResponseStream, resetLocalMessages } = useChatStore((s) => s);
 	const [input, setInput] = useState("");
 	const [projectMenuOpen, setProjectMenuOpen] = useState(false);
 	const [projectSearch, setProjectSearch] = useState("");
@@ -61,19 +62,24 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 		fetchProjects();
 	}, [fetchProjects]);
 
+	useLayoutEffect(() => {
+		clearTaskDetailRoute();
+		resetLocalMessages();
+	}, [clearTaskDetailRoute, resetLocalMessages]);
+
 	const handleSend = async () => {
 		const content = input.trim();
 		if (!content) return;
-		const data = await sendWorkbenchMessage(content, activeProjectId);
+		const data = await sendWorkbenchMessage(content, activeWorkbenchProjectId);
 		if (data?.session_id) {
-			startSessionResponseStream(data.session_id, content);
+			await startSessionResponseStream(data.session_id, content);
 		}
 		if (navigation && data?.project_id && data?.task_id && data?.session_id) {
 			navigation.goToTaskDetail(data.project_id, data.task_id, data.session_id);
 		}
 		setInput("");
 	};
-	const activeProject = projects.find((project) => project.id === activeProjectId);
+	const activeProject = projects.find((project) => project.id === activeWorkbenchProjectId);
 	const latestProject = projects[0];
 	const filteredProjects = useMemo(() => {
 		const keyword = projectSearch.trim().toLowerCase();
@@ -219,7 +225,7 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 
 											<div className="mt-2.5 max-h-[200px] space-y-1 overflow-y-auto pr-1">
 												{filteredProjects.map((project) => {
-													const selected = activeProjectId === project.id;
+													const selected = activeWorkbenchProjectId === project.id;
 
 													return (
 														<button

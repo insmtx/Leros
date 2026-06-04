@@ -23,6 +23,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MessageTimeline } from "../chat/MessageTimeline";
 import { ChatInput } from "../input/ChatInput";
 import { ArtifactPreviewDialog } from "./ArtifactPreviewDialog";
+import type { AppNavigation } from "./LeftRail";
 import { TaskDeleteDialog } from "./TaskDeleteDialog";
 
 const projectTabs = [
@@ -37,25 +38,39 @@ export function ProjectPage({
 	projectId,
 	tab,
 	onTabChange,
+	navigation,
 }: {
 	projectId?: string;
 	tab?: ProjectTab;
 	onTabChange?: (tab: ProjectTab) => void;
+	navigation?: AppNavigation;
 }) {
 	const {
 		projects,
 		activeProjectId,
+		currentView,
 		activeProjectTab,
 		projectDetailLoading,
 		projectDetailError,
 		projectSessionId,
+		activeWorkbenchProjectId,
+		activeWorkbenchTaskId,
+		activeTaskDetailProjectId,
+		activeTaskDetailSessionId,
 		fetchProjects,
 		setProjectRoute,
 		setActiveProjectTab,
 		fetchProjectDetail,
+		openTaskDetail,
 	} = useLayoutStore((s) => s);
 
-	const { setActiveSession, loadConversationMessages, resetLocalMessages } = useChatStore((s) => s);
+	const {
+		activeSessionId,
+		isGenerating,
+		setActiveSession,
+		loadConversationMessages,
+		resetLocalMessages,
+	} = useChatStore((s) => s);
 	const [taskArtifacts, setTaskArtifacts] = useState<ProjectArtifact[]>([]);
 
 	const resolvedProjectId = projectId ?? activeProjectId;
@@ -64,6 +79,29 @@ export function ProjectPage({
 		projects.find((item) => item.id === resolvedProjectId) ??
 		(resolvedProjectId ? undefined : projects[0]);
 	const taskIds = useMemo(() => project?.tasks.map((task) => task.id).join("|") ?? "", [project]);
+	const selectedTaskSessionId = useMemo(() => {
+		if (!project || activeWorkbenchProjectId !== project.id || !activeWorkbenchTaskId) return null;
+		return project.tasks.find((task) => task.id === activeWorkbenchTaskId)?.sessionId ?? null;
+	}, [project, activeWorkbenchProjectId, activeWorkbenchTaskId]);
+	const currentTaskSessionId =
+		activeTaskDetailProjectId === resolvedProjectId ? activeTaskDetailSessionId : null;
+	const streamingTaskSessionId =
+		isGenerating &&
+		activeSessionId &&
+		activeTaskDetailProjectId === resolvedProjectId &&
+		activeTaskDetailSessionId === activeSessionId
+			? activeTaskDetailSessionId
+			: null;
+	const resolvedSessionId =
+		streamingTaskSessionId ?? currentTaskSessionId ?? selectedTaskSessionId ?? projectSessionId;
+	const handleOpenTask = (task: ProjectTask) => {
+		if (!resolvedProjectId) return;
+		if (navigation) {
+			navigation.goToTaskDetail(resolvedProjectId, task.id, task.sessionId ?? null);
+			return;
+		}
+		openTaskDetail(resolvedProjectId, task.id, task.sessionId ?? null);
+	};
 
 	useEffect(() => {
 		fetchProjects();
@@ -118,15 +156,21 @@ export function ProjectPage({
 
 	useEffect(() => {
 		if (projectDetailLoading) return;
-		if (!projectSessionId) {
+		if (!resolvedSessionId) {
 			resetLocalMessages();
 			return;
 		}
-		setActiveSession(projectSessionId);
-		loadConversationMessages(projectSessionId);
+		setActiveSession(resolvedSessionId);
+		if (currentView === "taskDetail" && currentTaskSessionId === resolvedSessionId) return;
+		if (isGenerating && activeSessionId === resolvedSessionId) return;
+		loadConversationMessages(resolvedSessionId);
 	}, [
-		projectSessionId,
+		resolvedSessionId,
+		currentTaskSessionId,
 		projectDetailLoading,
+		currentView,
+		isGenerating,
+		activeSessionId,
 		setActiveSession,
 		loadConversationMessages,
 		resetLocalMessages,
@@ -226,7 +270,9 @@ export function ProjectPage({
 					)}
 				>
 					{resolvedTab === "chat" && <ProjectChat />}
-					{resolvedTab === "tasks" && <ProjectTasks tasks={project.tasks} />}
+					{resolvedTab === "tasks" && (
+						<ProjectTasks tasks={project.tasks} onOpenTask={handleOpenTask} />
+					)}
 					{resolvedTab === "files" && <ProjectFiles files={taskArtifacts} />}
 				</main>
 
@@ -239,7 +285,7 @@ export function ProjectPage({
 									{project.tasks.length} 项
 								</span>
 							</div>
-							<ProjectTaskList tasks={project.tasks} compact />
+							<ProjectTaskList tasks={project.tasks} compact onOpen={handleOpenTask} />
 						</section>
 
 						<section>
@@ -286,7 +332,13 @@ function ProjectEmptyState() {
 	);
 }
 
-function ProjectTasks({ tasks }: { tasks: ProjectTask[] }) {
+function ProjectTasks({
+	tasks,
+	onOpenTask,
+}: {
+	tasks: ProjectTask[];
+	onOpenTask?: (task: ProjectTask) => void;
+}) {
 	const { updateTask } = useLayoutStore((s) => s);
 	const [deleteTarget, setDeleteTarget] = useState<ProjectTask | null>(null);
 
@@ -302,6 +354,7 @@ function ProjectTasks({ tasks }: { tasks: ProjectTask[] }) {
 					tasks={tasks}
 					onStatusToggle={handleStatusToggle}
 					onDelete={setDeleteTarget}
+					onOpen={onOpenTask}
 				/>
 			</div>
 			{deleteTarget && (
@@ -334,11 +387,13 @@ function ProjectTaskList({
 	compact = false,
 	onStatusToggle,
 	onDelete,
+	onOpen,
 }: {
 	tasks: ProjectTask[];
 	compact?: boolean;
 	onStatusToggle?: (task: ProjectTask) => void;
 	onDelete?: (task: ProjectTask) => void;
+	onOpen?: (task: ProjectTask) => void;
 }) {
 	if (tasks.length === 0) {
 		return (
@@ -355,13 +410,18 @@ function ProjectTaskList({
 					key={task.id}
 					className={cn(
 						"group flex items-start border border-[var(--leros-control-border)] bg-[var(--leros-surface)] shadow-sm",
+						onOpen &&
+							"cursor-pointer transition-colors hover:border-[var(--leros-primary-soft)] hover:bg-[var(--leros-primary-softer)]/35",
 						compact ? "gap-3 rounded-lg px-3.5 py-3" : "gap-3.5 rounded-lg px-4 py-3.5",
 					)}
 				>
 					<button
 						type="button"
 						className="mt-0.5 shrink-0 cursor-pointer"
-						onClick={() => onStatusToggle?.(task)}
+						onClick={(event) => {
+							event.stopPropagation();
+							onStatusToggle?.(task);
+						}}
 						title={`切换状态（当前：${STATUS_LABEL[task.status] ?? task.status}）`}
 					>
 						{task.status === "done" ? (
@@ -372,7 +432,13 @@ function ProjectTaskList({
 							<Circle className="size-4 text-[var(--leros-text-muted)]" />
 						)}
 					</button>
-					<div className="min-w-0 flex-1">
+					<button
+						type="button"
+						className="min-w-0 flex-1 text-left"
+						onClick={() => onOpen?.(task)}
+						disabled={!onOpen}
+						title={onOpen ? "打开任务会话" : undefined}
+					>
 						<div className="truncate text-sm font-semibold leading-5 text-[var(--leros-text-strong)]">
 							{task.title}
 						</div>
@@ -395,12 +461,15 @@ function ProjectTaskList({
 								)}
 							</div>
 						)}
-					</div>
+					</button>
 					{!compact && onDelete && (
 						<button
 							type="button"
 							className="mt-0.5 shrink-0 rounded p-0.5 text-[var(--leros-text-muted)] opacity-0 transition-opacity hover:bg-[var(--leros-danger-softer)] hover:text-[var(--leros-danger)] group-hover:opacity-100"
-							onClick={() => onDelete(task)}
+							onClick={(event) => {
+								event.stopPropagation();
+								onDelete(task);
+							}}
 							title="删除任务"
 						>
 							<Trash2 className="size-4" />

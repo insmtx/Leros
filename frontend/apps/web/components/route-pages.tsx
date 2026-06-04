@@ -32,6 +32,7 @@ export function ProjectRoutePage({ tab = "chat" }: { tab?: ProjectTab }) {
 		<ProjectPage
 			projectId={projectId}
 			tab={tab}
+			navigation={navigation}
 			onTabChange={(nextTab) => {
 				if (nextTab === "chat") {
 					navigation.goToProject(projectId);
