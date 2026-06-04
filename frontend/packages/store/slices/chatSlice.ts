@@ -447,11 +447,7 @@ function messageMergeKey(message: Message): string | undefined {
 	return `${message.role}:${content}`;
 }
 
-function countMatchingMessages(
-	messages: Message[],
-	target: Message,
-	targetIndex?: number,
-): number {
+function countMatchingMessages(messages: Message[], target: Message, targetIndex?: number): number {
 	const key = messageMergeKey(target);
 	if (!key) return 0;
 
@@ -488,10 +484,7 @@ function compareMessages(a: Message, b: Message): number {
 	return a.timestamp - b.timestamp;
 }
 
-function mergeSessionMessages(
-	persistedMessages: Message[],
-	localMessages: Message[],
-): Message[] {
+function mergeSessionMessages(persistedMessages: Message[], localMessages: Message[]): Message[] {
 	const merged = [...persistedMessages];
 	localMessages.forEach((localMessage, index) => {
 		if (!shouldKeepLocalMessage(persistedMessages, localMessages, localMessage, index)) {
@@ -611,22 +604,6 @@ export class ChatActionImpl {
 			const data = res.data.data;
 			if (!data?.project_id || !data?.task_id || !data?.session_id) return;
 
-			const now = Date.now();
-			const userMsg: Message = {
-				id: `msg-user-${now}`,
-				conversationId: data.session_id,
-				role: "user",
-				content: trimmed,
-				timestamp: now,
-			};
-			const assistantMsg: Message = {
-				id: `msg-assistant-${now}`,
-				conversationId: data.session_id,
-				role: "assistant",
-				content: "",
-				timestamp: now + 100,
-			};
-
 			(this.#set as (partial: Record<string, unknown>) => void)({
 				activeProjectId: data.project_id,
 				activeTaskDetailProjectId: data.project_id,
@@ -635,25 +612,22 @@ export class ChatActionImpl {
 				currentView: "taskDetail",
 				activeProjectTab: "chat",
 				conversationListOpen: false,
-				activeSessionId: data.session_id,
-				messagesMap: {
-					[userMsg.id]: userMsg,
-					[assistantMsg.id]: assistantMsg,
-				},
-				messageIds: [userMsg.id, assistantMsg.id],
-				streamingMessageId: assistantMsg.id,
-				isGenerating: true,
 				inputText: "",
 				inputAttachments: [],
 			});
 
-			this.#startSSE(data.session_id, assistantMsg.id);
+			await this.startSessionResponseStream(data.session_id, trimmed);
+
+			const fullState = this.#fullGet() as {
+				fetchProjectDetail?: (projectId: string) => Promise<void>;
+			};
+			await fullState.fetchProjectDetail?.(data.project_id);
 		} catch (err) {
 			console.error("sendProjectMessage error:", err);
 		}
 	};
 
-	startSessionResponseStream = (sessionId: string, content: string) => {
+	startSessionResponseStream = async (sessionId: string, content: string) => {
 		const trimmed = content.trim();
 		if (!sessionId || !trimmed) return;
 
@@ -661,7 +635,15 @@ export class ChatActionImpl {
 		if (state.activeSessionId === sessionId && state.isGenerating) return;
 
 		const now = Date.now();
-		const userMsg: Message = {
+		this.#set({
+			activeSessionId: sessionId,
+			streamingMessageId: null,
+			isGenerating: true,
+			inputText: "",
+			inputAttachments: [],
+		});
+
+		const fallbackUserMsg: Message = {
 			id: `msg-user-${now}`,
 			conversationId: sessionId,
 			role: "user",
@@ -676,13 +658,27 @@ export class ChatActionImpl {
 			timestamp: now + 100,
 		};
 
+		let messages: Message[] = [fallbackUserMsg, assistantMsg];
+		try {
+			const res = await sessionApi.getMessages(sessionId, 1, 100);
+			const persistedMessages = (res.data.data?.items ?? []).map(mapBackendMessage);
+			messages = mergeSessionMessages(persistedMessages, [fallbackUserMsg]);
+			messages.push(assistantMsg);
+		} catch (err) {
+			console.error("startSessionResponseStream load history error:", err);
+		}
+
+		const messagesMap: Record<string, Message> = {};
+		const messageIds: string[] = [];
+		for (const message of messages) {
+			messagesMap[message.id] = message;
+			messageIds.push(message.id);
+		}
+
 		this.#set({
 			activeSessionId: sessionId,
-			messagesMap: {
-				[userMsg.id]: userMsg,
-				[assistantMsg.id]: assistantMsg,
-			},
-			messageIds: [userMsg.id, assistantMsg.id],
+			messagesMap,
+			messageIds,
 			streamingMessageId: assistantMsg.id,
 			isGenerating: true,
 			inputText: "",
@@ -783,12 +779,16 @@ export class ChatActionImpl {
 			const items = res.data.data?.items ?? [];
 			const persistedMessages = items.map(mapBackendMessage);
 			const state = this.#get();
-			const localSessionMessages =
-				state.activeSessionId === sessionId
-					? state.messageIds
-							.map((id) => state.messagesMap[id])
-							.filter((message): message is Message => message?.conversationId === sessionId)
-					: [];
+			const shouldPreserveLocalMessages =
+				state.activeSessionId === sessionId ||
+				(state.isGenerating &&
+					state.streamingMessageId !== null &&
+					state.messagesMap[state.streamingMessageId]?.conversationId === sessionId);
+			const localSessionMessages = shouldPreserveLocalMessages
+				? state.messageIds
+						.map((id) => state.messagesMap[id])
+						.filter((message): message is Message => message?.conversationId === sessionId)
+				: [];
 			const messages = localSessionMessages.length
 				? mergeSessionMessages(persistedMessages, localSessionMessages)
 				: persistedMessages;

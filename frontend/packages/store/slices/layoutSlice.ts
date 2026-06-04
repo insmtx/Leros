@@ -40,6 +40,7 @@ export type ProjectTask = {
 	title: string;
 	meta: string;
 	status: ProjectTaskStatus;
+	sessionId?: string;
 	taskType?: string;
 	deadline?: string;
 	description?: string;
@@ -103,6 +104,7 @@ export type LayoutState = {
 	activeConversationId: string | null;
 	activeWorkspaceId: string | null;
 	activeProjectId: string | null;
+	activeWorkbenchProjectId: string | null;
 	activeWorkbenchTaskId: string | null;
 	activeProjectTab: "chat" | "tasks" | "files";
 	workspaces: Workspace[];
@@ -151,11 +153,13 @@ function mapBackendProject(bp: BackendProject): Project {
 }
 
 function mapBackendTask(bt: BackendTask): ProjectTask {
+	const taskWithSession = bt as BackendTask & { session?: BackendSession };
 	return {
 		id: bt.public_id,
 		title: bt.title,
 		meta: bt.description ?? bt.task_type ?? "",
 		status: (bt.status as ProjectTaskStatus) ?? "todo",
+		sessionId: taskWithSession.session?.session_id,
 		taskType: bt.task_type,
 		deadline: bt.deadline,
 		description: bt.description,
@@ -190,6 +194,7 @@ const _initialState: LayoutState = {
 	activeConversationId: null,
 	activeWorkspaceId: null,
 	activeProjectId: null,
+	activeWorkbenchProjectId: null,
 	activeWorkbenchTaskId: null,
 	activeProjectTab: "chat",
 	workspaces: [
@@ -272,6 +277,13 @@ export class LayoutActionImpl {
 		this.#set({
 			currentView: view,
 			conversationListOpen: view === "chat",
+			...(view !== "taskDetail"
+				? {
+						activeTaskDetailProjectId: null,
+						activeTaskDetailTaskId: null,
+						activeTaskDetailSessionId: null,
+					}
+				: {}),
 		});
 	};
 
@@ -281,6 +293,9 @@ export class LayoutActionImpl {
 			activeProjectTab: "chat",
 			currentView: "project",
 			conversationListOpen: false,
+			activeTaskDetailProjectId: null,
+			activeTaskDetailTaskId: null,
+			activeTaskDetailSessionId: null,
 		});
 	};
 
@@ -290,11 +305,22 @@ export class LayoutActionImpl {
 			activeProjectTab: tab,
 			currentView: "project",
 			conversationListOpen: false,
+			activeTaskDetailProjectId: null,
+			activeTaskDetailTaskId: null,
+			activeTaskDetailSessionId: null,
+		});
+	};
+
+	clearTaskDetailRoute = () => {
+		this.#set({
+			activeTaskDetailProjectId: null,
+			activeTaskDetailTaskId: null,
+			activeTaskDetailSessionId: null,
 		});
 	};
 
 	selectWorkbenchProject = (projectId: string | null) => {
-		this.#set({ activeProjectId: projectId, activeWorkbenchTaskId: null });
+		this.#set({ activeWorkbenchProjectId: projectId, activeWorkbenchTaskId: null });
 		if (projectId) {
 			this.fetchTasks(projectId);
 		}
@@ -313,13 +339,83 @@ export class LayoutActionImpl {
 		if (!trimmed) return;
 
 		const state = this.#get();
+		const selectedTaskId = state.activeWorkbenchTaskId;
+
+		const workbenchProjectId = projectId ?? state.activeWorkbenchProjectId;
+
+		if (workbenchProjectId && selectedTaskId) {
+			let project = state.projects.find((p) => p.id === workbenchProjectId);
+			let selectedTask = project?.tasks.find((task) => task.id === selectedTaskId);
+
+			if (!selectedTask?.sessionId) {
+				try {
+					const detailRes = await projectApi.detail({ public_id: workbenchProjectId });
+					const detail = detailRes.data.data;
+					if (detail) {
+						const tasks = (detail.tasks ?? []).map(mapBackendTask);
+						this.#set((s) => ({
+							projects: s.projects.map((p) =>
+								p.id === workbenchProjectId
+									? {
+											...p,
+											name: detail.name,
+											description: detail.description ?? "",
+											objective: detail.objective,
+											updatedAt: new Date(detail.updated_at).getTime(),
+											tasks,
+											artifacts: [],
+											files: [],
+										}
+									: p,
+							),
+							projectSessionId: detail.session?.session_id ?? s.projectSessionId,
+						}));
+						project = { ...(project ?? mapBackendProject(detail)), tasks };
+						selectedTask = tasks.find((task) => task.id === selectedTaskId);
+					}
+				} catch (err) {
+					console.error("sendWorkbenchMessage refresh project detail error:", err);
+				}
+			}
+
+			if (selectedTask?.sessionId) {
+				try {
+					await sessionApi.addMessage({
+						session_id: selectedTask.sessionId,
+						role: "user",
+						content: trimmed,
+						message_type: "text",
+					});
+					const data = {
+						project_id: workbenchProjectId,
+						task_id: selectedTaskId,
+						session_id: selectedTask.sessionId,
+					};
+					this.#set({
+						activeProjectId: data.project_id,
+						activeWorkbenchProjectId: null,
+						activeWorkbenchTaskId: null,
+						activeTaskDetailProjectId: data.project_id,
+						activeTaskDetailTaskId: data.task_id,
+						activeTaskDetailSessionId: data.session_id,
+						currentView: "taskDetail",
+						conversationListOpen: false,
+					});
+					return data;
+				} catch (err) {
+					console.error("sendWorkbenchMessage addMessage error:", err);
+					return null;
+				}
+			}
+		}
+
 		const params: { content: string; project_id?: string; task_id?: string } = { content: trimmed };
 
-		if (projectId) {
-			params.project_id = projectId;
+		if (workbenchProjectId) {
+			params.project_id = workbenchProjectId;
 		}
-		if (state.activeWorkbenchTaskId) {
-			params.task_id = state.activeWorkbenchTaskId;
+		if (selectedTaskId) {
+			params.task_id = selectedTaskId;
 		}
 
 		try {
@@ -328,6 +424,8 @@ export class LayoutActionImpl {
 			if (data?.project_id && data?.task_id && data?.session_id) {
 				this.#set({
 					activeProjectId: data.project_id,
+					activeWorkbenchProjectId: null,
+					activeWorkbenchTaskId: null,
 					activeTaskDetailProjectId: data.project_id,
 					activeTaskDetailTaskId: data.task_id,
 					activeTaskDetailSessionId: data.session_id,
@@ -342,7 +440,7 @@ export class LayoutActionImpl {
 		}
 	};
 
-	openTaskDetail = (projectId: string, taskId: string, sessionId: string) => {
+	openTaskDetail = (projectId: string, taskId: string, sessionId: string | null = null) => {
 		this.#set({
 			activeTaskDetailProjectId: projectId,
 			activeTaskDetailTaskId: taskId,
@@ -428,6 +526,10 @@ export class LayoutActionImpl {
 			this.#set((state) => ({
 				projects: state.projects.filter((p) => p.id !== publicId),
 				activeProjectId: state.activeProjectId === publicId ? null : state.activeProjectId,
+				activeWorkbenchProjectId:
+					state.activeWorkbenchProjectId === publicId ? null : state.activeWorkbenchProjectId,
+				activeWorkbenchTaskId:
+					state.activeWorkbenchProjectId === publicId ? null : state.activeWorkbenchTaskId,
 			}));
 		} catch (err) {
 			console.error("deleteProject error:", err);
@@ -439,12 +541,24 @@ export class LayoutActionImpl {
 		if (!project) return;
 
 		try {
-			const res = await taskApi.list({ project_id: projectId, list_all: true, limit: 100 });
-			const items = res.data.data?.items ?? [];
+			const res = await projectApi.detail({ public_id: projectId });
+			const detail = res.data.data;
+			if (!detail) throw new Error("No data returned");
+			const tasks = (detail.tasks ?? []).map(mapBackendTask);
 			this.#set((s) => ({
 				projects: s.projects.map((p) =>
-					p.id === projectId ? { ...p, tasks: items.map(mapBackendTask) } : p,
+					p.id === projectId
+						? {
+								...p,
+								name: detail.name,
+								description: detail.description ?? "",
+								objective: detail.objective,
+								updatedAt: new Date(detail.updated_at).getTime(),
+								tasks,
+							}
+						: p,
 				),
+				projectSessionId: detail.session?.session_id ?? s.projectSessionId,
 			}));
 		} catch (err) {
 			console.error("fetchTasks error:", err);
