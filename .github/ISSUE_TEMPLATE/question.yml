@@ -1,0 +1,50 @@
+name: 使用问题或讨论
+description: 询问使用方式、设计取舍、集成方式或需要维护者澄清的问题。
+title: "[Question]: "
+labels:
+  - "type: question"
+  - "status: needs-triage"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        如果是开放式讨论，也可以优先使用 GitHub Discussions。请不要在公开 Issue 中粘贴密钥、token 或内部敏感信息。
+  - type: textarea
+    id: question
+    attributes:
+      label: 问题
+      description: 清楚描述你想确认或讨论的内容。
+    validations:
+      required: true
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 说明你在什么背景下遇到这个问题。
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: 已尝试的方法
+      description: 列出你已经查阅的文档、尝试过的命令、配置或代码。
+  - type: dropdown
+    id: area
+    attributes:
+      label: 相关范围
+      description: 选择最接近的模块。维护者 triage 时会同步添加 area 标签。
+      options:
+        - backend
+        - frontend
+        - docs
+        - infra
+        - unsure
+    validations:
+      required: true
+  - type: textarea
+    id: expected_help
+    attributes:
+      label: 期望获得的帮助
+      description: 说明你希望维护者提供解释、示例、决策建议还是文档链接。
+    validations:
+      required: true

@@ -1,0 +1,68 @@
+name: 开发任务
+description: 创建边界明确、可交付、可验收的工程任务。
+title: "[Task]: "
+labels:
+  - "type: task"
+  - "status: needs-triage"
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: 任务目标
+      description: 用一两句话说明该任务要达成的结果。
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 范围说明
+      description: 明确本任务包含什么、不包含什么。
+      placeholder: |
+        包含：
+        - ...
+
+        不包含：
+        - ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 任务范围
+      description: 选择最接近的模块。维护者 triage 时会同步添加 area 标签。
+      options:
+        - backend
+        - frontend
+        - docs
+        - infra
+        - unsure
+    validations:
+      required: true
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: 交付物
+      description: 列出完成后应该提交或产出的内容。
+      placeholder: |
+        - 代码改动：
+        - 测试：
+        - 文档：
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收条件
+      description: 列出判断任务完成的可验证条件。
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依赖与阻塞
+      description: 说明依赖的 Issue、PR、设计决策、外部服务或配置。
+  - type: textarea
+    id: notes
+    attributes:
+      label: 实现提示
+      description: 可补充相关文件、已有参考实现、技术约束或风险点。

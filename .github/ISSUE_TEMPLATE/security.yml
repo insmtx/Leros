@@ -1,0 +1,64 @@
+name: 安全问题
+description: 报告安全风险、权限问题或敏感信息泄露线索。请不要公开漏洞利用细节。
+title: "[Security]: "
+labels:
+  - "type: security"
+  - "status: needs-triage"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请不要在公开 Issue 中粘贴漏洞利用细节、token、密钥、内部地址、真实用户数据或其他敏感信息。这里只收集非敏感摘要，维护者 triage 后再决定后续私下处理方式。
+  - type: textarea
+    id: summary
+    attributes:
+      label: 非敏感摘要
+      description: 简要说明风险类型和影响范围，不要包含可直接利用的步骤或敏感材料。
+      placeholder: 例如：某接口疑似缺少权限校验，可能影响项目级资源访问。
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: 风险类型
+      options:
+        - 权限绕过
+        - 敏感信息泄露
+        - 认证或会话问题
+        - 依赖漏洞
+        - 配置风险
+        - 供应链风险
+        - 其他
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 相关范围
+      description: 选择最接近的模块。维护者 triage 时会同步添加 area 标签。
+      options:
+        - backend
+        - frontend
+        - infra
+        - unsure
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 可能影响
+      description: 描述可能影响的数据、权限、用户或部署环境，避免提供可直接利用的细节。
+    validations:
+      required: true
+  - type: textarea
+    id: contact
+    attributes:
+      label: 后续联系信息
+      description: 如需私下补充细节，可留下 GitHub 用户名或其他公开可联系渠道。
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 提交前检查
+      options:
+        - label: 我没有在此 Issue 中公开漏洞利用细节、密钥、token 或真实用户数据。
+          required: true

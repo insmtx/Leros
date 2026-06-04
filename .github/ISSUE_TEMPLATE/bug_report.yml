@@ -1,0 +1,92 @@
+name: 缺陷报告
+description: 报告可复现的异常行为、错误或回归问题。
+title: "[Bug]: "
+labels:
+  - "type: bug"
+  - "status: needs-triage"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你帮助改进 Leros。请尽量提供可复现的信息，方便维护者快速定位问题。
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题概述
+      description: 简要说明发生了什么，以及它为什么是一个问题。
+      placeholder: 例如：GitHub webhook 收到 pull_request 事件后没有发布到事件总线。
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 影响范围
+      description: 选择最接近的问题归属模块。维护者 triage 时会同步添加 area 标签。
+      options:
+        - backend
+        - frontend
+        - docs
+        - infra
+        - unsure
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 请提供从干净环境开始的最小复现步骤。
+      placeholder: |
+        1. 使用配置 ...
+        2. 启动服务 ...
+        3. 发送请求/触发事件 ...
+        4. 观察到 ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+      description: 描述你认为系统应该如何表现。
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 描述实际发生的行为，以及是否稳定复现。
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志或截图
+      description: 粘贴相关日志、错误堆栈、请求响应或截图。请先移除 token、密钥、内部地址等敏感信息。
+      render: shell
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境信息
+      description: 请填写与问题有关的运行环境。
+      value: |
+        - OS:
+        - Go:
+        - Node:
+        - Docker:
+        - 分支/Commit:
+        - 启动方式:
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 影响程度
+      description: 说明该问题影响了哪些用户、流程或环境，以及是否有临时绕过方案。
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 提交前检查
+      options:
+        - label: 我已搜索现有 Issues，确认没有重复报告。
+          required: true
+        - label: 我已移除日志或截图中的敏感信息。
+          required: true

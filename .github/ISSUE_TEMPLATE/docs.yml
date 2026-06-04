@@ -1,0 +1,65 @@
+name: 文档问题
+description: 报告文档缺失、错误、过期或表达不清的问题。
+title: "[Docs]: "
+labels:
+  - "type: docs"
+  - "status: needs-triage"
+body:
+  - type: input
+    id: location
+    attributes:
+      label: 文档位置
+      description: 填写相关文档路径、链接或章节标题。
+      placeholder: docs/PROJECT_STRUCTURE.md
+    validations:
+      required: true
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: 问题类型
+      options:
+        - 内容缺失
+        - 内容过期
+        - 描述错误
+        - 示例不可用
+        - 表达不清
+        - 结构调整
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题描述
+      description: 说明当前文档的问题，以及它对读者造成的影响。
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: 建议修改
+      description: 如果已有建议内容，可直接写出期望的修改方向或草稿。
+  - type: dropdown
+    id: area
+    attributes:
+      label: 相关范围
+      description: 选择最接近的模块。维护者 triage 时会同步添加 area 标签。
+      options:
+        - docs
+        - backend
+        - frontend
+        - infra
+        - unsure
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: 其他上下文
+      description: 可补充相关截图、命令输出、代码位置或讨论链接。
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 提交前检查
+      options:
+        - label: 我已确认该问题仍存在于 main 分支文档中。
+          required: true
