@@ -27,9 +27,13 @@ go.work.sum
 # env file
 .env
 
+# OS files
+.DS_Store
+
 # Editor/IDE
 # .idea/
 .vscode/
+.DS_Store
 
 .agents/
 bundles/

@@ -267,12 +267,27 @@ func (p *natsBus) subscribeWithDurable(ctx context.Context, topic string, consum
 
 // SubscribeFrom implements the eventbus.Subscriber interface.
 // startSeq == 0 时使用 DeliverNew 仅投递新消息；
-// startSeq > 0 时使用 OrderedConsumer（DeliverAll），由 handler 自行过滤。
+// startSeq > 0 时使用 DeliverByStartSequence 从指定序列号开始投递。
 func (p *natsBus) SubscribeFrom(ctx context.Context, topic string, startSeq int64, handler func(msg *nats.Msg)) error {
-	if startSeq == 0 {
+	if startSeq <= 0 {
 		return p.subscribeNewOnly(ctx, topic, handler)
 	}
-	return p.subscribeWithContext(ctx, topic, handler)
+	sub, err := p.js.Subscribe(topic, handler,
+		nats.StartSequence(uint64(startSeq)),
+		nats.Context(ctx),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to subscribe from seq %d on topic '%s': %w", startSeq, topic, err)
+	}
+
+	<-ctx.Done()
+
+	if err := sub.Unsubscribe(); err != nil {
+		logs.WarnContextf(ctx, "Failed to unsubscribe from topic '%s': %v", topic, err)
+	}
+	logs.InfoContextf(ctx, "Unsubscribed from topic: %s (from seq %d)", topic, startSeq)
+
+	return ctx.Err()
 }
 
 // subscribeNewOnly 使用 JetStream DeliverNew 策略订阅，仅接收订阅之后的新消息。

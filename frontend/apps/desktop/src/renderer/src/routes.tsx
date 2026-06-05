@@ -87,6 +87,7 @@ function ProjectRoutePage({ tab = "chat" }: { tab?: "chat" | "tasks" | "files" }
 		<ProjectPage
 			projectId={projectId}
 			tab={tab}
+			navigation={navigation}
 			onTabChange={(nextTab) => {
 				if (nextTab === "chat") {
 					navigation.goToProject(projectId);

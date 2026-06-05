@@ -2,7 +2,7 @@ package claude
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"errors"
 	"os"
 	"os/exec"
@@ -41,7 +41,6 @@ func TestAdapterAskCurrentTime(t *testing.T) {
 			Model:    firstNonEmptyEnv("LEROS_LLM_MODEL"),
 			BaseURL:  firstNonEmptyEnv("LEROS_LLM_BASE_URL"),
 		},
-		Timeout: 2 * time.Minute,
 	})
 	if err != nil {
 		t.Fatalf("run claude adapter: %v", err)
@@ -122,7 +121,7 @@ func TestBuildArgsAppendsSystemPrompt(t *testing.T) {
 	}
 }
 
-func TestBuildArgsBypassesPermissionsAndDisallowsInteractiveQuestions(t *testing.T) {
+func TestBuildArgsBypassesPermissionsByDefault(t *testing.T) {
 	args := buildArgs(engines.RunRequest{})
 
 	value, ok := argValue(args, "--permission-mode")
@@ -133,12 +132,12 @@ func TestBuildArgsBypassesPermissionsAndDisallowsInteractiveQuestions(t *testing
 		t.Fatalf("expected bypassPermissions permission mode, got %q", value)
 	}
 
-	value, ok = argValue(args, "--disallowedTools")
-	if !ok {
-		t.Fatalf("expected --disallowedTools in args: %#v", args)
+	if !containsArg(args, "--dangerously-skip-permissions") {
+		t.Fatalf("expected --dangerously-skip-permissions in args: %#v", args)
 	}
-	if value != "AskUserQuestion" {
-		t.Fatalf("expected AskUserQuestion to be disallowed, got %q", value)
+
+	if !containsArg(args, "--input-format") {
+		t.Fatalf("expected --input-format in args: %#v", args)
 	}
 }
 
@@ -153,16 +152,17 @@ func TestBuildArgsSkipsEmptySystemPrompt(t *testing.T) {
 	}
 }
 
-func TestClaudeModelEnvStripsV1Suffix(t *testing.T) {
+func TestClaudeModelEnvDoesNotSetAuthVars(t *testing.T) {
+	// API key and base URL are now injected via --settings file, not via cmd.Env.
 	env := claudeModelEnv(engines.ModelConfig{
 		APIKey:  "sk-test",
 		BaseURL: "http://127.0.0.1:8081/v1/",
 	})
-	if env["ANTHROPIC_API_KEY"] != "sk-test" {
-		t.Fatalf("unexpected api key env: %#v", env)
+	if _, ok := env["ANTHROPIC_API_KEY"]; ok {
+		t.Fatalf("ANTHROPIC_API_KEY should not be set via cmd.Env; use settings file instead")
 	}
-	if env["ANTHROPIC_BASE_URL"] != "http://127.0.0.1:8081" {
-		t.Fatalf("unexpected base url env: %#v", env)
+	if _, ok := env["ANTHROPIC_BASE_URL"]; ok {
+		t.Fatalf("ANTHROPIC_BASE_URL should not be set via cmd.Env; use settings file instead")
 	}
 }
 
@@ -313,7 +313,7 @@ func containsArg(args []string, value string) bool {
 func decodeEventContent(t *testing.T, content string) map[string]any {
 	t.Helper()
 	var decoded map[string]any
-	if err := json.Unmarshal([]byte(content), &decoded); err != nil {
+	if err := sonic.Unmarshal([]byte(content), &decoded); err != nil {
 		t.Fatalf("decode event content: %v", err)
 	}
 	return decoded
@@ -326,4 +326,13 @@ func findClaudeTestEvent(eventList []events.Event, eventType events.EventType) *
 		}
 	}
 	return nil
+}
+
+// parseClaudeLine 测试辅助：解析单行 claude JSON，返回第一个事件。
+func parseClaudeLine(line string, state *claudeStreamState) events.Event {
+	parsed := parseClaudeLineEvents(line, state)
+	if len(parsed) == 0 {
+		return events.Event{}
+	}
+	return parsed[0]
 }

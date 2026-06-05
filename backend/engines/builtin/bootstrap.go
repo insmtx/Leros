@@ -1,5 +1,5 @@
 // Package builtin 提供外部 CLI 引擎的编排服务。
-// 包含分层架构: CLI 发现 → Skill 同步 → MCP 注册
+// 包含分层架构: Skill 同步 → CLI 发现 → MCP 注册
 package builtin
 
 import (
@@ -24,7 +24,7 @@ type BootstrapOptions struct {
 // Layer 1: Bootstrap Service (编排层)
 // ============================================================
 
-// BootstrapService 负责协调整个外部 CLI 启动流程。
+// BootstrapService 负责协调整个引擎启动流程（native + 外部 CLI）。
 type BootstrapService struct {
 	cliDiscovery *CLIDiscoveryService
 	skillSync    *SkillSyncService
@@ -48,8 +48,9 @@ func (s *BootstrapService) GetSkillDirs() []string {
 	return s.cliDiscovery.GetSkillDirs()
 }
 
-// Bootstrap 执行完整的外部 CLI 启动流程。
-// 执行顺序: 发现 CLI → 同步 Skill → 注册 MCP
+// Bootstrap 执行完整的引擎启动流程。
+// 始终同步内置 skills 到 .leros/skills（服务于 native engine）；
+// 若检测到外部 CLI 则额外同步 symlink 并注册 MCP。
 func (s *BootstrapService) Bootstrap(ctx context.Context, cfg *config.CLIEnginesConfig, opts BootstrapOptions) (*config.CLIEnginesConfig, error) {
 	if cfg == nil {
 		cfg = &config.CLIEnginesConfig{}
@@ -57,14 +58,19 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, cfg *config.CLIEngines
 
 	var bootstrapErr error
 
-	// === Layer 2: CLI Discovery ===
+	// === Layer 2: Skill Sync (始终执行 — 服务于 native engine) ===
+	// Step 1: 同步内置 skills 到 workspace skills 目录（即为 native engine 的 skill 目录）。
+	logs.Info("Syncing built-in skills to Leros workspace skills directory...")
+	if err := s.skillSync.SyncBuiltinToLeros(opts.SkillsSourceDir); err != nil {
+		bootstrapErr = appendError(bootstrapErr, err)
+		logs.Warnf("Sync built-in skills failed: %v", err)
+	} else {
+		logs.Info("Built-in skills synced to Leros workspace skills directory")
+	}
+
+	// === Layer 3: CLI Discovery ===
 	logs.Info("Starting CLI discovery...")
 	clis := s.cliDiscovery.Discover()
-
-	if len(clis) == 0 {
-		logs.Warn("No CLI tools detected")
-		return cfg, nil
-	}
 
 	hasAvailable := false
 	for _, c := range clis {
@@ -78,7 +84,7 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, cfg *config.CLIEngines
 
 	if !hasAvailable {
 		logs.Warn("No CLI engines available")
-		return cfg, nil
+		return cfg, bootstrapErr
 	}
 
 	// 设置默认引擎
@@ -87,16 +93,6 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, cfg *config.CLIEngines
 			cfg.Default = defaultName
 			logs.Infof("Auto-detected default engine: %s", defaultName)
 		}
-	}
-
-	// === Layer 3: Skill Sync ===
-	// Step 1: 同步内置 skills 到 workspace skills 目录。
-	logs.Info("Syncing built-in skills to Leros workspace skills directory...")
-	if err := s.skillSync.SyncBuiltinToLeros(opts.SkillsSourceDir); err != nil {
-		bootstrapErr = appendError(bootstrapErr, err)
-		logs.Warnf("Sync built-in skills failed: %v", err)
-	} else {
-		logs.Info("Built-in skills synced to Leros workspace skills directory")
 	}
 
 	// Step 2: 从 workspace skills 同步到各 CLI 目录。

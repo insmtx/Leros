@@ -1,0 +1,15 @@
+# Leros Development Configuration - Worker
+
+worker_id: 1
+org_id: 1
+server_addr: "127.0.0.1:8080"
+workspace_root:
+
+nats:
+  url: "nats://localhost:4223/"
+
+log:
+  level: debug
+
+cli:
+  default: "leros"

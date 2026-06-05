@@ -6,14 +6,15 @@ import (
 	"strings"
 
 	"github.com/insmtx/Leros/backend/config"
+	"github.com/insmtx/Leros/backend/engines"
 	"github.com/insmtx/Leros/backend/engines/builtin"
 	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/insmtx/Leros/backend/internal/runtime/deps"
 	"github.com/insmtx/Leros/backend/internal/runtime/drivers/externalcli"
-	"github.com/insmtx/Leros/backend/internal/runtime/drivers/native"
 	"github.com/insmtx/Leros/backend/internal/runtime/lifecycle"
 	lifecyclecontext "github.com/insmtx/Leros/backend/internal/runtime/lifecycle/context"
 	"github.com/insmtx/Leros/backend/internal/runtime/lifecycle/steps"
+	"github.com/insmtx/Leros/backend/prompts"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -66,7 +67,7 @@ func (s *Service) Environment() *deps.Container {
 
 func (s *Service) buildRouter(ctx context.Context, opts Options) (agent.Runner, error) {
 	lifecycleBuilder := lifecyclecontext.NewContextBuilder(lifecyclecontext.ContextBuilder{
-		BaseSystemPrompt: native.DefaultSystemPrompt(),
+		BaseSystemPrompt: prompts.Get(prompts.KeyAgentSystemDefault),
 		Runtime:          s.env,
 		SessionMessages:  lifecyclecontext.NewPassthroughSessionMessageProvider(),
 	})
@@ -74,50 +75,44 @@ func (s *Service) buildRouter(ctx context.Context, opts Options) (agent.Runner, 
 
 	registered := 0
 	registeredKinds := make(map[string]struct{})
-	cliNames := []string{}
 
-	logs.Info("Registering Leros agent runtime")
-	lerosRunner, err := native.NewRunner(ctx, s.env)
+	// 统一创建引擎注册表（始终包含 native，可选包含 CLI）。
+	engineRegistry, err := builtin.NewRegistryFromConfig(opts.CLIConfig, s.env)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create engine registry: %w", err)
 	}
-	if err := router.Register(agent.RuntimeKindLeros, lerosRunner); err != nil {
-		return nil, err
-	}
-	registered++
-	registeredKinds[agent.RuntimeKindLeros] = struct{}{}
 
-	if opts.CLIConfig != nil {
-		cliRegistry, err := builtin.NewRegistryFromConfig(opts.CLIConfig)
+	for _, name := range engineRegistry.Names() {
+		engine, ok := engineRegistry.Get(name)
+		if !ok {
+			continue
+		}
+
+		runner, err := externalcli.NewRunner(name, engine)
 		if err != nil {
-			return nil, fmt.Errorf("create CLI engine registry: %w", err)
+			return nil, err
 		}
-		cliNames = cliRegistry.Names()
-		for _, name := range cliNames {
-			engine, ok := cliRegistry.Get(name)
-			if !ok {
-				continue
-			}
-			runner, err := externalcli.NewRunner(name, engine)
-			if err != nil {
-				return nil, err
-			}
-			if err := router.Register(name, runner); err != nil {
-				return nil, err
-			}
-			registered++
-			registeredKinds[strings.ToLower(strings.TrimSpace(name))] = struct{}{}
-			logs.Infof("Registering external agent CLI runtime: %s", name)
+		// 仅外部 CLI 引擎需要审批路由器；native 的 Approver 是 noop。
+		if name != engines.EngineNative {
+			runner.SetApprovalHandler(engines.DefaultApprovalRouter)
 		}
+		logs.Infof("Registering agent runtime: %s", name)
+
+		if err := router.Register(name, runner); err != nil {
+			return nil, err
+		}
+		registered++
+		registeredKinds[strings.ToLower(strings.TrimSpace(name))] = struct{}{}
 	}
 
 	if registered == 0 {
 		return nil, fmt.Errorf("no agent runtime is available")
 	}
 
-	selectedDefault := s.selectDefaultRuntime(opts.DefaultRuntime, opts, cliNames)
+	engineNames := engineRegistry.Names()
+	selectedDefault := s.selectDefaultRuntime(opts.DefaultRuntime, opts, engineNames)
 	if selectedDefault == "" {
-		selectedDefault = agent.RuntimeKindLeros
+		selectedDefault = engines.EngineNative
 	}
 	normalizedDefault := strings.ToLower(strings.TrimSpace(selectedDefault))
 	if _, ok := registeredKinds[normalizedDefault]; !ok {

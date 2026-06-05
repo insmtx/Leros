@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/insmtx/Leros/backend/internal/agent"
@@ -13,16 +14,27 @@ import (
 	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	agentworkspace "github.com/insmtx/Leros/backend/internal/workspace"
 	"github.com/insmtx/Leros/backend/pkg/dm"
+	"github.com/insmtx/Leros/backend/pkg/seqtracker"
 	"github.com/insmtx/Leros/backend/pkg/utils"
+	"github.com/insmtx/Leros/backend/pkg/workerpool"
 	"github.com/nats-io/nats.go"
 	"github.com/ygpkg/yg-go/logs"
 )
 
+const (
+	defaultDebounceWindow = 1500 * time.Millisecond
+	defaultMaxConcurrency = 20
+	// seqsKey is the Metadata key used to carry merged sequence numbers through the debouncer.
+	seqsKey = "_seqs"
+)
+
 // Config controls one standalone worker task consumer.
 type Config struct {
-	OrgID          uint
-	WorkerID       uint
-	DebounceWindow time.Duration
+	OrgID           uint
+	WorkerID        uint
+	DebounceWindow  time.Duration
+	MaxConcurrency  int    // concurrent worker pool size, default 20
+	SeqTrackerPath  string // path to SQLite seq tracker database
 }
 
 // Consumer subscribes to one worker task topic and dispatches tasks to an agent runtime.
@@ -32,6 +44,11 @@ type Consumer struct {
 	publisher  ResultPublisher
 	runner     agent.Runner
 	debouncer  *utils.TrailingDebouncer[protocol.WorkerTaskMessage]
+	pool       *workerpool.Pool
+	seqTracker seqtracker.SeqTracker
+	sem        chan struct{}
+	pending    map[string][]chan struct{}
+	pendingMu  sync.Mutex
 }
 
 // New creates a worker task consumer.
@@ -51,18 +68,42 @@ func New(cfg Config, subscriber eventbus.Subscriber, publisher ResultPublisher, 
 	if runner == nil {
 		return nil, fmt.Errorf("agent runner is required")
 	}
+
 	window := cfg.DebounceWindow
 	if window <= 0 {
-		window = 1500 * time.Millisecond
+		window = defaultDebounceWindow
 	}
+	maxConcurrency := cfg.MaxConcurrency
+	if maxConcurrency <= 0 {
+		maxConcurrency = defaultMaxConcurrency
+	}
+
+	// Init seq tracker if path provided.
+	var tracker seqtracker.SeqTracker
+	if strings.TrimSpace(cfg.SeqTrackerPath) != "" {
+		var err error
+		tracker, err = seqtracker.NewSQLiteTracker(cfg.SeqTrackerPath)
+		if err != nil {
+			return nil, fmt.Errorf("create seq tracker: %w", err)
+		}
+	}
+
 	consumer := &Consumer{
 		cfg:        cfg,
 		subscriber: subscriber,
 		publisher:  publisher,
 		runner:     runner,
+		pool:       workerpool.New(maxConcurrency),
+		seqTracker: tracker,
+		sem:        make(chan struct{}, maxConcurrency*2),
+		pending:    make(map[string][]chan struct{}),
 	}
-	debouncer, err := utils.NewTrailingDebouncer(window, consumer.runTask, func(ctx context.Context, err error) {
-		logs.ErrorContextf(ctx, "Failed to run worker task: %v", err)
+
+	// Debouncer handler changed from runTask to enqueueTask.
+	// The debouncer merges rapid messages in the same session; after the quiet window,
+	// enqueueTask submits the consolidated batch to the worker pool.
+	debouncer, err := utils.NewTrailingDebouncer(window, consumer.enqueueTask, func(ctx context.Context, err error) {
+		logs.ErrorContextf(ctx, "Failed to enqueue worker task: %v", err)
 	}, mergeWorkerTaskMessages)
 	if err != nil {
 		return nil, err
@@ -80,35 +121,82 @@ func (c *Consumer) TaskTopic() string {
 	return topic
 }
 
-// Start subscribes to the worker task topic.
+// Start subscribes to the worker task topic. On first start (no seq tracker or no
+// history) it creates a durable consumer from the latest position. On restart with
+// existing history it replays from the last completed seq via SubscribeFrom, using
+// SQLite as the authoritative recovery point. Only one subscription is active.
 func (c *Consumer) Start(ctx context.Context) error {
 	topic := c.TaskTopic()
-	logs.InfoContextf(ctx, "Starting worker task subscription: %s", topic)
-	return c.subscriber.Subscribe(ctx, topic, dm.WorkerTaskConsumer(), func(msg *nats.Msg) {
-		logs.InfoContextf(ctx, "Received worker task event from topic: %s", topic)
+	handler := func(msg *nats.Msg) {
 		if err := c.handleEvent(ctx, msg); err != nil {
 			logs.ErrorContextf(ctx, "Failed to handle worker task: %v", err)
 		}
-	})
+	}
+
+	// Recovery path: if we have prior completed seqs, replay from the last one.
+	if c.seqTracker != nil {
+		lastSeq, err := c.seqTracker.GetLastCompletedSeq(ctx, topic)
+		if err != nil {
+			logs.WarnContextf(ctx, "Failed to get last completed seq for topic %s: %v", topic, err)
+		}
+		if lastSeq > 0 {
+			logs.InfoContextf(ctx, "Starting worker task subscription (recovery): %s from seq %d", topic, lastSeq+1)
+			return c.subscriber.SubscribeFrom(ctx, topic, int64(lastSeq+1), handler)
+		}
+	}
+
+	logs.InfoContextf(ctx, "Starting worker task subscription: %s", topic)
+	return c.subscriber.Subscribe(ctx, topic, dm.WorkerTaskConsumer(), handler)
 }
 
+// handleEvent processes an incoming NATS message. It acquires a semaphore slot first
+// (blocks if at capacity → no Ack → NATS backpressure), then does synchronous validation
+// and seq tracking, then spawns the blocking schedule+wait work into a background goroutine
+// so the NATS callback returns immediately.
 func (c *Consumer) handleEvent(ctx context.Context, msg *nats.Msg) error {
+	// Acquire semaphore first — if at capacity, block here immediately.
+	c.sem <- struct{}{}
+
 	taskMsg, err := decodeWorkerTask(msg)
 	if err != nil {
+		<-c.sem
 		return err
 	}
 	if err := c.validateRoute(taskMsg); err != nil {
+		<-c.sem
 		return err
 	}
 	if taskMsg.Body.TaskType != protocol.TaskTypeAgentRun {
+		<-c.sem
 		return fmt.Errorf("unsupported worker task type %q", taskMsg.Body.TaskType)
 	}
 	if err := validateModelConfig(taskMsg.Body.Model); err != nil {
+		<-c.sem
 		return err
 	}
 
+	// Track seq for crash recovery.
+	var seq uint64
+	if meta, err := msg.Metadata(); err == nil {
+		seq = meta.Sequence.Stream
+	}
+	topic := c.TaskTopic()
+	if c.seqTracker != nil {
+		// Dedup: skip messages already completed (recovery replay).
+		if isDup, err := c.seqTracker.IsDuplicate(ctx, topic, seq); err == nil && isDup {
+			logs.InfoContextf(ctx, "Skipping duplicate message: topic=%s seq=%d", topic, seq)
+			<-c.sem
+			return nil
+		}
+		_ = c.seqTracker.TrackReceived(ctx, topic, seq,
+			taskMsg.Route.SessionID, taskMsg.ID, taskMsg.Trace.TaskID, taskMsg.Trace.RunID)
+	}
+
+	// Store seq in Metadata so debounce merging accumulates all seqs.
+	storeSeq(&taskMsg, seq)
+
 	logs.InfoContextf(ctx,
-		"Received worker task: msg_id=%s task_id=%s run_id=%s org_id=%s worker_id=%s session_id=%s task_type=%s",
+		"Received worker task: msg_id=%s task_id=%s run_id=%s org_id=%d worker_id=%d session_id=%s task_type=%s seq=%d",
 		taskMsg.ID,
 		taskMsg.Trace.TaskID,
 		taskMsg.Trace.RunID,
@@ -116,10 +204,18 @@ func (c *Consumer) handleEvent(ctx context.Context, msg *nats.Msg) error {
 		taskMsg.Route.WorkerID,
 		taskMsg.Route.SessionID,
 		taskMsg.Body.TaskType,
+		seq,
 	)
 
-	c.schedule(ctx, taskMsg)
+	// Spawn background goroutine — it owns the semaphore slot and releases it on exit.
+	go c.processEvent(ctx, taskMsg)
 	return nil
+}
+
+// processEvent runs the blocking portion of event handling in a background goroutine.
+func (c *Consumer) processEvent(ctx context.Context, taskMsg protocol.WorkerTaskMessage) {
+	defer func() { <-c.sem }()
+	c.schedule(ctx, taskMsg)
 }
 
 func validateModelConfig(model protocol.ModelOptions) error {
@@ -135,20 +231,96 @@ func validateModelConfig(model protocol.ModelOptions) error {
 	return nil
 }
 
+// schedule dispatches the task. For session-keyed tasks, it goes through the debouncer
+// and the handler blocks until execution completes. For non-session tasks, it submits
+// directly to the pool and blocks there.
 func (c *Consumer) schedule(ctx context.Context, taskMsg protocol.WorkerTaskMessage) {
 	key := sessionTaskKey(taskMsg)
 	if key == "" {
-		go func() {
-			if err := c.runTask(ctx, taskMsg); err != nil {
-				logs.ErrorContextf(ctx, "Failed to run worker task: %v", err)
-			}
-		}()
+		// No session — submit directly to pool (blocks until worker available).
+		c.pool.Submit(func(execCtx context.Context) error {
+			return c.executeWithTracker(execCtx, taskMsg)
+		})
 		return
 	}
 
-	c.debouncer.Call(ctx, key, taskMsg)
+	// Has session — debounce + wait for execution.
+	c.scheduleAndWait(ctx, key, taskMsg)
 }
 
+// scheduleAndWait registers a waiter for the session key, calls the debouncer, and blocks
+// until the consolidated batch has been executed. Only the first message per batch waits;
+// subsequent messages within the same debounce window merge and return immediately, so a
+// single semaphore slot covers the entire session batch.
+func (c *Consumer) scheduleAndWait(ctx context.Context, key string, taskMsg protocol.WorkerTaskMessage) {
+	c.pendingMu.Lock()
+	isFirst := len(c.pending[key]) == 0
+	var done chan struct{}
+	if isFirst {
+		done = make(chan struct{})
+		c.pending[key] = append(c.pending[key], done)
+	}
+	c.pendingMu.Unlock()
+
+	c.debouncer.Call(ctx, key, taskMsg)
+
+	if isFirst {
+		<-done // local ref — no race when enqueueTask deletes pending[key].
+	}
+	// Non-first: return immediately, sem released by processEvent's defer.
+}
+
+// enqueueTask is the debouncer handler. It submits the consolidated batch to the pool
+// and notifies only the waiters that were registered before this batch started executing.
+// New waiters registered during execution belong to the next batch and are left alone.
+func (c *Consumer) enqueueTask(ctx context.Context, taskMsg protocol.WorkerTaskMessage) error {
+	key := sessionTaskKey(taskMsg)
+
+	// Snapshot current waiters — any waiters registered after this point
+	// belong to the next batch accumulated during execution.
+	c.pendingMu.Lock()
+	waiters := c.pending[key]
+	delete(c.pending, key) // Clear so next batch starts fresh.
+	c.pendingMu.Unlock()
+
+	// pool.Submit blocks until a worker is available (backpressure).
+	c.pool.Submit(func(execCtx context.Context) error {
+		defer func() {
+			for _, ch := range waiters {
+				close(ch)
+			}
+		}()
+		return c.executeWithTracker(execCtx, taskMsg)
+	})
+	return nil
+}
+
+// executeWithTracker updates seq tracker status around the actual task execution.
+func (c *Consumer) executeWithTracker(ctx context.Context, taskMsg protocol.WorkerTaskMessage) error {
+	seqs := extractSeqs(taskMsg)
+	topic := c.TaskTopic()
+
+	for _, s := range seqs {
+		if c.seqTracker != nil {
+			_ = c.seqTracker.MarkProcessing(ctx, topic, s)
+		}
+	}
+
+	err := c.runTask(ctx, taskMsg)
+
+	for _, s := range seqs {
+		if c.seqTracker != nil {
+			if err != nil {
+				_ = c.seqTracker.MarkFailed(ctx, topic, s, err.Error())
+			} else {
+				_ = c.seqTracker.MarkCompleted(ctx, topic, s)
+			}
+		}
+	}
+	return err
+}
+
+// runTask executes the agent run for a consolidated task message. Existing logic preserved.
 func (c *Consumer) runTask(ctx context.Context, taskMsg protocol.WorkerTaskMessage) error {
 	req := RequestFromWorkerTask(taskMsg)
 	_, err := c.prepareWorkspace(ctx, taskMsg, req)
@@ -203,6 +375,15 @@ func (c *Consumer) prepareWorkspace(ctx context.Context, taskMsg protocol.Worker
 	return plan, nil
 }
 
+// Close shuts down the consumer gracefully, waiting for all in-flight tasks.
+func (c *Consumer) Close() error {
+	c.pool.Close()
+	if c.seqTracker != nil {
+		return c.seqTracker.Close()
+	}
+	return nil
+}
+
 func sessionTaskKey(msg protocol.WorkerTaskMessage) string {
 	if msg.Route.OrgID == 0 || msg.Route.WorkerID == 0 || strings.TrimSpace(msg.Route.SessionID) == "" {
 		return ""
@@ -223,21 +404,77 @@ func decodeWorkerTask(msg *nats.Msg) (protocol.WorkerTaskMessage, error) {
 
 func (c *Consumer) validateRoute(msg protocol.WorkerTaskMessage) error {
 	if msg.Route.OrgID != 0 && msg.Route.OrgID != c.cfg.OrgID {
-		return fmt.Errorf("task org_id %q does not match worker org_id %q", msg.Route.OrgID, c.cfg.OrgID)
+		return fmt.Errorf("task org_id %d does not match worker org_id %d", msg.Route.OrgID, c.cfg.OrgID)
 	}
 	if msg.Route.WorkerID != 0 && msg.Route.WorkerID != c.cfg.WorkerID {
-		return fmt.Errorf("task worker_id %q does not match worker_id %q", msg.Route.WorkerID, c.cfg.WorkerID)
+		return fmt.Errorf("task worker_id %d does not match worker_id %d", msg.Route.WorkerID, c.cfg.WorkerID)
 	}
 	return nil
 }
 
-// mergeWorkerTaskMessages merges the incoming task's Input.Messages into the existing pending task's Input.Messages.
+// mergeWorkerTaskMessages merges incoming task messages and accumulates seq numbers.
 func mergeWorkerTaskMessages(existing protocol.WorkerTaskMessage, incoming protocol.WorkerTaskMessage) protocol.WorkerTaskMessage {
+	// Merge input messages and attachments.
 	if len(incoming.Body.Input.Messages) > 0 {
 		existing.Body.Input.Messages = append(existing.Body.Input.Messages, incoming.Body.Input.Messages...)
 	}
 	if len(incoming.Body.Input.Attachments) > 0 {
 		existing.Body.Input.Attachments = append(existing.Body.Input.Attachments, incoming.Body.Input.Attachments...)
 	}
+
+	// Accumulate seq numbers from both messages.
+	existingSeqs := extractSeqs(existing)
+	incomingSeqs := extractSeqs(incoming)
+	allSeqs := append(existingSeqs, incomingSeqs...)
+	setSeqs(&existing, allSeqs)
+
 	return existing
+}
+
+// --- seq helpers ---
+
+func storeSeq(msg *protocol.WorkerTaskMessage, seq uint64) {
+	if seq == 0 {
+		return
+	}
+	setSeqs(msg, append(extractSeqs(*msg), seq))
+}
+
+func extractSeqs(msg protocol.WorkerTaskMessage) []uint64 {
+	if msg.Metadata == nil {
+		return nil
+	}
+	raw, ok := msg.Metadata[seqsKey]
+	if !ok {
+		return nil
+	}
+	// The value is stored as []uint64 by storeSeq/setSeqs.
+	switch v := raw.(type) {
+	case []uint64:
+		return v
+	// During JSON round-trip (e.g. tests), []uint64 may become []interface{}.
+	case []interface{}:
+		seqs := make([]uint64, 0, len(v))
+		for _, item := range v {
+			switch n := item.(type) {
+			case float64:
+				seqs = append(seqs, uint64(n))
+			case uint64:
+				seqs = append(seqs, n)
+			}
+		}
+		return seqs
+	default:
+		return nil
+	}
+}
+
+func setSeqs(msg *protocol.WorkerTaskMessage, seqs []uint64) {
+	if len(seqs) == 0 {
+		return
+	}
+	if msg.Metadata == nil {
+		msg.Metadata = make(map[string]any)
+	}
+	msg.Metadata[seqsKey] = seqs
 }

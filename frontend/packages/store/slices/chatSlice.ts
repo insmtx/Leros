@@ -3,6 +3,8 @@ import { getArtifactDownloadUrl } from "../api/artifactApi";
 import { API_BASE_URL } from "../api/config";
 import { sessionApi } from "../api/sessionApi";
 import type {
+	BackendApprovalDecisionPayload,
+	BackendApprovalRequestPayload,
 	BackendMessage,
 	BackendMessageChunk,
 	BackendRuntimeTodoItem,
@@ -15,6 +17,8 @@ import { workApi } from "../api/workApi";
 import { mockModelOptions } from "../mocks/chatMocks";
 import type { SliceCreator } from "../types";
 import type {
+	ApprovalAction,
+	ApprovalRequest,
 	Attachment,
 	Message,
 	MessageArtifact,
@@ -27,6 +31,7 @@ import type {
 	ToolCallStatus,
 } from "../types/chat";
 import { flattenActions } from "../utils";
+import { readStoredJwtToken } from "../utils/authStorage";
 import { formatFileSize } from "../utils/format";
 
 export type ChatState = {
@@ -274,6 +279,135 @@ function mergeArtifacts(
 	return next;
 }
 
+function normalizeApprovalAction(action?: string): ApprovalAction | undefined {
+	switch (action) {
+		case "approve":
+		case "deny":
+		case "always":
+			return action;
+		default:
+			return undefined;
+	}
+}
+
+function getApprovalStatus(action?: string): ApprovalRequest["status"] {
+	switch (action) {
+		case "approve":
+			return "approved";
+		case "deny":
+			return "denied";
+		case "always":
+			return "always";
+		default:
+			return "pending";
+	}
+}
+
+function mapApprovalRequestPayload(
+	payload: BackendApprovalRequestPayload,
+): ApprovalRequest | undefined {
+	const requestId = payload.request_id?.trim();
+	if (!requestId) return undefined;
+
+	return {
+		requestId,
+		toolName: payload.tool_name?.trim() || "Tool",
+		toolCallId: payload.tool_call_id?.trim() || undefined,
+		description: payload.description?.trim() || "需要审批后继续执行",
+		arguments: payload.arguments,
+		metadata: payload.metadata,
+		status: "pending",
+	};
+}
+
+function mapApprovalDecisionPayload(
+	payload: BackendApprovalDecisionPayload,
+): Pick<ApprovalRequest, "requestId" | "status" | "action" | "reason"> | undefined {
+	const requestId = payload.request_id?.trim();
+	if (!requestId) return undefined;
+	const action = normalizeApprovalAction(payload.action);
+
+	return {
+		requestId,
+		status: getApprovalStatus(action),
+		action,
+		reason: payload.reason?.trim() || undefined,
+	};
+}
+
+function mergeApprovalRequest(
+	current: ApprovalRequest[] | undefined,
+	update: ApprovalRequest,
+): ApprovalRequest[] {
+	const list = current ?? [];
+	const index = list.findIndex((approval) => approval.requestId === update.requestId);
+	if (index === -1) return [...list, update];
+
+	const existing = list[index];
+	if (!existing) return [...list, update];
+
+	const next = [...list];
+	next[index] = {
+		...existing,
+		...update,
+		status: existing.status === "pending" ? update.status : existing.status,
+		action: existing.action ?? update.action,
+		reason: existing.reason ?? update.reason,
+		error: existing.status === "error" ? existing.error : update.error,
+	};
+	return next;
+}
+
+function mergeApprovalDecision(
+	current: ApprovalRequest[] | undefined,
+	decision: Pick<ApprovalRequest, "requestId" | "status" | "action" | "reason">,
+): ApprovalRequest[] {
+	const list = current ?? [];
+	const index = list.findIndex((approval) => approval.requestId === decision.requestId);
+	if (index === -1) {
+		return [
+			...list,
+			{
+				requestId: decision.requestId,
+				toolName: "Tool",
+				description: "审批已处理",
+				status: decision.status,
+				action: decision.action,
+				reason: decision.reason,
+			},
+		];
+	}
+
+	const existing = list[index];
+	if (!existing) return list;
+
+	const next = [...list];
+	next[index] = {
+		...existing,
+		status: decision.status,
+		action: decision.action ?? existing.action,
+		reason: decision.reason ?? existing.reason,
+		error: undefined,
+	};
+	return next;
+}
+
+function getApprovalRequestPayload(
+	payload: BackendSessionEventPayload,
+): BackendApprovalRequestPayload | undefined {
+	if (payload.approval_request) return payload.approval_request;
+	if (payload.request_id || payload.tool_name) return payload;
+	return undefined;
+}
+
+function getApprovalDecisionPayload(
+	payload: BackendSessionEventPayload,
+): BackendApprovalDecisionPayload | undefined {
+	if (payload.approval_decision) return payload.approval_decision;
+	if (payload.request_id || payload.action) return payload;
+	return undefined;
+}
+
 function getTodoItems(
 	event: NormalizedSessionEvent,
 	payload: BackendSessionEventPayload,
@@ -376,6 +510,18 @@ function applySessionEventToMessage(
 			if (!artifact) return message;
 			return { ...message, artifacts: mergeArtifacts(message.artifacts, [artifact]) };
 		}
+		case "approval.requested": {
+			const approvalPayload = getApprovalRequestPayload(payload);
+			const approval = approvalPayload ? mapApprovalRequestPayload(approvalPayload) : undefined;
+			if (!approval) return message;
+			return { ...message, approvals: mergeApprovalRequest(message.approvals, approval) };
+		}
+		case "approval.resolved": {
+			const decisionPayload = getApprovalDecisionPayload(payload);
+			const decision = decisionPayload ? mapApprovalDecisionPayload(decisionPayload) : undefined;
+			if (!decision) return message;
+			return { ...message, approvals: mergeApprovalDecision(message.approvals, decision) };
+		}
 		case "message.delta":
 		case "message.result": {
 			const content = getEventContent(normalizedEvent, payload);
@@ -447,11 +593,7 @@ function messageMergeKey(message: Message): string | undefined {
 	return `${message.role}:${content}`;
 }
 
-function countMatchingMessages(
-	messages: Message[],
-	target: Message,
-	targetIndex?: number,
-): number {
+function countMatchingMessages(messages: Message[], target: Message, targetIndex?: number): number {
 	const key = messageMergeKey(target);
 	if (!key) return 0;
 
@@ -488,10 +630,7 @@ function compareMessages(a: Message, b: Message): number {
 	return a.timestamp - b.timestamp;
 }
 
-function mergeSessionMessages(
-	persistedMessages: Message[],
-	localMessages: Message[],
-): Message[] {
+function mergeSessionMessages(persistedMessages: Message[], localMessages: Message[]): Message[] {
 	const merged = [...persistedMessages];
 	localMessages.forEach((localMessage, index) => {
 		if (!shouldKeepLocalMessage(persistedMessages, localMessages, localMessage, index)) {
@@ -611,22 +750,6 @@ export class ChatActionImpl {
 			const data = res.data.data;
 			if (!data?.project_id || !data?.task_id || !data?.session_id) return;
 
-			const now = Date.now();
-			const userMsg: Message = {
-				id: `msg-user-${now}`,
-				conversationId: data.session_id,
-				role: "user",
-				content: trimmed,
-				timestamp: now,
-			};
-			const assistantMsg: Message = {
-				id: `msg-assistant-${now}`,
-				conversationId: data.session_id,
-				role: "assistant",
-				content: "",
-				timestamp: now + 100,
-			};
-
 			(this.#set as (partial: Record<string, unknown>) => void)({
 				activeProjectId: data.project_id,
 				activeTaskDetailProjectId: data.project_id,
@@ -635,25 +758,22 @@ export class ChatActionImpl {
 				currentView: "taskDetail",
 				activeProjectTab: "chat",
 				conversationListOpen: false,
-				activeSessionId: data.session_id,
-				messagesMap: {
-					[userMsg.id]: userMsg,
-					[assistantMsg.id]: assistantMsg,
-				},
-				messageIds: [userMsg.id, assistantMsg.id],
-				streamingMessageId: assistantMsg.id,
-				isGenerating: true,
 				inputText: "",
 				inputAttachments: [],
 			});
 
-			this.#startSSE(data.session_id, assistantMsg.id);
+			await this.startSessionResponseStream(data.session_id, trimmed);
+
+			const fullState = this.#fullGet() as {
+				fetchProjectDetail?: (projectId: string) => Promise<void>;
+			};
+			await fullState.fetchProjectDetail?.(data.project_id);
 		} catch (err) {
 			console.error("sendProjectMessage error:", err);
 		}
 	};
 
-	startSessionResponseStream = (sessionId: string, content: string) => {
+	startSessionResponseStream = async (sessionId: string, content: string) => {
 		const trimmed = content.trim();
 		if (!sessionId || !trimmed) return;
 
@@ -661,7 +781,15 @@ export class ChatActionImpl {
 		if (state.activeSessionId === sessionId && state.isGenerating) return;
 
 		const now = Date.now();
-		const userMsg: Message = {
+		this.#set({
+			activeSessionId: sessionId,
+			streamingMessageId: null,
+			isGenerating: true,
+			inputText: "",
+			inputAttachments: [],
+		});
+
+		const fallbackUserMsg: Message = {
 			id: `msg-user-${now}`,
 			conversationId: sessionId,
 			role: "user",
@@ -676,13 +804,27 @@ export class ChatActionImpl {
 			timestamp: now + 100,
 		};
 
+		let messages: Message[] = [fallbackUserMsg, assistantMsg];
+		try {
+			const res = await sessionApi.getMessages(sessionId, 1, 100);
+			const persistedMessages = (res.data.data?.items ?? []).map(mapBackendMessage);
+			messages = mergeSessionMessages(persistedMessages, [fallbackUserMsg]);
+			messages.push(assistantMsg);
+		} catch (err) {
+			console.error("startSessionResponseStream load history error:", err);
+		}
+
+		const messagesMap: Record<string, Message> = {};
+		const messageIds: string[] = [];
+		for (const message of messages) {
+			messagesMap[message.id] = message;
+			messageIds.push(message.id);
+		}
+
 		this.#set({
 			activeSessionId: sessionId,
-			messagesMap: {
-				[userMsg.id]: userMsg,
-				[assistantMsg.id]: assistantMsg,
-			},
-			messageIds: [userMsg.id, assistantMsg.id],
+			messagesMap,
+			messageIds,
 			streamingMessageId: assistantMsg.id,
 			isGenerating: true,
 			inputText: "",
@@ -699,8 +841,10 @@ export class ChatActionImpl {
 		}
 
 		const url = `${API_BASE_URL}/SessionEvents`;
+		const token = readStoredJwtToken();
 		const client = new FetchSSEClient(url, {
 			method: "POST",
+			headers: token ? { Authorization: `Bearer ${token}` } : undefined,
 			body: { session_id: sessionId },
 			onMessage: (event) => {
 				try {
@@ -783,12 +927,16 @@ export class ChatActionImpl {
 			const items = res.data.data?.items ?? [];
 			const persistedMessages = items.map(mapBackendMessage);
 			const state = this.#get();
-			const localSessionMessages =
-				state.activeSessionId === sessionId
-					? state.messageIds
-							.map((id) => state.messagesMap[id])
-							.filter((message): message is Message => message?.conversationId === sessionId)
-					: [];
+			const shouldPreserveLocalMessages =
+				state.activeSessionId === sessionId ||
+				(state.isGenerating &&
+					state.streamingMessageId !== null &&
+					state.messagesMap[state.streamingMessageId]?.conversationId === sessionId);
+			const localSessionMessages = shouldPreserveLocalMessages
+				? state.messageIds
+						.map((id) => state.messagesMap[id])
+						.filter((message): message is Message => message?.conversationId === sessionId)
+				: [];
 			const messages = localSessionMessages.length
 				? mergeSessionMessages(persistedMessages, localSessionMessages)
 				: persistedMessages;
@@ -864,7 +1012,7 @@ export class ChatActionImpl {
 	resendMessage = async (messageId: string) => {
 		const state = this.#get();
 		const oldMsg = state.messagesMap[messageId];
-		if (!oldMsg || oldMsg.role !== "assistant") return;
+		if (oldMsg?.role !== "assistant") return;
 
 		const { activeSessionId } = state;
 		if (!activeSessionId) return;
@@ -885,6 +1033,57 @@ export class ChatActionImpl {
 		});
 
 		this.#startSSE(activeSessionId, newMsg.id);
+	};
+
+	submitApprovalDecision = async (
+		messageId: string,
+		requestId: string,
+		action: ApprovalAction,
+		reason?: string,
+	) => {
+		const state = this.#get();
+		const message = state.messagesMap[messageId];
+		const sessionId = message?.conversationId || state.activeSessionId;
+		if (!sessionId) return;
+
+		this.#dispatchChat({
+			type: "updateApprovalStatus",
+			messageId,
+			requestId,
+			status: "submitting",
+			action,
+			reason,
+			error: undefined,
+		});
+
+		try {
+			await sessionApi.submitApprovalDecision({
+				session_id: sessionId,
+				request_id: requestId,
+				action,
+				reason,
+			});
+			this.#dispatchChat({
+				type: "updateApprovalStatus",
+				messageId,
+				requestId,
+				status: getApprovalStatus(action),
+				action,
+				reason,
+				error: undefined,
+			});
+		} catch (err) {
+			console.error("submitApprovalDecision error:", err);
+			this.#dispatchChat({
+				type: "updateApprovalStatus",
+				messageId,
+				requestId,
+				status: "error",
+				action,
+				reason,
+				error: "提交审批失败，请重试",
+			});
+		}
 	};
 
 	deleteMessage = async (messageId: number) => {
@@ -910,6 +1109,15 @@ type ChatActionType =
 	| { type: "addMessage"; value: Message }
 	| { type: "updateMessage"; id: string; value: Message }
 	| { type: "removeMessage"; id: string }
+	| {
+			type: "updateApprovalStatus";
+			messageId: string;
+			requestId: string;
+			status: ApprovalRequest["status"];
+			action?: ApprovalAction;
+			reason?: string;
+			error?: string;
+	  }
 	| {
 			type: "updateToolCallStatus";
 			toolCallId: string;
@@ -944,6 +1152,32 @@ function chatReducer(state: ChatState, action: ChatActionType): ChatState {
 				...state,
 				messagesMap: remainingMaps,
 				messageIds: state.messageIds.filter((mid) => mid !== id),
+			};
+		}
+
+		case "updateApprovalStatus": {
+			const { messageId, requestId, status, action: approvalAction, reason, error } = action;
+			const msg = state.messagesMap[messageId];
+			if (!msg?.approvals) return state;
+
+			const updatedApprovals = msg.approvals.map((approval) =>
+				approval.requestId === requestId
+					? {
+							...approval,
+							status,
+							action: approvalAction ?? approval.action,
+							reason: reason ?? approval.reason,
+							error,
+						}
+					: approval,
+			);
+
+			return {
+				...state,
+				messagesMap: {
+					...state.messagesMap,
+					[messageId]: { ...msg, approvals: updatedApprovals },
+				},
 			};
 		}
 

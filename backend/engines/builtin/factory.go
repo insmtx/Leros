@@ -8,11 +8,25 @@ import (
 	"github.com/insmtx/Leros/backend/engines"
 	"github.com/insmtx/Leros/backend/engines/claude"
 	"github.com/insmtx/Leros/backend/engines/codex"
+	"github.com/insmtx/Leros/backend/engines/native"
+	"github.com/insmtx/Leros/backend/internal/runtime/deps"
 )
 
-// NewRegistryFromConfig creates a registry with every detected built-in CLI engine.
-func NewRegistryFromConfig(cfg *config.CLIEnginesConfig) (*engines.Registry, error) {
+// NewRegistryFromConfig creates a registry with the native engine and every
+// detected built-in CLI engine.
+func NewRegistryFromConfig(cfg *config.CLIEnginesConfig, env *deps.Container) (*engines.Registry, error) {
 	registry := engines.NewRegistry()
+
+	// Always register the native in-process engine.
+	nativeEngine, err := native.NewAdapter(env)
+	if err != nil {
+		return nil, fmt.Errorf("create native engine: %w", err)
+	}
+	if err := registry.Register(native.EngineName, nativeEngine); err != nil {
+		return nil, err
+	}
+
+	// Discover and register external CLI engines.
 	for _, status := range engines.DiscoverAvailableCLI() {
 		if !status.Installed {
 			continue
