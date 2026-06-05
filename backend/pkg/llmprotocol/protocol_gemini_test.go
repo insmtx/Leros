@@ -1,7 +1,7 @@
-package modelrouter
+package llmprotocol
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"os"
 	"strings"
 	"testing"
@@ -14,7 +14,7 @@ func loadJSON(t *testing.T, path string) map[string]interface{} {
 		t.Fatalf("failed to read %s: %v", path, err)
 	}
 	var m map[string]interface{}
-	if err := json.Unmarshal(data, &m); err != nil {
+	if err := sonic.Unmarshal(data, &m); err != nil {
 		t.Fatalf("failed to unmarshal %s: %v", path, err)
 	}
 	return m
@@ -34,14 +34,13 @@ func loadJSONL(t *testing.T, path string) []map[string]interface{} {
 			continue
 		}
 		var m map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &m); err != nil {
+		if err := sonic.Unmarshal([]byte(line), &m); err != nil {
 			t.Fatalf("failed to unmarshal line in %s: %v\nline: %s", path, err, line)
 		}
 		result = append(result, m)
 	}
 	return result
 }
-
 
 // TestGeminiDecodeRequest tests all aspects of DecodeRequest.
 func TestGeminiDecodeRequest(t *testing.T) {
@@ -280,7 +279,6 @@ func TestGeminiDecodeRequest_Additional(t *testing.T) {
 	})
 }
 
-
 func TestGeminiDecodeRequest_SystemInstruction(t *testing.T) {
 	adapter := &geminiAdapter{}
 	raw := map[string]interface{}{
@@ -372,7 +370,6 @@ func TestGeminiDecodeRequest_GenerationConfig(t *testing.T) {
 		t.Errorf("Stop = %v", req.Stop)
 	}
 }
-
 
 // TestGeminiEncodeRequest tests EncodeRequest.
 func TestGeminiEncodeRequest(t *testing.T) {
@@ -496,7 +493,6 @@ func TestGeminiEncodeRequest(t *testing.T) {
 		}
 	})
 }
-
 
 // TestGeminiDecodeResponse tests DecodeResponse.
 func TestGeminiDecodeResponse(t *testing.T) {
@@ -647,6 +643,7 @@ func TestGeminiEncodeResponse(t *testing.T) {
 		}
 	})
 }
+
 // TestGeminiDecodeStreamEvent tests streaming event decoding.
 func TestGeminiDecodeStreamEvent(t *testing.T) {
 	adapter := &geminiAdapter{}

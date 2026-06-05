@@ -3,7 +3,6 @@ package codex
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os/exec"
@@ -11,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/insmtx/Leros/backend/engines"
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
 	"github.com/ygpkg/yg-go/logs"
@@ -42,7 +42,7 @@ type AppServer struct {
 	done      chan struct{}
 
 	pendingApproval *ServerRequest
-	onNotification  func(method string, params json.RawMessage)
+	onNotification  func(method string, params sonic.NoCopyRawMessage)
 	onServerRequest func(req ServerRequest)
 	evtChan         chan<- events.Event
 }
@@ -357,7 +357,7 @@ func (s *AppServer) PendingApproval() *ServerRequest {
 	return &cp
 }
 
-func (s *AppServer) RespondApproval(ctx context.Context, reqID json.RawMessage, decision string) error {
+func (s *AppServer) RespondApproval(ctx context.Context, reqID sonic.NoCopyRawMessage, decision string) error {
 	return s.respond(reqID, map[string]any{"decision": decision})
 }
 

@@ -45,13 +45,7 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (*engines.R
 		}
 	}
 
-	execCtx := ctx
-	cancel := func() {}
-	if req.Timeout > 0 {
-		execCtx, cancel = context.WithTimeout(ctx, req.Timeout)
-	}
-
-	cmd := exec.CommandContext(execCtx, inv.binary, args...)
+	cmd := exec.CommandContext(ctx, inv.binary, args...)
 	cmd.Dir = req.WorkDir
 	cmd.Env = engines.BuildRunEnv(inv.baseEnv, req.ExtraEnv, claudeModelEnv(req.Model))
 
@@ -91,10 +85,9 @@ func (inv *Invoker) Run(ctx context.Context, req engines.RunRequest) (*engines.R
 
 	go func() {
 		defer close(evtChan)
-		defer cancel()
 		closeStdinOnce := &sync.Once{}
-	closeStdin := func() { closeStdinOnce.Do(func() { stdinPipe.Close() }) }
-	defer closeStdin()
+		closeStdin := func() { closeStdinOnce.Do(func() { stdinPipe.Close() }) }
+		defer closeStdin()
 		// 清理 settings 文件
 		if settingsPath != "" {
 			defer func() { _ = os.Remove(settingsPath) }()

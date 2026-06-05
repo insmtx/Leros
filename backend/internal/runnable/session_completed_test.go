@@ -321,5 +321,8 @@ func (s *recordingSessionService) FailedSessionMessage(_ context.Context, req *c
 func (s *recordingSessionService) HandleSessionTitleRequest(context.Context, string) error {
 	return nil
 }
+func (s *recordingSessionService) SubmitApproval(context.Context, *contract.SubmitApprovalRequest) error {
+	return nil
+}
 
 var _ contract.SessionService = (*recordingSessionService)(nil)

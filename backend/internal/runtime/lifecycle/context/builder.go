@@ -8,9 +8,9 @@ import (
 
 	"github.com/insmtx/Leros/backend/internal/agent"
 	localmemory "github.com/insmtx/Leros/backend/internal/memory/local"
-	"github.com/insmtx/Leros/backend/internal/runtime/drivers/native"
 	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
 	agentworkspace "github.com/insmtx/Leros/backend/internal/workspace"
+	"github.com/insmtx/Leros/backend/prompts"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -30,7 +30,7 @@ type RuntimeProvider interface {
 func NewContextBuilder(cfg ContextBuilder) *ContextBuilder {
 	base := strings.TrimSpace(cfg.BaseSystemPrompt)
 	if base == "" {
-		base = native.DefaultSystemPrompt()
+		base = prompts.Get(prompts.KeyAgentSystemDefault)
 	}
 	return &ContextBuilder{
 		BaseSystemPrompt: base,

@@ -3,7 +3,6 @@ package engines
 
 import (
 	"context"
-	"time"
 
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
 )
@@ -93,9 +92,8 @@ type RunRequest struct {
 	Prompt          string
 	Model           ModelConfig
 	ExtraEnv        []string
-	Timeout         time.Duration
-	PermissionMode  PermissionMode   // 控制审批行为
-	ApprovalHandler ApprovalHandler  // 可选：由运行时注入，用于 on-request/auto 模式
+	PermissionMode  PermissionMode  // 控制审批行为
+	ApprovalHandler ApprovalHandler // 可选：由运行时注入，用于 on-request/auto 模式
 }
 
 // Process 是正在运行的外部 CLI 进程句柄。

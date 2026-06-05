@@ -1,8 +1,8 @@
-package modelrouter
+package llmprotocol
 
 import (
 	"bufio"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"os"
 	"strings"
 	"testing"
@@ -561,8 +561,8 @@ func TestAnthropicEncodeResponse(t *testing.T) {
 			Model:   "claude-sonnet-4-20250514",
 			Content: []IRContentPart{{Type: IRPartText, Text: "Hello, world!"}},
 			Usage: &IRUsage{
-				InputTokens:       10,
-				OutputTokens:      15,
+				InputTokens:          10,
+				OutputTokens:         15,
 				CacheReadInputTokens: 25,
 			},
 			StopReason: IRStopEndTurn,
@@ -1235,8 +1235,8 @@ func TestAnthropicStreamLifecycle(t *testing.T) {
 			continue
 		}
 		var raw map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
-			t.Fatalf("json.Unmarshal: %v, line=%q", err, line)
+		if err := sonic.Unmarshal([]byte(line), &raw); err != nil {
+			t.Fatalf("sonic.Unmarshal: %v, line=%q", err, line)
 		}
 		evts, err := adapter.DecodeStreamEvent(raw, st)
 		if err != nil {

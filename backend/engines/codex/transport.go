@@ -2,11 +2,11 @@ package codex
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync/atomic"
 
+	"github.com/bytedance/sonic"
 	"github.com/insmtx/Leros/backend/engines"
 	"github.com/ygpkg/yg-go/logs"
 )
@@ -24,7 +24,7 @@ func (s *AppServer) readLoop(ctx context.Context) {
 		}
 
 		var msg rpcMessage
-		if err := json.Unmarshal(line, &msg); err != nil {
+		if err := sonic.Unmarshal(line, &msg); err != nil {
 			logs.Warnf("Codex app-server parse error: %v line=%s", err, string(line))
 			continue
 		}
@@ -41,7 +41,7 @@ func (s *AppServer) readLoop(ctx context.Context) {
 
 		case len(msg.ID) > 0 && msg.Method == "":
 			var id int64
-			if err := json.Unmarshal(msg.ID, &id); err != nil {
+			if err := sonic.Unmarshal(msg.ID, &id); err != nil {
 				continue
 			}
 			s.mu.Lock()
@@ -63,7 +63,7 @@ func (s *AppServer) readLoop(ctx context.Context) {
 }
 
 func (s *AppServer) call(ctx context.Context, method string, params any, result any) error {
-	paramsRaw, err := json.Marshal(params)
+	paramsRaw, err := sonic.Marshal(params)
 	if err != nil {
 		return fmt.Errorf("marshal %s params: %w", method, err)
 	}
@@ -75,7 +75,7 @@ func (s *AppServer) call(ctx context.Context, method string, params any, result 
 		Method:  method,
 		Params:  paramsRaw,
 	}
-	reqBytes, err := json.Marshal(req)
+	reqBytes, err := sonic.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("marshal %s: %w", method, err)
 	}
@@ -107,7 +107,7 @@ func (s *AppServer) call(ctx context.Context, method string, params any, result 
 			return fmt.Errorf("%s: %s (code=%d)", method, resp.Error.Message, resp.Error.Code)
 		}
 		if result != nil && len(resp.Result) > 0 {
-			if err := json.Unmarshal(resp.Result, result); err != nil {
+			if err := sonic.Unmarshal(resp.Result, result); err != nil {
 				return fmt.Errorf("unmarshal %s result: %w", method, err)
 			}
 		}
@@ -116,7 +116,7 @@ func (s *AppServer) call(ctx context.Context, method string, params any, result 
 }
 
 func (s *AppServer) notify(method string, params any) error {
-	paramsRaw, err := json.Marshal(params)
+	paramsRaw, err := sonic.Marshal(params)
 	if err != nil {
 		return err
 	}
@@ -125,14 +125,14 @@ func (s *AppServer) notify(method string, params any) error {
 		Method:  method,
 		Params:  paramsRaw,
 	}
-	reqBytes, _ := json.Marshal(req)
+	reqBytes, _ := sonic.Marshal(req)
 	return s.writeLine(reqBytes)
 }
 
-func (s *AppServer) respond(id json.RawMessage, result any) error {
+func (s *AppServer) respond(id sonic.NoCopyRawMessage, result any) error {
 	var rawID any
-	json.Unmarshal(id, &rawID)
-	respBytes, _ := json.Marshal(map[string]any{
+	sonic.Unmarshal(id, &rawID)
+	respBytes, _ := sonic.Marshal(map[string]any{
 		"jsonrpc": "2.0",
 		"id":      rawID,
 		"result":  result,
@@ -154,8 +154,8 @@ func (s *AppServer) writeLine(data []byte) error {
 // Thread / Turn 操作
 // ============================================================================
 
-func (s *AppServer) StartThread(ctx context.Context, modelCfg engines.ModelConfig) (string, error) {
-	params := s.threadParams(modelCfg)
+func (s *AppServer) StartThread(ctx context.Context, modelCfg engines.ModelConfig, systemPrompt string) (string, error) {
+	params := s.threadParams(modelCfg, systemPrompt)
 	var resp struct {
 		Thread struct {
 			ID string `json:"id"`
@@ -174,8 +174,8 @@ func (s *AppServer) StartThread(ctx context.Context, modelCfg engines.ModelConfi
 	return threadID, nil
 }
 
-func (s *AppServer) ResumeThread(ctx context.Context, threadID string, modelCfg engines.ModelConfig) error {
-	params := s.resumeThreadParams(threadID, modelCfg)
+func (s *AppServer) ResumeThread(ctx context.Context, threadID string, modelCfg engines.ModelConfig, systemPrompt string) error {
+	params := s.resumeThreadParams(threadID, modelCfg, systemPrompt)
 	var resp struct {
 		Thread struct {
 			ID string `json:"id"`
@@ -213,7 +213,7 @@ func (s *AppServer) StartTurn(ctx context.Context, threadID string, prompt strin
 	return turnID, nil
 }
 
-func (s *AppServer) threadParams(modelCfg engines.ModelConfig) map[string]any {
+func (s *AppServer) threadParams(modelCfg engines.ModelConfig, systemPrompt string) map[string]any {
 	params := map[string]any{
 		"cwd":                   s.workDir,
 		"serviceName":           "Leros",
@@ -225,16 +225,22 @@ func (s *AppServer) threadParams(modelCfg engines.ModelConfig) map[string]any {
 	if modelCfg.Model != "" {
 		params["model"] = modelCfg.Model
 	}
+	if strings.TrimSpace(systemPrompt) != "" {
+		params["developerInstructions"] = systemPrompt
+	}
 	return params
 }
 
-func (s *AppServer) resumeThreadParams(threadID string, modelCfg engines.ModelConfig) map[string]any {
+func (s *AppServer) resumeThreadParams(threadID string, modelCfg engines.ModelConfig, systemPrompt string) map[string]any {
 	params := map[string]any{
 		"threadId": threadID,
 		"cwd":      s.workDir,
 	}
 	if modelCfg.Model != "" {
 		params["model"] = modelCfg.Model
+	}
+	if strings.TrimSpace(systemPrompt) != "" {
+		params["developerInstructions"] = systemPrompt
 	}
 	return params
 }

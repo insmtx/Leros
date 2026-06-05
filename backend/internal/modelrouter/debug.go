@@ -1,14 +1,16 @@
 package modelrouter
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
+
+	"github.com/insmtx/Leros/backend/pkg/llmprotocol"
 )
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -81,7 +83,7 @@ func (dl *DebugLogger) Close() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 // LogRequestMeta 记录请求元信息（入口协议、上游协议、模型名、是否流式）。
-func (dl *DebugLogger) LogRequestMeta(entryProtocol, upstreamProtocol Protocol, model string, stream bool) {
+func (dl *DebugLogger) LogRequestMeta(entryProtocol, upstreamProtocol llmprotocol.Protocol, model string, stream bool) {
 	dl.writeEvent("meta", map[string]interface{}{
 		"entry_protocol":    entryProtocol,
 		"upstream_protocol": upstreamProtocol,
@@ -96,12 +98,12 @@ func (dl *DebugLogger) LogOriginalRequest(body []byte) {
 }
 
 // LogIRDecoded 记录从入口协议解码后的 IR（第 3 步）。
-func (dl *DebugLogger) LogIRDecoded(ir *IRRequest) {
+func (dl *DebugLogger) LogIRDecoded(ir *llmprotocol.IRRequest) {
 	dl.writeStructEvent("ir_decoded", ir)
 }
 
 // LogIRNormalized 记录经过能力裁剪后的归一化 IR（第 4 步）。
-func (dl *DebugLogger) LogIRNormalized(ir *IRRequest) {
+func (dl *DebugLogger) LogIRNormalized(ir *llmprotocol.IRRequest) {
 	dl.writeStructEvent("ir_normalized", ir)
 }
 
@@ -180,7 +182,7 @@ func (dl *DebugLogger) writeEvent(event string, data map[string]interface{}) {
 
 	summary := eventSummary(event, data)
 
-	b, err := json.Marshal(record)
+	b, err := sonic.Marshal(record)
 	if err != nil {
 		return
 	}
@@ -230,7 +232,7 @@ func (dl *DebugLogger) writeJSONEvent(event string, body []byte) {
 	}
 
 	var parsed interface{}
-	if err := json.Unmarshal(body, &parsed); err != nil {
+	if err := sonic.Unmarshal(body, &parsed); err != nil {
 		parsed = string(body)
 	}
 
@@ -245,13 +247,13 @@ func (dl *DebugLogger) writeStructEvent(event string, v interface{}) {
 		return
 	}
 
-	b, err := json.Marshal(v)
+	b, err := sonic.Marshal(v)
 	if err != nil {
 		return
 	}
 
 	var parsed interface{}
-	json.Unmarshal(b, &parsed)
+	sonic.Unmarshal(b, &parsed)
 
 	dl.writeEvent(event, map[string]interface{}{
 		"body": parsed,

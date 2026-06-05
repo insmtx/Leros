@@ -15,6 +15,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/runtime/lifecycle"
 	lifecyclecontext "github.com/insmtx/Leros/backend/internal/runtime/lifecycle/context"
 	"github.com/insmtx/Leros/backend/internal/runtime/lifecycle/steps"
+	"github.com/insmtx/Leros/backend/prompts"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -67,7 +68,7 @@ func (s *Service) Environment() *deps.Container {
 
 func (s *Service) buildRouter(ctx context.Context, opts Options) (agent.Runner, error) {
 	lifecycleBuilder := lifecyclecontext.NewContextBuilder(lifecyclecontext.ContextBuilder{
-		BaseSystemPrompt: native.DefaultSystemPrompt(),
+		BaseSystemPrompt: prompts.Get(prompts.KeyAgentSystemDefault),
 		Runtime:          s.env,
 		SessionMessages:  lifecyclecontext.NewPassthroughSessionMessageProvider(),
 	})

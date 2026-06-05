@@ -1,7 +1,7 @@
-package modelrouter
+package llmprotocol
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"strings"
 	"testing"
 )
@@ -11,7 +11,7 @@ var testAdapter = &openAIChatAdapter{}
 func parseJSON(t *testing.T, raw string) map[string]interface{} {
 	t.Helper()
 	var m map[string]interface{}
-	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+	if err := sonic.Unmarshal([]byte(raw), &m); err != nil {
 		t.Fatalf("parseJSON: %v\nraw: %s", err, raw)
 	}
 	return m

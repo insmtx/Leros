@@ -1,7 +1,7 @@
-package modelrouter
+package llmprotocol
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"testing"
 )
 
@@ -749,10 +749,10 @@ func TestOpenAIResponsesEncodeResponse_RoundTrip(t *testing.T) {
 			{Type: IRPartText, Text: "The answer is 42."},
 		},
 		Usage: &IRUsage{
-			InputTokens:       10,
-			OutputTokens:      5,
-			TotalTokens:       15,
-			ReasoningTokens:   2,
+			InputTokens:          10,
+			OutputTokens:         5,
+			TotalTokens:          15,
+			ReasoningTokens:      2,
 			CacheReadInputTokens: 3,
 		},
 		StopReason: IRStopEndTurn,
@@ -1448,7 +1448,7 @@ func TestOpenAIResponsesStreamLifecycle_GoldenFile(t *testing.T) {
 	}
 
 	// Count deltas (excluding skipped events)
-	j, _ := json.MarshalIndent(irEvents, "", "  ")
+	j, _ := sonic.MarshalIndent(irEvents, "", "  ")
 	t.Logf("IR events: %s", string(j))
 
 	// Phase 2: Re-encode all IR events (IR -> upstream)

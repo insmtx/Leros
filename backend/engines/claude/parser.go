@@ -2,7 +2,7 @@ package claude
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"strings"
 
@@ -98,7 +98,7 @@ func parseClaudeLineEvents(line string, state *claudeStreamState) []events.Event
 		return nil
 	}
 	var event streamEvent
-	if json.Unmarshal([]byte(line), &event) != nil {
+	if sonic.Unmarshal([]byte(line), &event) != nil {
 		return []events.Event{*events.NewMessageDelta("", line)}
 	}
 	switch event.Type {

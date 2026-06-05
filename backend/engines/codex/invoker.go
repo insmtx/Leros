@@ -2,11 +2,11 @@ package codex
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 
+	"github.com/bytedance/sonic"
 	"github.com/insmtx/Leros/backend/engines"
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
 	"github.com/ygpkg/yg-go/logs"
@@ -117,7 +117,7 @@ type turnResult struct {
 // 通知处理
 // ============================================================================
 
-func (st *runState) handleNotification(method string, params json.RawMessage) {
+func (st *runState) handleNotification(method string, params sonic.NoCopyRawMessage) {
 	logs.Infof("Codex notification: method=%s params=%s", method, string(params))
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -148,31 +148,31 @@ func (st *runState) handleNotification(method string, params json.RawMessage) {
 	}
 }
 
-func (st *runState) onThreadStarted(params json.RawMessage) {
+func (st *runState) onThreadStarted(params sonic.NoCopyRawMessage) {
 	var payload struct {
 		Thread struct {
 			ID string `json:"id"`
 		} `json:"thread"`
 	}
-	if err := json.Unmarshal(params, &payload); err == nil && payload.Thread.ID != "" {
+	if err := sonic.Unmarshal(params, &payload); err == nil && payload.Thread.ID != "" {
 		st.srv.SetThreadID(payload.Thread.ID)
 		sendEventTo(st.evtChan, engines.EventProviderSessionStarted, payload.Thread.ID)
 	}
 }
 
-func (st *runState) onTurnStarted(params json.RawMessage) {
+func (st *runState) onTurnStarted(params sonic.NoCopyRawMessage) {
 	var payload struct {
 		Turn struct {
 			ID string `json:"id"`
 		} `json:"turn"`
 	}
-	if err := json.Unmarshal(params, &payload); err == nil {
+	if err := sonic.Unmarshal(params, &payload); err == nil {
 		st.turnID = payload.Turn.ID
 		st.srv.SetTurnID(st.turnID)
 	}
 }
 
-func (st *runState) onItemStarted(params json.RawMessage) {
+func (st *runState) onItemStarted(params sonic.NoCopyRawMessage) {
 	var payload struct {
 		Item struct {
 			ID      string `json:"id"`
@@ -181,7 +181,7 @@ func (st *runState) onItemStarted(params json.RawMessage) {
 			CWD     string `json:"cwd"`
 		} `json:"item"`
 	}
-	if err := json.Unmarshal(params, &payload); err != nil {
+	if err := sonic.Unmarshal(params, &payload); err != nil {
 		return
 	}
 	switch payload.Item.Type {
@@ -199,7 +199,7 @@ func (st *runState) onItemStarted(params json.RawMessage) {
 	}
 }
 
-func (st *runState) onItemCompleted(params json.RawMessage) {
+func (st *runState) onItemCompleted(params sonic.NoCopyRawMessage) {
 	var payload struct {
 		Item struct {
 			ID               string `json:"id"`
@@ -211,7 +211,7 @@ func (st *runState) onItemCompleted(params json.RawMessage) {
 			DurationMs       *int64 `json:"durationMs"`
 		} `json:"item"`
 	}
-	if err := json.Unmarshal(params, &payload); err != nil {
+	if err := sonic.Unmarshal(params, &payload); err != nil {
 		return
 	}
 	switch payload.Item.Type {
@@ -240,12 +240,12 @@ func (st *runState) emitToolResult(id, aggregated, output string, exitCode *int,
 	}
 }
 
-func (st *runState) onAgentDelta(params json.RawMessage) {
+func (st *runState) onAgentDelta(params sonic.NoCopyRawMessage) {
 	var payload struct {
 		ItemID string `json:"itemId"`
 		Delta  string `json:"delta"`
 	}
-	if err := json.Unmarshal(params, &payload); err != nil || payload.Delta == "" {
+	if err := sonic.Unmarshal(params, &payload); err != nil || payload.Delta == "" {
 		return
 	}
 	if payload.ItemID != "" {
@@ -255,17 +255,17 @@ func (st *runState) onAgentDelta(params json.RawMessage) {
 	emitMessageDelta(st.evtChan, st.messageID, payload.Delta)
 }
 
-func (st *runState) onTurnDiff(params json.RawMessage) {
+func (st *runState) onTurnDiff(params sonic.NoCopyRawMessage) {
 	var payload struct {
 		Diff string `json:"diff"`
 	}
-	if err := json.Unmarshal(params, &payload); err == nil && payload.Diff != "" {
+	if err := sonic.Unmarshal(params, &payload); err == nil && payload.Diff != "" {
 		st.currentDiff.WriteString(payload.Diff)
 		emitMessageDelta(st.evtChan, st.messageID, payload.Diff)
 	}
 }
 
-func (st *runState) onTurnCompleted(params json.RawMessage) {
+func (st *runState) onTurnCompleted(params sonic.NoCopyRawMessage) {
 	var payload struct {
 		Turn struct {
 			Error *struct {
@@ -273,7 +273,7 @@ func (st *runState) onTurnCompleted(params json.RawMessage) {
 			} `json:"error"`
 		} `json:"turn"`
 	}
-	if err := json.Unmarshal(params, &payload); err == nil {
+	if err := sonic.Unmarshal(params, &payload); err == nil {
 		if payload.Turn.Error != nil && payload.Turn.Error.Message != "" {
 			st.turnDone <- turnResult{failed: true, errorMsg: payload.Turn.Error.Message, message: st.assistantText.String()}
 		} else {
@@ -284,25 +284,25 @@ func (st *runState) onTurnCompleted(params json.RawMessage) {
 	}
 }
 
-func (st *runState) onHook(method string, params json.RawMessage) {
+func (st *runState) onHook(method string, params sonic.NoCopyRawMessage) {
 	var payload struct {
 		Run struct {
 			EventName string `json:"eventName"`
 		} `json:"run"`
 	}
-	if err := json.Unmarshal(params, &payload); err == nil && payload.Run.EventName != "" {
+	if err := sonic.Unmarshal(params, &payload); err == nil && payload.Run.EventName != "" {
 		emitMessageDelta(st.evtChan, st.messageID, fmt.Sprintf("[hook] %s: %s", method, payload.Run.EventName))
 	}
 }
 
-func (st *runState) onPlanUpdated(params json.RawMessage) {
+func (st *runState) onPlanUpdated(params sonic.NoCopyRawMessage) {
 	var payload struct {
 		Plan []struct {
 			Step   string `json:"step"`
 			Status string `json:"status"`
 		} `json:"plan"`
 	}
-	if err := json.Unmarshal(params, &payload); err != nil || len(payload.Plan) == 0 {
+	if err := sonic.Unmarshal(params, &payload); err != nil || len(payload.Plan) == 0 {
 		return
 	}
 	items := make([]events.RuntimeTodoItem, 0, len(payload.Plan))
@@ -327,7 +327,7 @@ func planStatus(s string) string {
 	}
 }
 
-func (st *runState) onTokenUsage(params json.RawMessage) {
+func (st *runState) onTokenUsage(params sonic.NoCopyRawMessage) {
 	var payload struct {
 		TokenUsage struct {
 			Total struct {
@@ -336,7 +336,7 @@ func (st *runState) onTokenUsage(params json.RawMessage) {
 			} `json:"total"`
 		} `json:"tokenUsage"`
 	}
-	if err := json.Unmarshal(params, &payload); err == nil {
+	if err := sonic.Unmarshal(params, &payload); err == nil {
 		st.tokenUsage = &events.UsagePayload{
 			InputTokens:  payload.TokenUsage.Total.InputTokens,
 			OutputTokens: payload.TokenUsage.Total.OutputTokens,
@@ -360,7 +360,7 @@ func (st *runState) handleServerRequest(req ServerRequest) {
 			Command string `json:"command"`
 			Reason  string `json:"reason"`
 		}
-		if err := json.Unmarshal(req.Params, &params); err == nil {
+		if err := sonic.Unmarshal(req.Params, &params); err == nil {
 			reqID := params.ItemID
 			if reqID == "" {
 				reqID = string(req.ID)
@@ -381,7 +381,7 @@ func (st *runState) handleServerRequest(req ServerRequest) {
 			GrantRoot string `json:"grantRoot"`
 			Reason    string `json:"reason"`
 		}
-		if err := json.Unmarshal(req.Params, &params); err == nil {
+		if err := sonic.Unmarshal(req.Params, &params); err == nil {
 			reqID := params.ItemID
 			if reqID == "" {
 				reqID = string(req.ID)
@@ -418,14 +418,14 @@ func (st *runState) ensureThread(ctx context.Context, req engines.RunRequest) (s
 	if resume {
 		threadID := strings.TrimSpace(req.SessionID)
 		if st.srv.ThreadID() != threadID {
-			if err := st.srv.ResumeThread(ctx, threadID, req.Model); err != nil {
+			if err := st.srv.ResumeThread(ctx, threadID, req.Model, req.SystemPrompt); err != nil {
 				return "", fmt.Errorf("resume thread %s: %w", threadID, err)
 			}
 		}
 		sendEventTo(st.evtChan, engines.EventProviderSessionStarted, threadID)
 		return threadID, nil
 	}
-	tid, err := st.srv.StartThread(ctx, req.Model)
+	tid, err := st.srv.StartThread(ctx, req.Model, req.SystemPrompt)
 	if err != nil {
 		return "", fmt.Errorf("start thread: %w", err)
 	}
@@ -503,7 +503,7 @@ func emitMessageDelta(ch chan<- events.Event, messageID, content string) {
 	if ch == nil || content == "" {
 		return
 	}
-	payload, _ := json.Marshal(events.MessageDeltaPayload{MessageID: messageID, Content: content})
+	payload, _ := sonic.Marshal(events.MessageDeltaPayload{MessageID: messageID, Content: content})
 	select {
 	case ch <- events.Event{
 		Type:    events.EventMessageDelta,
@@ -530,7 +530,7 @@ func sendEventPayloadTo(ch chan<- events.Event, eventType events.EventType, payl
 	}
 	event := events.Event{Type: eventType}
 	if payload != nil {
-		if encoded, err := json.Marshal(payload); err == nil {
+		if encoded, err := sonic.Marshal(payload); err == nil {
 			event.Payload = encoded
 		}
 	}

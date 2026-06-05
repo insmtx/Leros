@@ -3,7 +3,6 @@ package codex
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/insmtx/Leros/backend/engines"
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
 )
@@ -46,7 +46,6 @@ func TestSayHi(t *testing.T) {
 			Model:    "aliyun/deepseek-v4-flash",
 			BaseURL:  "http://127.0.0.1:8081",
 		},
-		Timeout: 2 * time.Minute,
 	})
 	if err != nil {
 		t.Fatalf("run codex adapter: %v", err)
@@ -156,7 +155,7 @@ func TestJSONRPCClientCallAndRespond(t *testing.T) {
 		if scanner.Scan() {
 			line := scanner.Text()
 			var req rpcRequest
-			if err := json.Unmarshal([]byte(line), &req); err != nil {
+			if err := sonic.Unmarshal([]byte(line), &req); err != nil {
 				t.Logf("server parse error: %v", err)
 				return
 			}
@@ -190,7 +189,7 @@ func TestJSONRPCClientNotification(t *testing.T) {
 	_ = clientToServerW
 
 	notifCh := make(chan string, 1)
-	client.OnNotification = func(method string, params json.RawMessage) {
+	client.OnNotification = func(method string, params sonic.NoCopyRawMessage) {
 		notifCh <- method
 	}
 
