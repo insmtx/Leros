@@ -74,6 +74,7 @@
 	}
 
 	.leros-sidebar {
+		position: relative;
 		display: flex;
 		width: var(--leros-sidebar-width);
 		height: 100%;
@@ -84,14 +85,28 @@
 		background: var(--leros-sidebar-bg);
 		color: var(--leros-text);
 		padding: 24px 0;
+		transition: width 180ms ease;
 	}
 
 	.leros-brand {
 		display: flex;
+		height: 40px;
+		flex-shrink: 0;
 		align-items: center;
 		justify-content: space-between;
 		padding: 0 24px;
 		margin-bottom: 40px;
+	}
+
+	.leros-brand-main {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.leros-sidebar-expandable {
+		overflow: hidden;
 	}
 
 	.leros-logo-placeholder {
@@ -108,8 +123,8 @@
 	}
 
 	.leros-logo-image {
-		width: 100%;
-		height: 100%;
+		width: 30px;
+		height: 30px;
 		border-radius: inherit;
 		object-fit: contain;
 	}
@@ -138,6 +153,29 @@
 		color: color-mix(in srgb, var(--leros-text) 70%, transparent);
 	}
 
+	.leros-sidebar-toggle {
+		display: inline-flex;
+		height: 32px;
+		width: 32px;
+		flex-shrink: 0;
+		cursor: pointer;
+		align-items: center;
+		justify-content: center;
+		border-radius: 999px;
+		color: var(--leros-text-subtle);
+		transition:
+			background 160ms ease,
+			color 160ms ease,
+			box-shadow 160ms ease;
+	}
+
+	.leros-sidebar-toggle:hover,
+	.leros-sidebar-toggle:focus-visible {
+		background: color-mix(in srgb, var(--leros-text) 8%, transparent);
+		color: var(--leros-text);
+		outline: none;
+	}
+
 	.leros-nav {
 		padding: 0 16px;
 	}
@@ -158,6 +196,7 @@
 	}
 
 	.leros-nav-item {
+		position: relative;
 		display: flex;
 		width: 100%;
 		cursor: pointer;
@@ -294,6 +333,99 @@
 	.leros-profile-menu [data-variant="destructive"]:focus-visible {
 		background: #fff1f1;
 		color: #e60000;
+	}
+
+	.leros-sidebar-resize-handle {
+		position: absolute;
+		top: 0;
+		right: -4px;
+		z-index: 10;
+		width: 8px;
+		height: 100%;
+		cursor: col-resize;
+	}
+
+	.leros-sidebar-resize-handle::after {
+		content: "";
+		position: absolute;
+		top: 0;
+		left: 50%;
+		width: 2px;
+		height: 100%;
+		transform: translateX(-50%);
+		background: transparent;
+		transition: background 160ms ease;
+	}
+
+	.leros-sidebar:hover .leros-sidebar-resize-handle::after,
+	.leros-sidebar-resize-handle:hover::after {
+		background: color-mix(in srgb, var(--leros-sidebar-border) 78%, transparent);
+	}
+
+	.leros-sidebar[data-collapsed="true"] {
+		padding-inline: 0;
+	}
+
+	.leros-sidebar[data-collapsed="true"] .leros-brand {
+		height: auto;
+		flex-direction: column;
+		justify-content: flex-start;
+		gap: 6px;
+		padding-inline: 10px;
+		margin-bottom: 6px;
+		align-items: center;
+	}
+
+	.leros-sidebar[data-collapsed="true"] .leros-brand-main {
+		width: auto;
+		height: 40px;
+		justify-content: center;
+	}
+
+	.leros-sidebar[data-collapsed="true"] .leros-sidebar-toggle {
+		position: static;
+		height: 28px;
+		width: 44px;
+		transform: none;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.leros-sidebar[data-collapsed="true"] .leros-nav {
+		padding-inline: 10px;
+	}
+
+	.leros-sidebar[data-collapsed="true"] .leros-sidebar-expandable {
+		display: none;
+	}
+
+	.leros-sidebar[data-collapsed="true"] .leros-nav-section-label {
+		padding-inline: 0;
+		text-align: center;
+		letter-spacing: 0.05em;
+	}
+
+	.leros-sidebar[data-collapsed="true"] .leros-profile-trigger {
+		width: 100%;
+		justify-content: center;
+		align-self: stretch;
+		padding: 12px;
+	}
+
+	.leros-sidebar[data-collapsed="true"] .leros-profile-trigger:hover,
+	.leros-sidebar[data-collapsed="true"] .leros-profile-trigger:focus-visible,
+	.leros-sidebar[data-collapsed="true"] .leros-profile-trigger[aria-expanded="true"] {
+		background: color-mix(in srgb, var(--leros-text) 6%, transparent);
+	}
+
+	.leros-sidebar[data-collapsed="true"] .leros-sidebar-footer {
+		display: flex;
+		justify-content: center;
+		padding: 16px 8px 0;
+	}
+
+	.leros-sidebar[data-collapsed="true"] .leros-sidebar-resize-handle {
+		cursor: default;
 	}
 }
 

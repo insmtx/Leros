@@ -98,6 +98,7 @@ export type ViewMode =
 
 export type LayoutState = {
 	leftRailCollapsed: boolean;
+	leftRailWidth: number;
 	rightRailCollapsed: boolean;
 	conversationListOpen: boolean;
 	currentView: ViewMode;
@@ -188,6 +189,7 @@ export function mapBackendArtifactToProjectArtifact(ba: BackendArtifact): Projec
 
 const _initialState: LayoutState = {
 	leftRailCollapsed: false,
+	leftRailWidth: 240,
 	rightRailCollapsed: false,
 	conversationListOpen: true,
 	currentView: "workbench",
@@ -265,6 +267,16 @@ export class LayoutActionImpl {
 
 	toggleLeftRail = () => {
 		this.#set((state) => ({ leftRailCollapsed: !state.leftRailCollapsed }));
+	};
+
+	setLeftRailCollapsed = (collapsed: boolean) => {
+		this.#set({ leftRailCollapsed: collapsed });
+	};
+
+	setLeftRailWidth = (width: number) => {
+		// 左侧栏宽度仅允许在可读与不挤压主内容的范围内变化
+		const nextWidth = Math.min(320, Math.max(220, Math.round(width)));
+		this.#set({ leftRailWidth: nextWidth });
 	};
 
 	toggleConversationList = () => {
