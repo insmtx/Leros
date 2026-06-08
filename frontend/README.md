@@ -166,6 +166,45 @@ turbo build --filter=@leros/web
 turbo build --filter=@leros/desktop
 ```
 
+### 桌面应用打包
+
+桌面端使用 Electron Builder 生成安装包。推荐从 `frontend/` 目录执行根级命令：
+
+```bash
+# macOS Apple Silicon
+pnpm dist:desktop:mac:arm64
+
+# macOS Intel
+pnpm dist:desktop:mac:x64
+
+# Windows x64
+pnpm dist:desktop:win:x64
+
+# Linux x64
+pnpm dist:desktop:linux:x64
+
+# 当前系统默认目标
+pnpm dist:desktop
+```
+
+产物输出到 `apps/desktop/dist/`。本地 `dist:*` 命令固定使用 `--publish never`，只生成安装包，不会上传 Release。
+
+### GitHub Release 发布
+
+桌面应用通过 `.github/workflows/desktop-release.yml` 发布。推送符合 `v*.*.*` 格式的 tag 后，GitHub Actions 会在对应系统 runner 上构建：
+
+- macOS arm64: DMG + ZIP
+- macOS x64: DMG + ZIP
+- Windows x64: NSIS `.exe`
+- Linux x64: AppImage + `.deb`
+
+构建完成后，workflow 会统一生成 `SHA256SUMS.txt` 并上传所有产物到 GitHub Release：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
 ### 其他命令
 
 ```bash
