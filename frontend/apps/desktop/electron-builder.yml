@@ -21,6 +21,7 @@ mac:
     - target: zip
   artifactName: ${productName}-${version}-mac-${arch}.${ext}
 win:
+  signAndEditExecutable: false
   target:
     - target: nsis
       arch:
