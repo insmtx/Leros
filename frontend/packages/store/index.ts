@@ -9,6 +9,11 @@ export type {
 export { authApi } from "./api/authApi";
 export { API_BASE_URL } from "./api/config";
 export { digitalAssistantApi } from "./api/digitalAssistantApi";
+export {
+	fetchProjectFileDownload,
+	getProjectFileDownloadUrl,
+	projectFileApi,
+} from "./api/projectFileApi";
 export { sessionApi } from "./api/sessionApi";
 export type { AppAction, AppStore } from "./appStore";
 export {

@@ -79,6 +79,8 @@ export type Attachment = {
 	size: number;
 	url?: string;
 	file?: File;
+	path?: string;
+	mimeType?: string;
 };
 
 export type ModelOption = {

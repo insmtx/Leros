@@ -1,6 +1,7 @@
 import { FetchSSEClient } from "@leros/ui/lib/fetch-sse";
 import { getArtifactDownloadUrl } from "../api/artifactApi";
 import { API_BASE_URL } from "../api/config";
+import { projectFileApi } from "../api/projectFileApi";
 import { sessionApi } from "../api/sessionApi";
 import type {
 	BackendApprovalDecisionPayload,
@@ -706,6 +707,22 @@ export class ChatActionImpl {
 				role: "user",
 				content,
 				message_type: "text",
+				metadata:
+					attachments && attachments.length > 0
+						? {
+								file_name: attachments[0]?.name,
+								file_url: attachments[0]?.path || attachments[0]?.url,
+								extra: {
+									attachments: attachments.map((attachment) => ({
+										name: attachment.name,
+										path: attachment.path,
+										url: attachment.url,
+										size: attachment.size,
+										mime_type: attachment.mimeType,
+									})),
+								},
+							}
+						: undefined,
 			});
 		} catch (err) {
 			console.error("sendMessage addMessage error:", err);
@@ -990,6 +1007,32 @@ export class ChatActionImpl {
 		this.#set((state) => ({
 			inputAttachments: [...state.inputAttachments, attachment],
 		}));
+	};
+
+	addUploadedAttachment = async (projectId: string, file: File) => {
+		const response = await projectFileApi.upload({ projectId, file });
+		const payload = response.data;
+		const uploadedPath =
+			typeof payload === "string" ? payload : typeof payload?.path === "string" ? payload.path : "";
+		const attachmentId = `att-${Date.now()}`;
+		const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+
+		const attachment: Attachment = {
+			id: attachmentId,
+			type: file.type.startsWith("image/") ? "image" : "file",
+			name: file.name,
+			size: file.size,
+			url: previewUrl,
+			file,
+			path: uploadedPath,
+			mimeType: file.type,
+		};
+
+		this.#set((state) => ({
+			inputAttachments: [...state.inputAttachments, attachment],
+		}));
+
+		return attachment;
 	};
 
 	removeAttachment = (id: string) => {

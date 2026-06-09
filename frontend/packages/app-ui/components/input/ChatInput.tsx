@@ -19,7 +19,11 @@ import {
 	X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { StructuredComposer, type StructuredComposerHandle } from "./StructuredComposer";
+
+// .csv 暂不支持预览，上传后体验异常，待预览能力就绪后再开放
+export const PROJECT_ATTACHMENT_ACCEPT = "image/*,.pdf,.txt,.md,.json"; // ,.csv
 
 export function ChatInput({ variant = "default" }: { variant?: "default" | "project" }) {
 	const {
@@ -37,6 +41,7 @@ export function ChatInput({ variant = "default" }: { variant?: "default" | "proj
 		submitApprovalDecision,
 		cancelGeneration,
 		addAttachment,
+		addUploadedAttachment,
 		removeAttachment,
 		setInputFocused,
 		setSelectedModel,
@@ -82,14 +87,24 @@ export function ChatInput({ variant = "default" }: { variant?: "default" | "proj
 	);
 
 	const handleFileSelect = useCallback(
-		(e: React.ChangeEvent<HTMLInputElement>) => {
+		async (e: React.ChangeEvent<HTMLInputElement>) => {
 			const files = Array.from(e.target.files ?? []);
+			const projectId = activeProjectId;
 			for (const file of files) {
+				if (isProjectVariant && projectId) {
+					try {
+						await addUploadedAttachment(projectId, file);
+						toast.success("文件上传成功");
+					} catch (err) {
+						console.error("ChatInput upload project attachment error:", err);
+					}
+					continue;
+				}
 				addAttachment(file);
 			}
 			e.target.value = "";
 		},
-		[addAttachment],
+		[activeProjectId, addAttachment, addUploadedAttachment, isProjectVariant],
 	);
 
 	const handleSend = useCallback(() => {
@@ -144,7 +159,7 @@ export function ChatInput({ variant = "default" }: { variant?: "default" | "proj
 						ref={fileInputRef}
 						type="file"
 						className="hidden"
-						accept="image/*,.pdf,.txt,.md,.json,.csv"
+						accept={PROJECT_ATTACHMENT_ACCEPT}
 						multiple
 						onChange={handleFileSelect}
 					/>

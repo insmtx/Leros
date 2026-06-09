@@ -300,6 +300,22 @@ export type BackendProjectDetail = BackendProject & {
 	members: BackendProjectMemberItem[];
 };
 
+export type BackendProjectFileNode = {
+	name: string;
+	path: string;
+	type: "file" | "directory" | string;
+	children?: BackendProjectFileNode[];
+	size?: number;
+	mime_type?: string;
+	mod_time?: number;
+};
+
+export type BackendProjectFileUploadResult = {
+	path: string;
+	filename: string;
+	size: number;
+};
+
 export type BackendNewMessageData = {
 	project_id: string;
 	task_id: string;
