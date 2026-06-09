@@ -30,18 +30,19 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
-    "react-router-dom": "^7.6.0",
-    "react": "catalog:",
-    "react-dom": "catalog:",
-    "lucide-react": "catalog:"
-  },
-  "devDependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@leros/ui": "workspace:*",
     "@leros/store": "workspace:*",
     "@leros/app-ui": "workspace:*",
     "@leros/styles": "workspace:*",
+    "react-router-dom": "^7.6.0",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "lucide-react": "catalog:",
+    "sonner": "^2.0.7"
+  },
+  "devDependencies": {
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@leros/tsconfig": "workspace:*",
     "@tailwindcss/vite": "^4",
