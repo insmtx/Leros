@@ -53,6 +53,7 @@ docs/swagger.yaml
 .worktrees
 frontend/.pnpm-store
 .pnpm-store
+frontend/apps/desktop/.win-pack/
 leros
 logs/
 .omo/

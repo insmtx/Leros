@@ -14,6 +14,11 @@ if (!targets) {
 	process.exit(1);
 }
 
+if (process.platform === "win32") {
+	await run("node", ["scripts/dist-win.js"]);
+	process.exit(0);
+}
+
 await run("pnpm", ["run", "compile"]);
 await run("electron-builder", [...targets, "--publish", "never"]);
 

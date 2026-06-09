@@ -19,7 +19,7 @@
     "dist:dir": "pnpm run compile && electron-builder --dir --publish never",
     "dist:mac:arm64": "pnpm run compile && electron-builder --mac --arm64 --publish never",
     "dist:mac:x64": "pnpm run compile && electron-builder --mac --x64 --publish never",
-    "dist:win:x64": "pnpm run compile && electron-builder --win --x64 --publish never",
+    "dist:win:x64": "node scripts/dist-win.js",
     "dist:linux:x64": "pnpm run compile && electron-builder --linux --x64 --publish never",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
@@ -30,18 +30,19 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
-    "react-router-dom": "^7.6.0",
-    "react": "catalog:",
-    "react-dom": "catalog:",
-    "lucide-react": "catalog:"
-  },
-  "devDependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@leros/ui": "workspace:*",
     "@leros/store": "workspace:*",
     "@leros/app-ui": "workspace:*",
     "@leros/styles": "workspace:*",
+    "react-router-dom": "^7.6.0",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "lucide-react": "catalog:",
+    "sonner": "^2.0.7"
+  },
+  "devDependencies": {
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@leros/tsconfig": "workspace:*",
     "@tailwindcss/vite": "^4",
