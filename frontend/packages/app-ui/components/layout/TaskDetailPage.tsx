@@ -17,11 +17,13 @@ import {
 	Table2,
 	Tag,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MessageTimeline } from "../chat/MessageTimeline";
 import { ChatInput } from "../input/ChatInput";
 import { ArtifactPreviewDialog } from "./ArtifactPreviewDialog";
 import type { AppNavigation } from "./LeftRail";
+import { getLatestAssistantTodos } from "./taskProgress";
+import { TaskTodoProgressPanel } from "./TaskTodoProgressPanel";
 
 const STATUS_LABEL: Record<string, string> = {
 	todo: "待办",
@@ -54,6 +56,9 @@ export function TaskDetailPage({
 	const {
 		activeSessionId,
 		isGenerating,
+		messageIds,
+		messagesMap,
+		streamingMessageId,
 		setActiveSession,
 		loadConversationMessages,
 	} = useChatStore((s) => s);
@@ -66,6 +71,17 @@ export function TaskDetailPage({
 	const resolvedTaskId = taskId ?? activeTaskDetailTaskId;
 	const resolvedSessionId = sessionId ?? activeTaskDetailSessionId;
 	const project = projects.find((p) => p.id === resolvedProjectId);
+
+	const latestTodos = useMemo(
+		() =>
+			getLatestAssistantTodos(
+				messagesMap,
+				messageIds,
+				resolvedSessionId,
+				streamingMessageId,
+			),
+		[messagesMap, messageIds, resolvedSessionId, streamingMessageId],
+	);
 
 	const fetchArtifacts = useCallback(async (taskId: string) => {
 		try {
@@ -260,6 +276,14 @@ export function TaskDetailPage({
 										</p>
 									)}
 								</div>
+							</section>
+						)}
+						{latestTodos && latestTodos.length > 0 && (
+							<section>
+								<h3 className="mb-3 text-xs font-semibold text-[var(--leros-text-muted)]">
+									任务进度
+								</h3>
+								<TaskTodoProgressPanel todos={latestTodos} />
 							</section>
 						)}
 						<section>

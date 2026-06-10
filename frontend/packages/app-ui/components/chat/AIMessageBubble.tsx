@@ -27,7 +27,6 @@ import { useEffect, useMemo, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ArtifactPreviewDialog } from "../layout/ArtifactPreviewDialog";
-import { TodoListBlock } from "./TodoListBlock";
 import { ToolCallBlock } from "./ToolCallBlock";
 
 function CopyButton({ text }: { text: string }) {
@@ -61,7 +60,6 @@ export function AIMessageBubble({
 	const hasContent = content.trim().length > 0;
 	const hasThinking = (message.thinking ?? "").trim().length > 0;
 	const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
-	const hasTodos = message.todos && message.todos.length > 0;
 	const hasArtifacts = message.artifacts && message.artifacts.length > 0;
 
 	return (
@@ -107,16 +105,9 @@ export function AIMessageBubble({
 					</div>
 				)}
 
-				{hasTodos && message.todos && (
-					<div className="mb-3">
-						<TodoListBlock todos={message.todos} />
-					</div>
-				)}
-
 				{!hasContent &&
 					!hasThinking &&
 					!hasToolCalls &&
-					!hasTodos &&
 					!hasArtifacts &&
 					isStreaming && (
 						<div className="w-fit rounded-2xl rounded-tl-md bg-white/90 px-4 py-3 shadow-sm ring-1 ring-slate-200/50">
