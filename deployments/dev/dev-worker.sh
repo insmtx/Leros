@@ -52,4 +52,5 @@ fi
 echo -e "${BLUE}Starting worker (worker-id: 1, HTTP port 8081)...${NC}"
 
 cd "$ROOT_DIR"
-LEROS_DEV=true ./bundles/leros worker --worker-id 1 --config "$CONFIG_FILE" --server-addr 127.0.0.1:8080 --listen-addr :8081
+WORKSPACE_ROOT="${LEROS_WORKSPACE_ROOT:-$ROOT_DIR/.leros-workspace}"
+LEROS_DEV=true ./bundles/leros worker --worker-id 1 --config "$CONFIG_FILE" --listen-addr :8081 --workspace-root "$WORKSPACE_ROOT"

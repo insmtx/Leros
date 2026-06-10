@@ -57,3 +57,4 @@ leros
 !backend/cmd/leros
 logs/
 .omo/
+.leros-workspace/**

@@ -137,6 +137,9 @@ type SessionMessage struct {
 	// session_message - assistant message artifact references.
 	Artifacts MessageArtifactSlice `gorm:"column:artifacts;type:jsonb"`
 
+	// session_message - file attachment references.
+	Attachments MessageAttachmentSlice `gorm:"column:attachments;type:jsonb"`
+
 	// session_message - 消息元数据，JSONB，允许为空
 	Metadata ObjectMetadata `gorm:"column:metadata;type:jsonb"`
 
@@ -184,6 +187,43 @@ type MessageArtifactSlice []MessageArtifact
 
 // MessageChunkSlice stores structured message chunks in JSONB.
 type MessageChunkSlice []MessageChunk
+
+type MessageAttachment struct {
+	FileUploadID string `json:"file_upload_id"`
+	Name         string `json:"name"`
+	MimeType     string `json:"mime_type"`
+	Size         int64  `json:"size"`
+	Purpose      string `json:"purpose,omitempty"`
+}
+
+type MessageAttachmentSlice []MessageAttachment
+
+func (m *MessageAttachmentSlice) Scan(value interface{}) error {
+	if value == nil {
+		*m = MessageAttachmentSlice{}
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("cannot scan %T into MessageAttachmentSlice", value)
+	}
+
+	var result []MessageAttachment
+	if err := json.Unmarshal(bytes, &result); err != nil {
+		return err
+	}
+
+	*m = MessageAttachmentSlice(result)
+	return nil
+}
+
+func (m MessageAttachmentSlice) Value() (driver.Value, error) {
+	if len(m) == 0 {
+		return nil, nil
+	}
+	return json.Marshal([]MessageAttachment(m))
+}
 
 // Scan implements sql.Scanner.
 func (m *MessageArtifactSlice) Scan(value interface{}) error {
