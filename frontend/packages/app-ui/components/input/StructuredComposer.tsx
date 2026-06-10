@@ -189,6 +189,13 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 			adjustHeight();
 		}, [value, adjustHeight]);
 
+		const validTokens = useMemo(
+			() => tokens.filter((token) => value.slice(token.start, token.end) === token.label),
+			[tokens, value],
+		);
+
+		const shouldUseHighlightLayer = validTokens.length > 0;
+
 		const focusAt = useCallback((cursor: number) => {
 			requestAnimationFrame(() => {
 				const textarea = textareaRef.current;
@@ -313,9 +320,6 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 		);
 
 		const renderHighlightedValue = () => {
-			const validTokens = tokens.filter(
-				(token) => value.slice(token.start, token.end) === token.label,
-			);
 			if (validTokens.length === 0) return value;
 
 			const parts: React.ReactNode[] = [];
@@ -343,8 +347,8 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 		};
 
 		const inputSpacingClass = isProjectVariant
-			? "min-h-[92px] rounded-none px-0 py-0 text-base"
-			: "min-h-[116px] rounded-2xl px-5 py-4 text-sm";
+			? "min-h-[92px] rounded-none px-0 py-0 text-base leading-7"
+			: "min-h-[116px] rounded-2xl px-5 py-4 text-sm leading-6";
 
 		return (
 			<div className="relative">
@@ -352,15 +356,7 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 					<div className="absolute bottom-full left-0 z-30 mb-2 w-full max-w-[360px] overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 p-1.5 shadow-[0_12px_36px_rgba(15,23,42,0.12)] backdrop-blur">
 						<Command shouldFilter={false} className="rounded-xl! bg-transparent p-0">
 							<div className="flex items-center gap-2 px-2.5 pb-1.5 pt-1 text-xs font-medium text-slate-400">
-								{trigger.kind === "assistant" ? (
-									<>
-										AI 队友
-									</>
-								) : (
-									<>
-										命令
-									</>
-								)}
+								{trigger.kind === "assistant" ? <>AI 队友</> : <>命令</>}
 								{trigger.query && <span className="truncate text-slate-400">{trigger.query}</span>}
 							</div>
 							<CommandList className="max-h-60">
@@ -419,15 +415,20 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 					</div>
 				)}
 
-				<div
-					aria-hidden="true"
-					className={cn(
-						"pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-slate-700",
-						inputSpacingClass,
-					)}
-				>
-					<div style={{ transform: `translateY(-${scrollTop}px)` }}>{renderHighlightedValue()}</div>
-				</div>
+				{shouldUseHighlightLayer && (
+					<div
+						aria-hidden="true"
+						className={cn(
+							"pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-slate-700",
+							inputSpacingClass,
+						)}
+					>
+						{/* 只有真正需要高亮 token 时才启用镜像层，避免长文本粘贴时双层排版产生重影。 */}
+						<div style={{ transform: `translateY(-${scrollTop}px)` }}>
+							{renderHighlightedValue()}
+						</div>
+					</div>
+				)}
 				<textarea
 					ref={textareaRef}
 					value={value}
@@ -450,7 +451,8 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 					}}
 					placeholder={placeholder}
 					className={cn(
-						"relative z-10 max-h-[220px] w-full resize-none bg-transparent text-transparent caret-slate-700 focus:outline-none placeholder:text-slate-400",
+						"relative z-10 max-h-[220px] w-full resize-none bg-transparent caret-slate-700 focus:outline-none placeholder:text-slate-400",
+						shouldUseHighlightLayer ? "text-transparent" : "text-slate-700",
 						inputSpacingClass,
 					)}
 					rows={1}
