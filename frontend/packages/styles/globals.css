@@ -1,10 +1,11 @@
 @import "tailwindcss";
-@plugin "@tailwindcss/typography";
 @import "tw-animate-css";
+@import "katex/dist/katex.min.css";
 @import "shadcn/tailwind.css";
 @import "@eigenpal/docx-editor-react/styles.css";
 @import "@leros/ui/styles/tokens.css";
 @import "@leros/ui/styles/base.css";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -18,7 +19,7 @@
 	--leros-sidebar-border: #c9d3ea;
 	--leros-surface: #ffffff;
 	--leros-surface-soft: #f6f8fc;
-	--leros-primary: #4F46E5;
+	--leros-primary: #4f46e5;
 	--leros-primary-strong: #0b57d0;
 	--leros-primary-soft: #dce7ff;
 	--leros-primary-softer: #e8efff;

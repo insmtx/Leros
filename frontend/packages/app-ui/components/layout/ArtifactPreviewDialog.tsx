@@ -13,8 +13,7 @@ import {
 import { cn } from "@leros/ui/lib/utils";
 import { Download, FileText, ImageIcon, LoaderCircle, Table2, X } from "lucide-react";
 import { type ComponentType, type CSSProperties, useEffect, useMemo, useState } from "react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { MarkdownRenderer } from "../common/MarkdownRenderer";
 
 type PreviewKind = "docx" | "markdown" | "text" | "image" | "pdf" | "unsupported";
 
@@ -249,9 +248,10 @@ function ArtifactPreviewBody({
 	if (previewKind === "markdown") {
 		return (
 			<div className="h-full overflow-auto bg-[var(--leros-surface)] px-8 py-7">
-				<div className="prose prose-slate prose-sm max-w-none prose-headings:text-[var(--leros-text-strong)] prose-p:leading-7 prose-pre:rounded-lg prose-pre:bg-slate-950">
-					<Markdown remarkPlugins={[remarkGfm]}>{preview.text ?? ""}</Markdown>
-				</div>
+				<MarkdownRenderer
+					content={preview.text ?? ""}
+					className="prose prose-slate prose-sm max-w-none prose-headings:text-[var(--leros-text-strong)] prose-p:leading-7 prose-pre:rounded-lg prose-pre:bg-slate-950"
+				/>
 			</div>
 		);
 	}
