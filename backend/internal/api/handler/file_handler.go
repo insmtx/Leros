@@ -59,7 +59,7 @@ func (h *FileHandler) UploadFile(ctx *gin.Context) {
 		Purpose:  purpose,
 	})
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
+		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, "upload file failed"))
 		return
 	}
 
@@ -85,7 +85,7 @@ func (h *FileHandler) DownloadFile(ctx *gin.Context) {
 			ctx.JSON(http.StatusNotFound, dto.Error(dto.CodeNotFound, "file not found"))
 			return
 		}
-		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
+		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, "get download url failed"))
 		return
 	}
 

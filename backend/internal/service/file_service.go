@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"mime"
+	"net/http"
 	"strings"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 	appstorage "github.com/insmtx/Leros/backend/internal/infra/storage"
 	"github.com/insmtx/Leros/backend/types"
 	"github.com/ygpkg/yg-go/encryptor/snowflake"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 type fileService struct {
@@ -31,19 +34,30 @@ func NewFileService(db *gorm.DB) contract.FileService {
 	return &fileService{db: db}
 }
 
+const maxUploadSize = 100 << 20 // 100MB
+
 func (s *fileService) UploadFile(ctx context.Context, req *contract.UploadFileRequest) (*contract.UploadFileResult, error) {
 	caller, err := requireCallerOrg(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	data, err := io.ReadAll(req.File)
+	data, err := io.ReadAll(io.LimitReader(req.File, maxUploadSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("read file: %w", err)
+	}
+	if int64(len(data)) > maxUploadSize {
+		return nil, fmt.Errorf("file size exceeds maximum allowed size of %dMB", maxUploadSize/(1<<20))
 	}
 
 	hash := sha256.Sum256(data)
 	sha256Hex := hex.EncodeToString(hash[:])
+
+	detectedMime := http.DetectContentType(data[:min(len(data), 512)])
+	mimeType := req.MimeType
+	if mediaType, _, err := mime.ParseMediaType(detectedMime); err == nil {
+		mimeType = mediaType
+	}
 
 	ext := ""
 	if idx := strings.LastIndex(req.Filename, "."); idx >= 0 {
@@ -56,10 +70,11 @@ func (s *fileService) UploadFile(ctx context.Context, req *contract.UploadFileRe
 	bucket := appstorage.DefaultBucket()
 
 	result, err := st.PutObject(ctx, bucket, key, bytes.NewReader(data),
-		storage.WithContentType(req.MimeType),
+		storage.WithContentType(mimeType),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("put object: %w", err)
+		logs.ErrorContextf(ctx, "put object failed: %v", err)
+		return nil, fmt.Errorf("upload file failed")
 	}
 
 	publicID := fmt.Sprintf("file_%s", snowflake.GenerateIDBase58())
@@ -69,7 +84,7 @@ func (s *fileService) UploadFile(ctx context.Context, req *contract.UploadFileRe
 		OwnerID:      caller.Uin,
 		Filename:     storeFilename,
 		OriginalName: req.Filename,
-		MimeType:     req.MimeType,
+		MimeType:     mimeType,
 		FileSize:     int64(len(data)),
 		StoragePath:  result.Path.Path(),
 		Sha256:       sha256Hex,
@@ -85,7 +100,7 @@ func (s *fileService) UploadFile(ctx context.Context, req *contract.UploadFileRe
 		FileUploadID: publicID,
 		Filename:     storeFilename,
 		OriginalName: req.Filename,
-		MimeType:     req.MimeType,
+		MimeType:     mimeType,
 		FileSize:     file.FileSize,
 		Sha256:       sha256Hex,
 		URL:          result.Path.PublicURL(),
@@ -107,7 +122,8 @@ func (s *fileService) GetFileDownloadURL(ctx context.Context, orgID uint, fileID
 	ttl := 30 * time.Minute
 	url, err := st.PresignGetObject(ctx, bucket, file.StoragePath, ttl)
 	if err != nil {
-		return nil, fmt.Errorf("presign url: %w", err)
+		logs.ErrorContextf(ctx, "presign url failed: %v", err)
+		return nil, fmt.Errorf("get download url failed")
 	}
 
 	return &contract.FileDownloadURL{
