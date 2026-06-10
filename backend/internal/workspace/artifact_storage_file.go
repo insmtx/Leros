@@ -2,6 +2,8 @@ package workspace
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"mime"
@@ -27,17 +29,26 @@ func ResolveArtifactStorageFile(ctx context.Context, orgID uint, workerID uint, 
 	st := appstorage.Get()
 	bucket := appstorage.DefaultBucket()
 
-	info, err := st.HeadObject(ctx, bucket, storageKey)
+	result, err := st.GetObject(ctx, bucket, storageKey)
 	if err != nil {
-		return nil, fmt.Errorf("head artifact object: %w", err)
+		return nil, fmt.Errorf("get artifact object: %w", err)
+	}
+	defer result.Body.Close()
+
+	data, err := io.ReadAll(result.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read artifact object: %w", err)
 	}
 
+	hash := sha256.Sum256(data)
+	sha256Hex := hex.EncodeToString(hash[:])
+
 	return &ArtifactStorageFile{
-		Path:     info.Path.Path(),
-		Filename: filepath.Base(info.Path.Key()),
-		MimeType: detectMimeTypeFromKey(info.Path.Key(), declaredMimeType),
-		FileSize: info.Size,
-		Sha256:   info.ETag,
+		Path:     result.Path.Path(),
+		Filename: filepath.Base(result.Path.Key()),
+		MimeType: detectMimeTypeFromKey(result.Path.Key(), declaredMimeType),
+		FileSize: result.Size,
+		Sha256:   sha256Hex,
 	}, nil
 }
 
