@@ -405,4 +405,3 @@ func (s *WorkerManager) createWorker(c *gin.Context) {
 
 	c.JSON(http.StatusOK, instance)
 }
-

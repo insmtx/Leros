@@ -135,7 +135,7 @@ type ApprovalRequestPayload struct {
 // ApprovalDecisionPayload describes the outcome of an approval request.
 type ApprovalDecisionPayload struct {
 	RequestID string `json:"request_id"`
-	Action    string `json:"action"`  // "approve" | "deny" | "always"
+	Action    string `json:"action"` // "approve" | "deny" | "always"
 	Reason    string `json:"reason,omitempty"`
 }
 

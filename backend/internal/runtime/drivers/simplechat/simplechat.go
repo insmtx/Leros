@@ -74,6 +74,12 @@ func (s *SimpleChat) Run(ctx context.Context, req *agent.RequestContext) (*agent
 	}
 
 	userInput := agent.BuildUserInput(req)
+	if attachmentText := agent.BuildAttachmentText(req.Input.Attachments); attachmentText != "" {
+		if userInput != "" {
+			userInput += "\n"
+		}
+		userInput += attachmentText
+	}
 	if userInput == "" {
 		return nil, fmt.Errorf("empty user input")
 	}

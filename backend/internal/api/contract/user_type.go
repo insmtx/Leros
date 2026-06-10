@@ -7,19 +7,19 @@ import (
 )
 
 type UserInfo struct {
-	PublicID     string    `json:"public_id"`
-	GithubID     int64     `json:"github_id,omitempty"`
-	GithubLogin  string    `json:"github_login"`
-	Name         string    `json:"name"`
-	Email        string    `json:"email,omitempty"`
-	AvatarURL    string    `json:"avatar_url,omitempty"`
-	Bio          string    `json:"bio,omitempty"`
-	Company      string    `json:"company,omitempty"`
-	Location     string    `json:"location,omitempty"`
-	PublicRepos  int       `json:"public_repos,omitempty"`
-	Followers    int       `json:"followers,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	PublicID    string    `json:"public_id"`
+	GithubID    int64     `json:"github_id,omitempty"`
+	GithubLogin string    `json:"github_login"`
+	Name        string    `json:"name"`
+	Email       string    `json:"email,omitempty"`
+	AvatarURL   string    `json:"avatar_url,omitempty"`
+	Bio         string    `json:"bio,omitempty"`
+	Company     string    `json:"company,omitempty"`
+	Location    string    `json:"location,omitempty"`
+	PublicRepos int       `json:"public_repos,omitempty"`
+	Followers   int       `json:"followers,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type CreateUserRequest struct {

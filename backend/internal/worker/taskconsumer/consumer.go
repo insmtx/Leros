@@ -30,11 +30,11 @@ const (
 
 // Config controls one standalone worker task consumer.
 type Config struct {
-	OrgID           uint
-	WorkerID        uint
-	DebounceWindow  time.Duration
-	MaxConcurrency  int    // concurrent worker pool size, default 20
-	SeqTrackerPath  string // path to SQLite seq tracker database
+	OrgID          uint
+	WorkerID       uint
+	DebounceWindow time.Duration
+	MaxConcurrency int    // concurrent worker pool size, default 20
+	SeqTrackerPath string // path to SQLite seq tracker database
 }
 
 // Consumer subscribes to one worker task topic and dispatches tasks to an agent runtime.

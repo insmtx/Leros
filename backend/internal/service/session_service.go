@@ -389,7 +389,6 @@ func (s *sessionService) HandleSessionTitleRequest(ctx context.Context, sessionI
 	return nil
 }
 
-
 func (s *sessionService) SubmitApproval(ctx context.Context, req *contract.SubmitApprovalRequest) error {
 	if req.WorkerID == 0 {
 		req.WorkerID = 1 // TODO: 由 session 关联的运行时动态获取

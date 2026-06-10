@@ -55,10 +55,10 @@ type ProjectList struct {
 // ProjectDetail 项目详情响应，包含关联的会话、任务、产物和成员
 type ProjectDetail struct {
 	Project
-	Session   *Session             `json:"session,omitempty"`
-	Tasks     []ProjectTaskItem    `json:"tasks"`
-	Artifacts []Artifact           `json:"artifacts,omitempty"`
-	Members   []ProjectMemberItem  `json:"members"`
+	Session   *Session            `json:"session,omitempty"`
+	Tasks     []ProjectTaskItem   `json:"tasks"`
+	Artifacts []Artifact          `json:"artifacts,omitempty"`
+	Members   []ProjectMemberItem `json:"members"`
 }
 
 // ProjectTaskItem 项目详情中的任务项，包含关联的会话信息
@@ -85,13 +85,13 @@ type ProjectMemory struct {
 
 // FileTreeNode 文件树节点，递归结构
 type FileTreeNode struct {
-	Name     string          `json:"name"`               // 文件/目录名
-	Path     string          `json:"path"`               // 相对路径，兼做节点标识
-	Type     string          `json:"type"`               // "file" | "directory"
-	Children []*FileTreeNode `json:"children,omitempty"` // 仅目录有
-	Size     int64           `json:"size,omitempty"`     // 仅文件有
+	Name     string          `json:"name"`                // 文件/目录名
+	Path     string          `json:"path"`                // 相对路径，兼做节点标识
+	Type     string          `json:"type"`                // "file" | "directory"
+	Children []*FileTreeNode `json:"children,omitempty"`  // 仅目录有
+	Size     int64           `json:"size,omitempty"`      // 仅文件有
 	MimeType string          `json:"mime_type,omitempty"` // 仅文件有
-	ModTime  int64           `json:"mod_time,omitempty"` // 最后修改时间，Unix 时间戳（秒）
+	ModTime  int64           `json:"mod_time,omitempty"`  // 最后修改时间，Unix 时间戳（秒）
 }
 
 // FileUploadResult 文件上传结果

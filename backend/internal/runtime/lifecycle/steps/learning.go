@@ -145,7 +145,11 @@ func ShouldRunLearningCheck(req *agent.RequestContext, result *agent.RunResult, 
 	if alreadyCalledLearningTool(trace.ToolNames) {
 		return false
 	}
-	if containsLearningCue(agent.BuildUserInput(req)) {
+	userInput := agent.BuildUserInput(req)
+	if attachmentText := agent.BuildAttachmentText(req.Input.Attachments); attachmentText != "" {
+		userInput += "\n" + attachmentText
+	}
+	if containsLearningCue(userInput) {
 		return true
 	}
 	if trace.ToolFailures > 0 {

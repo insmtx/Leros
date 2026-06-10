@@ -44,13 +44,13 @@ type DatabaseConfig struct {
 
 // StorageConfig 是存储的配置结构
 type StorageConfig struct {
-	Driver     string `yaml:"driver"`
-	Endpoint   string `yaml:"endpoint,omitempty"`
-	AccessKey  string `yaml:"access_key,omitempty"`
-	SecretKey  string `yaml:"secret_key,omitempty"`
-	UseSSL     bool   `yaml:"use_ssl,omitempty"`
-	Bucket     string `yaml:"bucket,omitempty"`
-	BaseURL    string `yaml:"base_url,omitempty"`
-	URLStyle   string `yaml:"url_style,omitempty"`
-	LocalDir   string `yaml:"local_dir,omitempty"`
+	Driver    string `yaml:"driver"`
+	Endpoint  string `yaml:"endpoint,omitempty"`
+	AccessKey string `yaml:"access_key,omitempty"`
+	SecretKey string `yaml:"secret_key,omitempty"`
+	UseSSL    bool   `yaml:"use_ssl,omitempty"`
+	Bucket    string `yaml:"bucket,omitempty"`
+	BaseURL   string `yaml:"base_url,omitempty"`
+	URLStyle  string `yaml:"url_style,omitempty"`
+	LocalDir  string `yaml:"local_dir,omitempty"`
 }

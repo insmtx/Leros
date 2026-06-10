@@ -34,7 +34,7 @@ func TestRunnerAdaptsEngineResult(t *testing.T) {
 		RunID:        "run_cli",
 		SystemPrompt: "system only",
 		Input: agent.InputContext{
-			Type: agent.InputTypeMessage,
+			Type:     agent.InputTypeMessage,
 			Messages: []agent.InputMessage{{Role: "user", Content: "hello"}},
 		},
 		Runtime: agent.RuntimeOptions{WorkDir: "/tmp"},
@@ -79,7 +79,7 @@ func TestRunnerDefaultsEmptyWorkDirToWorkspaceTemp(t *testing.T) {
 	_, err = runner.Run(context.Background(), &agent.RequestContext{
 		RunID: "run_temp",
 		Input: agent.InputContext{
-			Type: agent.InputTypeMessage,
+			Type:     agent.InputTypeMessage,
 			Messages: []agent.InputMessage{{Role: "user", Content: "hello"}},
 		},
 		Runtime: agent.RuntimeOptions{WorkDir: expected},
@@ -112,7 +112,7 @@ func TestRunnerStoresProviderSessionAndResumes(t *testing.T) {
 			ID: "assistant-1",
 		},
 		Input: agent.InputContext{
-			Type: agent.InputTypeMessage,
+			Type:     agent.InputTypeMessage,
 			Messages: []agent.InputMessage{{Role: "user", Content: "hello"}},
 		},
 		Runtime: agent.RuntimeOptions{WorkDir: "/tmp"},
@@ -154,7 +154,7 @@ func TestRunnerDoesNotPreallocateClaudeProviderSession(t *testing.T) {
 			ID: "internal-session-claude",
 		},
 		Input: agent.InputContext{
-			Type: agent.InputTypeMessage,
+			Type:     agent.InputTypeMessage,
 			Messages: []agent.InputMessage{{Role: "user", Content: "hello"}},
 		},
 		Runtime: agent.RuntimeOptions{WorkDir: "/tmp"},
@@ -196,7 +196,7 @@ func TestRunnerForwardsExternalToolEvents(t *testing.T) {
 		TraceID:   "trace_tool_events",
 		EventSink: sink,
 		Input: agent.InputContext{
-			Type: agent.InputTypeMessage,
+			Type:     agent.InputTypeMessage,
 			Messages: []agent.InputMessage{{Role: "user", Content: "hello"}},
 		},
 		Runtime: agent.RuntimeOptions{WorkDir: "/tmp"},
@@ -248,7 +248,7 @@ func TestRunnerNormalizesTodoEventsThroughTracker(t *testing.T) {
 		TraceID:   "trace_todo",
 		EventSink: sink,
 		Input: agent.InputContext{
-			Type: agent.InputTypeMessage,
+			Type:     agent.InputTypeMessage,
 			Messages: []agent.InputMessage{{Role: "user", Content: "hello"}},
 		},
 		Runtime: agent.RuntimeOptions{WorkDir: "/tmp"},

@@ -73,6 +73,12 @@ func (r *Runner) Run(ctx context.Context, req *agent.RequestContext) (*agent.Run
 	}
 
 	prompt := agent.BuildUserInput(req)
+	if attachmentText := agent.BuildAttachmentText(req.Input.Attachments); attachmentText != "" {
+		if prompt != "" {
+			prompt += "\n"
+		}
+		prompt += attachmentText
+	}
 	sessionPlan := r.resolveProviderSession(ctx, req, workDir)
 
 	handle, err := r.engine.Run(ctx, engines.RunRequest{

@@ -225,7 +225,6 @@ func (h *ProjectHandler) ListProjects(ctx *gin.Context) {
 // Error Handling
 // ================================================================
 
-
 func handleProjectServiceError(ctx *gin.Context, err error) {
 	errMsg := err.Error()
 

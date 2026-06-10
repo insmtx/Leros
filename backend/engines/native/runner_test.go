@@ -221,7 +221,7 @@ func TestAgentRunNodeTool(t *testing.T) {
 	}
 
 	eventsCh, err := agt.Run(ctx, engines.RunRequest{
-		ExecutionID:  "run_real_model_node_shell_time",
+		ExecutionID: "run_real_model_node_shell_time",
 		SystemPrompt: strings.Join([]string{
 			"You must use tools to complete the user task; do not answer without tool usage.",
 			"node_shell executes commands in the current worker environment.",

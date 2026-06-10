@@ -98,12 +98,12 @@ func newTestWorkerTaskMessage(t *testing.T, orgID uint, workerID uint, sessionID
 				AssistantID: "assistant_test",
 				Tools:       []string{},
 			},
-		Input: protocol.TaskInput{
-			Type: protocol.InputTypeTaskInstruction,
-			Messages: []protocol.ChatMessage{
-				{Role: protocol.MessageRoleUser, Content: "Check the current system time and report it back."},
+			Input: protocol.TaskInput{
+				Type: protocol.InputTypeTaskInstruction,
+				Messages: []protocol.ChatMessage{
+					{Role: protocol.MessageRoleUser, Content: "Check the current system time and report it back."},
+				},
 			},
-		},
 			Runtime: protocol.RuntimeOptions{
 				Kind:    AgentRuntime,
 				WorkDir: ".",

@@ -16,9 +16,9 @@ import (
 
 // FileSnapshot records a single file's metadata at a point in time.
 type FileSnapshot struct {
-	Path         string `json:"path"`
-	Size         int64  `json:"size"`
-	MtimeUnixNano int64 `json:"mtime_unix_nano"`
+	Path          string `json:"path"`
+	Size          int64  `json:"size"`
+	MtimeUnixNano int64  `json:"mtime_unix_nano"`
 }
 
 // WriteBaseline scans the repo directory, applies ignore rules, and writes a baseline.jsonl.
@@ -197,8 +197,8 @@ func scanRepoFiles(ctx context.Context, repoDir string) ([]FileSnapshot, error) 
 			return nil
 		}
 		snapshots = append(snapshots, FileSnapshot{
-			Path:           path,
-			Size:           info.Size(),
+			Path:          path,
+			Size:          info.Size(),
 			MtimeUnixNano: info.ModTime().UnixNano(),
 		})
 		return nil
@@ -211,11 +211,11 @@ func scanRepoFiles(ctx context.Context, repoDir string) ([]FileSnapshot, error) 
 
 // IgnoreChecker applies gitignore rules and Leros built-in excludes.
 type IgnoreChecker struct {
-	repoDir   string
-	gitDir    string
-	lerosDir  string
-	cache     map[string]bool
-	useGit    bool
+	repoDir  string
+	gitDir   string
+	lerosDir string
+	cache    map[string]bool
+	useGit   bool
 }
 
 // NewIgnoreChecker creates an IgnoreChecker for the given repo directory.

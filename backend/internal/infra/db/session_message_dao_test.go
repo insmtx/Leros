@@ -13,7 +13,7 @@ func TestCreateMessage(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "create_msg_session",
-		Type:      types.SessionTypeUserChat,
+		Type:     types.SessionTypeUserChat,
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -43,7 +43,7 @@ func TestGetMessageByID(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "get_msg_session",
-		Type:      types.SessionTypeUserChat,
+		Type:     types.SessionTypeUserChat,
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -81,7 +81,7 @@ func TestGetSessionMessages(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "get_messages_session",
-		Type:      types.SessionTypeUserChat,
+		Type:     types.SessionTypeUserChat,
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -124,7 +124,7 @@ func TestGetSessionMessages_Pagination(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "pagination_msg_session",
-		Type:      types.SessionTypeUserChat,
+		Type:     types.SessionTypeUserChat,
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -163,7 +163,7 @@ func TestDeleteMessage(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "delete_msg_session",
-		Type:      types.SessionTypeUserChat,
+		Type:     types.SessionTypeUserChat,
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -202,7 +202,7 @@ func TestClearSessionMessages(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "clear_msg_session",
-		Type:      types.SessionTypeUserChat,
+		Type:     types.SessionTypeUserChat,
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -242,7 +242,7 @@ func TestGetLatestMessage(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "latest_msg_session",
-		Type:      types.SessionTypeUserChat,
+		Type:     types.SessionTypeUserChat,
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -281,7 +281,7 @@ func TestGetMessageCount(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "count_msg_session",
-		Type:      types.SessionTypeUserChat,
+		Type:     types.SessionTypeUserChat,
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -316,7 +316,7 @@ func TestGetNextSequence(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "sequence_session",
-		Type:      types.SessionTypeUserChat,
+		Type:     types.SessionTypeUserChat,
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {
@@ -351,7 +351,7 @@ func TestGetNextSequence_EmptySession(t *testing.T) {
 
 	session := &types.Session{
 		PublicID: "empty_sequence_session",
-		Type:      types.SessionTypeUserChat,
+		Type:     types.SessionTypeUserChat,
 	}
 
 	if err := CreateSession(ctx, db, session); err != nil {

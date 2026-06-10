@@ -15,18 +15,18 @@ import (
 
 // rpcRequest 是 JSON-RPC 2.0 请求。
 type rpcRequest struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      int64           `json:"id,omitempty"`
-	Method  string          `json:"method,omitempty"`
+	JSONRPC string                 `json:"jsonrpc"`
+	ID      int64                  `json:"id,omitempty"`
+	Method  string                 `json:"method,omitempty"`
 	Params  sonic.NoCopyRawMessage `json:"params,omitempty"`
 }
 
 // rpcResponse 是 JSON-RPC 2.0 响应。
 type rpcResponse struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      int64           `json:"id"`
+	JSONRPC string                 `json:"jsonrpc"`
+	ID      int64                  `json:"id"`
 	Result  sonic.NoCopyRawMessage `json:"result,omitempty"`
-	Error   *rpcError       `json:"error,omitempty"`
+	Error   *rpcError              `json:"error,omitempty"`
 }
 
 // rpcError 是 JSON-RPC 2.0 错误对象。
@@ -41,12 +41,12 @@ func (e *rpcError) Error() string {
 
 // rpcMessage 用于解析收到的消息（统一入口）。
 type rpcMessage struct {
-	JSONRPC string          `json:"jsonrpc"`
+	JSONRPC string                 `json:"jsonrpc"`
 	ID      sonic.NoCopyRawMessage `json:"id,omitempty"`
-	Method  string          `json:"method,omitempty"`
+	Method  string                 `json:"method,omitempty"`
 	Params  sonic.NoCopyRawMessage `json:"params,omitempty"`
 	Result  sonic.NoCopyRawMessage `json:"result,omitempty"`
-	Error   *rpcError       `json:"error,omitempty"`
+	Error   *rpcError              `json:"error,omitempty"`
 }
 
 // ServerRequest 表示来自 Codex app-server 的请求（需要客户端响应）。
@@ -58,8 +58,8 @@ type ServerRequest struct {
 
 // Client 是 JSON-RPC 2.0 客户端，基于独立的 reader/writer 进行行分隔的 JSON 通信。
 type Client struct {
-	w       io.Writer
-	reader  *bufio.Scanner
+	w      io.Writer
+	reader *bufio.Scanner
 
 	writeMu      sync.Mutex
 	nextID       atomic.Int64
@@ -69,8 +69,8 @@ type Client struct {
 	bufferCalled bool // scanner.Buffer() 是否已调用过（防止 panic）
 
 	// 回调：由上层设置
-	OnNotification   func(method string, params sonic.NoCopyRawMessage)
-	OnServerRequest  func(req ServerRequest)
+	OnNotification  func(method string, params sonic.NoCopyRawMessage)
+	OnServerRequest func(req ServerRequest)
 }
 
 // NewClient 创建 JSON-RPC 客户端。

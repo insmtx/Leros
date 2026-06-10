@@ -1,8 +1,8 @@
 package claude
 
 import (
-	"github.com/bytedance/sonic"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"io"
 	"strings"
 

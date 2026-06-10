@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	envServerURL  = "LEROS_SERVER_URL"
-	envAuthToken  = "LEROS_AUTH_TOKEN"
-	envDev        = "LEROS_DEV"
+	envServerURL = "LEROS_SERVER_URL"
+	envAuthToken = "LEROS_AUTH_TOKEN"
+	envDev       = "LEROS_DEV"
 
-	defaultServerAddr   = "127.0.0.1:8080"
+	defaultServerAddr    = "127.0.0.1:8080"
 	defaultCLIConfigDir  = ".leros"
 	defaultCLIConfigFile = "config.yaml"
 )

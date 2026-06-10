@@ -306,7 +306,7 @@ func TestEnsureExternalSkillLinkReplacesRealDir(t *testing.T) {
 	if fi.Mode()&os.ModeSymlink == 0 {
 		t.Fatal("expected real dir replaced by symlink")
 	}
-	}
+}
 
 func TestEnsureExternalSkillLinkRejectsEmptyName(t *testing.T) {
 	if err := EnsureExternalSkillLink("", []string{t.TempDir()}); err == nil {

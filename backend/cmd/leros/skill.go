@@ -17,10 +17,10 @@ import (
 )
 
 var (
-	skillJSON     bool
-	skillForce    bool
-	skillYes      bool
-	skillLimit    int
+	skillJSON  bool
+	skillForce bool
+	skillYes   bool
+	skillLimit int
 )
 
 // knownCLISkillDirs 外部 CLI skill 目录，安装后创建 symlink 同步。
@@ -169,4 +169,3 @@ func runSearch(query string) error {
 	fmt.Fprintf(os.Stderr, "\nFound %d result(s).\n", len(results))
 	return nil
 }
-

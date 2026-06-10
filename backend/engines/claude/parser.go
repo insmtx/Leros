@@ -2,8 +2,8 @@ package claude
 
 import (
 	"context"
-	"github.com/bytedance/sonic"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"strings"
 
 	"github.com/insmtx/Leros/backend/engines"
@@ -30,11 +30,11 @@ type streamEvent struct {
 }
 
 type controlReq struct {
-	Subtype  string         `json:"subtype"`
-	ToolName string         `json:"tool_name"`
-	Name     string         `json:"name,omitempty"`
-	Input    map[string]any `json:"input"`
-	ToolUseID string        `json:"tool_use_id"`
+	Subtype   string         `json:"subtype"`
+	ToolName  string         `json:"tool_name"`
+	Name      string         `json:"name,omitempty"`
+	Input     map[string]any `json:"input"`
+	ToolUseID string         `json:"tool_use_id"`
 }
 
 type streamMessage struct {

@@ -375,7 +375,7 @@ func TestListSessions_ByType(t *testing.T) {
 	typeFilter := types.SessionTypeUserChat
 	sessions, total, err := ListSessions(ctx, db, &types.PageQuery{
 		Pagination: types.Pagination{Limit: 20},
-		Filters: []types.Filter{{Field: "type", Value: []string{string(typeFilter)}, ExactMatch: true}},
+		Filters:    []types.Filter{{Field: "type", Value: []string{string(typeFilter)}, ExactMatch: true}},
 	})
 	if err != nil {
 		t.Fatalf("ListSessions failed: %v", err)
@@ -419,7 +419,7 @@ func TestListSessions_ByStatus(t *testing.T) {
 	statusFilter := string(types.SessionStatusActive)
 	sessions, total, err := ListSessions(ctx, db, &types.PageQuery{
 		Pagination: types.Pagination{Limit: 20},
-		Filters: []types.Filter{{Field: "status", Value: []string{statusFilter}}},
+		Filters:    []types.Filter{{Field: "status", Value: []string{statusFilter}}},
 	})
 	if err != nil {
 		t.Fatalf("ListSessions failed: %v", err)
@@ -459,7 +459,7 @@ func TestListSessions_ByKeyword(t *testing.T) {
 	keyword := "Alpha"
 	sessions, total, err := ListSessions(ctx, db, &types.PageQuery{
 		Pagination: types.Pagination{Limit: 20},
-		Filters: []types.Filter{{Field: "keyword", Value: []string{keyword}}},
+		Filters:    []types.Filter{{Field: "keyword", Value: []string{keyword}}},
 	})
 	if err != nil {
 		t.Fatalf("ListSessions failed: %v", err)

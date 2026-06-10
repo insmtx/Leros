@@ -35,14 +35,14 @@ type ListSessionsRequest struct {
 
 // AddMessageRequest adds a message to a session.
 type AddMessageRequest struct {
-	Role        string                       `json:"role" binding:"required"`
-	Content     string                       `json:"content" binding:"required"`
-	MessageType string                       `json:"message_type,omitempty"`
-	Chunks      []types.MessageChunk         `json:"chunks,omitempty"`
-	Attachments []types.MessageAttachment    `json:"attachments,omitempty"`
-	Thinking    string                       `json:"thinking,omitempty"`
-	Metadata    *types.ObjectMetadata        `json:"metadata,omitempty"`
-	Usage       *types.MessageUsage          `json:"usage,omitempty"`
+	Role        string                    `json:"role" binding:"required"`
+	Content     string                    `json:"content" binding:"required"`
+	MessageType string                    `json:"message_type,omitempty"`
+	Chunks      []types.MessageChunk      `json:"chunks,omitempty"`
+	Attachments []types.MessageAttachment `json:"attachments,omitempty"`
+	Thinking    string                    `json:"thinking,omitempty"`
+	Metadata    *types.ObjectMetadata     `json:"metadata,omitempty"`
+	Usage       *types.MessageUsage       `json:"usage,omitempty"`
 }
 
 // Session is the API response shape for a conversation.
@@ -55,7 +55,6 @@ type SubmitApprovalRequest struct {
 	Action    string `json:"action"`
 	Reason    string `json:"reason,omitempty"`
 }
-
 
 type Session struct {
 	SessionID            string                `json:"session_id"`
@@ -78,19 +77,19 @@ type Session struct {
 
 // SessionMessage is the API response shape for a persisted conversation message.
 type SessionMessage struct {
-	ID          string                       `json:"id"`
-	SessionID   string                       `json:"session_id"`
-	Role        string                       `json:"role"`
-	Content     string                       `json:"content"`
-	Chunks      []SessionEvent               `json:"chunks,omitempty"`
-	Artifacts   []types.MessageArtifact      `json:"artifacts,omitempty"`
-	Attachments []types.MessageAttachment    `json:"attachments,omitempty"`
-	Timestamp   int64                        `json:"timestamp"`
-	MessageType string                       `json:"message_type,omitempty"`
-	Metadata    *types.ObjectMetadata        `json:"metadata,omitempty"`
-	Usage       *types.MessageUsage          `json:"usage,omitempty"`
-	Sequence    int64                        `json:"sequence"`
-	CreatedAt   time.Time                    `json:"created_at"`
+	ID          string                    `json:"id"`
+	SessionID   string                    `json:"session_id"`
+	Role        string                    `json:"role"`
+	Content     string                    `json:"content"`
+	Chunks      []SessionEvent            `json:"chunks,omitempty"`
+	Artifacts   []types.MessageArtifact   `json:"artifacts,omitempty"`
+	Attachments []types.MessageAttachment `json:"attachments,omitempty"`
+	Timestamp   int64                     `json:"timestamp"`
+	MessageType string                    `json:"message_type,omitempty"`
+	Metadata    *types.ObjectMetadata     `json:"metadata,omitempty"`
+	Usage       *types.MessageUsage       `json:"usage,omitempty"`
+	Sequence    int64                     `json:"sequence"`
+	CreatedAt   time.Time                 `json:"created_at"`
 }
 
 // SessionEvent is the public event shape embedded in persisted message chunks.

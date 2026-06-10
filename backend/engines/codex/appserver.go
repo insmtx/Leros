@@ -30,16 +30,16 @@ type AppServer struct {
 	scanner *bufio.Scanner // stdout 行扫描器（整个生命周期共享）
 	stdin   io.WriteCloser
 
-	writeMu   sync.Mutex
-	nextRPCID int64
-	mu        sync.Mutex
-	pending   map[int64]chan *rpcResponse
-	threadID  string
-	turnID    string
-	busy      bool
+	writeMu    sync.Mutex
+	nextRPCID  int64
+	mu         sync.Mutex
+	pending    map[int64]chan *rpcResponse
+	threadID   string
+	turnID     string
+	busy       bool
 	lastActive time.Time
-	closed    bool
-	done      chan struct{}
+	closed     bool
+	done       chan struct{}
 
 	pendingApproval *ServerRequest
 	onNotification  func(method string, params sonic.NoCopyRawMessage)

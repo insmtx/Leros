@@ -8,25 +8,25 @@ import (
 
 // LLMModel LLM模型配置响应结构
 type LLMModel struct {
-	ID          uint                   `json:"id"`
-	OrgID       uint                   `json:"org_id"`
-	Code        string                 `json:"code"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Provider    string                 `json:"provider"`
-	Model       string                 `json:"model"`
-	BaseURL     string                 `json:"base_url"`
-	BaseURLHasV1 bool                 `json:"base_url_has_v1"`
-	APIKey      string                 `json:"api_key"`
-	MaxTokens   int                    `json:"max_tokens"`
-	Temperature float64                `json:"temperature"`
-	TimeoutSec  int                    `json:"timeout_sec"`
-	Status      string                 `json:"status"`
-	IsDefault   bool                   `json:"is_default"`
-	IsSystem    bool                   `json:"is_system"`
-	Config      map[string]interface{} `json:"config,omitempty"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
+	ID           uint                   `json:"id"`
+	OrgID        uint                   `json:"org_id"`
+	Code         string                 `json:"code"`
+	Name         string                 `json:"name"`
+	Description  string                 `json:"description"`
+	Provider     string                 `json:"provider"`
+	Model        string                 `json:"model"`
+	BaseURL      string                 `json:"base_url"`
+	BaseURLHasV1 bool                   `json:"base_url_has_v1"`
+	APIKey       string                 `json:"api_key"`
+	MaxTokens    int                    `json:"max_tokens"`
+	Temperature  float64                `json:"temperature"`
+	TimeoutSec   int                    `json:"timeout_sec"`
+	Status       string                 `json:"status"`
+	IsDefault    bool                   `json:"is_default"`
+	IsSystem     bool                   `json:"is_system"`
+	Config       map[string]interface{} `json:"config,omitempty"`
+	CreatedAt    time.Time              `json:"created_at"`
+	UpdatedAt    time.Time              `json:"updated_at"`
 }
 
 // CreateLLMModelRequest 创建LLM模型配置请求

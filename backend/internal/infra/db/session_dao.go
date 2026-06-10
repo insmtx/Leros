@@ -65,7 +65,7 @@ func GetSessionByPublicID(ctx context.Context, db *gorm.DB, publicID string) (*t
 // UpdateSession 更新会话（冲突时更新）
 func UpdateSession(ctx context.Context, db *gorm.DB, session *types.Session) error {
 	return db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "project_id"}, {Name: "task_id"}},
+		Columns: []clause.Column{{Name: "project_id"}, {Name: "task_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"public_id",
 			"updated_at",

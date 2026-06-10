@@ -116,6 +116,26 @@ type PolicyContext struct {
 	PermissionMode  string `json:"permission_mode,omitempty"` // "bypass" | "on-request" | "auto"; empty defaults to bypass
 }
 
+// BuildAttachmentText formats input attachments as a text block for prompt injection.
+func BuildAttachmentText(attachments []Attachment) string {
+	if len(attachments) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("\n[Attachments]\n")
+	for _, a := range attachments {
+		sb.WriteString(fmt.Sprintf("- %s", a.Name))
+		if a.URL != "" {
+			sb.WriteString(fmt.Sprintf(" (%s)", a.URL))
+		}
+		if a.MimeType != "" {
+			sb.WriteString(fmt.Sprintf(" [%s]", a.MimeType))
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
 // BuildUserInput joins the user-side messages from the request into a formatted text.
 func BuildUserInput(req *RequestContext) string {
 	if req == nil {

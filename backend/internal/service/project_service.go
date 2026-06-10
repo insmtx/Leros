@@ -16,8 +16,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/insmtx/Leros/backend/internal/api/contract"
-	localmemory "github.com/insmtx/Leros/backend/internal/memory/local"
 	"github.com/insmtx/Leros/backend/internal/infra/db"
+	localmemory "github.com/insmtx/Leros/backend/internal/memory/local"
 	"github.com/insmtx/Leros/backend/internal/workspace"
 	"github.com/insmtx/Leros/backend/types"
 	"github.com/ygpkg/yg-go/encryptor/snowflake"
@@ -438,7 +438,7 @@ func (s *projectService) GetProjectMemory(ctx context.Context, publicID string) 
 		Entries: entries,
 		Total:   len(entries),
 	}, nil
-	}
+}
 
 func (s *projectService) GetProjectFileTree(ctx context.Context, publicID string, parentPath string, depth int) ([]*contract.FileTreeNode, error) {
 	// 1. 鉴权
