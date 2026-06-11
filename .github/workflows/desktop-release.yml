@@ -143,6 +143,8 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.TENCENT_COS_SECRET_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.TENCENT_COS_SECRET_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.TENCENT_COS_REGION }}
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
           COS_BUCKET: ${{ secrets.TENCENT_COS_BUCKET }}
           COS_REGION: ${{ secrets.TENCENT_COS_REGION }}
           COS_PREFIX: ${{ vars.TENCENT_COS_PREFIX || 'desktop' }}
@@ -154,6 +156,7 @@ jobs:
           fi
 
           aws configure set default.s3.addressing_style virtual
+          aws configure set default.s3.multipart_threshold 5GB
 
           aws s3 sync release-assets "s3://${COS_BUCKET}/${COS_PREFIX}/${release_dir}/" \
             --endpoint-url "https://cos.${COS_REGION}.myqcloud.com" \
