@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.1.1] - 2026-06-11
+
+### Skill 市场与桌面端发布增强
+
+本版本补齐 Skill 市场的后端 API、前端真实数据接入与安装链路，优化桌面端发布流程，并修复多用户数据隔离和构建稳定性问题。
+
+- 新增 Skill 市场 API 与内置 Skill 数据模型，重构 `backend/skills` 为 server / worker 分层目录
+- Skill 市场前端接入真实 API，支持内置 Skill 下载与安装流程端到端闭环
+- BuiltinSource 改为 HTTP API 模式，短关键词外部搜索跳过逻辑下沉到 `SkillsShSource.Search`
+- Skill 管理支持删除时清理 CLI symlink，并引入类型化 catalog 错误
+- 修复用户、组织、项目、任务、会话、消息与 artifact 查询中的用户数据隔离问题
+- 新增 `install.sh`，支持将 `leros` 注册为全局系统命令，并补充 Makefile 安装入口
+- 优化桌面端发布 workflow，移除 COSCLI 上传链路，配置桌面端发布 API 地址注入
+- 优化桌面端发布产物体积，修复 SkillMarketView 中 `offsetRef` 导致的构建问题
+
 ## [v0.1.0] - 2026-06-11
 
 ### SingerOS 首个可用版本
