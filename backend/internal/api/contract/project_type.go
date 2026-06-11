@@ -96,7 +96,8 @@ type FileTreeNode struct {
 
 // FileUploadResult 文件上传结果
 type FileUploadResult struct {
-	Path     string `json:"path"`     // 相对 repo 根目录的路径
-	Filename string `json:"filename"` // 文件名
-	Size     int64  `json:"size"`     // 文件大小（字节）
+	Path     string `json:"path"`               // 相对 repo 根目录的路径
+	Filename string `json:"filename"`           // 文件名
+	Size     int64  `json:"size"`               // 文件大小（字节）
+	URL      string `json:"url,omitempty"`      // 文件访问 URL
 }

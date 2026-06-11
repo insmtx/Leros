@@ -18,7 +18,7 @@ import (
 
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
-	appstorage "github.com/insmtx/Leros/backend/internal/infra/storage"
+	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	"github.com/insmtx/Leros/backend/types"
 	"github.com/ygpkg/yg-go/encryptor/snowflake"
 	"github.com/ygpkg/yg-go/logs"
@@ -66,8 +66,8 @@ func (s *fileService) UploadFile(ctx context.Context, req *contract.UploadFileRe
 	storeFilename := fmt.Sprintf("%s%s", snowflake.GenerateIDBase58(), ext)
 	key := fmt.Sprintf("%s/%d/%s", req.Purpose, caller.OrgID, storeFilename)
 
-	st := appstorage.GetStorage()
-	bucket := appstorage.DefaultBucket()
+	st := filestore.GetStorage()
+	bucket := filestore.DefaultBucket()
 
 	result, err := st.PutObject(ctx, bucket, key, bytes.NewReader(data),
 		storage.WithContentType(mimeType),
@@ -116,8 +116,8 @@ func (s *fileService) GetFileDownloadURL(ctx context.Context, orgID uint, fileID
 		return nil, fmt.Errorf("file not found")
 	}
 
-	st := appstorage.GetStorage()
-	bucket := appstorage.DefaultBucket()
+	st := filestore.GetStorage()
+	bucket := filestore.DefaultBucket()
 
 	ttl := 30 * time.Minute
 	url, err := st.PresignGetObject(ctx, bucket, file.StoragePath, ttl)

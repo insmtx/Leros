@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	appstorage "github.com/insmtx/Leros/backend/internal/infra/storage"
+	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 )
 
 type ArtifactStorageFile struct {
@@ -26,8 +26,8 @@ func ResolveArtifactStorageFile(ctx context.Context, orgID uint, workerID uint, 
 		return nil, err
 	}
 
-	st := appstorage.GetStorage()
-	bucket := appstorage.DefaultBucket()
+	st := filestore.GetStorage()
+	bucket := filestore.DefaultBucket()
 
 	result, err := st.GetObject(ctx, bucket, storageKey)
 	if err != nil {
@@ -53,8 +53,8 @@ func ResolveArtifactStorageFile(ctx context.Context, orgID uint, workerID uint, 
 }
 
 func OpenArtifactStorageFile(ctx context.Context, orgID uint, workerID uint, storageKey string) (io.ReadCloser, error) {
-	st := appstorage.GetStorage()
-	bucket := appstorage.DefaultBucket()
+	st := filestore.GetStorage()
+	bucket := filestore.DefaultBucket()
 
 	result, err := st.GetObject(ctx, bucket, storageKey)
 	if err != nil {

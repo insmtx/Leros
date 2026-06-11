@@ -1,4 +1,4 @@
-package storage
+package filestore
 
 import (
 	"fmt"
@@ -19,9 +19,14 @@ var (
 
 func Init(cfg *config.StorageConfig) error {
 	if cfg == nil {
-		root, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("get working directory: %w", err)
+		var root string
+		if exe, err := os.Executable(); err == nil {
+			root = filepath.Dir(exe)
+		} else {
+			root, err = os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get working directory: %w", err)
+			}
 		}
 		cfg = &config.StorageConfig{
 			Driver:   "local",

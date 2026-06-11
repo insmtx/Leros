@@ -14,7 +14,7 @@ import (
 
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/config"
-	"github.com/insmtx/Leros/backend/internal/infra/storage"
+	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	"github.com/insmtx/Leros/backend/pkg/leros"
@@ -183,7 +183,7 @@ func TestHandleSessionArtifactDeclaredMessagePersistsArtifactFromWorkerStorage(t
 	root := t.TempDir()
 	t.Setenv(leros.EnvWorkspaceRoot, root)
 
-	if err := storage.Init(&config.StorageConfig{
+	if err := filestore.Init(&config.StorageConfig{
 		Driver:   "local",
 		LocalDir: root,
 		Bucket:   "bucket",

@@ -15,8 +15,8 @@ import (
 	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/api"
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
+	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	"github.com/insmtx/Leros/backend/internal/infra/mq"
-	"github.com/insmtx/Leros/backend/internal/infra/storage"
 	"github.com/insmtx/Leros/backend/pkg/leros"
 	"github.com/spf13/cobra"
 	"github.com/ygpkg/yg-go/lifecycle"
@@ -76,7 +76,7 @@ func newServerCommand() *cobra.Command {
 				logs.Warn("  - See example-config.yaml for database configuration example")
 			}
 
-			if err := storage.Init(cfg.Storage); err != nil {
+			if err := filestore.Init(cfg.Storage); err != nil {
 				logs.Fatalf("Failed to initialize storage: %v", err)
 				return
 			}
