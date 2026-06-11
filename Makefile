@@ -7,10 +7,10 @@ build:
 	go build -v -o ./bundles/leros ./backend/cmd/leros/
 
 install:
-	bash scripts/install.sh
+	bash deployments/dev/install.sh
 
 uninstall:
-	bash scripts/install.sh --uninstall
+	bash deployments/dev/install.sh --uninstall
 
 docker-build-base:
 	docker build -t $(REGISTRY)$(PROJECT)-base:latest -f deployments/build/Dockerfile.base .
