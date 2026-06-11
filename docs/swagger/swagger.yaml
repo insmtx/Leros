@@ -1,5 +1,12 @@
 basePath: /v1
 definitions:
+  contract.AddFileRequest:
+    properties:
+      public_id:
+        type: string
+    required:
+    - public_id
+    type: object
   contract.CreateDigitalAssistantRequest:
     properties:
       avatar:
@@ -301,6 +308,10 @@ definitions:
     properties:
       assistant_id:
         type: integer
+      attachments:
+        items:
+          $ref: '#/definitions/types.MessageAttachment'
+        type: array
       content:
         type: string
       message_type:
@@ -386,6 +397,10 @@ definitions:
     type: object
   handler.AddMessageRequest:
     properties:
+      attachments:
+        items:
+          $ref: '#/definitions/types.MessageAttachment'
+        type: array
       chunks:
         items:
           $ref: '#/definitions/types.MessageChunk'
@@ -705,6 +720,19 @@ definitions:
         type: string
     required:
     - public_id
+    type: object
+  types.MessageAttachment:
+    properties:
+      file_upload_id:
+        type: string
+      mime_type:
+        type: string
+      name:
+        type: string
+      purpose:
+        type: string
+      size:
+        type: integer
     type: object
   types.MessageChunk:
     properties:
@@ -2697,6 +2725,49 @@ paths:
       summary: 更新用户
       tags:
       - User
+  /projects/{project_id}/AddFile:
+    post:
+      consumes:
+      - application/json
+      description: 将已通过 /v1/files/upload 上传的文件关联到指定项目
+      parameters:
+      - description: 项目 public_id
+        in: path
+        name: project_id
+        required: true
+        type: string
+      - description: 文件信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/contract.AddFileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: 资源不存在
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: 内部服务器错误
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: 关联文件到项目
+      tags:
+      - Project
   /projects/{project_id}/files:
     get:
       description: 按 path + depth 获取项目文件目录层级结构

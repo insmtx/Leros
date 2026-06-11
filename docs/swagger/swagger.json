@@ -2986,6 +2986,71 @@
                 }
             }
         },
+        "/projects/{project_id}/AddFile": {
+            "post": {
+                "description": "将已通过 /v1/files/upload 上传的文件关联到指定项目",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Project"
+                ],
+                "summary": "关联文件到项目",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "项目 public_id",
+                        "name": "project_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "文件信息",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.AddFileRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "未认证",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "资源不存在",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/projects/{project_id}/files": {
             "get": {
                 "description": "按 path + depth 获取项目文件目录层级结构",
@@ -3223,6 +3288,17 @@
         }
     },
     "definitions": {
+        "contract.AddFileRequest": {
+            "type": "object",
+            "required": [
+                "public_id"
+            ],
+            "properties": {
+                "public_id": {
+                    "type": "string"
+                }
+            }
+        },
         "contract.CreateDigitalAssistantRequest": {
             "type": "object",
             "required": [
@@ -3681,6 +3757,12 @@
                 "assistant_id": {
                     "type": "integer"
                 },
+                "attachments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.MessageAttachment"
+                    }
+                },
                 "content": {
                     "type": "string"
                 },
@@ -3813,6 +3895,12 @@
                 "session_id"
             ],
             "properties": {
+                "attachments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.MessageAttachment"
+                    }
+                },
                 "chunks": {
                     "type": "array",
                     "items": {
@@ -4297,6 +4385,26 @@
                 },
                 "public_id": {
                     "type": "string"
+                }
+            }
+        },
+        "types.MessageAttachment": {
+            "type": "object",
+            "properties": {
+                "file_upload_id": {
+                    "type": "string"
+                },
+                "mime_type": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "purpose": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
                 }
             }
         },

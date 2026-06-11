@@ -51,6 +51,10 @@ type ObjectMetadata struct {
 	Tags []string `json:"tags,omitempty"`
 	// 元数据 - 项目类型/模板标识
 	Type string `json:"type,omitempty"`
+	// 元数据 - 对象存储桶
+	Bucket string `json:"bucket,omitempty"`
+	// 元数据 - 对象存储键
+	Key string `json:"key,omitempty"`
 	// 元数据 - 其他扩展字段
 	Extra map[string]interface{} `json:"extra,omitempty"`
 }
