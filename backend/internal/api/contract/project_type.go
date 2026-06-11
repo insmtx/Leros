@@ -101,3 +101,8 @@ type FileUploadResult struct {
 	Size     int64  `json:"size"`               // 文件大小（字节）
 	URL      string `json:"url,omitempty"`      // 文件访问 URL
 }
+
+// AddFileRequest 将已上传文件关联到项目的请求
+type AddFileRequest struct {
+	PublicID string `json:"public_id" binding:"required"`
+}

@@ -36,4 +36,6 @@ type ProjectService interface {
 
 	// 上传项目文件
 	UploadProjectFile(ctx context.Context, publicID string, reader io.Reader, filename string) (*FileUploadResult, error)
+
+	AddFile(ctx context.Context, publicID string, filePublicID string) error
 }

@@ -97,12 +97,14 @@ func (s *fileService) UploadFile(ctx context.Context, req *contract.UploadFileRe
 	}
 
 	return &contract.UploadFileResult{
+		PublicID:     publicID,
 		FileUploadID: publicID,
 		Filename:     storeFilename,
 		OriginalName: req.Filename,
 		MimeType:     mimeType,
 		FileSize:     file.FileSize,
 		Sha256:       sha256Hex,
+		StoragePath:  result.Path.URI(),
 		URL:          result.Path.PublicURL(),
 	}, nil
 }

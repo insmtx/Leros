@@ -761,6 +761,43 @@ func (s *projectService) UploadProjectFile(ctx context.Context, publicID string,
 	}, nil
 }
 
+// AddFile 将已上传的文件关联到项目。
+func (s *projectService) AddFile(ctx context.Context, publicID string, filePublicID string) error {
+	caller, err := requireCallerOrg(ctx)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(publicID) == "" {
+		return errors.New("public_id is required")
+	}
+	if strings.TrimSpace(filePublicID) == "" {
+		return errors.New("file_public_id is required")
+	}
+
+	project, err := db.GetProjectByPublicID(ctx, s.db, caller.OrgID, publicID)
+	if err != nil {
+		return err
+	}
+	if project == nil {
+		return errors.New("project not found")
+	}
+
+	file, err := db.GetFileUploadByPublicID(ctx, s.db, caller.OrgID, filePublicID)
+	if err != nil {
+		return err
+	}
+	if file == nil {
+		return errors.New("file not found")
+	}
+
+	file.Metadata.Extra["project_id"] = publicID
+	if err := db.UpdateFileUpload(ctx, s.db, file); err != nil {
+		return fmt.Errorf("update file upload metadata: %w", err)
+	}
+
+	return nil
+}
+
 func generateProjectPublicID() string {
 	return fmt.Sprintf("prj_%s", snowflake.GenerateIDBase58())
 }

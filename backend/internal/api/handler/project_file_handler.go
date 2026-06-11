@@ -30,6 +30,7 @@ func (h *ProjectFileHandler) RegisterRoutes(r gin.IRouter) {
 	r.POST("/projects/:project_id/files/upload", h.UploadProjectFile)
 	r.GET("/projects/:project_id/files/*filepath", h.DownloadProjectFile)
 	r.GET("/projects/:project_id/memory", h.GetProjectMemory)
+	r.POST("/projects/:project_id/AddFile", h.AddProjectFile)
 }
 
 // GetProjectFileTree 获取项目文件树
@@ -187,6 +188,40 @@ func (h *ProjectFileHandler) GetProjectMemory(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, dto.Success(result))
 }
 
+// AddProjectFile 将已上传文件关联到项目
+// @Summary 关联文件到项目
+// @Description 将已通过 /v1/files/upload 上传的文件关联到指定项目
+// @Tags Project
+// @Accept json
+// @Produce json
+// @Param project_id path string true "项目 public_id"
+// @Param request body contract.AddFileRequest true "文件信息"
+// @Success 200 {object} dto.Response "成功响应"
+// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
+// @Failure 401 {object} dto.ErrorResponse "未认证"
+// @Failure 404 {object} dto.ErrorResponse "资源不存在"
+// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
+// @Router /projects/{project_id}/AddFile [post]
+func (h *ProjectFileHandler) AddProjectFile(ctx *gin.Context) {
+	projectID := strings.TrimSpace(ctx.Param("project_id"))
+	if projectID == "" {
+		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, "project_id is required"))
+		return
+	}
+
+	var req contract.AddFileRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, "invalid request body"))
+		return
+	}
+
+	if err := h.service.AddFile(ctx, projectID, req.PublicID); err != nil {
+		handleProjectFileServiceError(ctx, err)
+		return
+	}
+	ctx.JSON(http.StatusOK, dto.Success(nil))
+}
+
 func handleProjectFileServiceError(ctx *gin.Context, err error) {
 	errMsg := err.Error()
 
@@ -200,6 +235,7 @@ func handleProjectFileServiceError(ctx *gin.Context, err error) {
 	case "project not found", "file not found", "directory not found":
 		ctx.JSON(http.StatusNotFound, dto.Error(dto.CodeNotFound, errMsg))
 	case "public_id is required",
+		"file_public_id is required",
 		"file path is required",
 		"filename is required",
 		"invalid parent path",

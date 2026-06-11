@@ -24,6 +24,10 @@ func GetFileUploadByPublicID(ctx context.Context, db *gorm.DB, orgID uint, publi
 	return &file, nil
 }
 
+func UpdateFileUpload(ctx context.Context, db *gorm.DB, file *types.FileUpload) error {
+	return db.WithContext(ctx).Save(file).Error
+}
+
 func ListFileUploads(ctx context.Context, db *gorm.DB, orgID uint, purpose string, offset, limit int) ([]types.FileUpload, int64, error) {
 	var files []types.FileUpload
 	query := db.WithContext(ctx).Model(&types.FileUpload{}).Where("org_id = ?", orgID)
