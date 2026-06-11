@@ -2,6 +2,8 @@ package storage
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/ygpkg/storage-go"
 	_ "github.com/ygpkg/storage-go/driver/local"
@@ -17,7 +19,15 @@ var (
 
 func Init(cfg *config.StorageConfig) error {
 	if cfg == nil {
-		return fmt.Errorf("storage config is required")
+		root, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("get working directory: %w", err)
+		}
+		cfg = &config.StorageConfig{
+			Driver:   "local",
+			LocalDir: filepath.Join(root, "leros-bucket"),
+			Bucket:   "bucket",
+		}
 	}
 	driver := storage.DriverType(cfg.Driver)
 	sCfg := storage.Config{
