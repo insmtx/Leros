@@ -13,6 +13,7 @@ import (
 	skillmanagetools "github.com/insmtx/Leros/backend/tools/skill_manage"
 	mcpsdk "github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 const (
@@ -33,11 +34,16 @@ func NewServer() *Server {
 
 // NewTools 返回当前通过 MCP 暴露的 Leros 工具。
 func NewTools() []tools.Tool {
-	return []tools.Tool{
+	ts := []tools.Tool{
 		memorytools.NewTool(),
-		skillmanagetools.NewTool(),
-		artifactdeclaretools.NewTool(),
 	}
+	if skillManage, err := skillmanagetools.NewTool(); err != nil {
+		logs.Warnf("MCP: skill_manage tool unavailable: %v", err)
+	} else {
+		ts = append(ts, skillManage)
+	}
+	ts = append(ts, artifactdeclaretools.NewTool())
+	return ts
 }
 
 // NewServerWithTools 从 Leros 内部工具创建 Leros MCP 服务器。

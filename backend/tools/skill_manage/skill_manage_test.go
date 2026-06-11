@@ -9,11 +9,11 @@ import (
 )
 
 func TestToolExecuteCreate(t *testing.T) {
-	store, err := skillstore.NewSkillStore(t.TempDir())
+	t.Setenv("LEROS_WORKSPACE_ROOT", t.TempDir())
+	tool, err := NewTool()
 	if err != nil {
-		t.Fatalf("new store: %v", err)
+		t.Fatalf("NewTool: %v", err)
 	}
-	tool := NewToolWithStore(store)
 
 	output, err := tool.Execute(context.Background(), map[string]interface{}{
 		"action":  "create",
@@ -34,7 +34,10 @@ func TestToolExecuteCreate(t *testing.T) {
 }
 
 func TestToolValidateRequiresNewTextForPatch(t *testing.T) {
-	tool := NewToolWithStore(nil)
+	tool, toolErr := NewTool()
+	if toolErr != nil {
+		t.Fatalf("NewTool: %v", toolErr)
+	}
 	err := tool.Validate(map[string]interface{}{
 		"action":   "patch",
 		"name":     "review-flow",

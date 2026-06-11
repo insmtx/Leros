@@ -59,4 +59,6 @@ const (
 
 	// TableNameFileUpload 文件上传表名
 	TableNameFileUpload = tablenamePrefix + "file_upload"
+	// TableNameBuiltinSkillMarketplaceItem 内置 Skill 市场条目表名
+	TableNameBuiltinSkillMarketplaceItem = tablenamePrefix + "builtin_skill_marketplace_item"
 )

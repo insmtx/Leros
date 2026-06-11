@@ -7,35 +7,19 @@ import (
 	"time"
 
 	"github.com/insmtx/Leros/backend/internal/agent"
-	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
 	"github.com/ygpkg/yg-go/logs"
 )
 
 // ContextBuilder 统一为内部 Agent 和外部 CLI 构建运行上下文。
 type ContextBuilder struct {
-	Runtime         RuntimeProvider
 	SessionMessages SessionMessageProvider
-}
-
-// RuntimeProvider 聚合运行时依赖供 ContextBuilder 使用。
-type RuntimeProvider interface {
-	SkillsProvider() skillcatalog.CatalogProvider
 }
 
 // NewContextBuilder 创建统一上下文构建器。
 func NewContextBuilder(cfg ContextBuilder) *ContextBuilder {
 	return &ContextBuilder{
-		Runtime:         cfg.Runtime,
 		SessionMessages: cfg.SessionMessages,
 	}
-}
-
-// SkillsProvider 返回运行时上下文中的技能提供者。
-func (b *ContextBuilder) SkillsProvider() skillcatalog.CatalogProvider {
-	if b == nil || b.Runtime == nil {
-		return nil
-	}
-	return b.Runtime.SkillsProvider()
 }
 
 // Prepare 克隆请求并注入 memory、skill、session 上下文。

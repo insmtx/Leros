@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	skillmanageinternal "github.com/insmtx/Leros/backend/internal/skill/manage"
 	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
 	"github.com/insmtx/Leros/backend/pkg/leros"
 	"github.com/insmtx/Leros/backend/tools"
@@ -59,28 +58,20 @@ func buildSkillManageDescription() string {
 // Tool lets the agent create and update procedural skills.
 type Tool struct {
 	tools.BaseTool
-	manager *skillmanageinternal.Manager
+	store *skillstore.SkillStore
 }
+
+// OnMutation 由 deps.Container 在启动时设置。
+// NewTool() 会将其传递给底层 SkillStore。
+var OnMutation func(ctx context.Context, kind skillstore.MutationKind, name, action string)
 
 // NewTool creates skill_manage with the default Leros skills store.
-func NewTool() *Tool {
-	store, _ := skillstore.NewSkillStore("")
-	return NewToolWithStore(store)
-}
-
-// NewToolWithStore creates skill_manage with an explicit store.
-// No post-processing (catalog reload or projection) is attached.
-// For production use, prefer registering via deps.Container which wires the full handler chain.
-func NewToolWithStore(store *skillstore.SkillStore) *Tool {
-	var manager *skillmanageinternal.Manager
-	if store != nil {
-		manager, _ = skillmanageinternal.NewManager(store, nil)
+func NewTool() (*Tool, error) {
+	store, err := skillstore.NewSkillStore("")
+	if err != nil {
+		return nil, fmt.Errorf("skill manage: create store: %w", err)
 	}
-	return NewToolWithManager(manager)
-}
-
-// NewToolWithManager creates skill_manage with an explicit skill manager.
-func NewToolWithManager(manager *skillmanageinternal.Manager) *Tool {
+	store.OnMutation = OnMutation
 	return &Tool{
 		BaseTool: tools.NewBaseTool(
 			ToolNameSkillManage,
@@ -125,8 +116,8 @@ func NewToolWithManager(manager *skillmanageinternal.Manager) *Tool {
 				},
 			},
 		),
-		manager: manager,
-	}
+		store:    store,
+	}, nil
 }
 
 // Validate checks skill_manage input before execution.
@@ -180,8 +171,8 @@ func (t *Tool) Validate(input map[string]interface{}) error {
 
 // Execute performs the requested skill management action.
 func (t *Tool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
-	if t == nil || t.manager == nil {
-		return "", fmt.Errorf("skill manager is not initialized")
+	if t == nil || t.store == nil {
+		return "", fmt.Errorf("skill store is not initialized")
 	}
 	if err := t.Validate(input); err != nil {
 		return "", err
@@ -194,17 +185,17 @@ func (t *Tool) Execute(ctx context.Context, input map[string]interface{}) (strin
 	var err error
 	switch action {
 	case actionCreate:
-		result, err = t.manager.Create(ctx, skillstore.CreateRequest{
+		result, err = t.store.Create(ctx, skillstore.CreateRequest{
 			Name:    name,
 			Content: rawStringValue(input, "content"),
 		})
 	case actionEdit:
-		result, err = t.manager.Edit(ctx, skillstore.EditRequest{
+		result, err = t.store.Edit(ctx, skillstore.EditRequest{
 			Name:    name,
 			Content: rawStringValue(input, "content"),
 		})
 	case actionPatch:
-		result, err = t.manager.Patch(ctx, skillstore.PatchRequest{
+		result, err = t.store.Patch(ctx, skillstore.PatchRequest{
 			Name:       name,
 			FilePath:   stringValue(input, "file_path"),
 			OldText:    rawStringValue(input, "old_text"),
@@ -212,17 +203,17 @@ func (t *Tool) Execute(ctx context.Context, input map[string]interface{}) (strin
 			ReplaceAll: boolValue(input, "replace_all"),
 		})
 	case actionDelete:
-		result, err = t.manager.Delete(ctx, skillstore.DeleteRequest{
+		result, err = t.store.Delete(ctx, skillstore.DeleteRequest{
 			Name: name,
 		})
 	case actionWriteFile:
-		result, err = t.manager.WriteFile(ctx, skillstore.WriteFileRequest{
+		result, err = t.store.WriteFile(ctx, skillstore.WriteFileRequest{
 			Name:        name,
 			FilePath:    stringValue(input, "file_path"),
 			FileContent: rawStringValue(input, "file_content"),
 		})
 	case actionRemoveFile:
-		result, err = t.manager.RemoveFile(ctx, skillstore.RemoveFileRequest{
+		result, err = t.store.RemoveFile(ctx, skillstore.RemoveFileRequest{
 			Name:     name,
 			FilePath: stringValue(input, "file_path"),
 		})

@@ -66,7 +66,6 @@ func (s *Service) Environment() *deps.Container {
 
 func (s *Service) buildRouter(ctx context.Context, opts Options) (agent.Runner, error) {
 	lifecycleBuilder := lifecyclecontext.NewContextBuilder(lifecyclecontext.ContextBuilder{
-		Runtime:         s.env,
 		SessionMessages: lifecyclecontext.NewPassthroughSessionMessageProvider(),
 	})
 	router := agent.NewRuntimeRouter(agent.RuntimeKindLeros)

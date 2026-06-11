@@ -3,7 +3,9 @@ package skilluse
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -27,19 +29,29 @@ const (
 	maxSkillFileReadBytes     = 128 * 1024
 )
 
+// ErrSkillNotFound is a structured error returned when a skill cannot be found.
+// AvailableSkills is always populated so callers can surface available options.
+type ErrSkillNotFound struct {
+	Name             string
+	AvailableSkills  []string
+	ManifestMismatch string
+}
+
+func (e *ErrSkillNotFound) Error() string {
+	if e.ManifestMismatch != "" {
+		return e.ManifestMismatch
+	}
+	return fmt.Sprintf("Skill %q not found.", e.Name)
+}
+
 // SkillUseTool lets an agent query and load skills from the runtime skill catalog.
+// It dynamically scans the filesystem on every call — no cached state.
 type SkillUseTool struct {
 	tools.BaseTool
-	provider skillcatalog.CatalogProvider
 }
 
-// NewSkillUseTool creates a catalog-backed skill use tool.
-func NewSkillUseTool(catalog skillcatalog.SkillCatalog) *SkillUseTool {
-	return NewSkillUseToolWithProvider(skillcatalog.NewStaticCatalogProvider(catalog))
-}
-
-// NewSkillUseToolWithProvider creates a provider-backed skill use tool.
-func NewSkillUseToolWithProvider(provider skillcatalog.CatalogProvider) *SkillUseTool {
+// NewSkillUseTool creates a skill use tool that dynamically scans the skills directory.
+func NewSkillUseTool() *SkillUseTool {
 	return &SkillUseTool{
 		BaseTool: tools.NewBaseTool(
 			ToolNameSkillUse,
@@ -68,7 +80,6 @@ func NewSkillUseToolWithProvider(provider skillcatalog.CatalogProvider) *SkillUs
 				},
 			},
 		),
-		provider: provider,
 	}
 }
 
@@ -107,13 +118,6 @@ func (t *SkillUseTool) Execute(ctx context.Context, input map[string]interface{}
 	if err := t.Validate(input); err != nil {
 		return "", err
 	}
-	catalog, err := t.currentCatalog()
-	if err != nil {
-		return "", err
-	}
-	if catalog == nil {
-		return "", fmt.Errorf("skill catalog is required")
-	}
 
 	select {
 	case <-ctx.Done():
@@ -123,100 +127,153 @@ func (t *SkillUseTool) Execute(ctx context.Context, input map[string]interface{}
 
 	switch stringValue(input, "action") {
 	case actionList:
-		return tools.JSONString(listSkills(catalog))
+		result, err := listSkills()
+		if err != nil {
+			return "", fmt.Errorf("list skills: %w", err)
+		}
+		return tools.JSONString(result)
 	case actionGet:
-		return tools.JSONString(getSkill(catalog, stringValue(input, "name")))
+		return t.executeGet(input)
 	case actionReadFile:
-		return tools.JSONString(readSkillFile(catalog, stringValue(input, "name"), stringValue(input, "path")))
+		return t.executeReadFile(input)
 	default:
 		return "", fmt.Errorf("unsupported action %q", stringValue(input, "action"))
 	}
 }
 
-func (t *SkillUseTool) currentCatalog() (skillcatalog.SkillCatalog, error) {
-	if t == nil || t.provider == nil {
-		return nil, fmt.Errorf("skill catalog is required")
+func listSkills() (map[string]interface{}, error) {
+	summaries, err := skillcatalog.List()
+	if err != nil {
+		return nil, err
 	}
-	return t.provider.Current(), nil
-}
-
-func listSkills(catalog skillcatalog.SkillCatalog) map[string]interface{} {
-	summaries := catalog.List()
 	skills := make([]map[string]interface{}, 0, len(summaries))
+	categorySet := make(map[string]struct{})
 	for _, summary := range summaries {
 		skills = append(skills, summaryMap(summary))
+		if summary.Category != "" {
+			categorySet[summary.Category] = struct{}{}
+		}
 	}
+
+	categories := make([]string, 0, len(categorySet))
+	for c := range categorySet {
+		categories = append(categories, c)
+	}
+	sort.Strings(categories)
 
 	return map[string]interface{}{
-		"success": true,
-		"count":   len(skills),
-		"skills":  skills,
-	}
+		"success":    true,
+		"count":      len(skills),
+		"skills":     skills,
+		"categories": categories,
+		"hint":       "Use skill_use with action=get and name=<skill_name> to see full content, tags, and linked files",
+	}, nil
 }
 
-func getSkill(catalog skillcatalog.SkillCatalog, name string) map[string]interface{} {
-	entry, err := findSkill(catalog, name)
+// executeGet looks up the skill by name via the catalog and returns the full entry.
+func (t *SkillUseTool) executeGet(input map[string]interface{}) (string, error) {
+	name := stringValue(input, "name")
+
+	entry, err := skillcatalog.Get(name)
 	if err != nil {
-		return skillNotFound(name, catalog.List())
+		return tools.JSONString(buildSkillNotFoundResponse(err))
 	}
 
-	files, err := catalog.ListFiles(entry.Manifest.Name, defaultSkillFileListLimit)
+	files, err := skillcatalog.ListFiles(entry.Manifest.Name, defaultSkillFileListLimit)
 	if err != nil {
-		return map[string]interface{}{
+		return tools.JSONString(map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),
-		}
+		})
 	}
 
 	skillDir := displaySkillDir(entry)
-	return map[string]interface{}{
-		"success":          true,
-		"name":             entry.Manifest.Name,
-		"description":      entry.Manifest.Description,
-		"version":          entry.Manifest.Version,
-		"category":         entry.Manifest.Metadata.Leros.Category,
-		"tags":             entry.Manifest.Metadata.Leros.Tags,
-		"related_skills":   []string{},
-		"content":          entry.Body,
-		"path":             entry.Path,
-		"skill_dir":        skillDir,
-		"linked_files":     optionalFiles(files),
-		"usage_hint":       usageHint(files),
-		"always":           entry.Manifest.Metadata.Leros.Always,
-		"requires_tools":   entry.Manifest.Metadata.Leros.RequiresTools,
-		"scope":            "catalog",
-		"skill_type":       "file",
-		"enabled":          true,
-		"file_list_limit":  defaultSkillFileListLimit,
-		"setup_needed":     false,
-		"readiness_status": "available",
-	}
+	return tools.JSONString(map[string]interface{}{
+		"success":        true,
+		"name":           entry.Manifest.Name,
+		"description":    entry.Manifest.Description,
+		"version":        entry.Manifest.Version,
+		"category":       entry.Manifest.Metadata.Category,
+		"tags":           entry.Manifest.Metadata.Tags,
+		"content":        entry.Body,
+		"path":           entry.Path,
+		"skill_dir":      skillDir,
+		"linked_files":   optionalFiles(files),
+		"usage_hint":     usageHint(files),
+		"always":         entry.Manifest.Metadata.Always,
+		"requires_tools": entry.Manifest.Metadata.RequiresTools,
+	})
 }
 
-func readSkillFile(catalog skillcatalog.SkillCatalog, name string, relativePath string) map[string]interface{} {
-	entry, err := findSkill(catalog, name)
-	if err != nil {
-		return skillNotFound(name, catalog.List())
-	}
+// executeReadFile looks up the skill by name and reads a supporting file.
+func (t *SkillUseTool) executeReadFile(input map[string]interface{}) (string, error) {
+	name := stringValue(input, "name")
+	relativePath := stringValue(input, "path")
 
-	content, err := catalog.ReadFile(entry.Manifest.Name, relativePath)
+	content, err := skillcatalog.ReadFile(name, relativePath)
 	if err != nil {
-		return map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		}
+		return tools.JSONString(buildSkillNotFoundResponse(err))
 	}
 
 	displayContent, truncated := truncateFileContent(content, maxSkillFileReadBytes)
+	return tools.JSONString(map[string]interface{}{
+		"success":   true,
+		"name":      name,
+		"path":      relativePath,
+		"content":   displayContent,
+		"size":      len(content),
+		"truncated": truncated,
+	})
+}
+
+// buildSkillNotFoundResponse builds the structured JSON response for
+// skill-not-found errors.
+func buildSkillNotFoundResponse(err error) map[string]interface{} {
+	if err == nil {
+		return map[string]interface{}{
+			"success":          false,
+			"error":            "unknown error",
+			"available_skills": []string{},
+			"hint":             "Use skill_use with action=list to see all available skills",
+		}
+	}
+
+	// Extract structured error details using errors.As.
+	var errMsg string
+	var notFoundErr *skillcatalog.ErrSkillNotFound
+	var mismatchErr *skillcatalog.ErrSkillManifestMismatch
+	switch {
+	case errors.As(err, &mismatchErr):
+		if mismatchErr.ManifestName != "" {
+			errMsg = fmt.Sprintf("Skill '%s' found at path %s but its manifest name is '%s'.",
+				mismatchErr.RequestedName, mismatchErr.Path, mismatchErr.ManifestName)
+		} else {
+			errMsg = fmt.Sprintf("Skill '%s' found at path %s but its manifest name does not match.",
+				mismatchErr.RequestedName, mismatchErr.Path)
+		}
+	case errors.As(err, &notFoundErr):
+		errMsg = fmt.Sprintf("Skill '%s' not found.", notFoundErr.Name)
+	default:
+		errMsg = err.Error()
+	}
+
+	// Build available skill names from a fresh scan.
+	available := []string{}
+	limit := 20
+	if summaries, listErr := skillcatalog.List(); listErr == nil {
+		for _, s := range summaries {
+			available = append(available, s.Name)
+			if len(available) >= limit {
+				break
+			}
+		}
+	}
+
 	return map[string]interface{}{
-		"success":         true,
-		"name":            entry.Manifest.Name,
-		"path":            relativePath,
-		"content":         displayContent,
-		"size":            len(content),
-		"truncated":       truncated,
-		"max_read_bytes":  maxSkillFileReadBytes,
-		"original_length": len(content),
+		"success":          false,
+		"error":            errMsg,
+		"available_skills": available,
+		"hint":             "Use skill_use with action=list to see all available skills",
 	}
 }
 
@@ -229,9 +286,8 @@ func summaryMap(summary skillcatalog.Summary) map[string]interface{} {
 		"tags":           summary.Tags,
 		"always":         summary.Always,
 		"requires_tools": summary.RequiresTools,
-		"scope":          "catalog",
-		"skill_type":     "file",
-		"enabled":        true,
+		"source":         summary.Source,
+		"trust":          summary.Trust,
 	}
 }
 
@@ -247,22 +303,6 @@ func usageHint(files []string) interface{} {
 		return nil
 	}
 	return "To view linked files, call skill_use with action=read_file and path set to a linked file path."
-}
-
-func findSkill(catalog skillcatalog.SkillCatalog, name string) (*skillcatalog.Entry, error) {
-	entry, err := catalog.Get(name)
-	if err == nil {
-		return entry, nil
-	}
-
-	for _, summary := range catalog.List() {
-		if !strings.EqualFold(summary.Name, name) {
-			continue
-		}
-		return catalog.Get(summary.Name)
-	}
-
-	return nil, err
 }
 
 func displaySkillDir(entry *skillcatalog.Entry) string {
@@ -286,19 +326,6 @@ func truncateFileContent(content []byte, maxBytes int) (string, bool) {
 	}
 
 	return string(truncated), true
-}
-
-func skillNotFound(name string, summaries []skillcatalog.Summary) map[string]interface{} {
-	available := make([]string, 0, len(summaries))
-	for _, summary := range summaries {
-		available = append(available, summary.Name)
-	}
-
-	return map[string]interface{}{
-		"success":   false,
-		"error":     fmt.Sprintf("skill %q not found", name),
-		"available": available,
-	}
 }
 
 func stringValue(input map[string]interface{}, key string) string {

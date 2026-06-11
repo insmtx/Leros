@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/insmtx/Leros/backend/internal/api/contract"
+	"github.com/insmtx/Leros/backend/internal/infra/db"
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	"github.com/insmtx/Leros/backend/types"
@@ -37,7 +38,10 @@ func (s *artifactService) ListTaskArtifacts(ctx context.Context, taskPublicID st
 	if task == nil {
 		return nil, errors.New("task not found")
 	}
-	artifacts, err := infradb.ListTaskArtifacts(ctx, s.db, caller.OrgID, task.ID)
+	if err := verifyUserPermission(task.OwnerID, caller.Uin); err != nil {
+		return nil, err
+	}
+	artifacts, err := db.ListTaskArtifacts(ctx, s.db, caller.OrgID, task.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +69,7 @@ func (s *artifactService) GetArtifactDownload(ctx context.Context, artifactPubli
 	}
 
 	reader, _, err := filestore.OpenFileByPublicID(ctx, s.db, artifact.OrgID, artifact.StorageKey)
-	if err != nil {
+	if err := verifyUserPermission(artifact.OwnerID, caller.Uin); err != nil {
 		return nil, err
 	}
 	return &contract.ArtifactDownload{

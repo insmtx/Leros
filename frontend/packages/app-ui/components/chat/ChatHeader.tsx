@@ -1,6 +1,6 @@
 "use client";
 
-import { useChatStore, useLayoutStore } from "@leros/store";
+import { formatTokenCount, useChatStore, useLayoutStore } from "@leros/store";
 import { Avatar, AvatarFallback } from "@leros/ui/components/ui/avatar";
 import { Button } from "@leros/ui/components/ui/button";
 import { Ellipsis, FileText, Plus, Search, Settings, Share2 } from "lucide-react";
@@ -11,11 +11,6 @@ export function ChatHeader() {
 
 	const currentModel = modelOptions.find((m) => m.id === selectedModel);
 	const activeConversation = conversations.find((c) => c.id === activeConversationId);
-
-	const formatTokenCount = (count: number) => {
-		if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
-		return String(count);
-	};
 
 	return (
 		<div

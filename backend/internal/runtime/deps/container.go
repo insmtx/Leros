@@ -6,8 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
-	skillmanage "github.com/insmtx/Leros/backend/internal/skill/manage"
+	"github.com/insmtx/Leros/backend/engines"
 	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
 	"github.com/insmtx/Leros/backend/tools"
 	memorytools "github.com/insmtx/Leros/backend/tools/memory"
@@ -23,8 +22,7 @@ type Options struct {
 }
 
 type Container struct {
-	skillsProvider skillcatalog.CatalogProvider
-	toolRegistry   *tools.Registry
+	toolRegistry *tools.Registry
 }
 
 var (
@@ -55,30 +53,15 @@ func ResetDefaultForTest() {
 }
 
 func New(ctx context.Context, opts Options) (*Container, error) {
-	catalogProvider, err := skillcatalog.NewFileCatalogProvider(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("load skills: %w", err)
-	}
-
-	logs.Infof("Loaded %d skills from %s for runtime", len(catalogProvider.Current().List()), catalogProvider.LoadedDirs())
-
 	registry := tools.NewRegistry()
-	if err := registerTools(registry, catalogProvider, opts.CLISkillDirs); err != nil {
+	if err := registerTools(registry, opts.CLISkillDirs); err != nil {
 		return nil, err
 	}
 	logs.Infof("Loaded %d tools for runtime", len(registry.List()))
 
 	return &Container{
-		skillsProvider: catalogProvider,
-		toolRegistry:   registry,
+		toolRegistry: registry,
 	}, nil
-}
-
-func (c *Container) SkillsProvider() skillcatalog.CatalogProvider {
-	if c == nil || c.skillsProvider == nil {
-		return skillcatalog.NewStaticCatalogProvider(skillcatalog.NewEmptyCatalog())
-	}
-	return c.skillsProvider
 }
 
 func (c *Container) ToolRegistry() *tools.Registry {
@@ -110,32 +93,24 @@ func (c *Container) AvailableToolNames(names []string) []string {
 	return result
 }
 
-func registerTools(registry *tools.Registry, catalogProvider *skillcatalog.FileCatalogProvider, cliSkillDirs []string) error {
-	if err := skillusetools.RegisterWithProvider(registry, catalogProvider); err != nil {
+func registerTools(registry *tools.Registry, cliSkillDirs []string) error {
+	if err := skillusetools.Register(registry); err != nil {
 		return fmt.Errorf("register skill use tool: %w", err)
 	}
-	store, err := skillstore.NewSkillStore("")
-	if err != nil {
-		return fmt.Errorf("new skill store: %w", err)
+	// skill_manage mutation 后处理：create 时创建外部 CLI symlink，delete 时清理。
+	// NewTool() 内部创建的 SkillStore 会读取此回调。
+	skillmanagetools.OnMutation = func(ctx context.Context, kind skillstore.MutationKind, name, action string) {
+		if len(cliSkillDirs) > 0 {
+			switch kind {
+			case skillstore.MutationCreate:
+				_ = engines.EnsureExternalSkillLink(name, cliSkillDirs)
+			case skillstore.MutationDelete:
+				_ = engines.RemoveExternalSkillLink(name, cliSkillDirs)
+			}
+		}
 	}
 
-	// skill_manage 的 mutation 后处理链：
-	//   CompositeHandler(
-	//     ProjectionHandler      ← 立即执行：create 时建外部 symlink
-	//     DebouncedHandler(      ← 500ms 防抖：连续修改只 reload 一次
-	//       CatalogReloadHandler ← 刷新 skill_use 读取的只读快照
-	//     )
-	//   )
-	handler := skillmanage.NewCompositeHandler(
-		skillmanage.NewProjectionHandler(cliSkillDirs),
-		skillmanage.NewDebouncedHandler(0, skillmanage.NewCatalogReloadHandler(catalogProvider)),
-	)
-
-	manager, err := skillmanage.NewManager(store, handler)
-	if err != nil {
-		return fmt.Errorf("new skill manager: %w", err)
-	}
-	if err := skillmanagetools.RegisterWithManager(registry, manager); err != nil {
+	if err := skillmanagetools.Register(registry); err != nil {
 		return fmt.Errorf("register skill manage tool: %w", err)
 	}
 	if err := memorytools.Register(registry); err != nil {

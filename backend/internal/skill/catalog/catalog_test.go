@@ -8,217 +8,233 @@ import (
 	"github.com/insmtx/Leros/backend/pkg/leros"
 )
 
-func TestCatalogLoadsSkillDocuments(t *testing.T) {
-	rootDir := t.TempDir()
-	skillDir := filepath.Join(rootDir, "github-pr-review")
-	referencesDir := filepath.Join(skillDir, "references")
+func TestList(t *testing.T) {
+	skillsDir := setupSkillsRoot(t)
+	writeTestSkill(t, skillsDir, "review", "Review skill", "review body")
 
-	if err := os.MkdirAll(referencesDir, 0o755); err != nil {
-		t.Fatalf("mkdir failed: %v", err)
+	summaries, err := List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(summaries) != 1 {
+		t.Fatalf("expected 1 skill, got %d", len(summaries))
+	}
+	s := summaries[0]
+	if s.Name != "review" {
+		t.Fatalf("expected name review, got %s", s.Name)
+	}
+	if s.Description != "Review skill" {
+		t.Fatalf("expected description 'Review skill', got %s", s.Description)
+	}
+}
+
+func TestListDerivesNameWithoutFrontmatter(t *testing.T) {
+	skillsDir := setupSkillsRoot(t)
+	skillDir := filepath.Join(skillsDir, "plain-skill")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, skillFileName), []byte("# Plain Skill"), 0o644); err != nil {
+		t.Fatalf("write skill: %v", err)
+	}
+
+	summaries, err := List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(summaries) != 1 {
+		t.Fatalf("expected 1 skill, got %d", len(summaries))
+	}
+	if summaries[0].Name != "plain-skill" {
+		t.Fatalf("expected derived name plain-skill, got %s", summaries[0].Name)
+	}
+}
+
+func TestListCreatesMissingDirAndScansEmpty(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	t.Setenv(leros.EnvWorkspaceRoot, workspaceRoot)
+
+	summaries, err := List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+
+	expected := filepath.Join(workspaceRoot, ".leros", "skills")
+	if _, err := os.Stat(expected); err != nil {
+		t.Fatalf("expected skills dir to be created at %s: %v", expected, err)
+	}
+	if len(summaries) != 0 {
+		t.Fatalf("expected empty catalog, got %d skills", len(summaries))
+	}
+}
+
+func TestListWithFrontmatterMetadata(t *testing.T) {
+	skillsDir := setupSkillsRoot(t)
+	skillDir := filepath.Join(skillsDir, "github-pr-review")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
 	}
 
 	skillDocument := `---
 name: github-pr-review
-description: Review GitHub pull requests with Leros conventions.
+description: Review GitHub pull requests.
 version: 1.0.0
 metadata:
-  leros:
-    category: github
-    tags: [github, pr, review]
-    always: true
-    requires_tools: [github.pr.get_files, github.pr.publish_review]
+  category: github
+  tags: [github, pr]
+  always: true
+  requires_tools: [github.pr.get_files]
 ---
 # GitHub PR Review
-
-Review steps here.
 `
 	if err := os.WriteFile(filepath.Join(skillDir, skillFileName), []byte(skillDocument), 0o644); err != nil {
-		t.Fatalf("write skill failed: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(referencesDir, "policy.md"), []byte("policy content"), 0o644); err != nil {
-		t.Fatalf("write reference failed: %v", err)
+		t.Fatalf("write skill: %v", err)
 	}
 
-	catalog, err := NewCatalog(os.DirFS(rootDir))
+	summaries, err := List()
 	if err != nil {
-		t.Fatalf("load catalog failed: %v", err)
+		t.Fatalf("List: %v", err)
 	}
-
-	summaries := catalog.List()
 	if len(summaries) != 1 {
-		t.Fatalf("expected 1 skill summary, got %d", len(summaries))
+		t.Fatalf("expected 1 skill, got %d", len(summaries))
 	}
 
-	summary := summaries[0]
-	if summary.Name != "github-pr-review" {
-		t.Fatalf("expected skill name github-pr-review, got %s", summary.Name)
+	s := summaries[0]
+	if s.Name != "github-pr-review" {
+		t.Fatalf("expected name github-pr-review, got %s", s.Name)
 	}
-	if !summary.Always {
-		t.Fatalf("expected skill always flag to be true")
+	if !s.Always {
+		t.Fatalf("expected always=true")
 	}
-
-	entry, err := catalog.Get("github-pr-review")
-	if err != nil {
-		t.Fatalf("get skill failed: %v", err)
+	if s.Category != "github" {
+		t.Fatalf("expected category github, got %s", s.Category)
 	}
-	if entry.Manifest.Metadata.Leros.Category != "github" {
-		t.Fatalf("expected category github, got %s", entry.Manifest.Metadata.Leros.Category)
-	}
-	if entry.Body == "" {
-		t.Fatalf("expected non-empty skill body")
-	}
-
-	referenceBody, err := catalog.ReadFile("github-pr-review", "references/policy.md")
-	if err != nil {
-		t.Fatalf("read skill file failed: %v", err)
-	}
-	if string(referenceBody) != "policy content" {
-		t.Fatalf("unexpected reference body: %s", string(referenceBody))
-	}
-
-	files, err := catalog.ListFiles("github-pr-review", 10)
-	if err != nil {
-		t.Fatalf("list skill files failed: %v", err)
-	}
-	if len(files) != 1 || files[0] != "references/policy.md" {
-		t.Fatalf("unexpected skill files: %#v", files)
+	if s.Version != "1.0.0" {
+		t.Fatalf("expected version 1.0.0, got %s", s.Version)
 	}
 }
 
-func TestCatalogDerivesNameWithoutFrontmatter(t *testing.T) {
-	rootDir := t.TempDir()
-	skillDir := filepath.Join(rootDir, "plain-skill")
+func TestGetCaseInsensitive(t *testing.T) {
+	skillsDir := setupSkillsRoot(t)
+	writeTestSkill(t, skillsDir, "my-skill", "My Skill", "body")
 
-	if err := os.MkdirAll(skillDir, 0o755); err != nil {
-		t.Fatalf("mkdir failed: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(skillDir, skillFileName), []byte("# Plain Skill"), 0o644); err != nil {
-		t.Fatalf("write skill failed: %v", err)
-	}
-
-	catalog, err := NewCatalog(os.DirFS(rootDir))
+	entry, err := Get("MY-SKILL")
 	if err != nil {
-		t.Fatalf("load catalog failed: %v", err)
+		t.Fatalf("Get MY-SKILL: %v", err)
 	}
-
-	entry, err := catalog.Get("plain-skill")
-	if err != nil {
-		t.Fatalf("get skill failed: %v", err)
-	}
-	if entry.Manifest.Description != "plain-skill" {
-		t.Fatalf("expected derived description plain-skill, got %s", entry.Manifest.Description)
+	if entry.Manifest.Name != "my-skill" {
+		t.Fatalf("expected my-skill, got %s", entry.Manifest.Name)
 	}
 }
 
-func TestCatalogFromDirStoresAbsoluteSkillDir(t *testing.T) {
-	rootDir := t.TempDir()
-	writeTestSkill(t, filepath.Join(rootDir, "review"), "review", "Review skill", "body")
+func TestGetNotFound(t *testing.T) {
+	skillsDir := setupSkillsRoot(t)
+	writeTestSkill(t, skillsDir, "review", "Review", "body")
 
-	catalog, err := NewCatalogFromDir(rootDir)
-	if err != nil {
-		t.Fatalf("load catalog from dir: %v", err)
-	}
-
-	entry, err := catalog.Get("review")
-	if err != nil {
-		t.Fatalf("get skill: %v", err)
-	}
-	if !filepath.IsAbs(filepath.FromSlash(entry.AbsoluteDir)) {
-		t.Fatalf("expected absolute skill dir, got %q", entry.AbsoluteDir)
-	}
-	expected := filepath.ToSlash(filepath.Join(rootDir, "review"))
-	if entry.AbsoluteDir != expected {
-		t.Fatalf("expected %q, got %q", expected, entry.AbsoluteDir)
+	if _, err := Get("nonexistent"); err == nil {
+		t.Fatalf("expected error for nonexistent skill")
 	}
 }
 
-func TestCatalogMergeKeepsFirstDuplicateSkill(t *testing.T) {
-	firstRoot := t.TempDir()
-	secondRoot := t.TempDir()
-	writeTestSkill(t, filepath.Join(firstRoot, "review"), "review", "First description", "first body")
-	writeTestSkill(t, filepath.Join(secondRoot, "review"), "review", "Second description", "second body")
-
-	first, err := NewCatalog(os.DirFS(firstRoot))
-	if err != nil {
-		t.Fatalf("load first catalog: %v", err)
+func TestGetManifestMismatchDirectPath(t *testing.T) {
+	skillsDir := setupSkillsRoot(t)
+	// Create a directory named "mismatch-dir" but the SKILL.md manifest has a different name.
+	mismatchDir := filepath.Join(skillsDir, "mismatch-dir")
+	if err := os.MkdirAll(mismatchDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
 	}
-	second, err := NewCatalog(os.DirFS(secondRoot))
-	if err != nil {
-		t.Fatalf("load second catalog: %v", err)
-	}
-
-	merged := NewEmptyCatalog()
-	merged.merge(first)
-	merged.merge(second)
-
-	entry, err := merged.Get("review")
-	if err != nil {
-		t.Fatalf("get merged skill: %v", err)
-	}
-	if entry.Manifest.Description != "First description" {
-		t.Fatalf("expected first duplicate to win, got %q", entry.Manifest.Description)
-	}
-}
-
-func TestDefaultLerosSkillsDirUsesWorkspaceRoot(t *testing.T) {
-	workspaceRoot := t.TempDir()
-	t.Setenv(leros.EnvWorkspaceRoot, workspaceRoot)
-
-	dir, err := defaultLerosSkillsDir()
-	if err != nil {
-		t.Fatalf("default workspace skills dir: %v", err)
+	skillDocument := `---
+name: different-name
+description: A skill with mismatched name.
+---
+# Mismatch
+`
+	if err := os.WriteFile(filepath.Join(mismatchDir, skillFileName), []byte(skillDocument), 0o644); err != nil {
+		t.Fatalf("write skill: %v", err)
 	}
 
-	expected := filepath.ToSlash(filepath.Join(workspaceRoot, ".leros", "skills"))
-	if dir != expected {
-		t.Fatalf("expected %s, got %s", expected, dir)
+	// Looking up by the directory name should fail with manifest name mismatch.
+	if _, err := Get("mismatch-dir"); err == nil {
+		t.Fatalf("expected mismatch error for mismatch-dir")
+	}
+
+	// Looking up by the manifest name should fail since no directory matches that name.
+	if _, err := Get("different-name"); err == nil {
+		t.Fatalf("expected different-name to not be found (dir is mismatch-dir)")
 	}
 }
 
-func TestLoadDefaultCatalogCreatesMissingSkillsDir(t *testing.T) {
-	workspaceRoot := t.TempDir()
-	t.Setenv(leros.EnvWorkspaceRoot, workspaceRoot)
+func TestReadFile(t *testing.T) {
+	skillsDir := setupSkillsRoot(t)
+	skillDir := filepath.Join(skillsDir, "review")
+	referencesDir := filepath.Join(skillDir, "references")
+	if err := os.MkdirAll(referencesDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	writeTestSkill(t, skillsDir, "review", "Review skill", "body")
+	if err := os.WriteFile(filepath.Join(referencesDir, "policy.md"), []byte("policy content"), 0o644); err != nil {
+		t.Fatalf("write reference: %v", err)
+	}
 
-	catalog, rootDir, err := LoadDefaultCatalog()
+	content, err := ReadFile("review", "references/policy.md")
 	if err != nil {
-		t.Fatalf("load default catalog: %v", err)
+		t.Fatalf("ReadFile: %v", err)
 	}
-
-	expected := filepath.ToSlash(filepath.Join(workspaceRoot, ".leros", "skills"))
-	if rootDir != expected {
-		t.Fatalf("expected root dir %s, got %s", expected, rootDir)
-	}
-	if _, err := os.Stat(filepath.Join(workspaceRoot, ".leros", "skills")); err != nil {
-		t.Fatalf("expected skills dir to be created: %v", err)
-	}
-	if summaries := catalog.List(); len(summaries) != 0 {
-		t.Fatalf("expected empty catalog, got %#v", summaries)
+	if string(content) != "policy content" {
+		t.Fatalf("expected 'policy content', got %q", string(content))
 	}
 }
 
-func TestCatalogRejectsPathTraversal(t *testing.T) {
-	rootDir := t.TempDir()
-	skillDir := filepath.Join(rootDir, "safe-skill")
+func TestReadFileRejectsPathTraversal(t *testing.T) {
+	skillsDir := setupSkillsRoot(t)
+	writeTestSkill(t, skillsDir, "safe-skill", "Safe", "body")
 
-	if err := os.MkdirAll(skillDir, 0o755); err != nil {
-		t.Fatalf("mkdir failed: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(skillDir, skillFileName), []byte("# Safe Skill"), 0o644); err != nil {
-		t.Fatalf("write skill failed: %v", err)
-	}
-
-	catalog, err := NewCatalog(os.DirFS(rootDir))
-	if err != nil {
-		t.Fatalf("load catalog failed: %v", err)
-	}
-
-	if _, err := catalog.ReadFile("safe-skill", "../secret.txt"); err == nil {
+	if _, err := ReadFile("safe-skill", "../secret.txt"); err == nil {
 		t.Fatalf("expected traversal path to be rejected")
 	}
 }
 
-func writeTestSkill(t *testing.T, dir string, name string, description string, body string) {
+func TestListFiles(t *testing.T) {
+	skillsDir := setupSkillsRoot(t)
+	skillDir := filepath.Join(skillsDir, "review")
+	referencesDir := filepath.Join(skillDir, "references")
+	if err := os.MkdirAll(referencesDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	writeTestSkill(t, skillsDir, "review", "Review skill", "body")
+	if err := os.WriteFile(filepath.Join(referencesDir, "policy.md"), []byte("policy"), 0o644); err != nil {
+		t.Fatalf("write reference: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(referencesDir, "guide.md"), []byte("guide"), 0o644); err != nil {
+		t.Fatalf("write reference: %v", err)
+	}
+
+	files, err := ListFiles("review", 10)
+	if err != nil {
+		t.Fatalf("ListFiles: %v", err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("expected 2 files, got %d: %v", len(files), files)
+	}
+	if files[0] != "references/guide.md" || files[1] != "references/policy.md" {
+		t.Fatalf("unexpected files: %v", files)
+	}
+}
+
+func setupSkillsRoot(t *testing.T) string {
 	t.Helper()
+	rootDir := t.TempDir()
+	t.Setenv(leros.EnvWorkspaceRoot, rootDir)
+	skillsDir := filepath.Join(rootDir, ".leros", "skills")
+	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
+		t.Fatalf("mkdir skills root: %v", err)
+	}
+	return skillsDir
+}
+
+func writeTestSkill(t *testing.T, skillsDir string, name string, description string, body string) {
+	t.Helper()
+	dir := filepath.Join(skillsDir, name)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir skill: %v", err)
 	}

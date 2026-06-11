@@ -56,3 +56,4 @@ mkdir -p "$LEROS_STORAGE_LOCAL_DIR"
 
 cd "$ROOT_DIR"
 LEROS_DEV=true LEROS_STORAGE_LOCAL_DIR="$LEROS_STORAGE_LOCAL_DIR" ./bundles/leros server --config "$CONFIG_FILE" --workspace-root "$ROOT_DIR/.leros-workspace" --listen-addr :8080
+./bundles/leros server --config "$CONFIG_FILE"

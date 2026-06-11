@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
+	"github.com/insmtx/Leros/backend/pkg/leros"
 )
 
 func TestSkillUseToolListAndGet(t *testing.T) {
-	catalog := newTestCatalog(t)
-	tool := NewSkillUseTool(catalog)
+	newTestCatalog(t)
+	tool := NewSkillUseTool()
 
 	rawListResult, err := tool.Execute(context.Background(), map[string]interface{}{
 		"action": actionList,
@@ -28,6 +28,29 @@ func TestSkillUseToolListAndGet(t *testing.T) {
 	}
 	if listResult["count"] != float64(1) {
 		t.Fatalf("expected 1 skill, got %#v", listResult["count"])
+	}
+	// Verify categories and hint
+	categories, ok := listResult["categories"].([]interface{})
+	if !ok || len(categories) != 1 || categories[0] != "github" {
+		t.Fatalf("unexpected categories: %#v", listResult["categories"])
+	}
+	if listResult["hint"] != "Use skill_use with action=get and name=<skill_name> to see full content, tags, and linked files" {
+		t.Fatalf("unexpected hint: %#v", listResult["hint"])
+	}
+	// Verify source and trust in first skill
+	skills, ok := listResult["skills"].([]interface{})
+	if !ok || len(skills) != 1 {
+		t.Fatalf("unexpected skills: %#v", listResult["skills"])
+	}
+	skill0, ok := skills[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("unexpected skill entry type: %T", skills[0])
+	}
+	if skill0["source"] != "local" {
+		t.Fatalf("expected source 'local', got %#v", skill0["source"])
+	}
+	if skill0["trust"] != "trusted" {
+		t.Fatalf("expected trust 'trusted', got %#v", skill0["trust"])
 	}
 
 	rawGetResult, err := tool.Execute(context.Background(), map[string]interface{}{
@@ -56,10 +79,7 @@ func TestSkillUseToolListAndGet(t *testing.T) {
 	if !ok || !filepath.IsAbs(filepath.FromSlash(dir)) {
 		t.Fatalf("expected skill_dir to be absolute, got %#v", getResult["skill_dir"])
 	}
-	if getResult["readiness_status"] != "available" {
-		t.Fatalf("unexpected readiness status: %#v", getResult["readiness_status"])
-	}
-	for _, removedField := range []string{"ok", "title", "output", "metadata", "skill", "body", "dir", "files"} {
+	for _, removedField := range []string{"related_skills", "scope", "skill_type", "enabled", "setup_needed", "readiness_status", "file_list_limit", "ok", "title", "output", "metadata", "skill", "body", "dir", "files"} {
 		if _, exists := getResult[removedField]; exists {
 			t.Fatalf("field %q should not be returned in skill view result: %#v", removedField, getResult[removedField])
 		}
@@ -67,8 +87,8 @@ func TestSkillUseToolListAndGet(t *testing.T) {
 }
 
 func TestSkillUseToolReadFile(t *testing.T) {
-	catalog := newTestCatalog(t)
-	tool := NewSkillUseTool(catalog)
+	newTestCatalog(t)
+	tool := NewSkillUseTool()
 
 	rawResult, err := tool.Execute(context.Background(), map[string]interface{}{
 		"action": actionReadFile,
@@ -94,8 +114,8 @@ func TestSkillUseToolReadFile(t *testing.T) {
 }
 
 func TestSkillUseToolReadFileTruncatesLargeContent(t *testing.T) {
-	catalog := newTestCatalog(t)
-	tool := NewSkillUseTool(catalog)
+	newTestCatalog(t)
+	tool := NewSkillUseTool()
 
 	rawResult, err := tool.Execute(context.Background(), map[string]interface{}{
 		"action": actionReadFile,
@@ -121,47 +141,38 @@ func TestSkillUseToolReadFileTruncatesLargeContent(t *testing.T) {
 	}
 }
 
-func TestSkillUseToolLoadsBundledWeatherSkillForWeatherQuery(t *testing.T) {
-	catalog := newBundledSkillsCatalog(t)
-	tool := NewSkillUseTool(catalog)
+func TestSkillUseToolLoadsBundledSkillByName(t *testing.T) {
+	newBundledSkillsCatalog(t)
+	tool := NewSkillUseTool()
 
 	rawResult, err := tool.Execute(context.Background(), map[string]interface{}{
 		"action": actionGet,
-		"name":   "WEATHER",
+		"name":   "ANYSEARCH",
 	})
 	if err != nil {
-		t.Fatalf("get weather skill failed: %v", err)
+		t.Fatalf("get anysearch skill failed: %v", err)
 	}
 	result := decodeSkillToolOutput(t, rawResult)
 	if result["success"] != true {
-		t.Fatalf("expected successful weather skill result, got %#v", result)
+		t.Fatalf("expected successful anysearch skill result, got %#v", result)
 	}
 
-	if result["name"] != "weather" {
+	if result["name"] != "anysearch" {
 		t.Fatalf("unexpected skill name: %#v", result["name"])
-	}
-	if result["description"] != "Get current weather and forecasts (no API key required)." {
-		t.Fatalf("unexpected weather skill description: %#v", result["description"])
 	}
 
 	content, ok := result["content"].(string)
 	if !ok {
-		t.Fatalf("expected weather skill content string, got %#v", result["content"])
+		t.Fatalf("expected anysearch skill content string, got %#v", result["content"])
 	}
-	for _, expected := range []string{
-		`curl -s "wttr.in/London?format=3"`,
-		"Open-Meteo",
-		"current_weather=true",
-	} {
-		if !strings.Contains(content, expected) {
-			t.Fatalf("expected weather skill content to contain %q, got %s", expected, content)
-		}
+	if content == "" {
+		t.Fatalf("expected non-empty anysearch skill content")
 	}
 }
 
 func TestSkillUseToolMissingSkillReturnsAvailableNames(t *testing.T) {
-	catalog := newTestCatalog(t)
-	tool := NewSkillUseTool(catalog)
+	newTestCatalog(t)
+	tool := NewSkillUseTool()
 
 	rawResult, err := tool.Execute(context.Background(), map[string]interface{}{
 		"action": actionGet,
@@ -175,17 +186,73 @@ func TestSkillUseToolMissingSkillReturnsAvailableNames(t *testing.T) {
 		t.Fatalf("expected not found result, got %#v", result)
 	}
 
-	available, ok := result["available"].([]interface{})
+	available, ok := result["available_skills"].([]interface{})
 	if !ok {
-		t.Fatalf("expected available skill names, got %#v", result["available"])
+		t.Fatalf("expected available_skills, got %#v", result["available_skills"])
 	}
 	if len(available) != 1 || available[0] != "github-pr-review" {
 		t.Fatalf("unexpected available skills: %#v", available)
 	}
+
+	hint, ok := result["hint"].(string)
+	if !ok || hint == "" {
+		t.Fatalf("expected non-empty hint, got %#v", result["hint"])
+	}
+}
+
+func TestSkillUseToolGetSkillWithManifestMismatch(t *testing.T) {
+	rootDir := t.TempDir()
+	t.Setenv(leros.EnvWorkspaceRoot, rootDir)
+
+	skillsDir := filepath.Join(rootDir, ".leros", "skills")
+	mismatchDir := filepath.Join(skillsDir, "mismatch-dir")
+	if err := os.MkdirAll(mismatchDir, 0o755); err != nil {
+		t.Fatalf("mkdir failed: %v", err)
+	}
+
+	// SKILL.md with a different name than the directory
+	skillDocument := `---
+name: different-name
+description: A skill with mismatched name.
+---
+# Mismatch
+`
+	if err := os.WriteFile(filepath.Join(mismatchDir, "SKILL.md"), []byte(skillDocument), 0o644); err != nil {
+		t.Fatalf("write skill failed: %v", err)
+	}
+
+	tool := NewSkillUseTool()
+	rawResult, err := tool.Execute(context.Background(), map[string]interface{}{
+		"action": actionGet,
+		"name":   "mismatch-dir",
+	})
+	if err != nil {
+		t.Fatalf("get mismatch skill should return structured result: %v", err)
+	}
+	result := decodeSkillToolOutput(t, rawResult)
+	if result["success"] != false {
+		t.Fatalf("expected not found result for manifest mismatch, got %#v", result)
+	}
+
+	errMsg, _ := result["error"].(string)
+	if errMsg == "" || !strings.Contains(errMsg, "manifest name") {
+		t.Fatalf("expected error to mention manifest name mismatch, got %q", errMsg)
+	}
+
+	available, ok := result["available_skills"].([]interface{})
+	if !ok {
+		t.Fatalf("expected available_skills in mismatch response, got %#v", result["available_skills"])
+	}
+	_ = available
+
+	hint, ok := result["hint"].(string)
+	if !ok || hint == "" {
+		t.Fatalf("expected non-empty hint in mismatch response, got %#v", result["hint"])
+	}
 }
 
 func TestSkillUseToolValidate(t *testing.T) {
-	tool := NewSkillUseTool(nil)
+	tool := NewSkillUseTool()
 
 	if err := tool.Validate(map[string]interface{}{}); err == nil {
 		t.Fatalf("expected missing action to fail")
@@ -198,11 +265,14 @@ func TestSkillUseToolValidate(t *testing.T) {
 	}
 }
 
-func newTestCatalog(t *testing.T) *skillcatalog.Catalog {
+func newTestCatalog(t *testing.T) {
 	t.Helper()
 
 	rootDir := t.TempDir()
-	skillDir := filepath.Join(rootDir, "github-pr-review")
+	t.Setenv(leros.EnvWorkspaceRoot, rootDir)
+
+	skillsDir := filepath.Join(rootDir, ".leros", "skills")
+	skillDir := filepath.Join(skillsDir, "github-pr-review")
 	referencesDir := filepath.Join(skillDir, "references")
 	if err := os.MkdirAll(referencesDir, 0o755); err != nil {
 		t.Fatalf("mkdir failed: %v", err)
@@ -213,11 +283,10 @@ name: github-pr-review
 description: Review GitHub pull requests.
 version: 0.1.0
 metadata:
-  leros:
-    category: github
-    tags: [github, pr, review]
-    always: true
-    requires_tools: [github.pr.get_files]
+  category: github
+  tags: [github, pr, review]
+  always: true
+  requires_tools: [github.pr.get_files]
 ---
 # Review
 
@@ -232,13 +301,6 @@ Read the pull request before reviewing.
 	if err := os.WriteFile(filepath.Join(referencesDir, "large.md"), []byte(strings.Repeat("a", maxSkillFileReadBytes+5)), 0o644); err != nil {
 		t.Fatalf("write large reference failed: %v", err)
 	}
-
-	catalog, err := skillcatalog.NewCatalogFromDir(rootDir)
-	if err != nil {
-		t.Fatalf("load catalog failed: %v", err)
-	}
-
-	return catalog
 }
 
 func decodeSkillToolOutput(t *testing.T, output string) map[string]interface{} {
@@ -251,7 +313,7 @@ func decodeSkillToolOutput(t *testing.T, output string) map[string]interface{} {
 	return decoded
 }
 
-func newBundledSkillsCatalog(t *testing.T) *skillcatalog.Catalog {
+func newBundledSkillsCatalog(t *testing.T) {
 	t.Helper()
 
 	_, currentFile, _, ok := runtime.Caller(0)
@@ -259,11 +321,56 @@ func newBundledSkillsCatalog(t *testing.T) *skillcatalog.Catalog {
 		t.Fatalf("resolve current test file")
 	}
 
-	skillsDir := filepath.Join(filepath.Dir(currentFile), "..", "..", "skills")
-	catalog, err := skillcatalog.NewCatalogFromDir(skillsDir)
-	if err != nil {
-		t.Fatalf("load bundled skills catalog: %v", err)
+	// Bundled skills live at backend/skills/, but ScanSkillsDir() scans <workspace>/.leros/skills/.
+	// Set workspace root to a temp dir and copy the bundled skills into .leros/skills/.
+	sourceSkillsDir := filepath.Join(filepath.Dir(currentFile), "..", "..", "skills")
+	rootDir := t.TempDir()
+	destSkillsDir := filepath.Join(rootDir, ".leros", "skills")
+	if err := os.MkdirAll(filepath.Dir(destSkillsDir), 0o755); err != nil {
+		t.Fatalf("mkdir .leros failed: %v", err)
 	}
+	// Copy the skills directory recursively via cp -a
+	entries, err := os.ReadDir(sourceSkillsDir)
+	if err != nil {
+		t.Fatalf("read bundled skills dir: %v", err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		src := filepath.Join(sourceSkillsDir, entry.Name())
+		dst := filepath.Join(destSkillsDir, entry.Name())
+		if err := copyDir(src, dst); err != nil {
+			t.Fatalf("copy skill %s: %v", entry.Name(), err)
+		}
+	}
+	t.Setenv(leros.EnvWorkspaceRoot, rootDir)
+}
 
-	return catalog
+func copyDir(src, dst string) error {
+	if err := os.MkdirAll(dst, 0o755); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+		if entry.IsDir() {
+			if err := copyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			content, err := os.ReadFile(srcPath)
+			if err != nil {
+				return err
+			}
+			if err := os.WriteFile(dstPath, content, 0o644); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

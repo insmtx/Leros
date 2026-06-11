@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/insmtx/Leros/backend/engines"
+	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
 	"github.com/insmtx/Leros/backend/internal/skill/fetch"
 	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
 	"github.com/insmtx/Leros/backend/pkg/leros"
@@ -22,6 +23,16 @@ var (
 	skillYes   bool
 	skillLimit int
 )
+
+// newSourceRouter 创建包含内置源的 SourceRouter（内置源优先级最高）。
+func newSourceRouter() *fetch.SourceRouter {
+	return fetch.NewSourceRouterWithSources(
+		fetch.NewBuiltinSource(cliServerAddr()),
+		fetch.NewUrlSource(),
+		fetch.NewGitHubSource(),
+		fetch.NewSkillsShSource(),
+	)
+}
 
 // knownCLISkillDirs 外部 CLI skill 目录，安装后创建 symlink 同步。
 var knownCLISkillDirs = []string{
@@ -61,6 +72,16 @@ Identifier formats:
 		},
 	}
 
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List installed skills",
+		Long:  `List skills installed in the local workspace.`,
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runList()
+		},
+	}
+
 	cmd.PersistentFlags().BoolVar(&skillJSON, "json", false, "Output in JSON format")
 
 	installCmd.Flags().BoolVar(&skillForce, "force", false, "Overwrite existing skill")
@@ -69,20 +90,18 @@ Identifier formats:
 	searchCmd.Flags().IntVar(&skillLimit, "limit", 10, "Maximum number of results")
 	searchCmd.Flags().BoolVar(&skillJSON, "json", false, "Output in JSON format")
 
-	cmd.AddCommand(installCmd, searchCmd)
+	cmd.AddCommand(installCmd, searchCmd, listCmd)
 	return cmd
 }
 
 func runInstall(identifier string) error {
 	ctx := context.Background()
-	router := fetch.NewSourceRouter()
+	router := newSourceRouter()
 
-	var bundle *fetch.SkillBundle
-	var err error
-
-	if strings.Contains(identifier, "/") {
-		bundle, err = router.Fetch(ctx, identifier)
-	} else {
+	// 先尝试 Fetch（BuiltinSource.CanHandle 捕获短名，GitHubSource/UrlSource 捕获完整标识符）。
+	bundle, err := router.Fetch(ctx, identifier)
+	if err != nil && !strings.Contains(identifier, "/") {
+		// 短名 Fetch 失败时，回退到按名称搜索所有源。
 		bundle, err = router.ResolveShortName(ctx, identifier)
 	}
 	if err != nil {
@@ -134,7 +153,7 @@ func runInstall(identifier string) error {
 
 func runSearch(query string) error {
 	ctx := context.Background()
-	router := fetch.NewSourceRouter()
+	router := newSourceRouter()
 
 	results, err := router.Search(ctx, query, skillLimit)
 	if err != nil {
@@ -167,5 +186,53 @@ func runSearch(query string) error {
 	w.Flush()
 
 	fmt.Fprintf(os.Stderr, "\nFound %d result(s).\n", len(results))
+	return nil
+}
+
+func runList() error {
+	summaries, err := skillcatalog.List()
+	if err != nil {
+		return fmt.Errorf("list skills: %w", err)
+	}
+
+	if skillJSON {
+		type listItem struct {
+			Name        string `json:"name"`
+			Description string `json:"description"`
+			Category    string `json:"category"`
+			Source      string `json:"source"`
+			Trust       string `json:"trust"`
+		}
+		items := make([]listItem, 0, len(summaries))
+		for _, s := range summaries {
+			items = append(items, listItem{
+				Name:        s.Name,
+				Description: s.Description,
+				Category:    s.Category,
+				Source:      s.Source,
+				Trust:       s.Trust,
+			})
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		if items == nil {
+			items = []listItem{}
+		}
+		return enc.Encode(items)
+	}
+
+	if len(summaries) == 0 {
+		fmt.Println("No skills installed.")
+		return nil
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+	fmt.Fprintln(w, "NAME\tCATEGORY\tSOURCE\tTRUST")
+	for _, s := range summaries {
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", s.Name, s.Category, s.Source, s.Trust)
+	}
+	w.Flush()
+
+	fmt.Fprintf(os.Stderr, "\n%d skill(s) installed.\n", len(summaries))
 	return nil
 }

@@ -55,9 +55,12 @@ export function AuthProvider({
 	const fetchProjects = useLayoutStore((s) => s.fetchProjects);
 	const resetAuthScopedData = useLayoutStore((s) => s.resetAuthScopedData);
 	const resetLocalMessages = useChatStore((s) => s.resetLocalMessages);
+	const [hydrated, setHydrated] = useState(false);
 	const [dialogOpen, setDialogOpen] = useState(false);
 	const [mode, setMode] = useState<AuthMode>("login");
 	const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
+	useEffect(() => { setHydrated(true); }, []);
 
 	const openAuthDialog = useCallback((nextMode: AuthMode = "login") => {
 		setMode(nextMode);
@@ -99,13 +102,13 @@ export function AuthProvider({
 
 	const value = useMemo<AuthContextValue>(
 		() => ({
-			isAuthenticated: Boolean(authUser),
-			user: authUser,
+			isAuthenticated: hydrated && Boolean(authUser),
+			user: hydrated ? authUser : null,
 			openAuthDialog,
 			requireAuth,
 			logout,
 		}),
-		[authUser, openAuthDialog, requireAuth, logout],
+		[authUser, hydrated, openAuthDialog, requireAuth, logout],
 	);
 
 	return (

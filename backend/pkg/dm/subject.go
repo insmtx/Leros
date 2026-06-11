@@ -29,6 +29,17 @@ func WorkerTaskSubject(orgid, workerid uint) (string, error) {
 	return fmt.Sprintf("org.%d.worker.%d.task", orgid, workerid), nil
 }
 
+// WorkerSkillInstallSubject 构造 worker skill 安装 topic，格式为 "org.{org_id}.worker.{worker_id}.skill.install"。
+func WorkerSkillInstallSubject(orgid, workerid uint) (string, error) {
+	if orgid == 0 {
+		return "", errors.New("orgid is required")
+	}
+	if workerid == 0 {
+		return "", errors.New("workerid is required")
+	}
+	return fmt.Sprintf("org.%d.worker.%d.skill.install", orgid, workerid), nil
+}
+
 // SessionMessageRequestSubject 构造会话请求 topic，格式为 "org.{org_id}.session.{session_id}.request"。
 func SessionMessageRequestSubject(orgid uint, sessionid string) (string, error) {
 	if orgid == 0 {

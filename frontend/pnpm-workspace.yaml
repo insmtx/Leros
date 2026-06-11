@@ -13,6 +13,7 @@ catalog:
 
   tailwindcss: "^4"
   "@tailwindcss/postcss": "^4"
+  "@tailwindcss/typography": "^0.5.20"
   "@tailwindcss/vite": "^4"
   tailwind-merge: "^3.4.0"
   class-variance-authority: "^0.7.1"

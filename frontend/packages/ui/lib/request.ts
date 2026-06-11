@@ -40,13 +40,18 @@ class HttpClient {
 		};
 	}
 
-	private buildURL(url: string, params?: Record<string, string | number | boolean>): string {
+	private buildURL(url: string, params?: Record<string, string | number | boolean | string[]>): string {
 		const fullURL = this.baseURL ? `${this.baseURL}${url}` : url;
 		if (!params) return fullURL;
 
 		const urlObj = new URL(fullURL, window.location.origin);
 		Object.keys(params).forEach((key) => {
-			urlObj.searchParams.append(key, String(params[key]));
+			const value = params[key];
+			if (Array.isArray(value)) {
+				value.forEach((v) => urlObj.searchParams.append(key, v));
+			} else {
+				urlObj.searchParams.append(key, String(value));
+			}
 		});
 		return urlObj.toString();
 	}
@@ -198,7 +203,7 @@ export interface RequestOptions extends RequestInit {
 	retryCount?: number;
 	retryDelay?: number;
 	baseURL?: string;
-	params?: Record<string, string | number | boolean>;
+	params?: Record<string, string | number | boolean | string[]>;
 }
 
 export interface ApiResponse<T = unknown> {

@@ -27,17 +27,14 @@ func (m *Manifest) Normalize(defaultName string) {
 	}
 }
 
-// ManifestMetadata 存储 Leros 专用的元数据扩展。
+// ManifestMetadata 存储 Skill 路由提示和元数据扩展。
 type ManifestMetadata struct {
-	Leros LerosMetadata `yaml:"leros,omitempty"`
-}
-
-// LerosMetadata 存储运行时使用的第一组 Skill 路由提示。
-type LerosMetadata struct {
 	Category      string   `yaml:"category,omitempty"`
 	Tags          []string `yaml:"tags,omitempty"`
 	Always        bool     `yaml:"always,omitempty"`
 	RequiresTools []string `yaml:"requires_tools,omitempty"`
+	Source        string   `yaml:"source,omitempty"`
+	Trust         string   `yaml:"trust,omitempty"`
 }
 
 // Entry 表示一个已发现并解析出元数据和正文的 Skill 文档。
@@ -58,18 +55,30 @@ type Summary struct {
 	Tags          []string
 	Always        bool
 	RequiresTools []string
+	Source        string
+	Trust         string
 }
 
 // Summary 返回适合提示词使用的 Skill 条目摘要。
 func (e *Entry) Summary() Summary {
+	source := e.Manifest.Metadata.Source
+	if source == "" {
+		source = "local"
+	}
+	trust := e.Manifest.Metadata.Trust
+	if trust == "" {
+		trust = "trusted"
+	}
 	return Summary{
 		Name:          e.Manifest.Name,
 		Description:   e.Manifest.Description,
 		Version:       e.Manifest.Version,
-		Category:      e.Manifest.Metadata.Leros.Category,
-		Tags:          e.Manifest.Metadata.Leros.Tags,
-		Always:        e.Manifest.Metadata.Leros.Always,
-		RequiresTools: e.Manifest.Metadata.Leros.RequiresTools,
+		Category:      e.Manifest.Metadata.Category,
+		Tags:          e.Manifest.Metadata.Tags,
+		Always:        e.Manifest.Metadata.Always,
+		RequiresTools: e.Manifest.Metadata.RequiresTools,
+		Source:        source,
+		Trust:         trust,
 	}
 }
 

@@ -1,10 +1,16 @@
 PROJECT := leros
 REGISTRY ?= registry.yygu.cn/insmtx/
 
-.PHONY: build docker-build-base docker-push-base docker-build docker-dev-build docker-push docker-compose-up docker-compose-down run run-foreground run-detached stop logs swagger swagger-clean dev-setup dev-server dev-worker dev-frontend
+.PHONY: build install uninstall docker-build-base docker-push-base docker-build docker-dev-build docker-push docker-compose-up docker-compose-down run run-foreground run-detached stop logs swagger swagger-clean dev-setup dev-server dev-worker dev-frontend
 
 build:
 	go build -v -o ./bundles/leros ./backend/cmd/leros/
+
+install:
+	bash deployments/dev/install.sh
+
+uninstall:
+	bash deployments/dev/install.sh --uninstall
 
 docker-build-base:
 	docker build -t $(REGISTRY)$(PROJECT)-base:latest -f deployments/build/Dockerfile.base .

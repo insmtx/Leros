@@ -12,13 +12,13 @@ files:
   - "!electron.vite.config.*"
   - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
 asar: true
+compression: maximum
 asarUnpack:
   - resources/**
 mac:
   category: public.app-category.developer-tools
   target:
     - target: dmg
-    - target: zip
   artifactName: ${productName}-${version}-mac-${arch}.${ext}
 win:
   signAndEditExecutable: false

@@ -52,6 +52,11 @@ export type BackendMessage = {
 	message_type: string;
 	sequence: number;
 	metadata?: BackendMessageMetadata;
+	usage?: {
+		input_tokens?: number;
+		output_tokens?: number;
+		total_tokens?: number;
+	};
 	chunks?: BackendMessageChunk[];
 	created_at: string;
 };

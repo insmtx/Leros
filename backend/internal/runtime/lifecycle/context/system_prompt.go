@@ -9,31 +9,28 @@ import (
 
 	"github.com/insmtx/Leros/backend/internal/agent"
 	localmemory "github.com/insmtx/Leros/backend/internal/memory/local"
+	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
 	agentworkspace "github.com/insmtx/Leros/backend/internal/workspace"
 	"github.com/insmtx/Leros/backend/prompts"
 	"github.com/ygpkg/yg-go/logs"
 )
 
 // buildSkillLoadingContext 构建 Skill 加载指令 + available_skills 数据。
-// 静态提示词模板来自 prompts 包，动态 skills 数据在运行时注入。
+// 静态提示词模板来自 prompts 包，动态 skills 数据在运行时从文件系统扫描注入。
 func (b *ContextBuilder) buildSkillLoadingContext() string {
 	var skillsData string
-	if b != nil && b.SkillsProvider() != nil {
-		catalog := b.SkillsProvider().Current()
-		if catalog != nil {
-			if summaries := catalog.List(); len(summaries) > 0 {
-				var sb strings.Builder
-				sb.WriteString("\n")
-				for _, s := range summaries {
-					sb.WriteString("- ")
-					sb.WriteString(s.Name)
-					sb.WriteString(": ")
-					sb.WriteString(s.Description)
-					sb.WriteString("\n")
-				}
-				skillsData = strings.TrimSpace(sb.String())
-			}
+	summaries, err := skillcatalog.List()
+	if err == nil && len(summaries) > 0 {
+		var sb strings.Builder
+		sb.WriteString("\n")
+		for _, s := range summaries {
+			sb.WriteString("- ")
+			sb.WriteString(s.Name)
+			sb.WriteString(": ")
+			sb.WriteString(s.Description)
+			sb.WriteString("\n")
 		}
+		skillsData = strings.TrimSpace(sb.String())
 	}
 
 	template := prompts.Get(prompts.KeyAgentNativeSkillLoading)

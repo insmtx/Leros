@@ -16,6 +16,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
 	runtimetodo "github.com/insmtx/Leros/backend/internal/runtime/todo"
 	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
+	"github.com/insmtx/Leros/backend/pkg/leros"
 	"github.com/insmtx/Leros/backend/tools"
 	memorytools "github.com/insmtx/Leros/backend/tools/memory"
 	nodetools "github.com/insmtx/Leros/backend/tools/node"
@@ -31,7 +32,7 @@ func TestRunnerBuildToolBindingMergesDefaultTools(t *testing.T) {
 	if err := memorytools.Register(registry); err != nil {
 		t.Fatalf("register memory tools: %v", err)
 	}
-	if err := skillusetools.Register(registry, skillcatalog.NewEmptyCatalog()); err != nil {
+	if err := skillusetools.Register(registry); err != nil {
 		t.Fatalf("register skill use tools: %v", err)
 	}
 	if err := skillmanagetools.Register(registry); err != nil {
@@ -249,13 +250,14 @@ func TestAgentRunWeatherSkillQuery(t *testing.T) {
 
 	ctx, cancel := realModelTestContext(t)
 	defer cancel()
-	catalog, skillDir := newBundledRuntimeSkillsCatalog(t)
-	if _, err := catalog.Get("weather"); err != nil {
+	skillDir := newBundledRuntimeSkillsCatalog(t)
+	// Verify the weather skill is available via dynamic scan
+	if _, err := skillcatalog.Get("weather"); err != nil {
 		t.Fatalf("weather skill must be available in %s: %v", skillDir, err)
 	}
 
 	registry := tools.NewRegistry()
-	if err := skillusetools.Register(registry, catalog); err != nil {
+	if err := skillusetools.Register(registry); err != nil {
 		t.Fatalf("register skill tools: %v", err)
 	}
 	if err := nodetools.Register(registry); err != nil {
@@ -324,7 +326,7 @@ func collectResult(t *testing.T, eventsCh <-chan events.Event) string {
 	return message
 }
 
-func newBundledRuntimeSkillsCatalog(t *testing.T) (*skillcatalog.Catalog, string) {
+func newBundledRuntimeSkillsCatalog(t *testing.T) string {
 	t.Helper()
 
 	_, currentFile, _, ok := goruntime.Caller(0)
@@ -333,12 +335,10 @@ func newBundledRuntimeSkillsCatalog(t *testing.T) (*skillcatalog.Catalog, string
 	}
 
 	skillsDir := filepath.Join(filepath.Dir(currentFile), "..", "skills")
-	catalog, err := skillcatalog.NewCatalog(os.DirFS(skillsDir))
-	if err != nil {
-		t.Fatalf("load bundled skills catalog from %s: %v", skillsDir, err)
-	}
-
-	return catalog, skillsDir
+	// The skills dir is <workspace>/.leros/skills, so the workspace root is the parent of .leros
+	workspaceRoot := filepath.Dir(filepath.Dir(skillsDir))
+	t.Setenv(leros.EnvWorkspaceRoot, workspaceRoot)
+	return skillsDir
 }
 
 func realModelTestContext(t *testing.T) (context.Context, context.CancelFunc) {

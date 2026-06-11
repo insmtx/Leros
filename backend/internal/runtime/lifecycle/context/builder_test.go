@@ -6,21 +6,10 @@ import (
 	"testing"
 
 	"github.com/insmtx/Leros/backend/internal/agent"
-	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
 )
 
-type mockRuntimeProvider struct {
-	skillsProvider skillcatalog.CatalogProvider
-}
-
-func (m *mockRuntimeProvider) SkillsProvider() skillcatalog.CatalogProvider {
-	return m.skillsProvider
-}
-
 func TestContextBuilderBuildSystemPromptLayers(t *testing.T) {
-	builder := NewContextBuilder(ContextBuilder{
-		Runtime: &mockRuntimeProvider{},
-	})
+	builder := NewContextBuilder(ContextBuilder{})
 	prompt, err := builder.BuildSystemPrompt(context.Background(), &agent.RequestContext{
 		Assistant: agent.AssistantContext{SystemPrompt: "Assistant-specific prompt."},
 		Conversation: agent.ConversationContext{

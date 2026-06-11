@@ -18,11 +18,18 @@ var TrustedRepos = map[string]bool{
 
 // SkillMeta 搜索或检查返回的轻量 Skill 信息。
 type SkillMeta struct {
-	Name        string `json:"name"`
-	Identifier  string `json:"identifier"`
-	Source      string `json:"source"`
-	TrustLevel  string `json:"trust_level"`
-	Description string `json:"description"`
+	SkillID     string   `json:"skill_id"`
+	Name        string   `json:"name,omitempty"`
+	Identifier  string   `json:"identifier"`
+	Source      string   `json:"source"`
+	TrustLevel  string   `json:"trust_level"`
+	Description string   `json:"description"`
+	Version     string   `json:"version,omitempty"`
+	Author      string   `json:"author,omitempty"`
+	Category    string   `json:"category,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+	Icon        string   `json:"icon,omitempty"`
+	Installs    int64    `json:"installs,omitempty"`
 }
 
 // SkillBundle Fetch 返回的完整 Skill 内容。
@@ -56,6 +63,11 @@ func NewSourceRouter() *SourceRouter {
 			NewSkillsShSource(),
 		},
 	}
+}
+
+// NewSourceRouterWithSources 使用指定源列表创建 SourceRouter。
+func NewSourceRouterWithSources(sources ...SkillSource) *SourceRouter {
+	return &SourceRouter{sources: sources}
 }
 
 // Search 并发向所有源发起搜索，合并结果并去重。
@@ -108,12 +120,26 @@ func (r *SourceRouter) Fetch(ctx context.Context, identifier string) (*SkillBund
 	return nil, fmt.Errorf("no source could handle identifier %q", identifier)
 }
 
-// ResolveShortName 对不含 "/" 的短名称，通过 skills.sh 搜索精确匹配后安装。
+// ResolveShortName 对不含 "/" 的短名称，按 source 优先级依次搜索精确匹配后安装。
 func (r *SourceRouter) ResolveShortName(ctx context.Context, name string) (*SkillBundle, error) {
 	if strings.Contains(name, "/") {
 		return nil, fmt.Errorf("ResolveShortName called with identifier containing '/': %s", name)
 	}
 
+	// 按 router 内 source 优先级依次搜索。
+	for _, src := range r.sources {
+		results, err := src.Search(ctx, name, 10)
+		if err != nil {
+			continue
+		}
+		for _, meta := range results {
+			if strings.EqualFold(meta.Name, name) {
+				return r.Fetch(ctx, meta.Identifier)
+			}
+		}
+	}
+
+	// 兜底：直接搜索 skills.sh。
 	skillsSh := NewSkillsShSource()
 	results, err := skillsSh.Search(ctx, name, 10)
 	if err != nil {

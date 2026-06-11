@@ -36,6 +36,9 @@ func (s *SkillsShSource) CanHandle(identifier string) bool {
 
 // Search 调用 skills.sh 搜索 API。
 func (s *SkillsShSource) Search(ctx context.Context, query string, limit int) ([]SkillMeta, error) {
+	if len([]rune(strings.TrimSpace(query))) < 2 {
+		return []SkillMeta{}, nil
+	}
 	params := url.Values{}
 	params.Set("q", query)
 	if limit > 0 {
@@ -76,11 +79,13 @@ func (s *SkillsShSource) Search(ctx context.Context, query string, limit int) ([
 
 		identifier := item.Source + "/" + item.SkillID
 		results = append(results, SkillMeta{
+			SkillID:     item.SkillID,
 			Name:        item.Name,
 			Identifier:  identifier,
-			Source:      s.SourceID(),
+			Source:      item.Source,
 			TrustLevel:  TrustLevelForRepo(owner, repo),
 			Description: item.Description,
+			Installs:    int64(item.Installs),
 		})
 	}
 

@@ -57,6 +57,12 @@ export type MessageMetadata = {
 	latency?: number;
 };
 
+export type MessageUsage = {
+	inputTokens?: number;
+	outputTokens?: number;
+	totalTokens?: number;
+};
+
 export type Message = {
 	id: string;
 	conversationId: string;
@@ -70,6 +76,7 @@ export type Message = {
 	artifacts?: MessageArtifact[];
 	thinking?: string;
 	metadata?: MessageMetadata;
+	usage?: MessageUsage;
 };
 
 export type Attachment = {
