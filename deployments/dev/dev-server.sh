@@ -51,7 +51,7 @@ fi
 
 echo -e "${BLUE}Starting server (port 8080)...${NC}"
 
-LEROS_STORAGE_LOCAL_DIR="$ROOT_DIR/leros-bucket"
+LEROS_STORAGE_LOCAL_DIR="$ROOT_DIR/leros-storage"
 mkdir -p "$LEROS_STORAGE_LOCAL_DIR"
 
 cd "$ROOT_DIR"

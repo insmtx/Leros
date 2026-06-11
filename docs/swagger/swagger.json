@@ -4445,10 +4445,18 @@
         "types.ObjectMetadata": {
             "type": "object",
             "properties": {
+                "bucket": {
+                    "description": "元数据 - 对象存储桶",
+                    "type": "string"
+                },
                 "extra": {
                     "description": "元数据 - 其他扩展字段",
                     "type": "object",
                     "additionalProperties": true
+                },
+                "key": {
+                    "description": "元数据 - 对象存储键",
+                    "type": "string"
                 },
                 "tags": {
                     "description": "元数据 - 项目标签",

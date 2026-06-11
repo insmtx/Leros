@@ -758,10 +758,16 @@ definitions:
     type: object
   types.ObjectMetadata:
     properties:
+      bucket:
+        description: 元数据 - 对象存储桶
+        type: string
       extra:
         additionalProperties: true
         description: 元数据 - 其他扩展字段
         type: object
+      key:
+        description: 元数据 - 对象存储键
+        type: string
       tags:
         description: 元数据 - 项目标签
         items:

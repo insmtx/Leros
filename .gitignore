@@ -59,4 +59,4 @@ leros
 logs/
 .omo/
 .leros-workspace/**
-leros-bucket/
+leros-storage/
