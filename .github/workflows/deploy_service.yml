@@ -1,0 +1,62 @@
+name: Leros 测试环境部署
+on:
+  workflow_dispatch:
+
+jobs:
+  leros_deploy:
+    runs-on: self-hosted
+    timeout-minutes: 45
+    env:
+      PROJECT: leros
+      REGISTRY_HOST: ${{ secrets.DOCKER_REGISTRY_HOST }}
+      ENV: test
+      K8S_NS: insmtx-test
+    outputs:
+      image_tag: ${{ steps.step_env.outputs.image_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate image tag
+        id: step_env
+        run: |
+          TAG="$(date +%Y%m%d)-${GITHUB_SHA::8}"
+          echo "image_tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Image: ${REGISTRY_HOST}/insmtx/${PROJECT}:${TAG}"
+
+      - name: Build Docker image
+        run: |
+          TAG=${{ steps.step_env.outputs.image_tag }} make docker-build-tag
+
+      - name: Push Docker image
+        run: |
+          echo "${{ secrets.DOCKER_REGISTRY_PASSWORD }}" | docker login ${REGISTRY_HOST} -u ${{ secrets.DOCKER_REGISTRY_USERNAME }} --password-stdin
+          TAG=${{ steps.step_env.outputs.image_tag }} make docker-push-tag
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOYER_PRIMARY_KEY }}
+          script: |
+            IMAGE_TAG=${{ steps.step_env.outputs.image_tag }}
+            FULL_IMAGE=${REGISTRY_HOST}/insmtx/${PROJECT}:${IMAGE_TAG}
+            kubectl set image deployment/${PROJECT} ${PROJECT}=${FULL_IMAGE} -n ${K8S_NS}
+            kubectl set image deployment/${PROJECT}-worker ${PROJECT}-worker=${FULL_IMAGE} -n ${K8S_NS}
+            kubectl rollout status deployment/${PROJECT} -n ${K8S_NS}
+            kubectl rollout status deployment/${PROJECT}-worker -n ${K8S_NS}
+
+      - name: Notify success
+        if: success()
+        run: |
+          curl -H "Content-Type: application/json;charset=utf-8" \
+            -d "{\"msgtype\": \"text\",\"text\": {\"content\":\"【测试环境】${PROJECT}:${{ steps.step_env.outputs.image_tag }} 部署成功\"}}" \
+            "${{ secrets.WEWORK_WEBHOOK_URL }}"
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          curl -H "Content-Type: application/json;charset=utf-8" \
+            -d "{\"msgtype\": \"text\",\"text\": {\"content\":\"【测试环境】${PROJECT}:${{ steps.step_env.outputs.image_tag }} 部署失败\"}}" \
+            "${{ secrets.WEWORK_WEBHOOK_URL }}"
