@@ -1,6 +1,35 @@
+import type { ApiError } from "@leros/ui/lib/request";
 import { apiClient } from "./client";
 import { fetchFileDownload } from "./fileApi";
 import type { BackendArtifact, BackendArtifactDetail, BackendDataResponse } from "./types";
+
+function isNotFoundError(error: unknown): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"status" in error &&
+		(error as ApiError).status === 404
+	);
+}
+
+/** Lists task artifacts; prefers deployed RPC route, falls back to REST GET for local dev. */
+async function listTaskArtifacts(taskId: string) {
+	const normalizedTaskId = taskId.trim();
+	if (!normalizedTaskId) {
+		throw new Error("task_id is required");
+	}
+
+	try {
+		return await apiClient.post<BackendDataResponse<BackendArtifact[]>>("/ListTaskArtifacts", {
+			task_id: normalizedTaskId,
+		});
+	} catch (error) {
+		if (!isNotFoundError(error)) throw error;
+		return apiClient.get<BackendDataResponse<BackendArtifact[]>>(
+			`/tasks/${encodeURIComponent(normalizedTaskId)}/artifacts`,
+		);
+	}
+}
 
 const publishFileIdCache = new Map<string, string>();
 
@@ -45,8 +74,5 @@ export async function fetchArtifactDownload(
 
 export const artifactApi = {
 	fetchDownload: fetchArtifactDownload,
-	listTaskArtifacts: (taskId: string) =>
-		apiClient.get<BackendDataResponse<BackendArtifact[]>>(
-			`/tasks/${encodeURIComponent(taskId)}/artifacts`,
-		),
+	listTaskArtifacts,
 };
