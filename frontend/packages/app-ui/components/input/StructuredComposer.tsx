@@ -22,14 +22,6 @@ import { type ChatCommand, mockAssistants, mockChatCommands } from "./mockDirect
 
 type DirectiveKind = "assistant" | "command";
 
-type DirectiveToken = {
-	id: string;
-	kind: DirectiveKind;
-	start: number;
-	end: number;
-	label: string;
-};
-
 type ActiveTrigger = {
 	kind: DirectiveKind;
 	start: number;
@@ -37,10 +29,21 @@ type ActiveTrigger = {
 	query: string;
 };
 
+type InsertedToken = {
+	label: string;
+	start: number;
+	end: number;
+};
+
 type AssistantOption = {
 	code: string;
 	name: string;
 	description: string;
+};
+
+type EditorSnapshot = {
+	text: string;
+	tokens: InsertedToken[];
 };
 
 export type StructuredComposerHandle = {
@@ -51,7 +54,7 @@ type StructuredComposerProps = {
 	value: string;
 	onChange: (value: string) => void;
 	onSubmit: () => void;
-	onPaste: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void;
+	onPaste: (event: React.ClipboardEvent<HTMLElement>) => void;
 	onFocus: () => void;
 	onBlur: () => void;
 	placeholder: string;
@@ -85,11 +88,225 @@ function findTrigger(value: string, cursor: number): ActiveTrigger | null {
 	return null;
 }
 
-function updateTokensForTextChange(
-	tokens: DirectiveToken[],
+function normalizeSearchValue(value: string): string {
+	return value.trim().toLowerCase();
+}
+
+function sortTokens(tokens: InsertedToken[]): InsertedToken[] {
+	return [...tokens].sort((a, b) => a.start - b.start);
+}
+
+function areTokensEqual(left: InsertedToken[], right: InsertedToken[]): boolean {
+	if (left.length !== right.length) return false;
+	return left.every((token, index) => {
+		const target = right[index];
+		return (
+			target &&
+			token.label === target.label &&
+			token.start === target.start &&
+			token.end === target.end
+		);
+	});
+}
+
+function extractSnapshot(root: HTMLElement): EditorSnapshot {
+	const tokens: InsertedToken[] = [];
+
+	const walk = (node: Node, cursor: number): { text: string; cursor: number } => {
+		if (node.nodeType === Node.TEXT_NODE) {
+			const text = node.textContent ?? "";
+			return { text, cursor: cursor + text.length };
+		}
+
+		if (!(node instanceof HTMLElement)) {
+			return { text: "", cursor };
+		}
+
+		if (node.dataset.mentionNode === "true") {
+			const label = node.dataset.mentionLabel ?? node.textContent ?? "";
+			tokens.push({
+				label,
+				start: cursor,
+				end: cursor + label.length,
+			});
+			return { text: label, cursor: cursor + label.length };
+		}
+
+		if (node.tagName === "BR") {
+			return { text: "\n", cursor: cursor + 1 };
+		}
+
+		let text = "";
+		let nextCursor = cursor;
+		for (const child of Array.from(node.childNodes)) {
+			const result = walk(child, nextCursor);
+			text += result.text;
+			nextCursor = result.cursor;
+		}
+		return { text, cursor: nextCursor };
+	};
+
+	let text = "";
+	let cursor = 0;
+	for (const child of Array.from(root.childNodes)) {
+		const result = walk(child, cursor);
+		text += result.text;
+		cursor = result.cursor;
+	}
+
+	return {
+		text,
+		tokens: sortTokens(tokens),
+	};
+}
+
+function buildEditorContent(root: HTMLElement, value: string, tokens: InsertedToken[]) {
+	const fragment = document.createDocumentFragment();
+	const orderedTokens = sortTokens(tokens);
+	let cursor = 0;
+
+	for (const token of orderedTokens) {
+		if (token.start > cursor) {
+			fragment.appendChild(document.createTextNode(value.slice(cursor, token.start)));
+		}
+
+		const mention = document.createElement("span");
+		mention.dataset.mentionNode = "true";
+		mention.dataset.mentionLabel = token.label;
+		mention.setAttribute("contenteditable", "false");
+		mention.className =
+			"inline-flex rounded-md bg-blue-100 px-1.5 py-0.5 text-blue-700 align-baseline";
+		mention.textContent = token.label;
+		fragment.appendChild(mention);
+		cursor = token.end;
+	}
+
+	if (cursor < value.length) {
+		fragment.appendChild(document.createTextNode(value.slice(cursor)));
+	}
+
+	root.replaceChildren(fragment);
+}
+
+function setCaretOffset(root: HTMLElement, offset: number) {
+	const selection = window.getSelection();
+	if (!selection) return;
+
+	const range = document.createRange();
+	let remaining = offset;
+
+	const placeAtEnd = () => {
+		range.selectNodeContents(root);
+		range.collapse(false);
+		selection.removeAllRanges();
+		selection.addRange(range);
+	};
+
+	const walk = (node: Node): boolean => {
+		if (node.nodeType === Node.TEXT_NODE) {
+			const textLength = node.textContent?.length ?? 0;
+			if (remaining <= textLength) {
+				range.setStart(node, remaining);
+				range.collapse(true);
+				selection.removeAllRanges();
+				selection.addRange(range);
+				return true;
+			}
+			remaining -= textLength;
+			return false;
+		}
+
+		if (!(node instanceof HTMLElement)) {
+			return false;
+		}
+
+		if (node.dataset.mentionNode === "true") {
+			const labelLength = node.dataset.mentionLabel?.length ?? node.textContent?.length ?? 0;
+			if (remaining <= labelLength) {
+				range.setStartAfter(node);
+				range.collapse(true);
+				selection.removeAllRanges();
+				selection.addRange(range);
+				return true;
+			}
+			remaining -= labelLength;
+			return false;
+		}
+
+		if (node.tagName === "BR") {
+			if (remaining <= 1) {
+				range.setStartAfter(node);
+				range.collapse(true);
+				selection.removeAllRanges();
+				selection.addRange(range);
+				return true;
+			}
+			remaining -= 1;
+			return false;
+		}
+
+		for (const child of Array.from(node.childNodes)) {
+			if (walk(child)) return true;
+		}
+		return false;
+	};
+
+	for (const child of Array.from(root.childNodes)) {
+		if (walk(child)) return;
+	}
+
+	placeAtEnd();
+}
+
+function getCaretOffset(root: HTMLElement): number {
+	const selection = window.getSelection();
+	if (!selection || selection.rangeCount === 0) return extractSnapshot(root).text.length;
+
+	const range = selection.getRangeAt(0);
+	const workingRange = range.cloneRange();
+	workingRange.selectNodeContents(root);
+	workingRange.setEnd(range.endContainer, range.endOffset);
+	return extractSnapshotFromFragment(workingRange.cloneContents()).text.length;
+}
+
+function extractSnapshotFromFragment(fragment: DocumentFragment): EditorSnapshot {
+	const wrapper = document.createElement("div");
+	wrapper.appendChild(fragment);
+	return extractSnapshot(wrapper);
+}
+
+function shiftTokensForInsert(
+	tokens: InsertedToken[],
+	start: number,
+	end: number,
+	inserted: InsertedToken,
+	plainTextDelta: number,
+) {
+	const nextTokens: InsertedToken[] = [];
+	for (const token of tokens) {
+		if (token.end <= start) {
+			nextTokens.push(token);
+			continue;
+		}
+
+		if (token.start >= end) {
+			nextTokens.push({
+				...token,
+				start: token.start + plainTextDelta,
+				end: token.end + plainTextDelta,
+			});
+		}
+	}
+
+	nextTokens.push(inserted);
+	return sortTokens(nextTokens);
+}
+
+function shiftTokensForTextEdit(
+	tokens: InsertedToken[],
 	previousValue: string,
 	nextValue: string,
-): DirectiveToken[] {
+): InsertedToken[] {
 	let prefixLength = 0;
 	while (
 		prefixLength < previousValue.length &&
@@ -112,21 +329,19 @@ function updateTokensForTextChange(
 	const previousEditEnd = previousValue.length - suffixLength;
 	const delta = nextValue.length - previousValue.length;
 
-	return tokens
-		.flatMap((token) => {
+	return sortTokens(
+		tokens.flatMap((token) => {
 			if (previousEditEnd <= token.start) {
 				return [{ ...token, start: token.start + delta, end: token.end + delta }];
 			}
+
 			if (prefixLength >= token.end) {
 				return [token];
 			}
-			return [];
-		})
-		.filter((token) => nextValue.slice(token.start, token.end) === token.label);
-}
 
-function normalizeSearchValue(value: string): string {
-	return value.trim().toLowerCase();
+			return [];
+		}),
+	);
 }
 
 export const StructuredComposer = forwardRef<StructuredComposerHandle, StructuredComposerProps>(
@@ -134,18 +349,12 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 		{ value, onChange, onSubmit, onPaste, onFocus, onBlur, placeholder, isProjectVariant },
 		ref,
 	) {
-		const textareaRef = useRef<HTMLTextAreaElement>(null);
-		const [tokens, setTokens] = useState<DirectiveToken[]>([]);
+		const editorRef = useRef<HTMLDivElement>(null);
 		const [trigger, setTrigger] = useState<ActiveTrigger | null>(null);
 		const [activeIndex, setActiveIndex] = useState(0);
-		const [scrollTop, setScrollTop] = useState(0);
+		const [tokens, setTokens] = useState<InsertedToken[]>([]);
 		const composingRef = useRef(false);
-
-		useEffect(() => {
-			if (value) return;
-			setTokens([]);
-			setTrigger(null);
-		}, [value]);
+		const pendingCaretRef = useRef<number | null>(null);
 
 		const assistantOptions = useMemo<AssistantOption[]>(() => mockAssistants, []);
 
@@ -178,44 +387,70 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 			setActiveIndex(0);
 		}, [trigger?.kind, trigger?.query]);
 
-		const adjustHeight = useCallback(() => {
-			const textarea = textareaRef.current;
-			if (!textarea) return;
-			textarea.style.height = "auto";
-			textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
-		}, []);
+		useEffect(() => {
+			const editor = editorRef.current;
+			if (!editor) return;
+
+			const validTokens = sortTokens(
+				tokens.filter((token) => value.slice(token.start, token.end) === token.label),
+			);
+			const snapshot = extractSnapshot(editor);
+
+			if (snapshot.text !== value || !areTokensEqual(snapshot.tokens, validTokens)) {
+				// 只在纯文本或 mention 结构失配时重建 DOM，避免每次输入都打断用户的光标位置。
+				buildEditorContent(editor, value, validTokens);
+			}
+
+			if (pendingCaretRef.current !== null) {
+				setCaretOffset(editor, pendingCaretRef.current);
+				pendingCaretRef.current = null;
+			}
+		}, [tokens, value]);
 
 		useEffect(() => {
-			adjustHeight();
-		}, [value, adjustHeight]);
-
-		const validTokens = useMemo(
-			() => tokens.filter((token) => value.slice(token.start, token.end) === token.label),
-			[tokens, value],
-		);
-
-		const shouldUseHighlightLayer = validTokens.length > 0;
+			if (value) return;
+			setTokens([]);
+			setTrigger(null);
+		}, [value]);
 
 		const focusAt = useCallback((cursor: number) => {
 			requestAnimationFrame(() => {
-				const textarea = textareaRef.current;
-				if (!textarea) return;
-				textarea.focus();
-				textarea.setSelectionRange(cursor, cursor);
+				const editor = editorRef.current;
+				if (!editor) return;
+				editor.focus();
+				setCaretOffset(editor, cursor);
 			});
 		}, []);
 
+		const syncFromEditor = useCallback(() => {
+			const editor = editorRef.current;
+			if (!editor) return;
+
+			const snapshot = extractSnapshot(editor);
+			setTokens(snapshot.tokens);
+			onChange(snapshot.text);
+
+			if (!composingRef.current) {
+				setTrigger(findTrigger(snapshot.text, getCaretOffset(editor)));
+			}
+		}, [onChange]);
+
 		const insertTrigger = useCallback(
 			(kind: DirectiveKind) => {
-				const textarea = textareaRef.current;
-				const cursor = textarea?.selectionStart ?? value.length;
+				const editor = editorRef.current;
+				if (!editor) return;
+
+				const cursor = getCaretOffset(editor);
 				const marker = kind === "assistant" ? "@" : "/";
 				const needsLeadingSpace = cursor > 0 && !/\s/.test(value[cursor - 1] ?? "");
 				const insertion = `${needsLeadingSpace ? " " : ""}${marker}`;
 				const markerStart = cursor + (needsLeadingSpace ? 1 : 0);
 				const nextValue = `${value.slice(0, cursor)}${insertion}${value.slice(cursor)}`;
-				setTokens((current) => updateTokensForTextChange(current, value, nextValue));
+
+				// 工具栏触发的插入不会经过原生 input 事件，这里手动同步 mention 位置信息。
+				setTokens((current) => shiftTokensForTextEdit(current, value, nextValue));
 				onChange(nextValue);
+				pendingCaretRef.current = markerStart + 1;
 				setTrigger({ kind, start: markerStart, end: markerStart + 1, query: "" });
 				focusAt(markerStart + 1);
 			},
@@ -241,21 +476,32 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 				const followingText = value.slice(activeTrigger.end);
 				const trailingSpace = followingText.startsWith(" ") ? "" : " ";
 				const nextValue = `${value.slice(0, activeTrigger.start)}${label}${trailingSpace}${followingText}`;
-				const token: DirectiveToken = {
-					id: `${kind}-${Date.now()}`,
-					kind,
-					start: activeTrigger.start,
-					end: activeTrigger.start + label.length,
-					label,
-				};
+				if (isAssistant) {
+					const insertedToken: InsertedToken = {
+						label,
+						start: activeTrigger.start,
+						end: activeTrigger.start + label.length,
+					};
+					const delta =
+						label.length + trailingSpace.length - (activeTrigger.end - activeTrigger.start);
 
-				setTokens((current) => {
-					const updated = updateTokensForTextChange(current, value, nextValue);
-					return [...updated, token].sort((a, b) => a.start - b.start);
-				});
+					setTokens((current) =>
+						shiftTokensForInsert(
+							current,
+							activeTrigger.start,
+							activeTrigger.end,
+							insertedToken,
+							delta,
+						),
+					);
+				} else {
+					setTokens((current) => shiftTokensForTextEdit(current, value, nextValue));
+				}
 				onChange(nextValue);
 				setTrigger(null);
-				focusAt(token.end + trailingSpace.length);
+				// mention 节点插入后，显式恢复光标到节点后面的正文位置，避免落到不可编辑节点内部。
+				pendingCaretRef.current = activeTrigger.start + label.length + trailingSpace.length;
+				focusAt(activeTrigger.start + label.length + trailingSpace.length);
 			},
 			[focusAt, onChange, value],
 		);
@@ -271,21 +517,8 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 			if (command) selectToken("command", command, trigger);
 		}, [activeIndex, filteredAssistants, filteredCommands, selectToken, trigger]);
 
-		const handleChange = useCallback(
-			(event: React.ChangeEvent<HTMLTextAreaElement>) => {
-				const nextValue = event.target.value;
-				const cursor = event.target.selectionStart ?? nextValue.length;
-				setTokens((current) => updateTokensForTextChange(current, value, nextValue));
-				onChange(nextValue);
-				if (!composingRef.current) {
-					setTrigger(findTrigger(nextValue, cursor));
-				}
-			},
-			[onChange, value],
-		);
-
 		const handleKeyDown = useCallback(
-			(event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+			(event: React.KeyboardEvent<HTMLDivElement>) => {
 				if (trigger) {
 					if (event.key === "ArrowDown" || event.key === "ArrowUp") {
 						event.preventDefault();
@@ -296,11 +529,13 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 						});
 						return;
 					}
+
 					if ((event.key === "Enter" || event.key === "Tab") && pickerItemCount > 0) {
 						event.preventDefault();
 						selectActiveItem();
 						return;
 					}
+
 					if (event.key === "Escape") {
 						event.preventDefault();
 						setTrigger(null);
@@ -318,33 +553,6 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 			},
 			[isProjectVariant, onSubmit, pickerItemCount, selectActiveItem, trigger],
 		);
-
-		const renderHighlightedValue = () => {
-			if (validTokens.length === 0) return value;
-
-			const parts: React.ReactNode[] = [];
-			let cursor = 0;
-			for (const token of validTokens) {
-				if (token.start < cursor) continue;
-				parts.push(value.slice(cursor, token.start));
-				parts.push(
-					<span
-						key={token.id}
-						className={cn(
-							"rounded-md ring-2",
-							token.kind === "assistant"
-								? "bg-blue-100 text-blue-700 ring-blue-100"
-								: "bg-violet-100 text-violet-700 ring-violet-100",
-						)}
-					>
-						{token.label}
-					</span>,
-				);
-				cursor = token.end;
-			}
-			parts.push(value.slice(cursor));
-			return parts;
-		};
 
 		const inputSpacingClass = isProjectVariant
 			? "min-h-[92px] rounded-none px-0 py-0 text-base leading-7"
@@ -398,9 +606,6 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 														index === activeIndex && "bg-slate-100",
 													)}
 												>
-													{/* <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-violet-50 text-violet-600">
-														<Slash className="size-4" />
-													</div> */}
 													<div className="min-w-0 flex-1">
 														<div className="font-medium">/{command.label}</div>
 														<div className="truncate text-xs text-slate-400">
@@ -415,24 +620,28 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 					</div>
 				)}
 
-				{shouldUseHighlightLayer && (
+				{!value && (
 					<div
 						aria-hidden="true"
 						className={cn(
-							"pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-slate-700",
+							"pointer-events-none absolute left-0 top-0 text-slate-400",
 							inputSpacingClass,
 						)}
 					>
-						{/* 只有真正需要高亮 token 时才启用镜像层，避免长文本粘贴时双层排版产生重影。 */}
-						<div style={{ transform: `translateY(-${scrollTop}px)` }}>
-							{renderHighlightedValue()}
-						</div>
+						{placeholder}
 					</div>
 				)}
-				<textarea
-					ref={textareaRef}
-					value={value}
-					onChange={handleChange}
+
+				{/* biome-ignore lint/a11y/useSemanticElements: mention 编辑区必须使用 contenteditable div 承载内联节点。 */}
+				<div
+					ref={editorRef}
+					role="textbox"
+					aria-multiline="true"
+					tabIndex={0}
+					contentEditable
+					aria-label={placeholder}
+					suppressContentEditableWarning
+					onInput={() => syncFromEditor()}
 					onKeyDown={handleKeyDown}
 					onPaste={onPaste}
 					onFocus={onFocus}
@@ -440,22 +649,17 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 						onBlur();
 						setTimeout(() => setTrigger(null), 100);
 					}}
-					onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
 					onCompositionStart={() => {
 						composingRef.current = true;
 					}}
-					onCompositionEnd={(event) => {
+					onCompositionEnd={() => {
 						composingRef.current = false;
-						const cursor = event.currentTarget.selectionStart ?? value.length;
-						setTrigger(findTrigger(event.currentTarget.value, cursor));
+						syncFromEditor();
 					}}
-					placeholder={placeholder}
 					className={cn(
-						"relative z-10 max-h-[220px] w-full resize-none bg-transparent caret-slate-700 focus:outline-none placeholder:text-slate-400",
-						shouldUseHighlightLayer ? "text-transparent" : "text-slate-700",
+						"relative z-10 max-h-[220px] overflow-y-auto whitespace-pre-wrap break-words bg-transparent text-slate-700 caret-slate-700 focus:outline-none",
 						inputSpacingClass,
 					)}
-					rows={1}
 				/>
 			</div>
 		);

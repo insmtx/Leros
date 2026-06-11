@@ -71,6 +71,7 @@ export type {
 	MessageArtifact,
 	MessageMetadata,
 	MessageRole,
+	MessageUsage,
 	ModelOption,
 	RuntimeTodoItem,
 	TodoStatus,
@@ -78,4 +79,4 @@ export type {
 	ToolCallStatus,
 } from "./types/chat";
 export { flattenActions } from "./utils";
-export { formatDate, formatFileSize, formatTime } from "./utils/format";
+export { formatDate, formatFileSize, formatTime, formatTokenCount } from "./utils/format";

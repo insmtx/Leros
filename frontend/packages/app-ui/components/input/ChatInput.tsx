@@ -75,7 +75,7 @@ export function ChatInput({ variant = "default" }: { variant?: "default" | "proj
 	]);
 
 	const handlePaste = useCallback(
-		(e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+		(e: React.ClipboardEvent<HTMLElement>) => {
 			const files = Array.from(e.clipboardData.files);
 			for (const file of files) {
 				if (file.type.startsWith("image/") || file.type.startsWith("text/")) {

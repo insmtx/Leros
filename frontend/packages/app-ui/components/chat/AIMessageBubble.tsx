@@ -24,10 +24,8 @@ import {
 	Table2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { MarkdownRenderer } from "../common/MarkdownRenderer";
 import { ArtifactPreviewDialog } from "../layout/ArtifactPreviewDialog";
-import { TodoListBlock } from "./TodoListBlock";
 import { ToolCallBlock } from "./ToolCallBlock";
 
 function CopyButton({ text }: { text: string }) {
@@ -61,7 +59,6 @@ export function AIMessageBubble({
 	const hasContent = content.trim().length > 0;
 	const hasThinking = (message.thinking ?? "").trim().length > 0;
 	const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
-	const hasTodos = message.todos && message.todos.length > 0;
 	const hasArtifacts = message.artifacts && message.artifacts.length > 0;
 
 	return (
@@ -91,9 +88,10 @@ export function AIMessageBubble({
 				{hasContent && (
 					<div className="mb-3">
 						<div className="w-fit max-w-[min(780px,92%)] rounded-2xl rounded-tl-md bg-white px-4 py-3 text-sm leading-7 text-slate-800 shadow-md ring-1 ring-slate-200/70">
-							<div className="prose prose-slate prose-sm max-w-none prose-p:my-1.5 prose-pre:my-2 prose-ul:my-1.5 prose-ol:my-1.5">
-								<Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
-							</div>
+							<MarkdownRenderer
+								content={content}
+								className="prose prose-slate prose-sm max-w-none prose-p:my-1.5 prose-pre:my-2 prose-ul:my-1.5 prose-ol:my-1.5"
+							/>
 							{isStreaming && (
 								<span className="inline-block w-1.5 h-4 bg-slate-400 animate-pulse ml-0.5 rounded-sm" />
 							)}
@@ -107,26 +105,15 @@ export function AIMessageBubble({
 					</div>
 				)}
 
-				{hasTodos && message.todos && (
-					<div className="mb-3">
-						<TodoListBlock todos={message.todos} />
+				{!hasContent && !hasThinking && !hasToolCalls && !hasArtifacts && isStreaming && (
+					<div className="w-fit rounded-2xl rounded-tl-md bg-white/90 px-4 py-3 shadow-sm ring-1 ring-slate-200/50">
+						<div className="flex items-center gap-1">
+							<span className="size-1.5 rounded-full bg-slate-400 animate-pulse" />
+							<span className="size-1.5 rounded-full bg-slate-400 animate-pulse [animation-delay:200ms]" />
+							<span className="size-1.5 rounded-full bg-slate-400 animate-pulse [animation-delay:400ms]" />
+						</div>
 					</div>
 				)}
-
-				{!hasContent &&
-					!hasThinking &&
-					!hasToolCalls &&
-					!hasTodos &&
-					!hasArtifacts &&
-					isStreaming && (
-						<div className="w-fit rounded-2xl rounded-tl-md bg-white/90 px-4 py-3 shadow-sm ring-1 ring-slate-200/50">
-							<div className="flex items-center gap-1">
-								<span className="size-1.5 rounded-full bg-slate-400 animate-pulse" />
-								<span className="size-1.5 rounded-full bg-slate-400 animate-pulse [animation-delay:200ms]" />
-								<span className="size-1.5 rounded-full bg-slate-400 animate-pulse [animation-delay:400ms]" />
-							</div>
-						</div>
-					)}
 
 				{!isStreaming && (
 					<div className="mt-2 flex items-center gap-3">

@@ -151,13 +151,19 @@ import (
 - `/backend` - 主要 Go 应用程序代码
   - `/backend/cmd/leros` - 主 Leros 后端服务入口点
   - `/backend/config` - 配置加载和类型
+  - `/backend/engines` - 引擎层（native engine 与 system prompt 分层架构）
   - `/backend/gateway` - HTTP 网关包
   - `/backend/interaction` - 事件驱动交互层
     - `/backend/interaction/connectors` - 渠道连接器（GitHub 已实现；GitLab，WeWork 桩代码）
     - `/backend/internal/infra/mq` - NATS JetStream 事件总线实现
     - `/backend/interaction/gateway` - 事件网关设置
-  - `/backend/skills` - Skill 接口、类型和示例
+  - `/backend/internal/worker` - Worker 任务消费与调度
+  - `/backend/pkg` - 提取的公共库
+  - `/backend/prompts` - 系统提示词管理
+  - `/backend/skills` - Skill 接口、类型和示例（三层架构 + 事件驱动 handler 模型）
+  - `/backend/tools` - 工具模块
   - `/backend/types` - 核心领域类型（DigitalAssistant，Event 等）
+  - `/backend/tests` - 测试代码
 - `/bundles` - 构建输出目录（生成；已忽略 git）
 - `/deployments/build/Dockerfile` - 容器构建配置
 - `/deployments/dev/` - 开发环境配置和脚本
@@ -192,6 +198,8 @@ import (
 - `PR_EVENT_FLOW.md` - GitHub PR 事件处理流程验证清单
 - `TROUBLESHOOTING.md` - 常见问题故障排除指南
 
+根目录下另有 `CHANGELOG.md` 记录版本变更历史。
+
 ## Swagger API 文档
 
 Swagger 文档生成到 `docs/swagger/` 目录：
@@ -217,9 +225,10 @@ docs/swagger/swagger.yaml   # YAML 格式文档
 3. **Orchestrator** - 核心调度和协调机制（🔄 计划中）
 4. **DigitalAssistant** - 表示 AI worker 的顶级抽象（✅ 类型已定义）
 5. **Agent** - DigitalAssistant 中的决策实体（🔄 计划中）
-6. **Skill** - 可调用的可重用功能（✅ 接口和基础实现已完成）
-7. **Model Router** - 多提供商 LLM 路由（🔄 计划中。注：`backend/internal/modelrouter/v2` 已可用，v1 已废弃）
-8. **Memory System** - 短期和长期记忆（🔄 计划中）
+6. **Skill** - 可调用的可重用功能（✅ 三层架构 + 事件驱动 handler 模型已完成，支持创建/编辑/删除）
+7. **Worker** - 后台任务消费与调度系统（✅ 并发消费、LLM 配置传递已实现）
+8. **Model Router** - 多提供商 LLM 路由（🔄 计划中。注：`backend/internal/modelrouter/v2` 已可用，v1 已废弃）
+9. **Memory System** - 短期和长期记忆（🔄 计划中）
 
 ## 技能系统定义
 
@@ -304,6 +313,8 @@ Leros/
 │   │
 │   ├── config/              # 配置加载和类型（GitHub app config，等）
 │   │
+│   ├── engines/             # 引擎层（native engine 与 system prompt 分层架构）
+│   │
 │   ├── gateway/             # HTTP 网关（为未来路由的占位符）
 │   │
 │   ├── interaction/         # 事件驱动交互层
@@ -313,14 +324,24 @@ Leros/
 │   │   │   └── wework/      # WeWork/企业微信 连接器（🔄 桩代码）
 │   │   └── gateway/         # 事件网关路由器设置
 │   │
-│   ├── skills/              # Skill 接口，BaseSkill，SkillManager 接口
+│   ├── internal/worker/     # Worker 任务消费与调度
+│   │
+│   ├── pkg/                 # 提取的公共库
+│   │
+│   ├── prompts/             # 系统提示词管理
+│   │
+│   ├── skills/              # Skill 接口、类型和示例（三层架构 + 事件驱动 handler）
 │   │   └── examples/        # 示例技能实现
 │   │
-│   └── types/               # 核心领域类型
-│       ├── digital_assistant.go          # DigitalAssistant, AssistantConfig
-│       ├── digital_assistant_instance.go # DigitalAssistantInstance
-│       ├── event.go                      # Event (持久存储)
-│       └── tables.go                     # 数据库表名常量
+│   ├── tools/               # 工具模块
+│   │
+│   ├── types/               # 核心领域类型
+│   │   ├── digital_assistant.go          # DigitalAssistant, AssistantConfig
+│   │   ├── digital_assistant_instance.go # DigitalAssistantInstance
+│   │   ├── event.go                      # Event (持久存储)
+│   │   └── tables.go                     # 数据库表名常量
+│   │
+│   └── tests/               # 测试代码
 │
 ├── proto/                   # Protobuf 定义
 ├── gen/                     # 来源于 protos 的生成代码

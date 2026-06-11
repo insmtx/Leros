@@ -1,12 +1,19 @@
 "use client";
 
 import type { ProjectArtifact, ProjectTask } from "@leros/store";
-import { mapBackendArtifactToProjectArtifact, useChatStore, useLayoutStore } from "@leros/store";
+import {
+	formatTokenCount,
+	mapBackendArtifactToProjectArtifact,
+	useChatStore,
+	useLayoutStore,
+} from "@leros/store";
 import { artifactApi } from "@leros/store/api/artifactApi";
 import { taskApi } from "@leros/store/api/taskApi";
 import { cn } from "@leros/ui/lib/utils";
 import {
+	ArrowDownToLine,
 	ArrowLeft,
+	ArrowUpFromLine,
 	Bot,
 	Calendar,
 	CheckCircle2,
@@ -16,12 +23,15 @@ import {
 	LoaderCircle,
 	Table2,
 	Tag,
+	Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MessageTimeline } from "../chat/MessageTimeline";
 import { ChatInput } from "../input/ChatInput";
 import { ArtifactPreviewDialog } from "./ArtifactPreviewDialog";
 import type { AppNavigation } from "./LeftRail";
+import { TaskTodoProgressPanel } from "./TaskTodoProgressPanel";
+import { getLatestAssistantTodos } from "./taskProgress";
 
 const STATUS_LABEL: Record<string, string> = {
 	todo: "待办",
@@ -54,6 +64,9 @@ export function TaskDetailPage({
 	const {
 		activeSessionId,
 		isGenerating,
+		messageIds,
+		messagesMap,
+		streamingMessageId,
 		setActiveSession,
 		loadConversationMessages,
 	} = useChatStore((s) => s);
@@ -66,6 +79,42 @@ export function TaskDetailPage({
 	const resolvedTaskId = taskId ?? activeTaskDetailTaskId;
 	const resolvedSessionId = sessionId ?? activeTaskDetailSessionId;
 	const project = projects.find((p) => p.id === resolvedProjectId);
+
+	const latestTodos = useMemo(
+		() => getLatestAssistantTodos(messagesMap, messageIds, resolvedSessionId, streamingMessageId),
+		[messagesMap, messageIds, resolvedSessionId, streamingMessageId],
+	);
+
+	const tokenSummary = useMemo(() => {
+		// 任务详情右侧成本卡统一按当前会话内 assistant 消息聚合，刷新后可直接从历史消息恢复。
+		const initialSummary = {
+			inputTokens: 0,
+			outputTokens: 0,
+			totalTokens: 0,
+			messageCount: 0,
+		};
+
+		return messageIds.reduce((summary, id) => {
+			const message = messagesMap[id];
+			if (
+				!message ||
+				message.conversationId !== resolvedSessionId ||
+				message.role !== "assistant"
+			) {
+				return summary;
+			}
+
+			const inputTokens = message.usage?.inputTokens ?? 0;
+			const outputTokens = message.usage?.outputTokens ?? 0;
+			const totalTokens = message.usage?.totalTokens ?? message.metadata?.tokens ?? 0;
+			return {
+				inputTokens: summary.inputTokens + inputTokens,
+				outputTokens: summary.outputTokens + outputTokens,
+				totalTokens: summary.totalTokens + totalTokens,
+				messageCount: summary.messageCount + (totalTokens > 0 ? 1 : 0),
+			};
+		}, initialSummary);
+	}, [resolvedSessionId, messageIds, messagesMap]);
 
 	const fetchArtifacts = useCallback(async (taskId: string) => {
 		try {
@@ -233,8 +282,16 @@ export function TaskDetailPage({
 					<ChatInput variant="project" />
 				</main>
 
-				<aside className="flex w-[320px] shrink-0 flex-col border-l border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-5 py-6">
+				<aside className="flex w-[352px] shrink-0 flex-col border-l border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-5 py-6">
 					<div className="min-h-0 flex-1 space-y-8 overflow-y-auto pr-1">
+						<section>
+							<TaskTokenUsageCard
+								totalTokens={tokenSummary.totalTokens}
+								inputTokens={tokenSummary.inputTokens}
+								outputTokens={tokenSummary.outputTokens}
+								messageCount={tokenSummary.messageCount}
+							/>
+						</section>
 						{task?.description && (
 							<section>
 								<h3 className="mb-3 text-xs font-semibold text-[var(--leros-text-muted)]">
@@ -262,6 +319,14 @@ export function TaskDetailPage({
 								</div>
 							</section>
 						)}
+						{latestTodos && latestTodos.length > 0 && (
+							<section>
+								<h3 className="mb-3 text-xs font-semibold text-[var(--leros-text-muted)]">
+									任务进度
+								</h3>
+								<TaskTodoProgressPanel todos={latestTodos} />
+							</section>
+						)}
 						<section>
 							<div className="mb-3 flex items-center justify-between">
 								<h3 className="text-xs font-semibold text-[var(--leros-text-muted)]">任务产物</h3>
@@ -283,6 +348,123 @@ export function TaskDetailPage({
 			/>
 		</div>
 	);
+}
+
+function TaskTokenUsageCard({
+	totalTokens,
+	inputTokens,
+	outputTokens,
+	messageCount,
+}: {
+	totalTokens: number;
+	inputTokens: number;
+	outputTokens: number;
+	messageCount: number;
+}) {
+	const totalDisplay = splitTokenMetric(totalTokens);
+	const inputDisplay = splitTokenMetric(inputTokens, { compact: true });
+	const outputDisplay = splitTokenMetric(outputTokens, { compact: true });
+
+	if (totalTokens <= 0) {
+		return (
+			<div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_2px_10px_-4px_rgba(15,23,42,0.08)]">
+				<div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-5 py-3.5">
+					<div className="flex items-center gap-1.5">
+						<Zap className="size-4 text-indigo-500" />
+						<span className="text-sm font-semibold text-slate-700">Token 消耗</span>
+					</div>
+					<span className="rounded-full border border-indigo-100/70 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-600">
+						0
+					</span>
+				</div>
+				<div className="px-5 py-8 text-center text-xs text-slate-400">当前会话暂无消耗数据</div>
+			</div>
+		);
+	}
+
+	return (
+		<div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_2px_10px_-4px_rgba(15,23,42,0.08)]">
+			<div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-5 py-3.5">
+				<div className="flex items-center gap-1.5">
+					<Zap className="size-4 text-indigo-500" />
+					<span className="text-sm font-semibold text-slate-700">Token 消耗</span>
+				</div>
+				<span className="rounded-full border border-indigo-100/70 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-600">
+					{formatTokenCount(totalTokens)}
+				</span>
+			</div>
+
+			<div className="p-5">
+				<div className="mb-6">
+					<div className="text-xs font-medium text-slate-500">当前会话累计</div>
+					<div className="mt-1 flex items-end gap-0.5">
+						<div className="text-4xl font-bold tracking-tight text-slate-900">
+							{totalDisplay.value}
+						</div>
+						{totalDisplay.suffix ? (
+							<div className="pb-1 text-xl font-bold text-slate-400">{totalDisplay.suffix}</div>
+						) : null}
+					</div>
+				</div>
+
+				<div className="mb-5 flex rounded-xl border border-slate-100/80 bg-slate-50">
+					<div className="flex-1 p-3">
+						<div className="mb-1 flex items-center gap-1 text-slate-400">
+							<ArrowDownToLine className="size-[13px]" />
+							<span className="text-xs font-medium">输入</span>
+						</div>
+						<div className="flex items-end gap-0.5 text-slate-700">
+							<div className="text-lg font-semibold">{inputDisplay.value}</div>
+							{inputDisplay.suffix ? (
+								<div className="pb-0.5 text-xs font-semibold text-slate-400">
+									{inputDisplay.suffix}
+								</div>
+							) : null}
+						</div>
+					</div>
+
+					<div className="my-3 w-px bg-slate-200" />
+
+					<div className="flex-1 p-3 pl-4">
+						<div className="mb-1 flex items-center gap-1 text-slate-400">
+							<ArrowUpFromLine className="size-[13px]" />
+							<span className="text-xs font-medium">输出</span>
+						</div>
+						<div className="flex items-end gap-0.5 text-slate-700">
+							<div className="text-lg font-semibold">{outputDisplay.value}</div>
+							{outputDisplay.suffix ? (
+								<div className="pb-0.5 text-xs font-semibold text-slate-400">
+									{outputDisplay.suffix}
+								</div>
+							) : null}
+						</div>
+					</div>
+				</div>
+
+				<div className="flex items-center gap-1.5 border-t border-slate-100 pt-1 text-xs text-slate-400">
+					<CheckCircle2 className="size-[13px] text-emerald-500/80" />
+					<span>已统计 {messageCount} 条 AI 回复</span>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function splitTokenMetric(
+	count: number,
+	options?: { compact?: boolean },
+): { value: string; suffix: string } {
+	// 右侧卡片的输入/输出需要统一展示单位，所以这里允许把小于 1000 的值也压成 K 记法。
+	const formatted =
+		options?.compact && count > 0 && count < 1000
+			? `${(count / 1000).toFixed(1)}K`
+			: formatTokenCount(count);
+	const match = formatted.match(/^([\d.]+)([A-Z]+)?$/);
+	if (!match) return { value: formatted, suffix: "" };
+	return {
+		value: match[1] ?? formatted,
+		suffix: match[2] ?? "",
+	};
 }
 
 function TaskChatEmptyState() {

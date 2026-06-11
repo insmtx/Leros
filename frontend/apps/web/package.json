@@ -29,6 +29,7 @@
   "devDependencies": {
     "@leros/tsconfig": "workspace:*",
     "@tailwindcss/postcss": "catalog:",
+    "@tailwindcss/typography": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "tailwindcss": "catalog:",
