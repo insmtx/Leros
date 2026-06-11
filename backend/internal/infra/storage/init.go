@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	global        storage.Storage
-	defaultBucket string
+	defaultStorage storage.Storage
+	defaultBucket  string
 )
 
 func Init(cfg *config.StorageConfig) error {
@@ -49,13 +49,13 @@ func Init(cfg *config.StorageConfig) error {
 	if err != nil {
 		return fmt.Errorf("init storage: %w", err)
 	}
-	global = s
+	defaultStorage = s
 	defaultBucket = cfg.Bucket
 	return nil
 }
 
-func Get() storage.Storage {
-	return global
+func GetStorage() storage.Storage {
+	return defaultStorage
 }
 
 func DefaultBucket() string {

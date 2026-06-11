@@ -66,7 +66,7 @@ func (s *fileService) UploadFile(ctx context.Context, req *contract.UploadFileRe
 	storeFilename := fmt.Sprintf("%s%s", snowflake.GenerateIDBase58(), ext)
 	key := fmt.Sprintf("%s/%d/%s", req.Purpose, caller.OrgID, storeFilename)
 
-	st := appstorage.Get()
+	st := appstorage.GetStorage()
 	bucket := appstorage.DefaultBucket()
 
 	result, err := st.PutObject(ctx, bucket, key, bytes.NewReader(data),
@@ -116,7 +116,7 @@ func (s *fileService) GetFileDownloadURL(ctx context.Context, orgID uint, fileID
 		return nil, fmt.Errorf("file not found")
 	}
 
-	st := appstorage.Get()
+	st := appstorage.GetStorage()
 	bucket := appstorage.DefaultBucket()
 
 	ttl := 30 * time.Minute

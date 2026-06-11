@@ -26,7 +26,7 @@ func ResolveArtifactStorageFile(ctx context.Context, orgID uint, workerID uint, 
 		return nil, err
 	}
 
-	st := appstorage.Get()
+	st := appstorage.GetStorage()
 	bucket := appstorage.DefaultBucket()
 
 	result, err := st.GetObject(ctx, bucket, storageKey)
@@ -53,7 +53,7 @@ func ResolveArtifactStorageFile(ctx context.Context, orgID uint, workerID uint, 
 }
 
 func OpenArtifactStorageFile(ctx context.Context, orgID uint, workerID uint, storageKey string) (io.ReadCloser, error) {
-	st := appstorage.Get()
+	st := appstorage.GetStorage()
 	bucket := appstorage.DefaultBucket()
 
 	result, err := st.GetObject(ctx, bucket, storageKey)
