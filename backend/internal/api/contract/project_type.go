@@ -92,6 +92,7 @@ type FileTreeNode struct {
 	Size     int64           `json:"size,omitempty"`      // 仅文件有
 	MimeType string          `json:"mime_type,omitempty"` // 仅文件有
 	ModTime  int64           `json:"mod_time,omitempty"`  // 最后修改时间，Unix 时间戳（秒）
+	PublicID string          `json:"public_id,omitempty"` // 上传文件关联的 public_id，仓库文件为空
 }
 
 // FileUploadResult 文件上传结果

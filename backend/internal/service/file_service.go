@@ -59,6 +59,7 @@ func (s *fileService) UploadFile(ctx context.Context, req *contract.UploadFileRe
 		Filename:     storeFilename,
 		OriginalName: req.Filename,
 		MimeType:     mimeType,
+		Size:         int64(len(data)),
 		OrgID:        caller.OrgID,
 		OwnerID:      caller.Uin,
 		ObjectKey:    key,

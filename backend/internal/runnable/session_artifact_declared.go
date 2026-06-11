@@ -105,7 +105,16 @@ func (p *declaredArtifactPersister) PersistDeclaredArtifact(ctx context.Context,
 		return fmt.Errorf("session task_id is required for artifact persistence")
 	}
 
-	// TODO: 后续改为从远程地址下载产物文件，当前从本地文件系统读取
+	projects, err := infradb.GetProjectsByIDs(ctx, p.db, []uint{*session.ProjectID})
+	if err != nil {
+		return fmt.Errorf("find project %d: %w", *session.ProjectID, err)
+	}
+	if len(projects) == 0 {
+		return fmt.Errorf("project %d not found", *session.ProjectID)
+	}
+	projectPublicID := projects[0].PublicID
+
+	// TODO: 后续改为从远程地址下载产物文件，当前从本地文件系统读取，Data后续也要去掉
 	fileInfo, err := agentworkspace.ResolveArtifactStorageFile(ctx, route.OrgID, route.WorkerID, storageKey, item.MimeType)
 	if err != nil {
 		return err
@@ -117,10 +126,16 @@ func (p *declaredArtifactPersister) PersistDeclaredArtifact(ctx context.Context,
 		Filename:     fileInfo.Filename,
 		OriginalName: fileInfo.Filename,
 		MimeType:     fileInfo.MimeType,
+		Size:         fileInfo.FileSize,
 		OrgID:        session.OrgID,
 		OwnerID:      session.Uin,
 		ObjectKey:    rawStorageKey,
 		Purpose:      filestore.PurposeArtifact,
+		Metadata: map[string]interface{}{
+			"project_public_id": projectPublicID,
+			"worker_id":    route.WorkerID,
+			"artifact_id":  artifactID,
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("store artifact file: %w", err)

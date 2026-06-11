@@ -43,3 +43,17 @@ func ListFileUploads(ctx context.Context, db *gorm.DB, orgID uint, purpose strin
 	}
 	return files, total, nil
 }
+
+// ListProjectFileUploads 查询关联到指定项目的已上传文件列表。
+// 文件关联通过 FileUpload.Metadata.Extra["project_id"] 标记。
+func ListProjectFileUploads(ctx context.Context, db *gorm.DB, orgID uint, projectPublicID string) ([]types.FileUpload, error) {
+	var files []types.FileUpload
+	err := db.WithContext(ctx).Model(&types.FileUpload{}).
+		Where("org_id = ? AND metadata->'extra'->>'project_public_id' = ?", orgID, projectPublicID).
+		Order("created_at DESC").
+		Find(&files).Error
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
+}

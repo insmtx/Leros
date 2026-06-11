@@ -31,6 +31,8 @@ type UploadParams struct {
 	OwnerID      uint
 	ObjectKey    string
 	Purpose      string
+	Size         int64
+	Metadata     map[string]interface{}
 }
 
 // Upload 写入 filestore 并创建 FileUpload 记录
@@ -67,6 +69,10 @@ func Upload(ctx context.Context, db *gorm.DB, params UploadParams) (*types.FileU
 	if originalName == "" {
 		originalName = params.Filename
 	}
+	fileSize := params.Size
+	if fileSize <= 0 {
+		fileSize = int64(len(params.Data))
+	}
 	fileUpload := &types.FileUpload{
 		PublicID:     publicID,
 		OrgID:        params.OrgID,
@@ -74,11 +80,14 @@ func Upload(ctx context.Context, db *gorm.DB, params UploadParams) (*types.FileU
 		Filename:     params.Filename,
 		OriginalName: originalName,
 		MimeType:     params.MimeType,
-		FileSize:     int64(len(params.Data)),
+		FileSize:     fileSize,
 		StoragePath:  putResult.Path.Path(),
 		Sha256:       sha256Hex,
 		Purpose:      params.Purpose,
 		Status:       "active",
+		Metadata: types.ObjectMetadata{
+			Extra: params.Metadata,
+		},
 	}
 
 	if err := infradb.CreateFileUpload(ctx, db, fileUpload); err != nil {

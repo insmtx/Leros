@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"mime"
 	"net/http"
 	"os"
@@ -447,7 +446,6 @@ func (s *projectService) GetProjectMemory(ctx context.Context, publicID string) 
 }
 
 func (s *projectService) GetProjectFileTree(ctx context.Context, publicID string, parentPath string, depth int) ([]*contract.FileTreeNode, error) {
-	// 1. 鉴权
 	caller, err := requireCallerOrg(ctx)
 	if err != nil {
 		return nil, err
@@ -456,7 +454,6 @@ func (s *projectService) GetProjectFileTree(ctx context.Context, publicID string
 		return nil, errors.New("public_id is required")
 	}
 
-	// 2. 查项目
 	project, err := db.GetProjectByPublicID(ctx, s.db, caller.OrgID, publicID)
 	if err != nil {
 		return nil, err
@@ -465,103 +462,25 @@ func (s *projectService) GetProjectFileTree(ctx context.Context, publicID string
 		return nil, errors.New("project not found")
 	}
 
-	// 3. 解析 repo 路径
-	workerID := getWorkerIDByProjectID(publicID)
-	repoDir, err := workspace.ProjectRepoPath(project.OrgID, workerID, publicID)
+	uploadFiles, err := db.ListProjectFileUploads(ctx, s.db, caller.OrgID, publicID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list project file uploads: %w", err)
 	}
 
-	// 4. 确定起始目录
-	startDir := repoDir
-	parentPath = strings.TrimSpace(parentPath)
-	if parentPath != "" {
-		cleanPath := filepath.Clean(filepath.FromSlash(parentPath))
-		if strings.HasPrefix(cleanPath, "..") || filepath.IsAbs(cleanPath) {
-			return nil, errors.New("invalid parent path")
-		}
-		startDir = filepath.Join(repoDir, cleanPath)
-		// 确保起始目录存在
-		if info, statErr := os.Stat(startDir); statErr != nil || !info.IsDir() {
-			return nil, errors.New("directory not found")
-		}
-	}
-
-	// 5. 默认 depth=2
-	if depth <= 0 {
-		depth = 2
-	}
-
-	// 6. 构建 IgnoreChecker
-	checker, err := workspace.NewIgnoreChecker(repoDir)
-	if err != nil {
-		return nil, fmt.Errorf("init ignore checker: %w", err)
-	}
-
-	// 7. Walk 收集扁平条目（带深度控制）
-	var entries []fileTreeEntry
-
-	err = filepath.WalkDir(startDir, func(absPath string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return nil
-		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		// 跳过起始目录自身
-		if absPath == startDir {
-			return nil
-		}
-
-		// 计算相对深度
-		relFromStart, _ := filepath.Rel(startDir, absPath)
-		currentDepth := strings.Count(relFromStart, string(filepath.Separator)) + 1
-
-		if d.IsDir() {
-			if checker.ShouldSkipDir(absPath) {
-				return filepath.SkipDir
-			}
-			if currentDepth > depth {
-				return filepath.SkipDir
-			}
-			dirModTime := int64(0)
-			if dirInfo, statErr := d.Info(); statErr == nil {
-				dirModTime = dirInfo.ModTime().Unix()
-			}
-			entries = append(entries, fileTreeEntry{absPath: absPath, isDir: true, modTime: dirModTime})
-			return nil
-		}
-
-		// 文件：检查是否被忽略
-		ignored, ignoreErr := checker.IsIgnored(absPath)
-		if ignoreErr != nil || ignored {
-			return nil
-		}
-
-		if currentDepth > depth {
-			return nil
-		}
-
-		info, statErr := d.Info()
-		if statErr != nil {
-			return nil
-		}
-
-		entries = append(entries, fileTreeEntry{
-			absPath: absPath,
-			isDir:   false,
-			size:    info.Size(),
-			modTime: info.ModTime().Unix(),
+	fileTree := make([]*contract.FileTreeNode, 0, len(uploadFiles))
+	for _, f := range uploadFiles {
+		fileTree = append(fileTree, &contract.FileTreeNode{
+			Name:     f.Filename,
+			Path:     f.Filename,
+			Type:     "file",
+			Size:     f.FileSize,
+			MimeType: f.MimeType,
+			ModTime:  f.UpdatedAt.Unix(),
+			PublicID: f.PublicID,
 		})
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("walk repo: %w", err)
 	}
 
-	// 8. 构建树
-	return buildFileTree(entries, repoDir, startDir), nil
+	return fileTree, nil
 }
 
 // buildFileTree 将扁平条目构建为递归文件树。
@@ -793,7 +712,7 @@ func (s *projectService) AddFile(ctx context.Context, publicID string, filePubli
 	if file.Metadata.Extra == nil {
 		file.Metadata.Extra = make(map[string]interface{})
 	}
-	file.Metadata.Extra["project_id"] = publicID
+	file.Metadata.Extra["project_public_id"] = publicID
 	if err := db.UpdateFileUpload(ctx, s.db, file); err != nil {
 		return fmt.Errorf("update file upload metadata: %w", err)
 	}
