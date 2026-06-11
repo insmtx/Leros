@@ -137,16 +137,12 @@ jobs:
           cd release-assets
           find . -type f ! -name "SHA256SUMS.txt" -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
 
-      - name: Configure COS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.TENCENT_COS_SECRET_ID }}
-          aws-secret-access-key: ${{ secrets.TENCENT_COS_SECRET_KEY }}
-          aws-region: ${{ secrets.TENCENT_COS_REGION }}
-
       - name: Upload release assets to COS
         shell: bash
         env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.TENCENT_COS_SECRET_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TENCENT_COS_SECRET_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.TENCENT_COS_REGION }}
           COS_BUCKET: ${{ secrets.TENCENT_COS_BUCKET }}
           COS_REGION: ${{ secrets.TENCENT_COS_REGION }}
           COS_PREFIX: ${{ vars.TENCENT_COS_PREFIX || 'desktop' }}
