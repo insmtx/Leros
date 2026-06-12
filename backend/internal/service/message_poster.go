@@ -435,6 +435,7 @@ func convertMessageToProtocolAttachments(attachments types.MessageAttachmentSlic
 			ID:       a.FileUploadID,
 			Name:     a.Name,
 			MimeType: a.MimeType,
+			URL:      a.PublicURL,
 		})
 	}
 	return result
