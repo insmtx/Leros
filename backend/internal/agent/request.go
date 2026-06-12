@@ -123,6 +123,7 @@ func BuildAttachmentText(attachments []Attachment) string {
 	}
 	var sb strings.Builder
 	sb.WriteString("\n[Attachments]\n")
+	sb.WriteString("The following files were uploaded by the user:\n")
 	for _, a := range attachments {
 		sb.WriteString(fmt.Sprintf("- %s", a.Name))
 		if a.URL != "" {

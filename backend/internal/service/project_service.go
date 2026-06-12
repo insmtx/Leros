@@ -352,7 +352,9 @@ func (s *projectService) DetailProject(ctx context.Context, publicID string) (*c
 		return nil, err
 	}
 	for _, a := range artifacts {
-		result.Artifacts = append(result.Artifacts, convertToContractArtifact(a))
+		if converted := convertToContractArtifact(a); converted != nil {
+			result.Artifacts = append(result.Artifacts, *converted)
+		}
 	}
 
 	// 查询项目成员

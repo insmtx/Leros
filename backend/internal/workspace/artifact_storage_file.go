@@ -7,10 +7,9 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 )
 
 type ArtifactStorageFile struct {
@@ -27,42 +26,53 @@ func ResolveArtifactStorageFile(ctx context.Context, orgID uint, workerID uint, 
 		return nil, err
 	}
 
-	st := filestore.GetStorage()
-	bucket := filestore.DefaultBucket()
-
-	result, err := st.GetObject(ctx, bucket, storageKey)
+	absolutePath, err := ArtifactStoragePath(orgID, workerID, storageKey)
 	if err != nil {
-		return nil, fmt.Errorf("get artifact object: %w", err)
+		return nil, fmt.Errorf("resolve artifact storage path: %w", err)
 	}
-	defer result.Body.Close()
 
-	data, err := io.ReadAll(result.Body)
+	info, err := os.Stat(absolutePath)
 	if err != nil {
-		return nil, fmt.Errorf("read artifact object: %w", err)
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("artifact file not found: %s", storageKey)
+		}
+		return nil, fmt.Errorf("stat artifact file: %w", err)
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("artifact path is a directory: %s", storageKey)
+	}
+
+	data, err := os.ReadFile(absolutePath)
+	if err != nil {
+		return nil, fmt.Errorf("read artifact file: %w", err)
 	}
 
 	hash := sha256.Sum256(data)
 	sha256Hex := hex.EncodeToString(hash[:])
 
 	return &ArtifactStorageFile{
-		Path:     result.Path.Path(),
-		Filename: filepath.Base(result.Path.Key()),
-		MimeType: detectMimeTypeFromKey(result.Path.Key(), declaredMimeType),
-		FileSize: result.Size,
+		Path:     absolutePath,
+		Filename: filepath.Base(absolutePath),
+		MimeType: detectMimeTypeFromKey(storageKey, declaredMimeType),
+		FileSize: info.Size(),
 		Sha256:   sha256Hex,
 		Data:     data,
 	}, nil
 }
 
 func OpenArtifactStorageFile(ctx context.Context, orgID uint, workerID uint, storageKey string) (io.ReadCloser, error) {
-	st := filestore.GetStorage()
-	bucket := filestore.DefaultBucket()
-
-	result, err := st.GetObject(ctx, bucket, storageKey)
+	absolutePath, err := ArtifactStoragePath(orgID, workerID, storageKey)
 	if err != nil {
-		return nil, fmt.Errorf("get artifact object: %w", err)
+		return nil, fmt.Errorf("resolve artifact storage path: %w", err)
 	}
-	return result.Body, nil
+	file, err := os.Open(absolutePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("artifact file not found: %s", storageKey)
+		}
+		return nil, fmt.Errorf("open artifact file: %w", err)
+	}
+	return file, nil
 }
 
 func RepoRelativePathFromStorageKey(storageKey string) string {

@@ -21,7 +21,8 @@ func NewArtifactHandler(service contract.ArtifactService) *ArtifactHandler {
 }
 
 func (h *ArtifactHandler) RegisterRoutes(r gin.IRouter) {
-	r.GET("/tasks/:task_id/artifacts", h.ListTaskArtifacts)
+	r.POST("/ListTaskArtifacts", h.ListTaskArtifacts)
+	r.POST("/GetArtifact", h.GetArtifact)
 	r.GET("/artifacts/:artifact_id/download", h.DownloadArtifact)
 }
 
@@ -30,9 +31,45 @@ func RegisterArtifactRoutes(r gin.IRouter, service contract.ArtifactService) {
 	h.RegisterRoutes(r)
 }
 
+type ListTaskArtifactsRequest struct {
+	TaskID string `json:"task_id"`
+}
+
+type GetArtifactRequest struct {
+	ArtifactID string `json:"artifact_id"`
+}
+
 func (h *ArtifactHandler) ListTaskArtifacts(ctx *gin.Context) {
-	taskID := strings.TrimSpace(ctx.Param("task_id"))
+	var req ListTaskArtifactsRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
+		return
+	}
+	taskID := strings.TrimSpace(req.TaskID)
+	if taskID == "" {
+		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, "task_id is required"))
+		return
+	}
 	result, err := h.service.ListTaskArtifacts(ctx, taskID)
+	if err != nil {
+		handleArtifactServiceError(ctx, err)
+		return
+	}
+	ctx.JSON(http.StatusOK, dto.Success(result))
+}
+
+func (h *ArtifactHandler) GetArtifact(ctx *gin.Context) {
+	var req GetArtifactRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
+		return
+	}
+	artifactID := strings.TrimSpace(req.ArtifactID)
+	if artifactID == "" {
+		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, "artifact_id is required"))
+		return
+	}
+	result, err := h.service.GetArtifact(ctx, artifactID)
 	if err != nil {
 		handleArtifactServiceError(ctx, err)
 		return

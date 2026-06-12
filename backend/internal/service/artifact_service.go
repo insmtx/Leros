@@ -46,10 +46,33 @@ func (s *artifactService) ListTaskArtifacts(ctx context.Context, taskPublicID st
 		return nil, err
 	}
 	result := make([]contract.Artifact, 0, len(artifacts))
-	for _, artifact := range artifacts {
-		result = append(result, convertToContractArtifact(artifact))
+	for _, a := range artifacts {
+		if converted := convertToContractArtifact(a); converted != nil {
+			result = append(result, *converted)
+		}
 	}
 	return result, nil
+}
+
+func (s *artifactService) GetArtifact(ctx context.Context, artifactPublicID string) (*contract.ArtifactDetail, error) {
+	caller, err := requireCallerOrg(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(artifactPublicID) == "" {
+		return nil, errors.New("artifact_id is required")
+	}
+	artifact, err := infradb.GetArtifactByPublicID(ctx, s.db, caller.OrgID, artifactPublicID)
+	if err != nil {
+		return nil, err
+	}
+	if artifact == nil {
+		return nil, errors.New("artifact not found")
+	}
+	if err := verifyUserPermission(artifact.OwnerID, caller.Uin); err != nil {
+		return nil, err
+	}
+	return convertToArtifactDetail(artifact), nil
 }
 
 func (s *artifactService) GetArtifactDownload(ctx context.Context, artifactPublicID string) (*contract.ArtifactDownload, error) {
@@ -80,11 +103,11 @@ func (s *artifactService) GetArtifactDownload(ctx context.Context, artifactPubli
 	}, nil
 }
 
-func convertToContractArtifact(artifact *types.Artifact) contract.Artifact {
+func convertToContractArtifact(artifact *types.Artifact) *contract.Artifact {
 	if artifact == nil {
-		return contract.Artifact{}
+		return nil
 	}
-	return contract.Artifact{
+	return &contract.Artifact{
 		ArtifactID:   artifact.PublicID,
 		Title:        artifact.Title,
 		Filename:     artifact.Filename,
@@ -93,6 +116,21 @@ func convertToContractArtifact(artifact *types.Artifact) contract.Artifact {
 		MimeType:     artifact.MimeType,
 		FileSize:     artifact.FileSize,
 		Sha256:       artifact.Sha256,
+	}
+}
+
+func convertToArtifactDetail(artifact *types.Artifact) *contract.ArtifactDetail {
+	if artifact == nil {
+		return nil
+	}
+	return &contract.ArtifactDetail{
+		Artifact:     *convertToContractArtifact(artifact),
+		RelativePath: artifact.RelativePath,
+		FilePublicID: artifact.FilePublicID,
+		Source:       artifact.Source,
+		ExportFormat: artifact.ExportFormat,
+		Version:      artifact.Version,
+		Status:       artifact.Status,
 	}
 }
 

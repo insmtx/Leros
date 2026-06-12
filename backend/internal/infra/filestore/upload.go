@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/ygpkg/storage-go"
@@ -64,7 +65,7 @@ func Upload(ctx context.Context, db *gorm.DB, params UploadParams) (*types.FileU
 		return nil, fmt.Errorf("put object: %w", err)
 	}
 
-	publicID := fmt.Sprintf("%s://%s", putResult.Path.Scheme(), snowflake.GenerateIDBase58())
+	publicID := fmt.Sprintf("file_%s", snowflake.GenerateIDBase58())
 	originalName := params.OriginalName
 	if originalName == "" {
 		originalName = params.Filename
@@ -81,7 +82,7 @@ func Upload(ctx context.Context, db *gorm.DB, params UploadParams) (*types.FileU
 		OriginalName: originalName,
 		MimeType:     params.MimeType,
 		FileSize:     fileSize,
-		StoragePath:  putResult.Path.Path(),
+		StoragePath:  putResult.Path.URI(),
 		Sha256:       sha256Hex,
 		Purpose:      params.Purpose,
 		Status:       "active",
@@ -106,8 +107,13 @@ func OpenFileByPublicID(ctx context.Context, db *gorm.DB, orgID uint, publicID s
 		return nil, nil, fmt.Errorf("file upload record not found")
 	}
 
+	objectKey, err := storageKeyFromURI(fileUpload.StoragePath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse storage path: %w", err)
+	}
+
 	st := GetStorage()
-	result, err := st.GetObject(ctx, DefaultBucket(), fileUpload.StoragePath)
+	result, err := st.GetObject(ctx, DefaultBucket(), objectKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get object: %w", err)
 	}
@@ -124,10 +130,28 @@ func PresignDownloadByPublicID(ctx context.Context, db *gorm.DB, orgID uint, pub
 		return "", nil, fmt.Errorf("file upload record not found")
 	}
 
+	objectKey, err := storageKeyFromURI(fileUpload.StoragePath)
+	if err != nil {
+		return "", nil, fmt.Errorf("parse storage path: %w", err)
+	}
+
 	st := GetStorage()
-	url, err := st.PresignGetObject(ctx, DefaultBucket(), fileUpload.StoragePath, ttl)
+	url, err := st.PresignGetObject(ctx, DefaultBucket(), objectKey, ttl)
 	if err != nil {
 		return "", nil, fmt.Errorf("presign url: %w", err)
 	}
 	return url, fileUpload, nil
+}
+
+func storageKeyFromURI(uri string) (string, error) {
+	idx := strings.Index(uri, "://")
+	if idx < 0 {
+		return "", fmt.Errorf("invalid storage uri: %q", uri)
+	}
+	rest := uri[idx+3:]
+	slashIdx := strings.Index(rest, "/")
+	if slashIdx < 0 {
+		return "", fmt.Errorf("storage uri missing key: %q", uri)
+	}
+	return rest[slashIdx+1:], nil
 }

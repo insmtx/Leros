@@ -31,10 +31,11 @@ type Artifact struct {
 
 	// FileURL 文件链接或路径
 	FileURL      string `gorm:"column:file_url;type:varchar(2000);not null"`
+	FilePublicID string `gorm:"column:file_public_id;type:varchar(255);index"`
 	MimeType     string `gorm:"column:mime_type;type:varchar(100)"`
 	FileSize     int64  `gorm:"column:file_size;type:bigint"`
 	RelativePath string `gorm:"column:relative_path;type:varchar(2000)"`
-	StorageKey   string `gorm:"column:storage_key;type:varchar(2000);index"`
+	StorageKey   string `gorm:"column:storage_key;type:varchar(500);index"`
 	Sha256       string `gorm:"column:sha256;type:varchar(64);index"`
 	Source       string `gorm:"column:source;type:varchar(50);not null;default:'agent_declared';index"`
 

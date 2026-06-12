@@ -8,6 +8,7 @@ import (
 // ArtifactService defines task artifact query and download behavior.
 type ArtifactService interface {
 	ListTaskArtifacts(ctx context.Context, taskPublicID string) ([]Artifact, error)
+	GetArtifact(ctx context.Context, artifactPublicID string) (*ArtifactDetail, error)
 	GetArtifactDownload(ctx context.Context, artifactPublicID string) (*ArtifactDownload, error)
 }
 
@@ -21,6 +22,17 @@ type Artifact struct {
 	MimeType     string `json:"mime_type,omitempty"`
 	FileSize     int64  `json:"file_size,omitempty"`
 	Sha256       string `json:"sha256,omitempty"`
+}
+
+// ArtifactDetail is the full detail response for a single artifact.
+type ArtifactDetail struct {
+	Artifact
+	RelativePath string `json:"relative_path,omitempty"`
+	FilePublicID string `json:"file_public_id,omitempty"`
+	Source       string `json:"source,omitempty"`
+	ExportFormat string `json:"export_format,omitempty"`
+	Version      int    `json:"version,omitempty"`
+	Status       string `json:"status,omitempty"`
 }
 
 // ArtifactDownload contains a file stream and HTTP response metadata.

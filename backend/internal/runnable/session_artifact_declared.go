@@ -52,8 +52,15 @@ func handleSessionArtifactDeclaredMessage(ctx context.Context, persister *declar
 		logs.WarnContextf(ctx, "artifact declared message missing payload: session_id=%s seq=%d", streamMsg.Route.SessionID, streamMsg.Body.Seq)
 		return
 	}
-	if err := persister.PersistDeclaredArtifact(ctx, streamMsg.Route, *streamMsg.Body.Payload.Artifact); err != nil {
-		logs.WarnContextf(ctx, "persist declared artifact: %v", err)
+	artifact := streamMsg.Body.Payload.Artifact
+	logs.InfoContextf(ctx, "persisting declared artifact: session_id=%s artifact_id=%s storage_key=%s",
+		streamMsg.Route.SessionID, artifact.ArtifactID, artifact.StorageKey)
+	if err := persister.PersistDeclaredArtifact(ctx, streamMsg.Route, *artifact); err != nil {
+		logs.WarnContextf(ctx, "persist declared artifact failed: session_id=%s artifact_id=%s err=%v",
+			streamMsg.Route.SessionID, artifact.ArtifactID, err)
+	} else {
+		logs.InfoContextf(ctx, "persist declared artifact success: session_id=%s artifact_id=%s",
+			streamMsg.Route.SessionID, artifact.ArtifactID)
 	}
 }
 
@@ -77,6 +84,7 @@ func (p *declaredArtifactPersister) PersistDeclaredArtifact(ctx context.Context,
 	}
 	storageKey := strings.TrimSpace(item.StorageKey)
 	if storageKey == "" {
+		logs.WarnContextf(ctx, "persist declared artifact: storage_key is empty, artifact_id=%s session_id=%s", artifactID, sessionID)
 		return fmt.Errorf("storage_key is required")
 	}
 
@@ -85,6 +93,7 @@ func (p *declaredArtifactPersister) PersistDeclaredArtifact(ctx context.Context,
 		return err
 	}
 	if existing != nil {
+		logs.InfoContextf(ctx, "persist declared artifact: already exists, artifact_id=%s session_id=%s", artifactID, sessionID)
 		return nil
 	}
 
@@ -93,15 +102,22 @@ func (p *declaredArtifactPersister) PersistDeclaredArtifact(ctx context.Context,
 		return fmt.Errorf("find session %s: %w", sessionID, err)
 	}
 	if session == nil {
+		logs.WarnContextf(ctx, "persist declared artifact: session not found, artifact_id=%s session_id=%s", artifactID, sessionID)
 		return fmt.Errorf("session %s not found", sessionID)
 	}
 	if session.OrgID != route.OrgID {
+		logs.WarnContextf(ctx, "persist declared artifact: org mismatch, artifact_id=%s session_org=%d route_org=%d",
+			artifactID, session.OrgID, route.OrgID)
 		return fmt.Errorf("session %s does not belong to org %d", sessionID, route.OrgID)
 	}
 	if session.ProjectID == nil || *session.ProjectID == 0 {
+		logs.WarnContextf(ctx, "persist declared artifact: session has no project_id, artifact_id=%s session_id=%s",
+			artifactID, sessionID)
 		return fmt.Errorf("session project_id is required for artifact persistence")
 	}
 	if session.TaskID == nil || *session.TaskID == 0 {
+		logs.WarnContextf(ctx, "persist declared artifact: session has no task_id, artifact_id=%s session_id=%s",
+			artifactID, sessionID)
 		return fmt.Errorf("session task_id is required for artifact persistence")
 	}
 
@@ -117,6 +133,8 @@ func (p *declaredArtifactPersister) PersistDeclaredArtifact(ctx context.Context,
 	// TODO: 后续改为从远程地址下载产物文件，当前从本地文件系统读取，Data后续也要去掉
 	fileInfo, err := agentworkspace.ResolveArtifactStorageFile(ctx, route.OrgID, route.WorkerID, storageKey, item.MimeType)
 	if err != nil {
+		logs.WarnContextf(ctx, "persist declared artifact: resolve storage file failed, artifact_id=%s storage_key=%s err=%v",
+			artifactID, storageKey, err)
 		return err
 	}
 	rawStorageKey := storageKey
@@ -157,10 +175,11 @@ func (p *declaredArtifactPersister) PersistDeclaredArtifact(ctx context.Context,
 		Description:  strings.TrimSpace(item.Description),
 		ArtifactType: artifactType(item.ArtifactType),
 		FileURL:      "/v1/artifacts/" + artifactID + "/download",
+		FilePublicID: fileUpload.PublicID,
 		MimeType:     fileInfo.MimeType,
 		FileSize:     fileInfo.FileSize,
-		RelativePath: agentworkspace.RepoRelativePathFromStorageKey(fileUpload.StoragePath),
-		StorageKey:   fileUpload.PublicID,
+		RelativePath: item.Filename,
+		StorageKey:   rawStorageKey,
 		Sha256:       fileInfo.Sha256,
 		Source:       artifactSource(item.Source),
 		Status:       artifactStatus(item.Status),
@@ -176,6 +195,7 @@ func (p *declaredArtifactPersister) PersistDeclaredArtifact(ctx context.Context,
 		artifact.Title = filename
 	}
 	if err := infradb.CreateArtifact(ctx, p.db, artifact); err != nil {
+		logs.WarnContextf(ctx, "persist declared artifact: create artifact record failed, artifact_id=%s err=%v", artifactID, err)
 		existing, findErr := infradb.GetArtifactByPublicID(ctx, p.db, route.OrgID, artifactID)
 		if findErr == nil && existing != nil {
 			return nil
