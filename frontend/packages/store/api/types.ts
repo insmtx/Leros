@@ -58,6 +58,7 @@ export type BackendMessage = {
 		total_tokens?: number;
 	};
 	chunks?: BackendMessageChunk[];
+	artifacts?: BackendSessionArtifactPayload[];
 	created_at: string;
 };
 
@@ -285,6 +286,24 @@ export type BackendArtifact = {
 	sha256?: string;
 };
 
+export type BackendArtifactDetail = {
+	artifact_id: string;
+	title: string;
+	filename?: string;
+	description?: string;
+	artifact_type: string;
+	mime_type?: string;
+	file_size?: number;
+	sha256?: string;
+	relative_path?: string;
+	source?: string;
+	export_format?: string;
+	version?: number;
+	status?: string;
+	publish_file_id?: string;
+	"publish-file_id"?: string;
+};
+
 export type BackendProjectMemberItem = {
 	member_id: number;
 	member_type: string;
@@ -313,12 +332,21 @@ export type BackendProjectFileNode = {
 	size?: number;
 	mime_type?: string;
 	mod_time?: number;
+	public_id?: string;
 };
 
 export type BackendProjectFileUploadResult = {
 	path: string;
 	filename: string;
 	size: number;
+	public_id?: string;
+	file_upload_id?: string;
+	original_name?: string;
+	mime_type?: string;
+	file_size?: number;
+	sha256?: string;
+	storage_path?: string;
+	url?: string;
 };
 
 export type BackendNewMessageData = {

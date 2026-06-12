@@ -1,0 +1,90 @@
+ARG BUILDPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+ARG GO_BUILDER_IMAGE=golang:1.25.4
+
+FROM ${GO_BUILDER_IMAGE} AS builder
+
+WORKDIR /build
+
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources
+ENV GOPROXY=https://goproxy.cn,direct
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    ca-certificates \
+    tzdata \
+    gcc \
+    libc6-dev \
+    libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/ \
+    go mod download
+
+COPY . .
+
+ARG TARGETOS
+ARG TARGETARCH
+
+RUN --mount=type=cache,target=/go/ \
+    CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
+    go build -ldflags="-s -w" -v -o /build/leros ./backend/cmd/leros/
+
+FROM registry.yygu.cn/library/ubuntu:24.04
+
+ARG TARGETARCH
+ARG CLAUDE_CODE_VERSION=latest
+
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://mirrors.aliyun.com/ubuntu/|g' /etc/apt/sources.list.d/ubuntu.sources \
+    && sed -i 's|http://security.ubuntu.com/ubuntu/|http://mirrors.aliyun.com/ubuntu/|g' /etc/apt/sources.list.d/ubuntu.sources
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    tzdata \
+    curl \
+    xz-utils \
+    git \
+    less \
+    libsqlite3-0 \
+    python3.12 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --break-system-packages -i https://mirrors.aliyun.com/pypi/simple/ requests
+
+ENV NODE_VERSION=22.14.0
+RUN set -eux; \
+    case "${TARGETARCH:-amd64}" in \
+        amd64) node_arch="x64" ;; \
+        arm64) node_arch="arm64" ;; \
+        *) echo "unsupported TARGETARCH=${TARGETARCH:-}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://npmmirror.com/mirrors/node/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz" -o /tmp/node.tar.xz; \
+    tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1; \
+    rm /tmp/node.tar.xz
+
+RUN npm config set registry https://registry.npmmirror.com \
+    && npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+    && npm cache clean --force
+
+COPY --from=builder /build/leros /leros
+COPY --from=builder /build/backend/skills /app/backend/skills
+
+RUN useradd -m -s /bin/bash leros \
+    && ln -sf /leros /usr/local/bin/leros \
+    && mkdir -p /app/config /workspace \
+    && chown -R leros:leros /app /workspace /home/leros
+
+WORKDIR /app
+
+ENV LEROS_WORKSPACE_ROOT=/workspace \
+    HOME=/home/leros
+
+EXPOSE 8081
+
+USER leros
+
+ENTRYPOINT ["/leros"]
+CMD ["worker", "--config", "/app/config/worker.config.yaml", "--workspace-root", "/workspace", "--listen-addr", ":8081"]

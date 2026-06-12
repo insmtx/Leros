@@ -2,7 +2,7 @@
 
 import type { ProjectArtifact, ProjectTask } from "@leros/store";
 import {
-	fetchProjectFileDownload,
+	fetchFileDownload,
 	mapBackendArtifactToProjectArtifact,
 	projectFileApi,
 	useChatStore,
@@ -617,9 +617,14 @@ function ProjectFiles({
 		const controller = new AbortController();
 
 		async function loadPreview() {
+			if (!currentFile.publicId) {
+				setPreviewState({ status: "error", message: "文件缺少 public_id，无法预览" });
+				return;
+			}
+
 			setPreviewState({ status: "loading" });
 			try {
-				const response = await fetchProjectFileDownload(projectId, currentFile.path, {
+				const response = await fetchFileDownload(currentFile.publicId, {
 					signal: controller.signal,
 				});
 				const mimeType =
@@ -657,7 +662,7 @@ function ProjectFiles({
 				URL.revokeObjectURL(objectUrl);
 			}
 		};
-	}, [projectId, previewFile]);
+	}, [previewFile]);
 
 	useEffect(() => {
 		if (!previewFile) return;
@@ -682,9 +687,9 @@ function ProjectFiles({
 		setUploading(true);
 		setUploadError(null);
 		try {
-			await projectFileApi.upload({ projectId, file });
+			const response = await projectFileApi.upload({ projectId, file });
 			await onRefresh();
-			toast.success("文件上传成功");
+			toast.success(response.message || "文件上传成功");
 		} catch (err) {
 			setUploadError(err instanceof Error ? err.message : "上传文件失败");
 		} finally {
@@ -693,8 +698,13 @@ function ProjectFiles({
 	};
 
 	const handleDownload = async (file: ProjectFileNode) => {
+		if (!file.publicId) {
+			console.error("ProjectFiles download error: missing public_id");
+			return;
+		}
+
 		try {
-			const response = await fetchProjectFileDownload(projectId, file.path);
+			const response = await fetchFileDownload(file.publicId);
 			const blob = await response.blob();
 			const objectUrl = URL.createObjectURL(blob);
 			const link = document.createElement("a");

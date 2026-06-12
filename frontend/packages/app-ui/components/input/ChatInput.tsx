@@ -93,10 +93,12 @@ export function ChatInput({ variant = "default" }: { variant?: "default" | "proj
 			for (const file of files) {
 				if (isProjectVariant && projectId) {
 					try {
-						await addUploadedAttachment(projectId, file);
-						toast.success("文件上传成功");
+						const { message } = await addUploadedAttachment(projectId, file);
+						toast.success(message || "文件上传成功");
 					} catch (err) {
+						const message = err instanceof Error ? err.message : "文件上传失败";
 						console.error("ChatInput upload project attachment error:", err);
+						toast.error(message);
 					}
 					continue;
 				}

@@ -1,4 +1,3 @@
-import { getArtifactDownloadUrl } from "../api/artifactApi";
 import { projectApi } from "../api/projectApi";
 import { sessionApi } from "../api/sessionApi";
 import { taskApi } from "../api/taskApi";
@@ -182,7 +181,7 @@ export function mapBackendArtifactToProjectArtifact(ba: BackendArtifact): Projec
 		mimeType: ba.mime_type,
 		size: formatFileSize(ba.file_size ?? 0),
 		updatedAt: "",
-		downloadUrl: getArtifactDownloadUrl(ba.artifact_id),
+		downloadUrl: "",
 		sha256: ba.sha256,
 	};
 }

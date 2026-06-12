@@ -6,6 +6,7 @@ export type BackendProjectFileNodeLike = {
 	size?: number;
 	mime_type?: string;
 	mod_time?: number;
+	public_id?: string;
 };
 
 export type ProjectFileNode = {
@@ -16,6 +17,7 @@ export type ProjectFileNode = {
 	size: number;
 	mimeType: string;
 	modTime: number;
+	publicId: string;
 };
 
 // 统一清洗后端文件树结构，避免页面层到处处理空值和字段名差异。
@@ -31,6 +33,7 @@ export function normalizeProjectFileTree(
 		size: typeof node.size === "number" ? node.size : 0,
 		mimeType: typeof node.mime_type === "string" ? node.mime_type : "",
 		modTime: typeof node.mod_time === "number" ? node.mod_time : 0,
+		publicId: typeof node.public_id === "string" ? node.public_id : "",
 		children: normalizeProjectFileTree(node.children),
 	}));
 }

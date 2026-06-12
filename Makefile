@@ -21,6 +21,20 @@ docker-push-base: docker-build-base
 docker-build:
 	docker build -t $(REGISTRY)$(PROJECT):latest -f deployments/build/Dockerfile.leros .
 
+docker-build-worker:
+	docker build -t $(REGISTRY)$(PROJECT)-worker:latest -f deployments/build/Dockerfile.worker .
+
+# SERVICE=leros|leros-worker  TAG=xxx
+docker-build-tag:
+	@case "$(SERVICE)" in \
+		leros-worker) DOCKERFILE=Dockerfile.worker ;; \
+		*) DOCKERFILE=Dockerfile.leros ;; \
+	esac; \
+	docker build -t $(REGISTRY)$(SERVICE):$(TAG) -f deployments/build/$$DOCKERFILE .
+
+docker-push-tag:
+	docker push $(REGISTRY)$(SERVICE):$(TAG)
+
 docker-dev-build:
 	docker build -t $(REGISTRY)$(PROJECT)-dev:latest -f deployments/build/Dockerfile.leros-dev .
 

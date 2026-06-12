@@ -3,6 +3,8 @@
 import {
 	formatTime,
 	mapBackendArtifactToProjectArtifact,
+	mergeProjectArtifacts,
+	messageArtifactToProjectArtifact,
 	type ProjectArtifact,
 	useChatStore,
 	useLayoutStore,
@@ -207,8 +209,10 @@ function MessageArtifactList({ artifacts }: { artifacts: MessageArtifact[] }) {
 		[artifacts],
 	);
 	const visibleArtifacts = useMemo(() => {
-		const artifactIds = new Set(artifacts.map((artifact) => artifact.id));
-		return taskArtifacts.filter((artifact) => artifactIds.has(artifact.id));
+		const sessionArtifacts = artifacts.map(messageArtifactToProjectArtifact);
+		const artifactIds = new Set(sessionArtifacts.map((artifact) => artifact.id));
+		const enrichedTaskArtifacts = taskArtifacts.filter((artifact) => artifactIds.has(artifact.id));
+		return mergeProjectArtifacts(enrichedTaskArtifacts, sessionArtifacts);
 	}, [artifacts, taskArtifacts]);
 
 	useEffect(() => {
@@ -239,7 +243,7 @@ function MessageArtifactList({ artifacts }: { artifacts: MessageArtifact[] }) {
 		};
 	}, [activeTaskDetailTaskId, artifactKey]);
 
-	if (!activeTaskDetailTaskId || visibleArtifacts.length === 0) return null;
+	if (visibleArtifacts.length === 0) return null;
 
 	return (
 		<>

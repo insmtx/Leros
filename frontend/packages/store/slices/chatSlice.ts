@@ -1,5 +1,4 @@
 import { FetchSSEClient } from "@leros/ui/lib/fetch-sse";
-import { getArtifactDownloadUrl } from "../api/artifactApi";
 import { API_BASE_URL } from "../api/config";
 import { projectFileApi } from "../api/projectFileApi";
 import { sessionApi } from "../api/sessionApi";
@@ -92,7 +91,18 @@ function mapBackendMessage(msg: BackendMessage): Message {
 		usage: mapUsage(msg.usage),
 	};
 
-	return applySessionEventsToMessage(message, msg.chunks, { appendContent: !message.content });
+	let mapped = applySessionEventsToMessage(message, msg.chunks, {
+		appendContent: !message.content,
+	});
+	if (msg.artifacts?.length) {
+		const artifacts = msg.artifacts
+			.map(mapArtifactPayload)
+			.filter((artifact): artifact is MessageArtifact => artifact !== undefined);
+		if (artifacts.length) {
+			mapped = { ...mapped, artifacts: mergeArtifacts(mapped.artifacts, artifacts) };
+		}
+	}
+	return mapped;
 }
 
 function mapToolCalls(tcList?: BackendToolCall[]): ToolCall[] | undefined {
@@ -281,7 +291,7 @@ function mapArtifactPayload(payload: BackendSessionArtifactPayload): MessageArti
 		mimeType,
 		size: formatFileSize(payload.file_size ?? 0),
 		updatedAt: "",
-		downloadUrl: getArtifactDownloadUrl(artifactID),
+		downloadUrl: "",
 		sha256: payload.sha256,
 	};
 }
@@ -1038,33 +1048,31 @@ export class ChatActionImpl {
 	addUploadedAttachment = async (projectId: string, file: File) => {
 		const response = await projectFileApi.upload({ projectId, file });
 		const payload = response.data;
-		const uploadedPath =
-			typeof payload === "string" ? payload : typeof payload?.path === "string" ? payload.path : "";
 		const attachmentId = `att-${Date.now()}`;
 		const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
 
 		const attachment: Attachment = {
 			id: attachmentId,
 			type: file.type.startsWith("image/") ? "image" : "file",
-			name: file.name,
-			size: file.size,
+			name: payload.original_name || payload.filename || file.name,
+			size: payload.file_size ?? payload.size ?? file.size,
 			url: previewUrl,
 			file,
-			path: uploadedPath,
-			mimeType: file.type,
+			path: payload.public_id || payload.storage_path || payload.path,
+			mimeType: payload.mime_type || file.type,
 		};
 
 		this.#set((state) => ({
 			inputAttachments: [...state.inputAttachments, attachment],
 		}));
 
-		return attachment;
+		return { attachment, message: response.message };
 	};
 
 	removeAttachment = (id: string) => {
 		const state = this.#get();
 		const att = state.inputAttachments.find((a) => a.id === id);
-		if (att?.url) URL.revokeObjectURL(att.url);
+		if (att?.url?.startsWith("blob:")) URL.revokeObjectURL(att.url);
 		this.#set((state) => ({
 			inputAttachments: state.inputAttachments.filter((a) => a.id !== id),
 		}));

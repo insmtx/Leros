@@ -2,8 +2,10 @@
 
 import type { ProjectArtifact, ProjectTask } from "@leros/store";
 import {
+	collectSessionArtifacts,
 	formatTokenCount,
 	mapBackendArtifactToProjectArtifact,
+	mergeProjectArtifacts,
 	useChatStore,
 	useLayoutStore,
 } from "@leros/store";
@@ -72,7 +74,7 @@ export function TaskDetailPage({
 	} = useChatStore((s) => s);
 
 	const [task, setTask] = useState<ProjectTask | null>(null);
-	const [artifacts, setArtifacts] = useState<ProjectArtifact[]>([]);
+	const [taskApiArtifacts, setTaskApiArtifacts] = useState<ProjectArtifact[]>([]);
 	const [previewArtifact, setPreviewArtifact] = useState<ProjectArtifact | null>(null);
 
 	const resolvedProjectId = projectId ?? activeTaskDetailProjectId;
@@ -116,13 +118,23 @@ export function TaskDetailPage({
 		}, initialSummary);
 	}, [resolvedSessionId, messageIds, messagesMap]);
 
+	const sessionArtifacts = useMemo(
+		() => collectSessionArtifacts(messagesMap, messageIds, resolvedSessionId),
+		[messagesMap, messageIds, resolvedSessionId],
+	);
+
+	const artifacts = useMemo(
+		() => mergeProjectArtifacts(taskApiArtifacts, sessionArtifacts),
+		[taskApiArtifacts, sessionArtifacts],
+	);
+
 	const fetchArtifacts = useCallback(async (taskId: string) => {
 		try {
 			const res = await artifactApi.listTaskArtifacts(taskId);
-			setArtifacts((res.data.data ?? []).map(mapBackendArtifactToProjectArtifact));
+			setTaskApiArtifacts((res.data.data ?? []).map(mapBackendArtifactToProjectArtifact));
 		} catch (err) {
 			console.error("TaskDetailPage fetch artifacts error:", err);
-			setArtifacts([]);
+			setTaskApiArtifacts([]);
 		}
 	}, []);
 

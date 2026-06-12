@@ -1,4 +1,4 @@
-export { artifactApi, fetchArtifactDownload, getArtifactDownloadUrl } from "./api/artifactApi";
+export { artifactApi, fetchArtifactDownload } from "./api/artifactApi";
 export type {
 	AuthOrgInfo,
 	AuthTokenResponse,
@@ -9,11 +9,8 @@ export type {
 export { authApi } from "./api/authApi";
 export { API_BASE_URL } from "./api/config";
 export { digitalAssistantApi } from "./api/digitalAssistantApi";
-export {
-	fetchProjectFileDownload,
-	getProjectFileDownloadUrl,
-	projectFileApi,
-} from "./api/projectFileApi";
+export { fetchFileDownload, fileApi, getFileDownloadUrl } from "./api/fileApi";
+export { projectFileApi } from "./api/projectFileApi";
 export { sessionApi } from "./api/sessionApi";
 export type {
 	SearchSkillMarketplaceParams,
@@ -85,4 +82,9 @@ export type {
 	ToolCallStatus,
 } from "./types/chat";
 export { flattenActions } from "./utils";
+export {
+	collectSessionArtifacts,
+	mergeProjectArtifacts,
+	messageArtifactToProjectArtifact,
+} from "./utils/artifacts";
 export { formatDate, formatFileSize, formatTime, formatTokenCount } from "./utils/format";

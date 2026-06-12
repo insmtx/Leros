@@ -1,0 +1,85 @@
+name: Leros 测试环境部署
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: '选择要部署的服务'
+        required: true
+        type: choice
+        default: 'leros'
+        options:
+          - leros
+          - leros-worker
+
+jobs:
+  leros_deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PROJECT: leros
+      REGISTRY_HOST: ${{ secrets.DOCKER_REGISTRY_HOST }}
+      ENV: test
+      K8S_NS: insmtx-test
+      DEPLOY_TARGET: ${{ github.event.inputs.deploy_target }}
+    outputs:
+      image_tag: ${{ steps.step_env.outputs.image_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate image tag
+        id: step_env
+        run: |
+          TAG="$(date +%Y%m%d)-${GITHUB_SHA::8}"
+          echo "image_tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Image: ${REGISTRY_HOST}/insmtx/${DEPLOY_TARGET}:${TAG}"
+
+      - name: Build and push image
+        env:
+          TAG: ${{ steps.step_env.outputs.image_tag }}
+          SERVICE: ${{ github.event.inputs.deploy_target }}
+        run: |
+          echo "${{ secrets.DOCKER_REGISTRY_PASSWORD }}" | docker login ${REGISTRY_HOST} -u ${{ secrets.DOCKER_REGISTRY_USERNAME }} --password-stdin
+          make docker-build-tag
+          make docker-push-tag
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        env:
+          REGISTRY_HOST: ${{ secrets.DOCKER_REGISTRY_HOST }}
+          K8S_NS: insmtx-test
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOYER_PRIMARY_KEY }}
+
+          envs: REGISTRY_HOST,K8S_NS
+
+          script: |
+            IMAGE_TAG=${{ steps.step_env.outputs.image_tag }}
+            TARGET="${{ github.event.inputs.deploy_target }}"
+
+            echo "REGISTRY_HOST=${REGISTRY_HOST}"
+            echo "K8S_NS=${K8S_NS}"
+
+            echo ">>> Deploying ${TARGET}..."
+            FULL_IMAGE=${REGISTRY_HOST}/insmtx/${TARGET}:${IMAGE_TAG}
+
+            kubectl set image deployment/${TARGET} ${TARGET}=${FULL_IMAGE} -n ${K8S_NS}
+            kubectl rollout status deployment/${TARGET} -n ${K8S_NS}
+
+      - name: Notify success
+        if: success()
+        run: |
+          MSG="【测试环境】${PROJECT}:${{ steps.step_env.outputs.image_tag }} (${{ github.event.inputs.deploy_target }}) 部署成功"
+          curl -H "Content-Type: application/json;charset=utf-8" \
+            -d "{\"msgtype\": \"text\",\"text\": {\"content\":\"${MSG}\"}}" \
+            "${{ secrets.WEWORK_WEBHOOK_URL }}"
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          MSG="【测试环境】${PROJECT}:${{ steps.step_env.outputs.image_tag }} (${{ github.event.inputs.deploy_target }}) 部署失败"
+          curl -H "Content-Type: application/json;charset=utf-8" \
+            -d "{\"msgtype\": \"text\",\"text\": {\"content\":\"${MSG}\"}}" \
+            "${{ secrets.WEWORK_WEBHOOK_URL }}"
