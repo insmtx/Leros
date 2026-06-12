@@ -81,6 +81,22 @@ jobs:
           electron_config_cache: ${{ runner.temp }}/electron-cache
           ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
 
+      - name: Set desktop version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: frontend/apps/desktop
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          node -e '
+            const fs = require("node:fs");
+            const version = process.argv[1];
+            const packagePath = "package.json";
+            const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+            packageJson.version = version;
+            fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
+          ' "$version"
+          echo "Desktop version: $version"
+
       - name: Typecheck desktop app
         working-directory: frontend
         run: pnpm --filter @leros/desktop typecheck
