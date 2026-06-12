@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/ygpkg/storage-go"
@@ -143,15 +142,24 @@ func PresignDownloadByPublicID(ctx context.Context, db *gorm.DB, orgID uint, pub
 	return url, fileUpload, nil
 }
 
+func ResolvePublicURL(ctx context.Context, storagePath string) (string, error) {
+	_, bucket, key, err := storage.ParseURI(storagePath)
+	if err != nil {
+		return "", fmt.Errorf("parse storage uri: %w", err)
+	}
+
+	st := GetStorage()
+	info, err := st.HeadObject(ctx, bucket, key)
+	if err != nil {
+		return "", fmt.Errorf("head object %s/%s: %w", bucket, key, err)
+	}
+	return info.Path.PublicURL(), nil
+}
+
 func storageKeyFromURI(uri string) (string, error) {
-	idx := strings.Index(uri, "://")
-	if idx < 0 {
-		return "", fmt.Errorf("invalid storage uri: %q", uri)
+	_, _, key, err := storage.ParseURI(uri)
+	if err != nil {
+		return "", fmt.Errorf("invalid storage uri %q: %w", uri, err)
 	}
-	rest := uri[idx+3:]
-	slashIdx := strings.Index(rest, "/")
-	if slashIdx < 0 {
-		return "", fmt.Errorf("storage uri missing key: %q", uri)
-	}
-	return rest[slashIdx+1:], nil
+	return key, nil
 }

@@ -194,6 +194,7 @@ type MessageAttachment struct {
 	MimeType     string `json:"mime_type"`
 	Size         int64  `json:"size"`
 	Purpose      string `json:"purpose,omitempty"`
+	PublicURL    string `json:"PublicURL"` // resolved at runtime, not exposed to front end
 }
 
 type MessageAttachmentSlice []MessageAttachment

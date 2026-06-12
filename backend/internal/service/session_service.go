@@ -15,6 +15,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/api/auth"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/infra/db"
+	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/worker/protocol"
@@ -266,6 +267,8 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID string, req *
 		return nil, err
 	}
 
+	s.resolveAttachmentURLs(ctx, session.OrgID, req.Attachments)
+
 	mp := NewMessagePoster(s.db, s.eventbus, s.inferrer)
 	message, err := mp.PostMessage(ctx, session, func(sequence int64) *types.SessionMessage {
 		return s.buildMessage(req, sequence)
@@ -275,6 +278,34 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID string, req *
 	}
 
 	return convertToContractSessionMessage(message, session.PublicID), nil
+}
+
+func (s *sessionService) resolveAttachmentURLs(ctx context.Context, orgID uint, attachments []types.MessageAttachment) {
+	if len(attachments) == 0 {
+		return
+	}
+	for i := range attachments {
+		if attachments[i].FileUploadID == "" {
+			continue
+		}
+		publicURL, err := s.resolveSingleAttachmentURL(ctx, orgID, attachments[i].FileUploadID)
+		if err != nil {
+			logs.WarnContextf(ctx, "resolve attachment public url for %s: %v", attachments[i].FileUploadID, err)
+			continue
+		}
+		attachments[i].PublicURL = publicURL
+	}
+}
+
+func (s *sessionService) resolveSingleAttachmentURL(ctx context.Context, orgID uint, publicID string) (string, error) {
+	fileUpload, err := db.GetFileUploadByPublicID(ctx, s.db, orgID, publicID)
+	if err != nil {
+		return "", fmt.Errorf("get file upload %s: %w", publicID, err)
+	}
+	if fileUpload == nil {
+		return "", fmt.Errorf("file upload %s not found", publicID)
+	}
+	return filestore.ResolvePublicURL(ctx, fileUpload.StoragePath)
 }
 
 func (s *sessionService) buildMessage(req *contract.AddMessageRequest, sequence int64) *types.SessionMessage {
