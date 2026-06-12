@@ -14,7 +14,7 @@ services:
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD", "pg_isready -U leros_dev_user -d leros_dev_db"]
+      test: ["CMD", "pg_isready", "-U", "leros_dev_user", "-d", "leros_dev_db"]
       interval: 10s
       timeout: 5s
       retries: 5
