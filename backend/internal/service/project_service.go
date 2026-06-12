@@ -490,7 +490,7 @@ func (s *projectService) GetProjectFileTree(ctx context.Context, publicID string
 	fileTree := make([]*contract.FileTreeNode, 0, len(uploadFiles))
 	for _, f := range uploadFiles {
 		fileTree = append(fileTree, &contract.FileTreeNode{
-			Name:     f.Filename,
+			Name:     f.OriginalName,
 			Path:     f.Filename,
 			Type:     "file",
 			Size:     f.FileSize,
