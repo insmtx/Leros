@@ -14,8 +14,8 @@ const presignQueryParam = "presign"
 
 // RegisterStaticRoutes registers static resource presign routes
 func RegisterStaticRoutes(r gin.IRouter) {
-	r.PUT("/static/:bucket/*key", handlePresignUpload)
-	r.GET("/static/:bucket/*key", handlePresignDownload)
+	r.PUT("/:bucket/*key", handlePresignUpload)
+	r.GET("/:bucket/*key", handlePresignDownload)
 }
 
 func handlePresignUpload(ctx *gin.Context) {

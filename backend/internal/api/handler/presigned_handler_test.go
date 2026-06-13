@@ -29,7 +29,8 @@ func setupPresignedTestRouter(t *testing.T) *gin.Engine {
 	}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterStaticRoutes(r)
+	staticGroup := r.Group("/static")
+	RegisterStaticRoutes(staticGroup)
 	RegisterPresignedRoutes(r)
 	return r
 }

@@ -114,7 +114,12 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 	}
 
 	if filestore.IsLocal() {
-		handler.RegisterStaticRoutes(v1)
+		staticGroup := v1.Group("/static", middleware.StaticAuth(
+			filestore.StaticAPIKey(),
+			cfg.Server.JWT.Secret,
+			db,
+		))
+		handler.RegisterStaticRoutes(staticGroup)
 		handler.RegisterPresignedRoutes(r)
 		logs.Info("Static routes registered successfully")
 	}

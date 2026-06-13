@@ -29,7 +29,8 @@ func TestCurlStylePresignUpload(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterStaticRoutes(r)
+	staticGroup := r.Group("/static")
+	RegisterStaticRoutes(staticGroup)
 
 	// 等价于 curl -X PUT "http://localhost:8080/v1/static/test-bucket/path/to/file.txt?presign=1"
 	w := httptest.NewRecorder()
@@ -68,7 +69,8 @@ func TestCurlStylePresignDownload(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterStaticRoutes(r)
+	staticGroup := r.Group("/static")
+	RegisterStaticRoutes(staticGroup)
 
 	// 等价于 curl -X GET "http://localhost:8080/v1/static/test-bucket/path/to/file.txt?presign=1"
 	w := httptest.NewRecorder()
@@ -108,7 +110,8 @@ func TestCurlStylePresignRoundTrip(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterStaticRoutes(r)
+	staticGroup := r.Group("/static")
+	RegisterStaticRoutes(staticGroup)
 
 	// 1. 获取预签名上传 URL
 	w1 := httptest.NewRecorder()

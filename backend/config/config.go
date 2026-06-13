@@ -54,4 +54,14 @@ type StorageConfig struct {
 	URLStyle   string `yaml:"url_style,omitempty"`
 	LocalDir   string `yaml:"local_dir,omitempty"`
 	SignSecret string `yaml:"sign_secret,omitempty"`
+	StaticAPIKey string `yaml:"static_api_key,omitempty"`
+}
+
+// GetStaticAPIKey returns the static API key for presign route authentication,
+// or an empty string if StorageConfig is nil.
+func (s *StorageConfig) GetStaticAPIKey() string {
+	if s == nil {
+		return ""
+	}
+	return s.StaticAPIKey
 }
