@@ -12,6 +12,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/api/handler"
 	"github.com/insmtx/Leros/backend/internal/api/middleware"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
+	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	"github.com/insmtx/Leros/backend/internal/infra/websocket"
 	"github.com/insmtx/Leros/backend/internal/runnable"
 	"github.com/insmtx/Leros/backend/internal/service"
@@ -110,6 +111,19 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		logs.Info("Session completed runnable started")
 		go runnable.StartSessionTitleHandler(context.Background(), sessionService, eventbus, db)
 		logs.Info("Session title handler runnable started")
+	}
+
+	staticGroup := v1.Group("/static", middleware.StaticAuth(
+		filestore.StaticAPIKey(),
+		cfg.Server.JWT.Secret,
+		db,
+	))
+	handler.RegisterStaticRoutes(staticGroup)
+	logs.Info("Static routes registered successfully")
+
+	if filestore.IsLocal() {
+		handler.RegisterPresignedRoutes(r)
+		logs.Info("Presigned consumption routes registered (local driver)")
 	}
 
 	// Swagger UI 路由
