@@ -1,9 +1,11 @@
 "use client";
 
 import {
+	AUTH_SESSION_EXPIRED_EVENT,
 	type AuthTokenResponse,
 	type AuthUser,
 	authApi,
+	getValidJwtToken,
 	useAuthStore,
 	useChatStore,
 	useLayoutStore,
@@ -60,7 +62,26 @@ export function AuthProvider({
 	const [mode, setMode] = useState<AuthMode>("login");
 	const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
-	useEffect(() => { setHydrated(true); }, []);
+	useEffect(() => {
+		setHydrated(true);
+	}, []);
+
+	useEffect(() => {
+		const handleExpiredSession = () => {
+			logoutAuth();
+			resetAuthScopedData();
+			resetLocalMessages();
+			setPendingAction(null);
+			setMode("login");
+			setDialogOpen(true);
+		};
+		window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleExpiredSession);
+		return () => window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleExpiredSession);
+	}, [logoutAuth, resetAuthScopedData, resetLocalMessages]);
+
+	useEffect(() => {
+		if (authUser) void getValidJwtToken();
+	}, [authUser]);
 
 	const openAuthDialog = useCallback((nextMode: AuthMode = "login") => {
 		setMode(nextMode);

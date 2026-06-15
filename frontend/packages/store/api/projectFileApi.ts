@@ -1,4 +1,4 @@
-import { readStoredJwtToken } from "../utils/authStorage";
+import { authenticatedFetch } from "../utils/authStorage";
 import { apiClient } from "./client";
 import { API_BASE_URL } from "./config";
 import type {
@@ -58,18 +58,14 @@ function assertBackendSuccess<T>(
 	return response;
 }
 
-async function uploadFile(
-	file: File,
-	token?: string | null,
-): Promise<BackendDataResponse<BackendUploadFilePayload>> {
+async function uploadFile(file: File): Promise<BackendDataResponse<BackendUploadFilePayload>> {
 	const formData = new FormData();
 	formData.append("file", file);
 	formData.append("purpose", "project");
 
-	const response = await fetch(`${API_BASE_URL}/files/upload`, {
+	const response = await authenticatedFetch(`${API_BASE_URL}/files/upload`, {
 		method: "POST",
 		body: formData,
-		headers: token ? { Authorization: `Bearer ${token}` } : undefined,
 	});
 
 	if (!response.ok) {
@@ -79,17 +75,16 @@ async function uploadFile(
 	return (await response.json()) as BackendDataResponse<BackendUploadFilePayload>;
 }
 
-async function addFileToProject(
-	{ projectId, publicId }: AddProjectFileParams,
-	token?: string | null,
-): Promise<BackendDataResponse<null>> {
-	const response = await fetch(
+async function addFileToProject({
+	projectId,
+	publicId,
+}: AddProjectFileParams): Promise<BackendDataResponse<null>> {
+	const response = await authenticatedFetch(
 		`${API_BASE_URL}/projects/${encodeURIComponent(projectId)}/AddFile`,
 		{
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				...(token ? { Authorization: `Bearer ${token}` } : {}),
 			},
 			body: JSON.stringify({ public_id: publicId }),
 		},
@@ -115,15 +110,14 @@ export const projectFileApi = {
 		),
 
 	upload: async ({ projectId, file }: UploadProjectFileParams) => {
-		const token = readStoredJwtToken();
-		const uploadResponse = assertBackendSuccess(await uploadFile(file, token), "文件上传失败");
+		const uploadResponse = assertBackendSuccess(await uploadFile(file), "文件上传失败");
 		const uploaded = uploadResponse.data;
 		if (!uploaded?.public_id) {
 			throw new Error("上传接口未返回 public_id");
 		}
 
 		const addResponse = assertBackendSuccess(
-			await addFileToProject({ projectId, publicId: uploaded.public_id }, token),
+			await addFileToProject({ projectId, publicId: uploaded.public_id }),
 			"添加文件到项目失败",
 		);
 

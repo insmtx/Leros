@@ -32,7 +32,7 @@ import type {
 	ToolCallStatus,
 } from "../types/chat";
 import { flattenActions } from "../utils";
-import { readStoredJwtToken } from "../utils/authStorage";
+import { getValidJwtToken } from "../utils/authStorage";
 import { formatFileSize } from "../utils/format";
 
 export type ChatState = {
@@ -879,17 +879,21 @@ export class ChatActionImpl {
 		this.#startSSE(sessionId, assistantMsg.id);
 	};
 
-	#startSSE = (sessionId: string, assistantMsgId: string) => {
+	#startSSE = async (sessionId: string, assistantMsgId: string) => {
 		if (this.#sseClient) {
 			this.#sseClient.close();
 			this.#sseClient = null;
 		}
 
 		const url = `${API_BASE_URL}/SessionEvents`;
-		const token = readStoredJwtToken();
+		const token = await getValidJwtToken();
+		if (!token) {
+			this.#finishStream();
+			return;
+		}
 		const client = new FetchSSEClient(url, {
 			method: "POST",
-			headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+			headers: { Authorization: `Bearer ${token}` },
 			body: { session_id: sessionId },
 			onMessage: (event) => {
 				try {
@@ -935,7 +939,7 @@ export class ChatActionImpl {
 		});
 
 		this.#set({ streamCancelRef: () => client.close() });
-		client.connect();
+		void client.connect();
 		this.#sseClient = client;
 	};
 
