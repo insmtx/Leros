@@ -132,9 +132,33 @@ func parseJSONString(s string, target interface{}) error {
 	return sonic.Unmarshal([]byte(s), target)
 }
 
-// marshalJSON marshals to JSON bytes.
+// marshalJSON marshals to JSON bytes with stable key ordering.
 func marshalJSON(v interface{}) ([]byte, error) {
-	return sonic.Marshal(v)
+	return sonic.ConfigStd.Marshal(v)
+}
+
+// validJSON reports whether data is valid JSON.
+func validJSON(data []byte) bool {
+	return sonic.Valid(data)
+}
+
+// CanonicalToolArguments returns the JSON string used for wire-level tool call
+// arguments. Raw JSON strings are preserved for protocols that already carry
+// arguments as strings; structured argument objects are marshaled with stable
+// map-key ordering for prompt-cache-friendly protocol conversion.
+func CanonicalToolArguments(raw string, parsed map[string]interface{}) string {
+	if raw != "" && validJSON([]byte(raw)) {
+		return raw
+	}
+	if parsed != nil {
+		if b, err := marshalJSON(parsed); err == nil {
+			return string(b)
+		}
+	}
+	if raw != "" {
+		return raw
+	}
+	return "{}"
 }
 
 // now returns current Unix timestamp.
@@ -159,7 +183,7 @@ func compactJSON(body []byte) string {
 	if err := sonic.Unmarshal(body, &v); err != nil {
 		return string(body)
 	}
-	b, err := sonic.Marshal(v)
+	b, err := sonic.ConfigStd.Marshal(v)
 	if err != nil {
 		return string(body)
 	}

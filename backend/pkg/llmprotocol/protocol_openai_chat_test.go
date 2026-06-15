@@ -185,12 +185,16 @@ func TestOpenAIChatDecodeRequest(t *testing.T) {
 		if err != nil {
 			t.Fatalf("DecodeRequest() error = %v", err)
 		}
+		if ir.FrequencyPenalty == nil || *ir.FrequencyPenalty != 0.5 {
+			t.Errorf("FrequencyPenalty = %v", ir.FrequencyPenalty)
+		}
+		// "n" is unrecognised -- should land in Extensions
 		ext, ok := ir.Extensions["openai_chat"]
 		if !ok {
 			t.Fatal("Extensions[openai_chat] missing")
 		}
-		if v, ok := ext["frequency_penalty"]; !ok || v != 0.5 {
-			t.Errorf("frequency_penalty = %v", v)
+		if _, ok := ext["n"]; !ok {
+			t.Errorf("unrecognised key 'n' not preserved in Extensions")
 		}
 	})
 

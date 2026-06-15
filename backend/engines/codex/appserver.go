@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	appServerIdleTimeout = 5 * time.Minute
+	appServerIdleTimeout = 2 * time.Minute
 	appServerGCInterval  = 1 * time.Minute
 )
 

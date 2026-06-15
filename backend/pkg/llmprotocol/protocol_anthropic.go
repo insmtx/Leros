@@ -2,9 +2,55 @@ package llmprotocol
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/bytedance/sonic"
 )
+
+const anthropicBillingHeaderPrefix = "x-anthropic-billing-header:"
+
+func getCacheControl(m map[string]interface{}) map[string]interface{} {
+	if cc, ok := m["cache_control"].(map[string]interface{}); ok {
+		return cloneMap(cc)
+	}
+	return nil
+}
+
+func cloneMap(in map[string]interface{}) map[string]interface{} {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]interface{}, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+func applyCacheControl(m map[string]interface{}, cc map[string]interface{}) {
+	if len(cc) > 0 {
+		m["cache_control"] = cc
+	}
+}
+
+func stripLeadingAnthropicBillingHeader(text string) string {
+	if !strings.HasPrefix(text, anthropicBillingHeaderPrefix) {
+		return text
+	}
+	lineEnd := strings.IndexAny(text, "\r\n")
+	if lineEnd < 0 {
+		return ""
+	}
+	restStart := lineEnd + 1
+	if text[lineEnd] == '\r' && restStart < len(text) && text[restStart] == '\n' {
+		restStart++
+	}
+	rest := text[restStart:]
+	rest = strings.TrimPrefix(rest, "\r\n")
+	rest = strings.TrimPrefix(rest, "\n")
+	rest = strings.TrimPrefix(rest, "\r")
+	return rest
+}
 
 // ensureContentArray returns a non-nil content array for Anthropic protocol compliance.
 func ensureContentArray(content []map[string]interface{}) []map[string]interface{} {
@@ -17,17 +63,18 @@ func ensureContentArray(content []map[string]interface{}) []map[string]interface
 // anthropicStreamState tracks the stream lifecycle for Anthropic protocol.
 // Owned entirely by the adapter — the handler/converter never touches it.
 type anthropicStreamState struct {
-	textStarted    map[int]bool
-	textStopped    map[int]bool
-	toolStarted    map[int]bool
-	toolStopped    map[int]bool
-	toolBlockIDs   map[int]string
-	toolBlockNames map[int]string
+	textStarted      map[int]bool
+	textStopped      map[int]bool
+	reasoningStarted map[int]bool
+	reasoningStopped map[int]bool
+	toolStarted      map[int]bool
+	toolStopped      map[int]bool
+	toolBlockIDs     map[int]string
+	toolBlockNames   map[int]string
 
-	// accumulatedInputTokens tracks input_tokens from message_start for merging into message_delta.
-	// Anthropic sends input_tokens in message_start and output_tokens in message_delta;
-	// we need to combine them to produce a complete IRUsage.
-	accumulatedInputTokens int
+	accumulatedInputTokens         int
+	accumulatedCacheReadTokens     int
+	accumulatedCacheCreationTokens int
 }
 
 // anthropicMessagesAdapter implements ProtocolAdapter for the Anthropic Messages API.
@@ -51,16 +98,47 @@ func (a *anthropicMessagesAdapter) DecodeRequest(raw map[string]interface{}) (*I
 		Stream:    getBool(raw, "stream"),
 		MaxTokens: getIntDefault(raw, "max_tokens"),
 	}
+	ir.CacheControl = getCacheControl(raw)
+	if metadata, ok := raw["metadata"].(map[string]interface{}); ok {
+		ir.Metadata = metadata
+	}
+
+	if outputConfig, ok := raw["output_config"].(map[string]interface{}); ok {
+		ir.ReasoningEffort = getString(outputConfig, "effort")
+		if len(outputConfig) > 0 {
+			if ir.Extensions == nil {
+				ir.Extensions = map[string]map[string]interface{}{}
+			}
+			ir.Extensions["anthropic"] = map[string]interface{}{"output_config": cloneMap(outputConfig)}
+		}
+	}
+
+	// Thinking config.
+	if thinking, ok := raw["thinking"].(map[string]interface{}); ok {
+		ir.Thinking = &IRThinkingConfig{
+			Type:         getString(thinking, "type"),
+			BudgetTokens: getIntDefault(thinking, "budget_tokens"),
+		}
+		if ir.ReasoningEffort != "" {
+			ir.Thinking.Effort = ir.ReasoningEffort
+		}
+	}
 
 	// System: string or array of text blocks.
 	if system, ok := raw["system"]; ok {
 		switch v := system.(type) {
 		case string:
-			ir.System = v
+			ir.System = stripLeadingAnthropicBillingHeader(v)
 		case []interface{}:
 			for _, item := range v {
 				if m, ok := item.(map[string]interface{}); ok && getString(m, "type") == "text" {
-					ir.System += getString(m, "text")
+					text := stripLeadingAnthropicBillingHeader(getString(m, "text"))
+					ir.System += text
+					ir.SystemParts = append(ir.SystemParts, IRSystemPart{
+						Type:         "text",
+						Text:         text,
+						CacheControl: getCacheControl(m),
+					})
 				}
 			}
 		}
@@ -78,6 +156,9 @@ func (a *anthropicMessagesAdapter) DecodeRequest(raw map[string]interface{}) (*I
 	// TopP.
 	if p, ok := getFloat(raw, "top_p"); ok {
 		ir.TopP = &p
+	}
+	if k, ok := getInt(raw, "top_k"); ok {
+		ir.TopK = &k
 	}
 	// Stop sequences.
 	if ss, ok := getStringList(raw, "stop_sequences"); ok {
@@ -130,33 +211,37 @@ func decodeAnthropicContent(content interface{}) []IRContentPart {
 			}
 			switch getString(m, "type") {
 			case "text":
-				parts = append(parts, IRContentPart{Type: IRPartText, Text: getString(m, "text")})
+				parts = append(parts, IRContentPart{Type: IRPartText, Text: getString(m, "text"), CacheControl: getCacheControl(m)})
 			case "thinking":
 				parts = append(parts, IRContentPart{
-					Type: IRPartReasoning,
+					Type:         IRPartReasoning,
+					CacheControl: getCacheControl(m),
 					Reasoning: &IRReasoningPart{
 						Content:   getString(m, "thinking"),
 						Signature: getString(m, "signature"),
+						Subtype:   "thinking",
 					},
 				})
 			case "redacted_thinking":
 				parts = append(parts, IRContentPart{
-					Type: IRPartReasoning,
+					Type:         IRPartReasoning,
+					CacheControl: getCacheControl(m),
 					Reasoning: &IRReasoningPart{
-						Content:   "[REDACTED]",
-						Signature: getString(m, "signature"),
+						Subtype:          "redacted_thinking",
+						EncryptedContent: getString(m, "data"),
+						Signature:        getString(m, "signature"),
 					},
 				})
 			case "tool_use":
 				input, _ := m["input"].(map[string]interface{})
-				inputJSON, _ := sonic.Marshal(input)
 				parts = append(parts, IRContentPart{
-					ID:   getString(m, "id"),
-					Type: IRPartToolCall,
+					ID:           getString(m, "id"),
+					Type:         IRPartToolCall,
+					CacheControl: getCacheControl(m),
 					ToolCall: &IRToolCallPart{
 						ID:            getString(m, "id"),
 						Name:          getString(m, "name"),
-						ArgumentsRaw:  string(inputJSON),
+						ArgumentsRaw:  CanonicalToolArguments("", input),
 						ArgumentsJSON: input,
 						Status:        "completed",
 					},
@@ -164,7 +249,8 @@ func decodeAnthropicContent(content interface{}) []IRContentPart {
 			case "tool_result":
 				resultContent := decodeToolResultContent(m["content"])
 				parts = append(parts, IRContentPart{
-					Type: IRPartToolResult,
+					Type:         IRPartToolResult,
+					CacheControl: getCacheControl(m),
 					ToolResult: &IRToolResultPart{
 						ToolCallID: getString(m, "tool_use_id"),
 						Content:    resultContent,
@@ -209,10 +295,11 @@ func decodeAnthropicTools(raw []interface{}) []IRToolDecl {
 		}
 		params, _ := m["input_schema"].(map[string]interface{})
 		tools = append(tools, IRToolDecl{
-			Type:        "function",
-			Name:        getString(m, "name"),
-			Description: getString(m, "description"),
-			Parameters:  params,
+			Type:         "function",
+			Name:         getString(m, "name"),
+			Description:  getString(m, "description"),
+			Parameters:   params,
+			CacheControl: getCacheControl(m),
 		})
 	}
 	return tools
@@ -262,14 +349,31 @@ func (a *anthropicMessagesAdapter) EncodeRequest(ir *IRRequest) (map[string]inte
 		"messages":   encodeAnthropicMessages(ir.Messages),
 	}
 
-	if ir.System != "" {
-		body["system"] = ir.System
+	if len(ir.SystemParts) > 0 {
+		body["system"] = encodeAnthropicSystemParts(ir.SystemParts)
+	} else if ir.System != "" {
+		body["system"] = stripLeadingAnthropicBillingHeader(ir.System)
+	}
+	if len(ir.CacheControl) > 0 {
+		body["cache_control"] = ir.CacheControl
+	}
+	if len(ir.Metadata) > 0 {
+		body["metadata"] = ir.Metadata
+	}
+	if tc := ir.Thinking; tc != nil {
+		body["thinking"] = encodeAnthropicThinkingConfig(tc, maxTokens)
+	}
+	if outputConfig := encodeAnthropicOutputConfig(ir); len(outputConfig) > 0 {
+		body["output_config"] = outputConfig
 	}
 	if ir.Temperature != nil {
 		body["temperature"] = *ir.Temperature
 	}
 	if ir.TopP != nil {
 		body["top_p"] = *ir.TopP
+	}
+	if ir.TopK != nil {
+		body["top_k"] = *ir.TopK
 	}
 	if len(ir.Stop) > 0 {
 		body["stop_sequences"] = ir.Stop
@@ -281,11 +385,15 @@ func (a *anthropicMessagesAdapter) EncodeRequest(ir *IRRequest) (map[string]inte
 	if len(ir.Tools) > 0 {
 		var tools []map[string]interface{}
 		for _, t := range ir.Tools {
-			tools = append(tools, map[string]interface{}{
+			tool := map[string]interface{}{
 				"name":         t.Name,
 				"description":  t.Description,
 				"input_schema": t.Parameters,
-			})
+			}
+			if len(t.CacheControl) > 0 {
+				tool["cache_control"] = t.CacheControl
+			}
+			tools = append(tools, tool)
 		}
 		body["tools"] = tools
 	}
@@ -295,6 +403,49 @@ func (a *anthropicMessagesAdapter) EncodeRequest(ir *IRRequest) (map[string]inte
 	}
 
 	return body, nil
+}
+
+func encodeAnthropicThinkingConfig(tc *IRThinkingConfig, maxTokens int) map[string]interface{} {
+	out := map[string]interface{}{}
+	if tc == nil {
+		return out
+	}
+	if tc.Type != "" {
+		out["type"] = tc.Type
+	}
+	if strings.EqualFold(tc.Type, "enabled") && tc.BudgetTokens > 0 {
+		budget := tc.BudgetTokens
+		if maxTokens > 1 && budget >= maxTokens {
+			budget = maxTokens - 1
+		}
+		out["budget_tokens"] = budget
+	}
+	return out
+}
+
+func encodeAnthropicOutputConfig(ir *IRRequest) map[string]interface{} {
+	if ir == nil {
+		return nil
+	}
+	effort := normalizeAnthropicEffort(ir.ReasoningEffort)
+	if effort == "" && ir.Thinking != nil {
+		effort = normalizeAnthropicEffort(ir.Thinking.Effort)
+	}
+	if effort == "" {
+		return nil
+	}
+	return map[string]interface{}{"effort": effort}
+}
+
+func normalizeAnthropicEffort(effort string) string {
+	switch strings.ToLower(strings.TrimSpace(effort)) {
+	case "minimal":
+		return "low"
+	case "low", "medium", "high", "xhigh", "max":
+		return strings.ToLower(strings.TrimSpace(effort))
+	default:
+		return ""
+	}
 }
 
 func encodeAnthropicMessages(msgs []IRMessage) []map[string]interface{} {
@@ -327,6 +478,22 @@ func encodeAnthropicMessages(msgs []IRMessage) []map[string]interface{} {
 	return result
 }
 
+func encodeAnthropicSystemParts(parts []IRSystemPart) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0, len(parts))
+	for _, part := range parts {
+		if part.Type != "" && part.Type != "text" {
+			continue
+		}
+		block := map[string]interface{}{
+			"type": "text",
+			"text": stripLeadingAnthropicBillingHeader(part.Text),
+		}
+		applyCacheControl(block, part.CacheControl)
+		result = append(result, block)
+	}
+	return result
+}
+
 func encodeAnthropicParts(parts []IRContentPart) []map[string]interface{} {
 	var content []map[string]interface{}
 	for _, part := range parts {
@@ -336,28 +503,43 @@ func encodeAnthropicParts(parts []IRContentPart) []map[string]interface{} {
 				"type": "text",
 				"text": part.Text,
 			})
+			applyCacheControl(content[len(content)-1], part.CacheControl)
 		case IRPartReasoning:
-			tb := map[string]interface{}{
-				"type":     "thinking",
-				"thinking": part.Reasoning.Content,
+			if part.Reasoning == nil {
+				continue
+			}
+			subtype := part.Reasoning.Subtype
+			if subtype == "" {
+				subtype = "thinking"
+			}
+			tb := map[string]interface{}{"type": subtype}
+			if subtype == "redacted_thinking" {
+				tb["data"] = part.Reasoning.EncryptedContent
+			} else {
+				tb["thinking"] = part.Reasoning.Content
 			}
 			if part.Reasoning.Signature != "" {
 				tb["signature"] = part.Reasoning.Signature
 			}
+			applyCacheControl(tb, part.CacheControl)
 			content = append(content, tb)
 		case IRPartToolCall:
 			var input interface{}
-			if part.ToolCall.ArgumentsJSON != nil {
+			if part.ToolCall.ArgumentsRaw != "" && validJSON([]byte(part.ToolCall.ArgumentsRaw)) {
+				_ = sonic.Unmarshal([]byte(part.ToolCall.ArgumentsRaw), &input)
+			} else if part.ToolCall.ArgumentsJSON != nil {
 				input = part.ToolCall.ArgumentsJSON
 			} else if part.ToolCall.ArgumentsRaw != "" {
 				_ = sonic.Unmarshal([]byte(part.ToolCall.ArgumentsRaw), &input)
 			}
-			content = append(content, map[string]interface{}{
+			tb := map[string]interface{}{
 				"type":  "tool_use",
 				"id":    part.ToolCall.ID,
 				"name":  part.ToolCall.Name,
 				"input": input,
-			})
+			}
+			applyCacheControl(tb, part.CacheControl)
+			content = append(content, tb)
 		case IRPartToolResult:
 			tb := map[string]interface{}{
 				"type":        "tool_result",
@@ -373,11 +555,13 @@ func encodeAnthropicParts(parts []IRContentPart) []map[string]interface{} {
 				tb["is_error"] = true
 				tb["content"] = part.ToolResult.Error
 			}
+			applyCacheControl(tb, part.CacheControl)
 			content = append(content, tb)
 		}
 	}
 	return content
 }
+
 
 func encodeAnthropicToolChoice(tc *IRToolChoice) interface{} {
 	switch tc.Type {
@@ -506,12 +690,14 @@ func mapAnthropicEncodedStopReason(reason IRStopReason) string {
 
 func (a *anthropicMessagesAdapter) NewStreamState() interface{} {
 	return &anthropicStreamState{
-		textStarted:    make(map[int]bool),
-		textStopped:    make(map[int]bool),
-		toolStarted:    make(map[int]bool),
-		toolStopped:    make(map[int]bool),
-		toolBlockIDs:   make(map[int]string),
-		toolBlockNames: make(map[int]string),
+		textStarted:      make(map[int]bool),
+		textStopped:      make(map[int]bool),
+		reasoningStarted: make(map[int]bool),
+		reasoningStopped: make(map[int]bool),
+		toolStarted:      make(map[int]bool),
+		toolStopped:      make(map[int]bool),
+		toolBlockIDs:     make(map[int]string),
+		toolBlockNames:   make(map[int]string),
 	}
 }
 
@@ -536,11 +722,13 @@ func (a *anthropicMessagesAdapter) DecodeStreamEvent(raw map[string]interface{},
 			ResponseModel: getString(msg, "model"),
 		}
 		if u, ok := msg["usage"].(map[string]interface{}); ok {
-			st.accumulatedInputTokens = getIntDefault(u, "input_tokens")
 			event.Usage = &IRUsage{
-				InputTokens:  st.accumulatedInputTokens,
+				InputTokens:  getIntDefault(u, "input_tokens"),
 				OutputTokens: getIntDefault(u, "output_tokens"),
 			}
+			st.accumulatedInputTokens = event.Usage.InputTokens
+			st.accumulatedCacheReadTokens = event.Usage.CacheReadInputTokens
+			st.accumulatedCacheCreationTokens = event.Usage.CacheCreationInputTokens
 		}
 		return []*IRStreamEvent{event}, nil
 
@@ -568,9 +756,14 @@ func (a *anthropicMessagesAdapter) DecodeStreamEvent(raw map[string]interface{},
 			}}, nil
 
 		case "thinking", "redacted_thinking":
+			st.reasoningStarted[idx] = true
 			thinkingContent := getString(block, "thinking")
+			subtype := "thinking"
+			encryptedContent := ""
 			if blockType == "redacted_thinking" {
-				thinkingContent = "[REDACTED]"
+				thinkingContent = ""
+				subtype = "redacted_thinking"
+				encryptedContent = getString(block, "data")
 			}
 			return []*IRStreamEvent{{
 				Type:  IRStreamContentStart,
@@ -578,8 +771,10 @@ func (a *anthropicMessagesAdapter) DecodeStreamEvent(raw map[string]interface{},
 				Part: &IRContentPart{
 					Type: IRPartReasoning,
 					Reasoning: &IRReasoningPart{
-						Content:   thinkingContent,
-						Signature: getString(block, "signature"),
+						Content:          thinkingContent,
+						Signature:        getString(block, "signature"),
+						Subtype:          subtype,
+						EncryptedContent: encryptedContent,
 					},
 				},
 			}}, nil

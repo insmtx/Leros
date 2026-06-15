@@ -158,7 +158,7 @@ func TestAnthropicDecodeRequest(t *testing.T) {
 			t.Fatalf("Parts[0].Type = %q", parts[0].Type)
 		}
 		if parts[0].Reasoning.Content != "Let me think..." {
-			t.Errorf("Reasoning.Content = %q", parts[0].Reasoning.Content)
+			t.Errorf("Reasoning.Subtype = %q, want redacted_thinking", parts[0].Reasoning.Subtype)
 		}
 		if parts[0].Reasoning.Signature != "sig_abc" {
 			t.Errorf("Reasoning.Signature = %q", parts[0].Reasoning.Signature)
@@ -187,8 +187,8 @@ func TestAnthropicDecodeRequest(t *testing.T) {
 			t.Fatalf("DecodeRequest() error = %v", err)
 		}
 		parts := ir.Messages[0].Parts
-		if parts[0].Reasoning.Content != "[REDACTED]" {
-			t.Errorf("Reasoning.Content = %q", parts[0].Reasoning.Content)
+		if parts[0].Reasoning.Subtype != "redacted_thinking" {
+			t.Errorf("Reasoning.Subtype = %q, want redacted_thinking", parts[0].Reasoning.Subtype)
 		}
 		if parts[0].Reasoning.Signature != "sig_xyz" {
 			t.Errorf("Reasoning.Signature = %q", parts[0].Reasoning.Signature)

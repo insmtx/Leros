@@ -39,8 +39,9 @@ func (a *openAIResponsesAdapter) Protocol() Protocol {
 // DecodeRequest converts a Responses API request body into canonical IR form.
 func (a *openAIResponsesAdapter) DecodeRequest(raw map[string]interface{}) (*IRRequest, error) {
 	ir := &IRRequest{
-		Model:  getString(raw, "model"),
-		Stream: getBool(raw, "stream"),
+		Model:      getString(raw, "model"),
+		Stream:     getBool(raw, "stream"),
+		Extensions: make(map[string]map[string]interface{}),
 	}
 
 	ir.Instructions = getString(raw, "instructions")
@@ -48,8 +49,6 @@ func (a *openAIResponsesAdapter) DecodeRequest(raw map[string]interface{}) (*IRR
 
 	if input, ok := raw["input"]; ok {
 		ir.Messages = decodeResponsesInput(input)
-		// 将 developer/system 消息的内容合并到 ir.System，
-		// 避免 Chat 编码时被跳过（encodeOpenAIChatMessages 只保留 ir.System）。
 		var kept []IRMessage
 		for _, msg := range ir.Messages {
 			if msg.Role == IRRoleSystem {
@@ -74,6 +73,15 @@ func (a *openAIResponsesAdapter) DecodeRequest(raw map[string]interface{}) (*IRR
 	if p, ok := getFloat(raw, "top_p"); ok {
 		ir.TopP = &p
 	}
+	if k, ok := getInt(raw, "top_k"); ok {
+		ir.TopK = &k
+	}
+	if fp, ok := getFloat(raw, "frequency_penalty"); ok {
+		ir.FrequencyPenalty = &fp
+	}
+	if pp, ok := getFloat(raw, "presence_penalty"); ok {
+		ir.PresencePenalty = &pp
+	}
 	if mt, ok := getInt(raw, "max_output_tokens"); ok {
 		ir.MaxTokens = mt
 	}
@@ -83,11 +91,25 @@ func (a *openAIResponsesAdapter) DecodeRequest(raw map[string]interface{}) (*IRR
 	if s, ok := getInt(raw, "seed"); ok {
 		ir.Seed = &s
 	}
+	if b, ok := raw["parallel_tool_calls"].(bool); ok {
+		ir.ParallelToolCalls = &b
+	}
+	if streamOptions, ok := raw["stream_options"].(map[string]interface{}); ok {
+		ir.StreamOptions = streamOptions
+	}
+	if metadata, ok := raw["metadata"].(map[string]interface{}); ok {
+		ir.Metadata = metadata
+	}
+	if b, ok := raw["store"].(bool); ok {
+		ir.Store = &b
+	}
+	if include, ok := getStringList(raw, "include"); ok {
+		ir.Include = include
+	}
 	ir.User = getString(raw, "user")
 
 	ir.ReasoningEffort = getString(raw, "reasoning_effort")
 	if ir.ReasoningEffort == "" {
-		// Check for reasoning.effort nested object: {"reasoning": {"effort": "high"}}
 		if reasoning, ok := raw["reasoning"].(map[string]interface{}); ok {
 			ir.ReasoningEffort = getString(reasoning, "effort")
 		}

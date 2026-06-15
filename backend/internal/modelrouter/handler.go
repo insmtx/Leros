@@ -671,7 +671,7 @@ func isStreamRequest(body []byte) bool {
 }
 
 func marshalJSON(v interface{}) ([]byte, error) {
-	return sonic.Marshal(v)
+	return sonic.ConfigStd.Marshal(v)
 }
 
 func getString(m map[string]interface{}, key string) string {

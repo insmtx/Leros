@@ -52,14 +52,15 @@ const (
 
 // IRContentPart is a single part within a message.
 type IRContentPart struct {
-	ID         string            `json:"id,omitempty"`
-	Type       IRPartType        `json:"type"`
-	Text       string            `json:"text,omitempty"`
-	ToolCall   *IRToolCallPart   `json:"tool_call,omitempty"`
-	ToolResult *IRToolResultPart `json:"tool_result,omitempty"`
-	Reasoning  *IRReasoningPart  `json:"reasoning,omitempty"`
-	Refusal    *IRRefusalPart    `json:"refusal,omitempty"`
-	Metadata   map[string]string `json:"metadata,omitempty"`
+	ID           string                 `json:"id,omitempty"`
+	Type         IRPartType             `json:"type"`
+	Text         string                 `json:"text,omitempty"`
+	ToolCall     *IRToolCallPart        `json:"tool_call,omitempty"`
+	ToolResult   *IRToolResultPart      `json:"tool_result,omitempty"`
+	Reasoning    *IRReasoningPart       `json:"reasoning,omitempty"`
+	Refusal      *IRRefusalPart         `json:"refusal,omitempty"`
+	Metadata     map[string]string      `json:"metadata,omitempty"`
+	CacheControl map[string]interface{} `json:"cache_control,omitempty"`
 }
 
 // IRToolCallPart holds tool invocation data.
@@ -81,8 +82,10 @@ type IRToolResultPart struct {
 
 // IRReasoningPart holds model reasoning/thinking content.
 type IRReasoningPart struct {
-	Content   string `json:"content"`
-	Signature string `json:"signature,omitempty"`
+	Content          string `json:"content"`
+	Signature        string `json:"signature,omitempty"`
+	Subtype          string `json:"subtype,omitempty"`
+	EncryptedContent string `json:"encrypted_content,omitempty"`
 }
 
 // IRRefusalPart holds model refusal content.
@@ -111,10 +114,19 @@ func (m IRMessage) GetTextContent() string {
 
 // IRToolDecl is a tool definition in the IR.
 type IRToolDecl struct {
-	Type        string      `json:"type"`
-	Name        string      `json:"name"`
-	Description string      `json:"description,omitempty"`
-	Parameters  interface{} `json:"parameters,omitempty"` // JSON Schema — acceptable here
+	Type         string                 `json:"type"`
+	Name         string                 `json:"name"`
+	Description  string                 `json:"description,omitempty"`
+	Parameters   interface{}            `json:"parameters,omitempty"` // JSON Schema — acceptable here
+	CacheControl map[string]interface{} `json:"cache_control,omitempty"`
+}
+
+// IRSystemPart preserves block-level system prompt metadata for protocols
+// such as Anthropic that allow cache breakpoints on system text blocks.
+type IRSystemPart struct {
+	Type         string                 `json:"type"`
+	Text         string                 `json:"text,omitempty"`
+	CacheControl map[string]interface{} `json:"cache_control,omitempty"`
 }
 
 // IRToolChoice represents how tool selection is handled.
@@ -143,25 +155,51 @@ type IRUsage struct {
 	ProviderRaw map[string]interface{} `json:"-"`
 }
 
+// IRThinkingConfig represents the thinking/extended-reasoning configuration for a request.
+// It is the canonical IR form — protocol adapters map their native thinking controls
+// to/from this struct.
+type IRThinkingConfig struct {
+	Type             string `json:"type,omitempty"`          // enabled, disabled, adaptive
+	BudgetTokens     int    `json:"budget_tokens,omitempty"` // explicit token budget
+	Effort           string `json:"effort,omitempty"`        // none, minimal, low, medium, high, xhigh, max
+	Level            string `json:"level,omitempty"`         // Gemini thinkingLevel
+	IncludeThoughts  *bool  `json:"include_thoughts,omitempty"`
+	DynamicBudget    bool   `json:"dynamic_budget,omitempty"`
+	Display          string `json:"display,omitempty"`
+	EncryptedContent string `json:"encrypted_content,omitempty"`
+	Subtype          string `json:"subtype,omitempty"`
+}
+
 // IRRequest is the canonical request in the IR.
 type IRRequest struct {
-	ID              string                            `json:"id,omitempty"`
-	Model           string                            `json:"model"`
-	Stream          bool                              `json:"stream,omitempty"`
-	User            string                            `json:"user,omitempty"`
-	System          string                            `json:"system,omitempty"`
-	Instructions    string                            `json:"instructions,omitempty"`
-	Messages        []IRMessage                       `json:"messages,omitempty"`
-	Tools           []IRToolDecl                      `json:"tools,omitempty"`
-	ToolChoice      *IRToolChoice                     `json:"tool_choice,omitempty"`
-	ResponseFormat  *IRResponseFormat                 `json:"response_format,omitempty"`
-	ReasoningEffort string                            `json:"reasoning_effort,omitempty"`
-	MaxTokens       int                               `json:"max_tokens,omitempty"`
-	Temperature     *float64                          `json:"temperature,omitempty"`
-	TopP            *float64                          `json:"top_p,omitempty"`
-	Stop            []string                          `json:"stop,omitempty"`
-	Seed            *int                              `json:"seed,omitempty"`
-	Extensions      map[string]map[string]interface{} `json:"-"` // per-protocol, not serialized
+	ID                string                            `json:"id,omitempty"`
+	Model             string                            `json:"model"`
+	Stream            bool                              `json:"stream,omitempty"`
+	User              string                            `json:"user,omitempty"`
+	System            string                            `json:"system,omitempty"`
+	SystemParts       []IRSystemPart                    `json:"system_parts,omitempty"`
+	Instructions      string                            `json:"instructions,omitempty"`
+	Messages          []IRMessage                       `json:"messages,omitempty"`
+	Tools             []IRToolDecl                      `json:"tools,omitempty"`
+	ToolChoice        *IRToolChoice                     `json:"tool_choice,omitempty"`
+	ResponseFormat    *IRResponseFormat                 `json:"response_format,omitempty"`
+	ReasoningEffort   string                            `json:"reasoning_effort,omitempty"`
+	Thinking          *IRThinkingConfig                 `json:"thinking,omitempty"`
+	MaxTokens         int                               `json:"max_tokens,omitempty"`
+	Temperature       *float64                          `json:"temperature,omitempty"`
+	TopP              *float64                          `json:"top_p,omitempty"`
+	TopK              *int                              `json:"top_k,omitempty"`
+	FrequencyPenalty  *float64                          `json:"frequency_penalty,omitempty"`
+	PresencePenalty   *float64                          `json:"presence_penalty,omitempty"`
+	Stop              []string                          `json:"stop,omitempty"`
+	Seed              *int                              `json:"seed,omitempty"`
+	ParallelToolCalls *bool                             `json:"parallel_tool_calls,omitempty"`
+	StreamOptions     map[string]interface{}            `json:"stream_options,omitempty"`
+	Metadata          map[string]interface{}            `json:"metadata,omitempty"`
+	Store             *bool                             `json:"store,omitempty"`
+	Include           []string                          `json:"include,omitempty"`
+	CacheControl      map[string]interface{}            `json:"cache_control,omitempty"`
+	Extensions        map[string]map[string]interface{} `json:"-"` // per-protocol, not serialized
 }
 
 // IRResponse is the canonical response in the IR.
