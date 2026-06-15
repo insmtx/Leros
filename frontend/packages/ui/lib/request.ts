@@ -2,9 +2,12 @@ class HttpClient {
 	private baseURL: string;
 	private defaultHeaders: Record<string, string>;
 	private interceptors: {
-		request: Array<(config: RequestInit) => RequestInit>;
+		request: Array<(config: RequestInit) => RequestInit | Promise<RequestInit>>;
 		response: Array<
-			(response: globalThis.Response) => globalThis.Response | Promise<globalThis.Response>
+			(
+				response: globalThis.Response,
+				context: { url: string; config: RequestInit },
+			) => globalThis.Response | Promise<globalThis.Response>
 		>;
 	};
 
@@ -20,7 +23,9 @@ class HttpClient {
 		};
 	}
 
-	useRequestInterceptor(interceptor: (config: RequestInit) => RequestInit): () => void {
+	useRequestInterceptor(
+		interceptor: (config: RequestInit) => RequestInit | Promise<RequestInit>,
+	): () => void {
 		this.interceptors.request.push(interceptor);
 		return () => {
 			const index = this.interceptors.request.indexOf(interceptor);
@@ -31,6 +36,7 @@ class HttpClient {
 	useResponseInterceptor(
 		interceptor: (
 			response: globalThis.Response,
+			context: { url: string; config: RequestInit },
 		) => globalThis.Response | Promise<globalThis.Response>,
 	): () => void {
 		this.interceptors.response.push(interceptor);
@@ -40,7 +46,10 @@ class HttpClient {
 		};
 	}
 
-	private buildURL(url: string, params?: Record<string, string | number | boolean | string[]>): string {
+	private buildURL(
+		url: string,
+		params?: Record<string, string | number | boolean | string[]>,
+	): string {
 		const fullURL = this.baseURL ? `${this.baseURL}${url}` : url;
 		if (!params) return fullURL;
 
@@ -48,7 +57,9 @@ class HttpClient {
 		Object.keys(params).forEach((key) => {
 			const value = params[key];
 			if (Array.isArray(value)) {
-				value.forEach((v) => urlObj.searchParams.append(key, v));
+				value.forEach((v) => {
+					urlObj.searchParams.append(key, v);
+				});
 			} else {
 				urlObj.searchParams.append(key, String(value));
 			}
@@ -94,7 +105,7 @@ class HttpClient {
 		};
 
 		for (const interceptor of this.interceptors.request) {
-			config = interceptor(config);
+			config = await interceptor(config);
 		}
 
 		const fullURL = this.buildURL(url, params);
@@ -107,7 +118,7 @@ class HttpClient {
 				let response = await this.requestWithTimeout(fullURL, config, timeout);
 
 				for (const interceptor of this.interceptors.response) {
-					response = await interceptor(response);
+					response = await interceptor(response, { url: fullURL, config });
 				}
 
 				if (!response.ok) {

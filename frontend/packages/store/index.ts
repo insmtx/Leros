@@ -87,4 +87,5 @@ export {
 	mergeProjectArtifacts,
 	messageArtifactToProjectArtifact,
 } from "./utils/artifacts";
+export { AUTH_SESSION_EXPIRED_EVENT, getValidJwtToken } from "./utils/authStorage";
 export { formatDate, formatFileSize, formatTime, formatTokenCount } from "./utils/format";
