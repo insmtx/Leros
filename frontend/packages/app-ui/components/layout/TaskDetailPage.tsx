@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MessageTimeline } from "../chat/MessageTimeline";
+import { SHOW_TASK_TOKEN_USAGE_CARD } from "../../constants/temporaryUiFlags";
 import { ChatInput } from "../input/ChatInput";
 import { ArtifactPreviewDialog } from "./ArtifactPreviewDialog";
 import type { AppNavigation } from "./LeftRail";
@@ -88,13 +89,17 @@ export function TaskDetailPage({
 	);
 
 	const tokenSummary = useMemo(() => {
-		// 任务详情右侧成本卡统一按当前会话内 assistant 消息聚合，刷新后可直接从历史消息恢复。
-		const initialSummary = {
+		const emptySummary = {
 			inputTokens: 0,
 			outputTokens: 0,
 			totalTokens: 0,
 			messageCount: 0,
 		};
+		if (!SHOW_TASK_TOKEN_USAGE_CARD) {
+			return emptySummary;
+		}
+		// 任务详情右侧成本卡统一按当前会话内 assistant 消息聚合，刷新后可直接从历史消息恢复。
+		const initialSummary = emptySummary;
 
 		return messageIds.reduce((summary, id) => {
 			const message = messagesMap[id];
@@ -296,14 +301,16 @@ export function TaskDetailPage({
 
 				<aside className="flex w-[352px] shrink-0 flex-col border-l border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-5 py-6">
 					<div className="min-h-0 flex-1 space-y-8 overflow-y-auto pr-1">
-						<section>
-							<TaskTokenUsageCard
-								totalTokens={tokenSummary.totalTokens}
-								inputTokens={tokenSummary.inputTokens}
-								outputTokens={tokenSummary.outputTokens}
-								messageCount={tokenSummary.messageCount}
-							/>
-						</section>
+						{SHOW_TASK_TOKEN_USAGE_CARD && (
+							<section>
+								<TaskTokenUsageCard
+									totalTokens={tokenSummary.totalTokens}
+									inputTokens={tokenSummary.inputTokens}
+									outputTokens={tokenSummary.outputTokens}
+									messageCount={tokenSummary.messageCount}
+								/>
+							</section>
+						)}
 						{task?.description && (
 							<section>
 								<h3 className="mb-3 text-xs font-semibold text-[var(--leros-text-muted)]">

@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { MarkdownRenderer } from "../common/MarkdownRenderer";
+import { SHOW_ASSISTANT_MESSAGE_METRICS } from "../../constants/temporaryUiFlags";
 import { ArtifactPreviewDialog } from "../layout/ArtifactPreviewDialog";
 import { ToolCallBlock } from "./ToolCallBlock";
 
@@ -63,7 +64,9 @@ export function AIMessageBubble({
 	const hasThinking = (message.thinking ?? "").trim().length > 0;
 	const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
 	const hasArtifacts = message.artifacts && message.artifacts.length > 0;
-	const metricSegments = getAssistantMessageFooterSegments(message);
+	const metricSegments = SHOW_ASSISTANT_MESSAGE_METRICS
+		? getAssistantMessageFooterSegments(message)
+		: [];
 
 	return (
 		<div data-slot="ai-message" className="group flex items-start gap-3">
