@@ -241,6 +241,8 @@ export type BackendSessionEventPayload = {
 	output_tokens?: number;
 	total_tokens?: number;
 	model?: string;
+	started_at?: string;
+	completed_at?: string;
 };
 
 export type BackendSessionEventPayloadLike = BackendSessionEventPayload | BackendRuntimeTodoItem[];

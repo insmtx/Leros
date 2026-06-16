@@ -307,6 +307,60 @@ func TestHandleSessionCompletedMessageUsesFailedRunCompletedPayload(t *testing.T
 	}
 }
 
+func TestMessageMetadataFromRunCompletedEnrichesDisplayFields(t *testing.T) {
+	startedAt := time.Date(2026, 3, 16, 10, 0, 0, 0, time.UTC)
+	completedAt := startedAt.Add(1500 * time.Millisecond)
+
+	metadata := messageMetadataFromRunCompleted(&events.RunCompletedPayload{
+		Metadata: map[string]any{
+			"model_name":         "gpt-4o",
+			"run_started_at_ms":  startedAt.UnixMilli(),
+			"runtime":            "external_cli",
+		},
+		Usage: &events.UsagePayload{
+			InputTokens:  100,
+			OutputTokens: 20,
+			TotalTokens:  120,
+		},
+		StartedAt:   startedAt,
+		CompletedAt: completedAt,
+	})
+	if metadata == nil || metadata.Extra == nil {
+		t.Fatal("expected metadata extra to be populated")
+	}
+	if metadata.Extra["model"] != "gpt-4o" {
+		t.Fatalf("expected model gpt-4o, got %#v", metadata.Extra["model"])
+	}
+	if metadata.Extra["tokens"] != 120 {
+		t.Fatalf("expected tokens 120, got %#v", metadata.Extra["tokens"])
+	}
+	if metadata.Extra["latency"] != int64(1500) {
+		t.Fatalf("expected latency 1500, got %#v", metadata.Extra["latency"])
+	}
+}
+
+func TestMessageMetadataFromRunCompletedWithoutRuntimeMetadata(t *testing.T) {
+	startedAt := time.Date(2026, 3, 16, 10, 0, 0, 0, time.UTC)
+	completedAt := startedAt.Add(800 * time.Millisecond)
+
+	metadata := messageMetadataFromRunCompleted(&events.RunCompletedPayload{
+		Usage: &events.UsagePayload{
+			TotalTokens: 42,
+		},
+		StartedAt:   startedAt,
+		CompletedAt: completedAt,
+	})
+	if metadata == nil || metadata.Extra == nil {
+		t.Fatal("expected metadata extra to be populated from usage and timing")
+	}
+	if metadata.Extra["tokens"] != 42 {
+		t.Fatalf("expected tokens 42, got %#v", metadata.Extra["tokens"])
+	}
+	if metadata.Extra["latency"] != int64(800) {
+		t.Fatalf("expected latency 800, got %#v", metadata.Extra["latency"])
+	}
+}
+
 type recordingSessionService struct {
 	completeReq *contract.CompleteSessionMessageRequest
 	failedReq   *contract.FailedSessionMessageRequest

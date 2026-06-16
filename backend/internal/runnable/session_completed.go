@@ -258,36 +258,102 @@ func messageMetadataFromRunCompleted(completed *events.RunCompletedPayload) *typ
 	if completed == nil {
 		return nil
 	}
-	src := completed.Metadata
-	if src == nil {
-		return nil
-	}
-
-	data, err := json.Marshal(src)
-	if err != nil {
-		return nil
-	}
 
 	msgMetadata := &types.ObjectMetadata{}
-	if err := json.Unmarshal(data, msgMetadata); err != nil {
-		return nil
-	}
+	extra := map[string]any{}
 
-	var flat map[string]any
-	if err := json.Unmarshal(data, &flat); err != nil {
-		return nil
-	}
-
-	knownKeys := map[string]bool{"tags": true, "type": true, "bucket": true, "key": true}
-	extra := make(map[string]any, len(flat))
-	for k, v := range flat {
-		if knownKeys[k] {
-			continue
+	if completed.Metadata != nil {
+		data, err := json.Marshal(completed.Metadata)
+		if err != nil {
+			return nil
 		}
-		extra[k] = v
+		if err := json.Unmarshal(data, msgMetadata); err != nil {
+			return nil
+		}
+
+		var flat map[string]any
+		if err := json.Unmarshal(data, &flat); err != nil {
+			return nil
+		}
+
+		knownKeys := map[string]bool{"tags": true, "type": true, "bucket": true, "key": true}
+		for k, v := range flat {
+			if knownKeys[k] {
+				continue
+			}
+			extra[k] = v
+		}
 	}
+
+	// 写入前端消息 footer 使用的标准展示字段（model / tokens / latency）。
+	enrichMessageDisplayMetadata(extra, completed)
 	if len(extra) > 0 {
 		msgMetadata.Extra = extra
 	}
+
+	if isEmptyObjectMetadata(msgMetadata) {
+		return nil
+	}
 	return msgMetadata
+}
+
+// enrichMessageDisplayMetadata 将单次 run 的模型、token 与耗时写入 metadata.extra，供前端按消息展示。
+func enrichMessageDisplayMetadata(extra map[string]any, completed *events.RunCompletedPayload) {
+	if extra == nil || completed == nil {
+		return
+	}
+	if model := messageDisplayModel(extra, completed.Metadata); model != "" {
+		extra["model"] = model
+	}
+	if completed.Usage != nil && completed.Usage.TotalTokens > 0 {
+		extra["tokens"] = completed.Usage.TotalTokens
+	}
+	if latencyMS := runCompletedLatencyMS(completed); latencyMS > 0 {
+		extra["latency"] = latencyMS
+	}
+}
+
+func messageDisplayModel(extra map[string]any, src map[string]any) string {
+	if model := metadataStringValue(extra["model"]); model != "" {
+		return model
+	}
+	if model := metadataStringValue(extra["model_name"]); model != "" {
+		return model
+	}
+	if src == nil {
+		return ""
+	}
+	if model := metadataStringValue(src["model"]); model != "" {
+		return model
+	}
+	return metadataStringValue(src["model_name"])
+}
+
+func runCompletedLatencyMS(completed *events.RunCompletedPayload) int64 {
+	if completed == nil || completed.StartedAt.IsZero() || completed.CompletedAt.IsZero() {
+		return 0
+	}
+	if completed.CompletedAt.Before(completed.StartedAt) {
+		return 0
+	}
+	return completed.CompletedAt.Sub(completed.StartedAt).Milliseconds()
+}
+
+func metadataStringValue(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	default:
+		return ""
+	}
+}
+
+func isEmptyObjectMetadata(metadata *types.ObjectMetadata) bool {
+	if metadata == nil {
+		return true
+	}
+	if len(metadata.Tags) > 0 || metadata.Type != "" || metadata.Bucket != "" || metadata.Key != "" {
+		return false
+	}
+	return len(metadata.Extra) == 0
 }

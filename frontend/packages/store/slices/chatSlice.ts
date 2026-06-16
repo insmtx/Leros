@@ -34,6 +34,11 @@ import type {
 import { flattenActions } from "../utils";
 import { getValidJwtToken } from "../utils/authStorage";
 import { formatFileSize } from "../utils/format";
+import {
+	buildMessageMetadata,
+	enrichAssistantMessageMetrics,
+	latencyFromRunCompletedTimes,
+} from "../utils/messageMetrics";
 
 export type ChatState = {
 	messagesMap: Record<string, Message>;
@@ -102,7 +107,7 @@ function mapBackendMessage(msg: BackendMessage): Message {
 			mapped = { ...mapped, artifacts: mergeArtifacts(mapped.artifacts, artifacts) };
 		}
 	}
-	return mapped;
+	return enrichAssistantMessageMetrics(mapped);
 }
 
 function mapToolCalls(tcList?: BackendToolCall[]): ToolCall[] | undefined {
@@ -124,13 +129,9 @@ function mapMetadata(metadata?: {
 	model?: string;
 	tokens?: number;
 	latency?: number;
+	extra?: Record<string, unknown>;
 }): MessageMetadata | undefined {
-	if (!metadata) return undefined;
-	return {
-		model: metadata.model,
-		tokens: metadata.tokens,
-		latency: metadata.latency,
-	};
+	return buildMessageMetadata(metadata);
 }
 
 function mapUsage(usage?: {
@@ -236,15 +237,16 @@ function getRunResultMessage(payload: BackendSessionEventPayload): string | unde
 }
 
 function metadataFromPayload(payload: BackendSessionEventPayload): MessageMetadata | undefined {
-	const metadata = mapMetadata(payload.metadata);
-	const tokens = metadata?.tokens ?? payload.usage?.total_tokens ?? payload.total_tokens;
-	const model = metadata?.model ?? payload.model;
-	if (!tokens && !model && !metadata?.latency) return metadata;
-	return {
-		...metadata,
-		model,
-		tokens,
-	};
+	const usage = mapUsage(payload.usage ?? payload);
+	const streamLatency = latencyFromRunCompletedTimes(payload.started_at, payload.completed_at);
+	return buildMessageMetadata(
+		{
+			...payload.metadata,
+			model: payload.metadata?.model ?? payload.model,
+			latency: payload.metadata?.latency ?? streamLatency,
+		},
+		usage,
+	);
 }
 
 function mergeToolCalls(current: ToolCall[] | undefined, updates: ToolCall[]): ToolCall[] {
@@ -584,7 +586,7 @@ function applySessionEventToMessage(
 			const artifacts = payload.artifacts
 				?.map(mapArtifactPayload)
 				.filter((artifact): artifact is MessageArtifact => artifact !== undefined);
-			return {
+			return enrichAssistantMessageMetrics({
 				...message,
 				content:
 					options.appendContent && !message.content && resultMessage
@@ -595,7 +597,7 @@ function applySessionEventToMessage(
 					: message.artifacts,
 				metadata: metadata ? { ...message.metadata, ...metadata } : message.metadata,
 				usage: usage ?? message.usage,
-			};
+			});
 		}
 		default:
 			return message;

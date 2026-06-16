@@ -2,6 +2,7 @@
 
 import {
 	formatTime,
+	getAssistantMessageMetrics,
 	mapBackendArtifactToProjectArtifact,
 	mergeProjectArtifacts,
 	messageArtifactToProjectArtifact,
@@ -62,6 +63,12 @@ export function AIMessageBubble({
 	const hasThinking = (message.thinking ?? "").trim().length > 0;
 	const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
 	const hasArtifacts = message.artifacts && message.artifacts.length > 0;
+	const metrics = getAssistantMessageMetrics(message);
+	const metricSegments = [
+		metrics?.model,
+		metrics?.tokens !== undefined ? `${metrics.tokens} tokens` : undefined,
+		metrics?.latency !== undefined ? `${metrics.latency}ms` : undefined,
+	].filter((segment): segment is string => Boolean(segment));
 
 	return (
 		<div data-slot="ai-message" className="group flex items-start gap-3">
@@ -119,14 +126,8 @@ export function AIMessageBubble({
 
 				{!isStreaming && (
 					<div className="mt-2 flex items-center gap-3">
-						{message.metadata && (
-							<div className="flex items-center gap-1.5 text-xs text-slate-400">
-								<span>{message.metadata.model}</span>
-								<span>·</span>
-								<span>{message.metadata.tokens} tokens</span>
-								<span>·</span>
-								<span>{message.metadata.latency}ms</span>
-							</div>
+						{metricSegments.length > 0 && (
+							<div className="text-xs text-slate-400">{metricSegments.join(" · ")}</div>
 						)}
 						<div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
 							<CopyButton text={content} />
