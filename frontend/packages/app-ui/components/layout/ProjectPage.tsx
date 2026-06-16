@@ -12,20 +12,14 @@ import { artifactApi } from "@leros/store/api/artifactApi";
 import { cn } from "@leros/ui/lib/utils";
 import {
 	Bot,
-	Calendar,
-	CheckCircle2,
 	ChevronsLeftRightEllipsis,
-	Circle,
 	Download,
 	Eye,
-	FileImage,
 	FileText,
 	LayoutPanelLeft,
 	LoaderCircle,
 	Search,
 	Settings,
-	Table2,
-	Tag,
 	Trash2,
 	X,
 } from "lucide-react";
@@ -35,6 +29,11 @@ import { MessageTimeline } from "../chat/MessageTimeline";
 import { ChatInput, PROJECT_ATTACHMENT_ACCEPT } from "../input/ChatInput";
 import { ArtifactPreviewDialog } from "./ArtifactPreviewDialog";
 import type { AppNavigation } from "./LeftRail";
+import {
+	ProjectFileTypeIcon,
+	SIDEBAR_COMPACT_LIST_CLASS,
+	TaskCardIcon,
+} from "./project-file-type-icon";
 import {
 	collectSelectableFiles,
 	normalizeProjectFileTree,
@@ -390,7 +389,7 @@ export function ProjectPage({
 							<section>
 								<div className="mx-auto mb-4 flex w-full max-w-[250px] items-center justify-between">
 									<h2 className="text-xs font-semibold text-[var(--leros-text-muted)]">产物</h2>
-									<span className="rounded-md bg-[var(--leros-chat-control-bg)] px-2 py-0.5 text-xs font-semibold text-[var(--leros-text)]">
+									<span className="rounded-md bg-[var(--leros-primary-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--leros-primary)]">
 										{taskArtifacts.length} 个
 									</span>
 								</div>
@@ -439,26 +438,13 @@ function ProjectTasks({
 	tasks: ProjectTask[];
 	onOpenTask?: (task: ProjectTask) => void;
 }) {
-	const { updateTask } = useLayoutStore((s) => s);
 	const [deleteTarget, setDeleteTarget] = useState<ProjectTask | null>(null);
-
-	const handleStatusToggle = async (task: ProjectTask) => {
-		await updateTask({
-			public_id: task.id,
-			status: NEXT_STATUS[task.status] ?? "todo",
-		});
-	};
 
 	return (
 		<div className="mx-auto w-full max-w-[720px]">
 			<h2 className="text-lg font-semibold text-[var(--leros-text-strong)]">任务</h2>
 			<div className="mt-4">
-				<ProjectTaskList
-					tasks={tasks}
-					onStatusToggle={handleStatusToggle}
-					onDelete={setDeleteTarget}
-					onOpen={onOpenTask}
-				/>
+				<ProjectTaskList tasks={tasks} onDelete={setDeleteTarget} onOpen={onOpenTask} />
 			</div>
 			{deleteTarget && (
 				<TaskDeleteDialog
@@ -473,28 +459,14 @@ function ProjectTasks({
 	);
 }
 
-const NEXT_STATUS: Record<string, string> = {
-	todo: "in_progress",
-	in_progress: "done",
-	done: "todo",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-	todo: "待办",
-	in_progress: "进行中",
-	done: "已完成",
-};
-
 function ProjectTaskList({
 	tasks,
 	compact = false,
-	onStatusToggle,
 	onDelete,
 	onOpen,
 }: {
 	tasks: ProjectTask[];
 	compact?: boolean;
-	onStatusToggle?: (task: ProjectTask) => void;
 	onDelete?: (task: ProjectTask) => void;
 	onOpen?: (task: ProjectTask) => void;
 }) {
@@ -507,79 +479,54 @@ function ProjectTaskList({
 	}
 
 	return (
-		<div className={cn("w-full", compact ? "mx-auto max-w-[250px] space-y-3" : "space-y-3")}>
-			{tasks.map((task) => (
-				<div
-					key={task.id}
-					className={cn(
-						"group flex items-start border border-[var(--leros-control-border)] bg-[var(--leros-surface)] shadow-sm",
-						onOpen &&
-							"cursor-pointer transition-colors hover:border-[var(--leros-primary-soft)] hover:bg-[var(--leros-primary-softer)]/35",
-						compact ? "gap-3 rounded-lg px-3.5 py-3" : "gap-3.5 rounded-lg px-4 py-3.5",
-					)}
-				>
-					<button
-						type="button"
-						className="mt-0.5 shrink-0 cursor-pointer"
-						onClick={(event) => {
-							event.stopPropagation();
-							onStatusToggle?.(task);
-						}}
-						title={`切换状态（当前：${STATUS_LABEL[task.status] ?? task.status}）`}
-					>
-						{task.status === "done" ? (
-							<CheckCircle2 className="size-4 text-[var(--leros-primary)]" />
-						) : task.status === "in_progress" ? (
-							<LoaderCircle className="size-4 text-[var(--leros-warning)]" />
-						) : (
-							<Circle className="size-4 text-[var(--leros-text-muted)]" />
+		<div className={cn("w-full", compact && "mx-auto max-w-[250px]")}>
+			<div className={cn(compact ? SIDEBAR_COMPACT_LIST_CLASS : "space-y-3")}>
+				{tasks.map((task) => (
+					<div
+						key={task.id}
+						className={cn(
+							"group flex items-start border border-[var(--leros-control-border)] bg-[var(--leros-surface)] shadow-sm",
+							onOpen &&
+								"cursor-pointer transition-colors hover:border-[var(--leros-primary-soft)] hover:bg-[var(--leros-primary-softer)]/35",
+							compact ? "gap-3 rounded-lg px-3.5 py-3" : "gap-3.5 rounded-lg px-4 py-3.5",
 						)}
-					</button>
-					<button
-						type="button"
-						className="min-w-0 flex-1 text-left"
-						onClick={() => onOpen?.(task)}
-						disabled={!onOpen}
-						title={onOpen ? "打开任务会话" : undefined}
 					>
-						<div className="truncate text-sm font-semibold leading-5 text-[var(--leros-text-strong)]">
-							{task.title}
+						<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--leros-primary-softer)] text-[var(--leros-primary)]">
+							{/* 主列表和右侧列表统一使用固定任务图标，避免状态图标和语义图标混用。 */}
+							<TaskCardIcon className="size-5" />
 						</div>
-						<div className="mt-1 truncate text-xs leading-4 text-[var(--leros-text-muted)]">
-							{task.meta}
-						</div>
-						{!compact && (task.taskType || task.deadline) && (
-							<div className="mt-2 flex flex-wrap items-center gap-2">
-								{task.taskType && (
-									<span className="inline-flex items-center gap-1 rounded-md bg-[var(--leros-primary-softer)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--leros-primary)]">
-										<Tag className="size-3" />
-										{task.taskType}
-									</span>
-								)}
-								{task.deadline && (
-									<span className="inline-flex items-center gap-1 rounded-md bg-[var(--leros-chat-control-bg)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--leros-text-muted)]">
-										<Calendar className="size-3" />
-										{task.deadline}
-									</span>
-								)}
-							</div>
-						)}
-					</button>
-					{!compact && onDelete && (
 						<button
 							type="button"
-							className="mt-0.5 shrink-0 rounded p-0.5 text-[var(--leros-text-muted)] opacity-0 transition-opacity hover:bg-[var(--leros-danger-softer)] hover:text-[var(--leros-danger)] group-hover:opacity-100"
-							onClick={(event) => {
-								event.stopPropagation();
-								onDelete(task);
-							}}
-							title="删除任务"
+							className="min-w-0 flex-1 text-left"
+							onClick={() => onOpen?.(task)}
+							disabled={!onOpen}
+							title={onOpen ? "打开任务会话" : undefined}
 						>
-							<Trash2 className="size-4" />
+							<div
+								className={cn(
+									"text-sm font-normal leading-5 text-[var(--leros-text-strong)]",
+									"line-clamp-2",
+								)}
+							>
+								{task.title}
+							</div>
 						</button>
-					)}
-				</div>
-			))}
+						{!compact && onDelete && (
+							<button
+								type="button"
+								className="mt-0.5 shrink-0 rounded p-0.5 text-[var(--leros-text-muted)] opacity-0 transition-opacity hover:bg-[var(--leros-danger-softer)] hover:text-[var(--leros-danger)] group-hover:opacity-100"
+								onClick={(event) => {
+									event.stopPropagation();
+									onDelete(task);
+								}}
+								title="删除任务"
+							>
+								<Trash2 className="size-4" />
+							</button>
+						)}
+					</div>
+				))}
+			</div>
 		</div>
 	);
 }
@@ -630,7 +577,10 @@ function ProjectFiles({
 
 		async function loadPreview() {
 			if (!currentFile.publicId) {
-				setPreviewState({ status: "error", message: "文件缺少 public_id，无法预览" });
+				setPreviewState({
+					status: "error",
+					message: "文件缺少 public_id，无法预览",
+				});
 				return;
 			}
 
@@ -837,7 +787,7 @@ function ProjectFiles({
 										title="查看"
 									>
 										<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--leros-primary-softer)] text-[var(--leros-primary)]">
-											<ProjectFileIcon file={file} />
+											<ProjectFileTypeIcon fileName={file.name} />
 										</div>
 										<div className="min-w-0">
 											<p className="truncate text-sm font-semibold text-[var(--leros-text-strong)]">
@@ -933,31 +883,6 @@ function ProjectFiles({
 			)}
 		</div>
 	);
-}
-
-function ProjectFileIcon({ file }: { file: ProjectFileNode }) {
-	const lowerPath = file.name.toLowerCase();
-	let iconSrc = "/assets/icons/file-text.svg";
-
-	if (lowerPath.endsWith(".jpg")) {
-		iconSrc = "/assets/icons/file-picture-jpg.svg";
-	} else if (lowerPath.endsWith(".jpeg")) {
-		iconSrc = "/assets/icons/file-picture-jpeg.svg";
-	} else if (lowerPath.endsWith(".png")) {
-		iconSrc = "/assets/icons/file-picture-png.svg";
-	} else if (lowerPath.endsWith(".pdf")) {
-		iconSrc = "/assets/icons/file-pdf.svg";
-	} else if (lowerPath.endsWith(".json")) {
-		iconSrc = "/assets/icons/file-text.svg";
-	} else if (
-		lowerPath.endsWith(".csv") ||
-		lowerPath.endsWith(".xlsx") ||
-		lowerPath.endsWith(".xls")
-	) {
-		iconSrc = "/assets/icons/file-text.svg";
-	}
-
-	return <img src={iconSrc} alt="" className="size-6 object-contain" aria-hidden="true" />;
 }
 
 function ProjectFilePreviewBody({
@@ -1121,38 +1046,40 @@ function ProjectArtifactList({
 
 	return (
 		<>
-			<div className={cn("w-full", compact ? "mx-auto max-w-[250px] space-y-3" : "space-y-3")}>
-				{artifacts.map((artifact) => (
-					<button
-						type="button"
-						key={artifact.id}
-						onClick={() => setPreviewArtifact(artifact)}
-						className={cn(
-							"group relative flex w-full cursor-pointer items-center overflow-hidden border border-[var(--leros-control-border)] bg-[var(--leros-surface)] text-left shadow-sm transition-colors hover:border-[var(--leros-primary-soft)] hover:bg-[var(--leros-primary-softer)]/35",
-							compact ? "gap-3 rounded-lg px-3.5 py-3" : "gap-3.5 rounded-lg px-4 py-3.5",
-						)}
-						title="预览产物"
-					>
-						{/* hover 时补一个轻量蒙层，明确提示当前整卡可点击预览 */}
-						<div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[rgba(15,23,42,0.16)] opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-							<span className="rounded-full bg-[rgba(15,23,42,0.72)] px-3 py-1 text-xs font-medium tracking-[0.02em] text-white shadow-sm">
-								点击预览
-							</span>
-						</div>
-						<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--leros-primary-softer)] text-[var(--leros-text)]">
-							<ArtifactIcon type={artifact.type} />
-						</div>
-						<div className="min-w-0">
-							<div className="truncate text-sm font-semibold leading-5 text-[var(--leros-text-strong)]">
-								{artifact.name}
+			<div className={cn("w-full", compact && "mx-auto max-w-[250px]")}>
+				<div className={cn(compact ? SIDEBAR_COMPACT_LIST_CLASS : "space-y-3")}>
+					{artifacts.map((artifact) => (
+						<button
+							type="button"
+							key={artifact.id}
+							onClick={() => setPreviewArtifact(artifact)}
+							className={cn(
+								"group relative flex w-full cursor-pointer items-center overflow-hidden border border-[var(--leros-control-border)] bg-[var(--leros-surface)] text-left shadow-sm transition-colors hover:border-[var(--leros-primary-soft)] hover:bg-[var(--leros-primary-softer)]/35",
+								compact ? "gap-3 rounded-lg px-3.5 py-3" : "gap-3.5 rounded-lg px-4 py-3.5",
+							)}
+							title="预览产物"
+						>
+							{/* hover 时补一个轻量蒙层，明确提示当前整卡可点击预览 */}
+							<div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[rgba(15,23,42,0.16)] opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+								<span className="rounded-full bg-[rgba(15,23,42,0.72)] px-3 py-1 text-xs font-medium tracking-[0.02em] text-white shadow-sm">
+									点击预览
+								</span>
 							</div>
-							<div className="mt-1 truncate text-xs leading-4 text-[var(--leros-text-muted)]">
-								{artifact.size}
-								{artifact.updatedAt ? ` · ${artifact.updatedAt}` : ""}
+							<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--leros-primary-softer)]">
+								<ProjectFileTypeIcon fileName={artifact.name} />
 							</div>
-						</div>
-					</button>
-				))}
+							<div className="min-w-0">
+								<div className="truncate text-sm font-normal leading-5 text-[var(--leros-text-strong)]">
+									{artifact.name}
+								</div>
+								<div className="mt-1 truncate text-xs leading-4 text-[var(--leros-text-muted)]">
+									{artifact.size}
+									{artifact.updatedAt ? ` · ${artifact.updatedAt}` : ""}
+								</div>
+							</div>
+						</button>
+					))}
+				</div>
 			</div>
 			<ArtifactPreviewDialog
 				artifact={previewArtifact}
@@ -1163,17 +1090,4 @@ function ProjectArtifactList({
 			/>
 		</>
 	);
-}
-
-function ArtifactIcon({ type }: { type: ProjectArtifact["type"] }) {
-	const className = "size-4";
-
-	switch (type) {
-		case "spreadsheet":
-			return <Table2 className={className} />;
-		case "image":
-			return <FileImage className={className} />;
-		default:
-			return <FileText className={className} />;
-	}
 }
