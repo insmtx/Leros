@@ -17,6 +17,8 @@ func RegisterSkillMarketplaceRoutes(r gin.IRouter, service contract.SkillMarketp
 	r.GET("/skill-marketplace/search", searchSkillMarketplace(service))
 	r.GET("/skill-marketplace/skills/:skill_id/download", downloadBuiltinSkill(service))
 	r.POST("/skill-marketplace/install", installSkill(service))
+	r.POST("/skill-marketplace/installed", installedSkills(service))
+	r.POST("/skill-marketplace/uninstall", uninstallSkill(service))
 }
 
 func downloadBuiltinSkill(service contract.SkillMarketplaceService) gin.HandlerFunc {
@@ -83,6 +85,53 @@ func installSkill(service contract.SkillMarketplaceService) gin.HandlerFunc {
 		}
 
 		result, err := service.InstallSkill(ctx, &req)
+		if err != nil {
+			if err.Error() == "user not authenticated or org not set" {
+				ctx.JSON(http.StatusUnauthorized, dto.Error(dto.CodeInternalError, err.Error()))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, dto.Success(result))
+	}
+}
+
+func installedSkills(service contract.SkillMarketplaceService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var req contract.InstalledSkillsRequest
+		// Empty body is acceptable; silently ignore bind errors.
+		_ = ctx.ShouldBindJSON(&req)
+
+		result, err := service.InstalledSkills(ctx, &req)
+		if err != nil {
+			if err.Error() == "user not authenticated or org not set" {
+				ctx.JSON(http.StatusUnauthorized, dto.Error(dto.CodeInternalError, err.Error()))
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, dto.Success(result))
+	}
+}
+
+func uninstallSkill(service contract.SkillMarketplaceService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var req contract.UninstallSkillRequest
+		if err := ctx.ShouldBindJSON(&req); err != nil {
+			ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, err.Error()))
+			return
+		}
+
+		if strings.TrimSpace(req.Name) == "" {
+			ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, "name is required"))
+			return
+		}
+
+		result, err := service.UninstallSkill(ctx, &req)
 		if err != nil {
 			if err.Error() == "user not authenticated or org not set" {
 				ctx.JSON(http.StatusUnauthorized, dto.Error(dto.CodeInternalError, err.Error()))

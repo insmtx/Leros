@@ -36,6 +36,47 @@ export interface InstallSkillResponse {
   message: string;
 }
 
+/** 后端返回的已安装 skill（worker 侧查询结果）。 */
+export interface SkillInstalledItem {
+  name: string;
+  description: string;
+  category: string;
+  source: string;
+  trust: string;
+}
+
+export interface InstalledSkillsResponse {
+  skills: SkillInstalledItem[];
+}
+
+export interface UninstallSkillParams {
+  name: string;
+}
+
+export interface UninstallSkillResponse {
+  status: string;
+  message: string;
+}
+
+/**
+ * 将后端 SkillInstalledItem 映射为兼容 SkillCard 组件的 SkillMarketplaceItem。
+ * 用 name 作为 skill_id（卸载接口使用 name 作为标识符）。
+ */
+export function installedToCardItem(item: SkillInstalledItem): SkillMarketplaceItem {
+  return {
+    source_type: item.source,
+    skill_id: item.name,
+    name: item.name,
+    description: item.description,
+    version: "",
+    author: item.source,
+    category: item.category,
+    tags: item.trust ? [item.trust] : [],
+    icon: "",
+    installs: 0,
+  };
+}
+
 function cleanParams(
   params: SearchSkillMarketplaceParams,
 ): Record<string, string | number | boolean | string[]> {
@@ -57,6 +98,18 @@ export const skillMarketplaceApi = {
   install: (params: InstallSkillParams) =>
     apiClient.post<BackendDataResponse<InstallSkillResponse>>(
       "/skill-marketplace/install",
+      params,
+    ),
+
+  installed: () =>
+    apiClient.post<BackendDataResponse<InstalledSkillsResponse>>(
+      "/skill-marketplace/installed",
+      {},
+    ),
+
+  uninstall: (params: UninstallSkillParams) =>
+    apiClient.post<BackendDataResponse<UninstallSkillResponse>>(
+      "/skill-marketplace/uninstall",
       params,
     ),
 };

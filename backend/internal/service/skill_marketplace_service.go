@@ -3,6 +3,7 @@ package service
 import (
 	"archive/zip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -254,20 +255,21 @@ func (s *skillMarketplaceService) InstallSkill(ctx context.Context, req *contrac
 
 	workerID := uint(1)
 
-	topic, err := dm.WorkerSkillInstallSubject(caller.OrgID, workerID)
+	topic, err := dm.WorkerSkillSubject(caller.OrgID, workerID)
 	if err != nil {
-		return nil, fmt.Errorf("build skill install topic: %w", err)
+		return nil, fmt.Errorf("build skill topic: %w", err)
 	}
 
-	msg := protocol.SkillInstallMessage{
+	msg := protocol.SkillManagementMessage{
 		ID:        fmt.Sprintf("%d-%d-%d", caller.OrgID, workerID, time.Now().UnixNano()),
-		Type:      protocol.MessageTypeSkillInstall,
+		Type:      protocol.MessageTypeSkillManagement,
 		CreatedAt: time.Now(),
 		Route: protocol.RouteContext{
 			OrgID:    caller.OrgID,
 			WorkerID: workerID,
 		},
-		Body: protocol.SkillInstallBody{
+		Body: protocol.SkillManagementBody{
+			Action:  "install",
 			Source:  strings.TrimSpace(req.Source),
 			SkillID: strings.TrimSpace(req.SkillID),
 		},
@@ -280,6 +282,95 @@ func (s *skillMarketplaceService) InstallSkill(ctx context.Context, req *contrac
 	return &contract.InstallSkillResponse{
 		Status:  "accepted",
 		Message: fmt.Sprintf("Skill install request queued for org %d, worker %d", caller.OrgID, workerID),
+	}, nil
+}
+
+func (s *skillMarketplaceService) InstalledSkills(ctx context.Context, req *contract.InstalledSkillsRequest) (*contract.InstalledSkillsResponse, error) {
+	caller, err := requireCallerOrg(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	workerID := uint(1)
+
+	topic, err := dm.WorkerSkillSubject(caller.OrgID, workerID)
+	if err != nil {
+		return nil, fmt.Errorf("build skill topic: %w", err)
+	}
+
+	msg := protocol.SkillManagementMessage{
+		ID:        fmt.Sprintf("%d-%d-%d", caller.OrgID, workerID, time.Now().UnixNano()),
+		Type:      protocol.MessageTypeSkillManagement,
+		CreatedAt: time.Now(),
+		Route: protocol.RouteContext{
+			OrgID:    caller.OrgID,
+			WorkerID: workerID,
+		},
+		Body: protocol.SkillManagementBody{
+			Action: "list",
+		},
+	}
+
+	reply, err := s.publisher.Request(ctx, topic, msg)
+	if err != nil {
+		return nil, fmt.Errorf("request skill list: %w", err)
+	}
+
+	var resp protocol.SkillManagementResponse
+	if err := json.Unmarshal(reply.Data, &resp); err != nil {
+		return nil, fmt.Errorf("unmarshal skill list response: %w", err)
+	}
+	if !resp.Success {
+		return nil, fmt.Errorf("skill list failed: %s", resp.Error)
+	}
+
+	// Convert response data to contract type
+	dataBytes, err := json.Marshal(resp.Data)
+	if err != nil {
+		return nil, fmt.Errorf("marshal skill list data: %w", err)
+	}
+	var skills []contract.SkillInstalledItem
+	if err := json.Unmarshal(dataBytes, &skills); err != nil {
+		return nil, fmt.Errorf("unmarshal skill list items: %w", err)
+	}
+
+	return &contract.InstalledSkillsResponse{Skills: skills}, nil
+}
+
+func (s *skillMarketplaceService) UninstallSkill(ctx context.Context, req *contract.UninstallSkillRequest) (*contract.UninstallSkillResponse, error) {
+	caller, err := requireCallerOrg(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	workerID := uint(1)
+
+	topic, err := dm.WorkerSkillSubject(caller.OrgID, workerID)
+	if err != nil {
+		return nil, fmt.Errorf("build skill topic: %w", err)
+	}
+
+	msg := protocol.SkillManagementMessage{
+		ID:        fmt.Sprintf("%d-%d-%d", caller.OrgID, workerID, time.Now().UnixNano()),
+		Type:      protocol.MessageTypeSkillManagement,
+		CreatedAt: time.Now(),
+		Route: protocol.RouteContext{
+			OrgID:    caller.OrgID,
+			WorkerID: workerID,
+		},
+		Body: protocol.SkillManagementBody{
+			Action: "uninstall",
+			Name:   strings.TrimSpace(req.Name),
+		},
+	}
+
+	if err := s.publisher.Publish(ctx, topic, msg); err != nil {
+		return nil, fmt.Errorf("publish skill uninstall: %w", err)
+	}
+
+	return &contract.UninstallSkillResponse{
+		Status:  "accepted",
+		Message: fmt.Sprintf("Skill uninstall request queued for org %d, worker %d", caller.OrgID, workerID),
 	}, nil
 }
 

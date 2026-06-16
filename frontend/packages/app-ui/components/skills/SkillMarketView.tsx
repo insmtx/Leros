@@ -10,7 +10,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@leros/ui/components/ui/tabs";
 import { ChevronDown, Import, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
-import type { SkillMarketplaceItem } from "@leros/store";
 import { MarketplacePanel } from "./MarketplacePanel";
 import { MySkillsPanel } from "./MySkillsPanel";
 
@@ -18,10 +17,17 @@ export function SkillMarketView() {
   const [activeTab, setActiveTab] = useState<"marketplace" | "mine">("marketplace");
   const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
   const [installingIds, setInstallingIds] = useState<Set<string>>(new Set());
-  const [allItems, setAllItems] = useState<SkillMarketplaceItem[]>([]);
 
   const handleInstallSuccess = useCallback((skillId: string) => {
     setInstalledIds((prev) => new Set(prev).add(skillId));
+  }, []);
+
+  const handleUninstall = useCallback((name: string) => {
+    setInstalledIds((prev) => {
+      const next = new Set(prev);
+      next.delete(name);
+      return next;
+    });
   }, []);
 
   return (
@@ -82,19 +88,19 @@ export function SkillMarketView() {
         </div>
 
         {/* Marketplace panel */}
-        <TabsContent value="marketplace" className="min-h-0 flex-1 flex-col outline-none">
+        <TabsContent value="marketplace" className="flex min-h-0 flex-1 flex-col outline-none">
           <MarketplacePanel
             installedIds={installedIds}
             installingIds={installingIds}
             onInstallSuccess={handleInstallSuccess}
             onInstallingChange={setInstallingIds}
-            onItemsLoaded={setAllItems}
+            onItemsLoaded={() => {}}
           />
         </TabsContent>
 
         {/* My Skills panel */}
         <TabsContent value="mine" className="min-h-0 flex-1 overflow-y-auto px-6 py-8 outline-none">
-          <MySkillsPanel installedIds={installedIds} allItems={allItems} />
+          <MySkillsPanel onUninstall={handleUninstall} />
         </TabsContent>
       </Tabs>
     </div>

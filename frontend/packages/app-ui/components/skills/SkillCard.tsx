@@ -10,6 +10,8 @@ interface SkillCardProps {
   onInstall?: (skill: SkillMarketplaceItem) => void;
   installing?: boolean;
   installed?: boolean;
+  onUninstall?: (skill: SkillMarketplaceItem) => void;
+  uninstalling?: boolean;
 }
 
 export function SkillCard({
@@ -18,6 +20,8 @@ export function SkillCard({
   onInstall,
   installing,
   installed,
+  onUninstall,
+  uninstalling,
 }: SkillCardProps) {
   const isLerosAI = skill.author === "Leros AI";
   const isMine = variant === "mine";
@@ -99,12 +103,34 @@ export function SkillCard({
         )}
       </div>
 
-      {/* Bottom: install button or installed badge */}
+      {/* Bottom: install button / installed badge / uninstall button */}
       <div className="flex items-center justify-end pt-3 border-t border-[var(--leros-control-border)] h-10">
         {isMine ? (
-          <span className="inline-flex items-center rounded-lg px-4 py-1 text-xs font-medium bg-green-50 text-green-600 border border-green-200">
-            已安装
-          </span>
+          <>
+            {/* Default: installed badge */}
+            <span className="inline-flex items-center rounded-lg px-4 py-1 text-xs font-medium bg-green-50 text-green-600 border border-green-200 group-hover:hidden">
+              已安装
+            </span>
+            {/* Hover: uninstall button */}
+            <button
+              type="button"
+              disabled={uninstalling}
+              onClick={() => onUninstall?.(skill)}
+              className={cn(
+                "hidden group-hover:inline-flex items-center gap-1.5 rounded-lg px-4 py-1 text-xs font-medium transition-all duration-200",
+                "border border-red-200 text-red-600 hover:bg-red-50",
+              )}
+            >
+              {uninstalling ? (
+                <>
+                  <Loader2 className="size-3 animate-spin" />
+                  卸载中
+                </>
+              ) : (
+                "卸载"
+              )}
+            </button>
+          </>
         ) : (
           <button
             type="button"

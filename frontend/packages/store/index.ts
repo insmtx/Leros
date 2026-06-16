@@ -13,11 +13,15 @@ export { fetchFileDownload, fileApi, getFileDownloadUrl } from "./api/fileApi";
 export { projectFileApi } from "./api/projectFileApi";
 export { sessionApi } from "./api/sessionApi";
 export type {
+	InstalledSkillsResponse,
 	SearchSkillMarketplaceParams,
 	SearchSkillMarketplaceResponse,
+	SkillInstalledItem,
 	SkillMarketplaceItem,
+	UninstallSkillParams,
+	UninstallSkillResponse,
 } from "./api/skillMarketplaceApi";
-export { skillMarketplaceApi } from "./api/skillMarketplaceApi";
+export { installedToCardItem, skillMarketplaceApi } from "./api/skillMarketplaceApi";
 export type { AppAction, AppStore } from "./appStore";
 export {
 	useAppStore,

@@ -28,6 +28,8 @@ type SkillMarketplaceService interface {
 	SearchSkillMarketplace(ctx context.Context, req *SearchSkillMarketplaceRequest) (*SearchSkillMarketplaceResponse, error)
 	DownloadBuiltinSkill(ctx context.Context, skillID string) (*SkillPackageDownload, error)
 	InstallSkill(ctx context.Context, req *InstallSkillRequest) (*InstallSkillResponse, error)
+	InstalledSkills(ctx context.Context, req *InstalledSkillsRequest) (*InstalledSkillsResponse, error)
+	UninstallSkill(ctx context.Context, req *UninstallSkillRequest) (*UninstallSkillResponse, error)
 }
 
 // SearchSkillMarketplaceRequest Skill 市场搜索请求。
@@ -62,4 +64,32 @@ type SkillSourceWarning struct {
 type SearchSkillMarketplaceResponse struct {
 	Items    []SkillMarketplaceItemView `json:"items"`
 	Warnings []SkillSourceWarning       `json:"warnings,omitempty"`
+}
+
+// InstalledSkillsRequest 查询 worker 上已安装 Skill 的请求。
+type InstalledSkillsRequest struct{}
+
+// SkillInstalledItem 表示 worker 上已安装的 Skill。
+type SkillInstalledItem struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+	Source      string `json:"source"`
+	Trust       string `json:"trust"`
+}
+
+// InstalledSkillsResponse 已安装 Skill 列表响应。
+type InstalledSkillsResponse struct {
+	Skills []SkillInstalledItem `json:"skills"`
+}
+
+// UninstallSkillRequest 卸载 Skill 请求。
+type UninstallSkillRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
+// UninstallSkillResponse 卸载 Skill 响应（异步，仅表示已接受）。
+type UninstallSkillResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
 }
