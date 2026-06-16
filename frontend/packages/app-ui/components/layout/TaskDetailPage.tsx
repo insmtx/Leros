@@ -40,6 +40,13 @@ const STATUS_LABEL: Record<string, string> = {
 	done: "已完成",
 };
 
+function truncateBreadcrumbText(text?: string | null, maxLength = 10) {
+	if (!text) {
+		return "";
+	}
+	return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
 export function TaskDetailPage({
 	projectId,
 	taskId,
@@ -81,6 +88,9 @@ export function TaskDetailPage({
 	const resolvedTaskId = taskId ?? activeTaskDetailTaskId;
 	const resolvedSessionId = sessionId ?? activeTaskDetailSessionId;
 	const project = projects.find((p) => p.id === resolvedProjectId);
+	// 面包屑只做展示截断，完整名称通过 title 保留，避免超长文本撑开头部布局。
+	const breadcrumbProjectName = truncateBreadcrumbText(project?.name);
+	const breadcrumbTaskTitle = truncateBreadcrumbText(task?.title ?? "浠诲姟");
 
 	const latestTodos = useMemo(
 		() => getLatestAssistantTodos(messagesMap, messageIds, resolvedSessionId, streamingMessageId),
@@ -226,14 +236,15 @@ export function TaskDetailPage({
 									resolvedProjectId && switchProject(resolvedProjectId);
 								}}
 								className="text-xs font-semibold uppercase tracking-widest hover:text-[var(--leros-text-strong)]"
+								title={project.name}
 							>
-								{project.name}
+								{breadcrumbProjectName}
 							</button>
 							<span className="text-[var(--leros-text-subtle)]">/</span>
 						</>
 					)}
-					<h1 className="text-base font-bold text-[var(--leros-text-strong)]">
-						{task?.title ?? "任务"}
+					<h1 className="text-base font-bold text-[var(--leros-text-strong)]" title={task?.title}>
+						{breadcrumbTaskTitle}
 					</h1>
 				</div>
 				<div className="flex items-center gap-3">
@@ -370,7 +381,6 @@ export function TaskDetailPage({
 		</div>
 	);
 }
-
 function TaskTokenUsageCard({
 	totalTokens,
 	inputTokens,
