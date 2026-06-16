@@ -1081,12 +1081,7 @@ function ProjectDocxPreview({
 	}
 
 	if (!DocxEditor) {
-		return (
-			<div className="flex h-full items-center justify-center text-[var(--leros-text-muted)]">
-				<LoaderCircle className="mr-2 size-4 animate-spin" />
-				准备 DOCX 预览
-			</div>
-		);
+		return <div className="h-full bg-white" />;
 	}
 
 	return (
@@ -1107,12 +1102,7 @@ function ProjectDocxPreview({
 				documentNameEditable={false}
 				className="leros-docx-preview h-full"
 				style={{ height: "100%", background: "#f6f7fb" }}
-				loadingIndicator={
-					<div className="flex h-full items-center justify-center text-[var(--leros-text-muted)]">
-						<LoaderCircle className="mr-2 size-4 animate-spin" />
-						渲染 DOCX
-					</div>
-				}
+				loadingIndicator={<div className="h-full bg-[#f6f7fb]" />}
 				onError={(err) => setError(err.message)}
 			/>
 		</div>
