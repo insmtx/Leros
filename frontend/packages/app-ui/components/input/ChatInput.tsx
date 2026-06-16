@@ -22,8 +22,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { StructuredComposer, type StructuredComposerHandle } from "./StructuredComposer";
 
-// .csv 暂不支持预览，上传后体验异常，待预览能力就绪后再开放
-export const PROJECT_ATTACHMENT_ACCEPT = "image/*,.pdf,.txt,.md,.json"; // ,.csv
+export const PROJECT_ATTACHMENT_ACCEPT = "image/*,.pdf,.txt,.md,.json,.xlsx,.xls,.csv";
 
 export function ChatInput({ variant = "default" }: { variant?: "default" | "project" }) {
 	const {

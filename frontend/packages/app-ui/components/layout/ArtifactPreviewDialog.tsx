@@ -14,8 +14,9 @@ import { cn } from "@leros/ui/lib/utils";
 import { Download, FileText, ImageIcon, LoaderCircle, Table2, X } from "lucide-react";
 import { type ComponentType, type CSSProperties, useEffect, useMemo, useState } from "react";
 import { MarkdownRenderer } from "../common/MarkdownRenderer";
+import { SpreadsheetPreview } from "./SpreadsheetPreview";
 
-type PreviewKind = "docx" | "markdown" | "text" | "image" | "pdf" | "unsupported";
+type PreviewKind = "docx" | "spreadsheet" | "markdown" | "text" | "image" | "pdf" | "unsupported";
 
 export type ArtifactPreviewItem = {
 	id: string;
@@ -109,7 +110,7 @@ export function ArtifactPreviewDialog({
 					return;
 				}
 
-				if (previewKind === "docx") {
+				if (previewKind === "docx" || previewKind === "spreadsheet") {
 					const buffer = await response.arrayBuffer();
 					if (!cancelled) setPreview({ status: "ready", buffer });
 					return;
@@ -243,6 +244,10 @@ function ArtifactPreviewBody({
 
 	if (previewKind === "docx" && preview.buffer) {
 		return <DocxPreview artifact={artifact} buffer={preview.buffer} />;
+	}
+
+	if (previewKind === "spreadsheet" && preview.buffer) {
+		return <SpreadsheetPreview buffer={preview.buffer} fileName={artifact.name} />;
 	}
 
 	if (previewKind === "markdown") {
@@ -379,6 +384,16 @@ function detectPreviewKind(artifact: ArtifactPreviewItem | null): PreviewKind {
 	) {
 		return "docx";
 	}
+	if (
+		mimeType.includes("spreadsheet") ||
+		mimeType.includes("excel") ||
+		mimeType === "text/csv" ||
+		name.endsWith(".xlsx") ||
+		name.endsWith(".xls") ||
+		name.endsWith(".csv")
+	) {
+		return "spreadsheet";
+	}
 	if (mimeType.includes("markdown") || name.endsWith(".md") || name.endsWith(".markdown")) {
 		return "markdown";
 	}
@@ -392,7 +407,6 @@ function detectPreviewKind(artifact: ArtifactPreviewItem | null): PreviewKind {
 		mimeType.startsWith("text/") ||
 		name.endsWith(".txt") ||
 		name.endsWith(".json") ||
-		name.endsWith(".csv") ||
 		name.endsWith(".yaml") ||
 		name.endsWith(".yml") ||
 		name.endsWith(".log")

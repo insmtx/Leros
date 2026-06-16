@@ -41,6 +41,7 @@ import {
 	type ProjectFileNode,
 	sortProjectFilesByUploadedTimeDesc,
 } from "./project-files";
+import { SpreadsheetPreview } from "./SpreadsheetPreview";
 import { TaskDeleteDialog } from "./TaskDeleteDialog";
 
 const projectTabs = [
@@ -60,6 +61,7 @@ type FilePreviewState =
 	| { status: "loading" }
 	| { status: "error"; message: string }
 	| { status: "text"; content: string }
+	| { status: "spreadsheet"; buffer: ArrayBuffer }
 	| { status: "blob"; url: string; mimeType: string };
 
 export function ProjectPage({
@@ -638,6 +640,14 @@ function ProjectFiles({
 					currentFile.mimeType ??
 					"application/octet-stream";
 
+				if (isSpreadsheetPreviewable(currentFile.path, mimeType)) {
+					const buffer = await response.arrayBuffer();
+					if (!cancelled) {
+						setPreviewState({ status: "spreadsheet", buffer });
+					}
+					return;
+				}
+
 				if (isTextPreviewable(currentFile.path, mimeType)) {
 					const content = await response.text();
 					if (!cancelled) {
@@ -981,6 +991,14 @@ function ProjectFilePreviewBody({
 		);
 	}
 
+	if (previewState.status === "spreadsheet") {
+		return (
+			<div className="h-[calc(100vh-150px)] min-h-[520px] overflow-hidden rounded-xl bg-white shadow-sm">
+				<SpreadsheetPreview buffer={previewState.buffer} fileName={file.name} />
+			</div>
+		);
+	}
+
 	if (previewState.mimeType.startsWith("image/")) {
 		return (
 			<div className="flex min-h-[320px] items-center justify-center rounded-xl bg-white p-4 shadow-sm">
@@ -1045,6 +1063,18 @@ function isTextPreviewable(path: string, mimeType: string): boolean {
 		".sh",
 		".sql",
 	].some((suffix) => normalizedPath.endsWith(suffix));
+}
+
+function isSpreadsheetPreviewable(path: string, mimeType: string): boolean {
+	const normalizedPath = path.toLowerCase();
+	const normalizedMimeType = mimeType.toLowerCase();
+
+	return (
+		normalizedMimeType.includes("spreadsheet") ||
+		normalizedMimeType.includes("excel") ||
+		normalizedMimeType === "text/csv" ||
+		[".xlsx", ".xls", ".csv"].some((suffix) => normalizedPath.endsWith(suffix))
+	);
 }
 
 function formatBytes(size: number): string {
