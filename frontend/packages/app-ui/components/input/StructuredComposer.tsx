@@ -54,7 +54,7 @@ type StructuredComposerProps = {
 	value: string;
 	onChange: (value: string) => void;
 	onSubmit: () => void;
-	onPaste: (event: React.ClipboardEvent<HTMLElement>) => void;
+	onPasteFiles: (event: React.ClipboardEvent<HTMLElement>) => void;
 	onFocus: () => void;
 	onBlur: () => void;
 	placeholder: string;
@@ -269,6 +269,28 @@ function getCaretOffset(root: HTMLElement): number {
 	return extractSnapshotFromFragment(workingRange.cloneContents()).text.length;
 }
 
+function getSelectionOffsets(root: HTMLElement): { start: number; end: number } {
+	const selection = window.getSelection();
+	if (!selection || selection.rangeCount === 0) {
+		const textLength = extractSnapshot(root).text.length;
+		return { start: textLength, end: textLength };
+	}
+
+	const range = selection.getRangeAt(0);
+	const startRange = range.cloneRange();
+	startRange.selectNodeContents(root);
+	startRange.setEnd(range.startContainer, range.startOffset);
+
+	const endRange = range.cloneRange();
+	endRange.selectNodeContents(root);
+	endRange.setEnd(range.endContainer, range.endOffset);
+
+	return {
+		start: extractSnapshotFromFragment(startRange.cloneContents()).text.length,
+		end: extractSnapshotFromFragment(endRange.cloneContents()).text.length,
+	};
+}
+
 function extractSnapshotFromFragment(fragment: DocumentFragment): EditorSnapshot {
 	const wrapper = document.createElement("div");
 	wrapper.appendChild(fragment);
@@ -346,7 +368,7 @@ function shiftTokensForTextEdit(
 
 export const StructuredComposer = forwardRef<StructuredComposerHandle, StructuredComposerProps>(
 	function StructuredComposer(
-		{ value, onChange, onSubmit, onPaste, onFocus, onBlur, placeholder, isProjectVariant },
+		{ value, onChange, onSubmit, onPasteFiles, onFocus, onBlur, placeholder, isProjectVariant },
 		ref,
 	) {
 		const editorRef = useRef<HTMLDivElement>(null);
@@ -434,6 +456,44 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 				setTrigger(findTrigger(snapshot.text, getCaretOffset(editor)));
 			}
 		}, [onChange]);
+
+		const handlePaste = useCallback(
+			(event: React.ClipboardEvent<HTMLDivElement>) => {
+				const clipboardFiles = Array.from(event.clipboardData.files);
+				if (clipboardFiles.length > 0) {
+					// 粘贴图片/文件时只走附件上传，不把浏览器生成的富文本或文件占位节点塞进输入框。
+					event.preventDefault();
+					onPasteFiles(event);
+					return;
+				}
+
+				const pastedText = event.clipboardData.getData("text/plain");
+				if (!pastedText) {
+					return;
+				}
+
+				event.preventDefault();
+
+				const editor = editorRef.current;
+				if (!editor) return;
+
+				const { start, end } = getSelectionOffsets(editor);
+				const nextValue = `${value.slice(0, start)}${pastedText}${value.slice(end)}`;
+				const nextCaret = start + pastedText.length;
+
+				// 富文本编辑器里外部粘贴默认会带入 HTML/样式，这里统一降级成纯文本，保证展示和发送内容一致。
+				setTokens((current) => shiftTokensForTextEdit(current, value, nextValue));
+				onChange(nextValue);
+				pendingCaretRef.current = nextCaret;
+
+				if (!composingRef.current) {
+					setTrigger(findTrigger(nextValue, nextCaret));
+				}
+
+				focusAt(nextCaret);
+			},
+			[focusAt, onChange, onPasteFiles, value],
+		);
 
 		const insertTrigger = useCallback(
 			(kind: DirectiveKind) => {
@@ -644,7 +704,7 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 					suppressContentEditableWarning
 					onInput={() => syncFromEditor()}
 					onKeyDown={handleKeyDown}
-					onPaste={onPaste}
+					onPaste={handlePaste}
 					onFocus={onFocus}
 					onBlur={() => {
 						onBlur();
