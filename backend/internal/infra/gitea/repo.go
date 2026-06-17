@@ -6,8 +6,8 @@ import (
 	"net/url"
 )
 
-func (c *Client) CreateRepo(ctx context.Context, org string, req CreateRepoRequest) (*RepoInfo, error) {
-	apiPath := fmt.Sprintf("/orgs/%s/repos", url.PathEscape(org))
+func (c *Client) CreateRepo(ctx context.Context, owner string, req CreateRepoRequest) (*RepoInfo, error) {
+	apiPath := fmt.Sprintf("/admin/users/%s/repos", url.PathEscape(owner))
 	var result RepoInfo
 	if err := c.doJSON(ctx, "POST", apiPath, req, &result); err != nil {
 		return nil, fmt.Errorf("create repo: %w", err)

@@ -26,5 +26,5 @@ llm:
 gitea:
   endpoint: "http://49.232.218.218:3009"
   admin_token: "<your_admin_token>"
-  default_owner: "leros-system"
+  default_owner: "admin"
   org_prefix: "leros"

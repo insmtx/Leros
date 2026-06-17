@@ -11,7 +11,7 @@ import (
 const (
 	testEndpoint   = "http://49.232.218.218:3009"
 	testToken      = "806372856159056499ffdc289d3238763d27c993"
-	testOwner      = "leros-system"
+	testOwner      = "admin"
 	testOrgPrefix  = "leros"
 	testEnv        = "test"
 )
