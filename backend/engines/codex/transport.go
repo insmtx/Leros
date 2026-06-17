@@ -197,18 +197,6 @@ func (s *AppServer) StartTurn(ctx context.Context, threadID string, prompt strin
 			"type": "text",
 			"text": prompt,
 		}},
-		"runRequest": map[string]any{
-			"mcpServers": map[string]any{
-				"leros": map[string]any{
-					"command": "npx",
-					"args": []string{
-						"-y",
-						"mcp-remote",
-						"http://127.0.0.1:8081/v1/mcp",
-					},
-				},
-			},
-		},
 	}
 	var resp struct {
 		Turn struct {
