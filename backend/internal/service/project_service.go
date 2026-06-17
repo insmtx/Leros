@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -12,32 +13,29 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"gorm.io/gorm"
 
 	"github.com/ygpkg/storage-go"
 
+	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/infra/filestore"
+	"github.com/insmtx/Leros/backend/internal/infra/gitea"
 	localmemory "github.com/insmtx/Leros/backend/internal/memory/local"
 	"github.com/insmtx/Leros/backend/internal/workspace"
 	"github.com/insmtx/Leros/backend/types"
 	"github.com/ygpkg/yg-go/encryptor/snowflake"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 type projectService struct {
-	db *gorm.DB
-}
-
-// fileTreeEntry 文件树 walk 阶段收集的扁平条目
-type fileTreeEntry struct {
-	absPath string
-	isDir   bool
-	size    int64
-	modTime int64
+	db          *gorm.DB
+	giteaClient *gitea.Client
+	giteaCfg    *config.GiteaConfig
+	env         string
 }
 
 // getWorkerIDByProjectID 根据项目 publicID 获取对应的 worker ID。
@@ -48,9 +46,12 @@ func getWorkerIDByProjectID(publicID string) uint {
 }
 
 // NewProjectService 创建项目服务实例
-func NewProjectService(db *gorm.DB) contract.ProjectService {
+func NewProjectService(db *gorm.DB, giteaClient *gitea.Client, giteaCfg *config.GiteaConfig, env string) contract.ProjectService {
 	return &projectService{
-		db: db,
+		db:          db,
+		giteaClient: giteaClient,
+		giteaCfg:    giteaCfg,
+		env:         env,
 	}
 }
 
@@ -91,9 +92,25 @@ func (s *projectService) CreateProject(ctx context.Context, req *contract.Create
 		}
 	}
 
+	project.GiteaDefaultBranch = "main"
+
+	repoName := s.buildRepoName(caller.OrgID, publicID)
+	repoInfo, err := s.giteaClient.CreateRepo(ctx, s.giteaCfg.DefaultOwner, gitea.CreateRepoRequest{
+		Name:        repoName,
+		Description: strings.TrimSpace(req.Description),
+		Private:     true,
+		AutoInit:    true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create gitea repo: %w", err)
+	}
+	project.GiteaRepoFullName = repoInfo.FullName
+	project.GiteaRepoID = repoInfo.ID
+
 	if err := db.CreateProject(ctx, s.db, project); err != nil {
 		return nil, err
 	}
+	s.initRepoStructure(ctx, repoInfo.FullName)
 	return convertToContractProject(project), nil
 }
 
@@ -482,95 +499,64 @@ func (s *projectService) GetProjectFileTree(ctx context.Context, publicID string
 		return nil, err
 	}
 
-	uploadFiles, err := db.ListProjectFileUploads(ctx, s.db, caller.OrgID, publicID)
+	if strings.TrimSpace(project.GiteaRepoFullName) == "" {
+		return nil, errors.New("project not linked to gitea repo")
+	}
+
+	parts := strings.SplitN(project.GiteaRepoFullName, "/", 2)
+	if len(parts) != 2 {
+		return nil, errors.New("invalid gitea repo full name")
+	}
+	owner, repo := parts[0], parts[1]
+
+	treePath := strings.Trim(parentPath, "/")
+	entries, err := s.giteaClient.ListContents(ctx, owner, repo, treePath, project.GiteaDefaultBranch)
 	if err != nil {
-		return nil, fmt.Errorf("list project file uploads: %w", err)
+		return nil, fmt.Errorf("list gitea contents: %w", err)
 	}
 
-	fileTree := make([]*contract.FileTreeNode, 0, len(uploadFiles))
-	for _, f := range uploadFiles {
-		fileTree = append(fileTree, &contract.FileTreeNode{
-			Name:     f.OriginalName,
-			Path:     f.Filename,
-			Type:     "file",
-			Size:     f.FileSize,
-			MimeType: f.MimeType,
-			ModTime:  f.UpdatedAt.Unix(),
-			PublicID: f.PublicID,
-		})
-	}
-
-	return fileTree, nil
-}
-
-// buildFileTree 将扁平条目构建为递归文件树。
-// entries 按路径排序以确保父节点先于子节点处理。
-func buildFileTree(entries []fileTreeEntry, repoDir string, startDir string) []*contract.FileTreeNode {
-	if len(entries) == 0 {
-		return []*contract.FileTreeNode{}
-	}
-
-	// 排序：目录优先 → 按深度 → 字典序
-	sort.Slice(entries, func(i, j int) bool {
-		a, b := entries[i], entries[j]
-		if a.isDir != b.isDir {
-			return a.isDir
-		}
-		depthA := strings.Count(a.absPath, string(filepath.Separator))
-		depthB := strings.Count(b.absPath, string(filepath.Separator))
-		if depthA != depthB {
-			return depthA < depthB
-		}
-		return a.absPath < b.absPath
-	})
-
-	nodeIndex := make(map[string]*contract.FileTreeNode)
-	var roots []*contract.FileTreeNode
-
+	nodes := make([]*contract.FileTreeNode, 0, len(entries))
 	for _, e := range entries {
-		rel, _ := filepath.Rel(repoDir, e.absPath)
-		slashPath := filepath.ToSlash(rel)
-
 		node := &contract.FileTreeNode{
-			Name: filepath.Base(e.absPath),
-			Path: slashPath,
+			Name: e.Name,
+			Path: e.Path,
 			Type: "file",
+			Size: e.Size,
 		}
-
-		if e.isDir {
+		if e.Type == "dir" {
 			node.Type = "directory"
 			node.Children = make([]*contract.FileTreeNode, 0)
-			node.ModTime = e.modTime
-		} else {
-			node.Size = e.size
-			node.ModTime = e.modTime
-			// 通过扩展名检测 MIME 类型
-			ext := filepath.Ext(e.absPath)
-			if mimeType := mime.TypeByExtension(ext); mimeType != "" {
-				node.MimeType = mimeType
+			if depth > 1 {
+				children, err := s.giteaClient.ListContents(ctx, owner, repo, e.Path, project.GiteaDefaultBranch)
+				if err == nil {
+					for _, child := range children {
+						childNode := &contract.FileTreeNode{
+							Name: child.Name,
+							Path: child.Path,
+							Type: "file",
+							Size: child.Size,
+						}
+						if child.Type == "dir" {
+							childNode.Type = "directory"
+							childNode.Children = make([]*contract.FileTreeNode, 0)
+						} else {
+							childNode.MimeType = mimeTypeByExt(child.Name)
+						}
+						node.Children = append(node.Children, childNode)
+					}
+				}
 			}
+		} else {
+			node.MimeType = mimeTypeByExt(e.Name)
 		}
-
-		nodeIndex[e.absPath] = node
-
-		parent := filepath.Dir(e.absPath)
-		if parent == startDir {
-			roots = append(roots, node)
-		} else if p, ok := nodeIndex[parent]; ok {
-			p.Children = append(p.Children, node)
-		}
+		nodes = append(nodes, node)
 	}
-
-	if roots == nil {
-		roots = []*contract.FileTreeNode{}
-	}
-	return roots
+	return nodes, nil
 }
 
 // DownloadProjectFile 下载项目中的文件。
 // 返回文件流、MIME 类型、文件大小。
 func (s *projectService) DownloadProjectFile(ctx context.Context, publicID string, filePath string) (io.ReadCloser, string, int64, error) {
-	// 1. 鉴权
 	caller, err := requireCallerOrg(ctx)
 	if err != nil {
 		return nil, "", 0, err
@@ -582,7 +568,6 @@ func (s *projectService) DownloadProjectFile(ctx context.Context, publicID strin
 		return nil, "", 0, errors.New("file path is required")
 	}
 
-	// 2. 查项目
 	project, err := db.GetProjectByPublicID(ctx, s.db, caller.OrgID, publicID)
 	if err != nil {
 		return nil, "", 0, err
@@ -594,53 +579,27 @@ func (s *projectService) DownloadProjectFile(ctx context.Context, publicID strin
 		return nil, "", 0, err
 	}
 
-	// 3. 解析 repo 路径
-	workerID := getWorkerIDByProjectID(publicID)
-	repoDir, err := workspace.ProjectRepoPath(project.OrgID, workerID, publicID)
-	if err != nil {
-		return nil, "", 0, err
+	if strings.TrimSpace(project.GiteaRepoFullName) == "" {
+		return nil, "", 0, errors.New("project not linked to gitea repo")
 	}
 
-	// 4. 安全解析文件路径（防穿越）
-	absPath, err := workspace.SafeJoin(repoDir, filepath.FromSlash(filePath))
+	parts := strings.SplitN(project.GiteaRepoFullName, "/", 2)
+	if len(parts) != 2 {
+		return nil, "", 0, errors.New("invalid gitea repo full name")
+	}
+	owner, repo := parts[0], parts[1]
+
+	reader, err := s.giteaClient.GetRawFile(ctx, owner, repo, project.GiteaDefaultBranch, filePath)
 	if err != nil {
-		return nil, "", 0, fmt.Errorf("invalid file path: %w", err)
+		return nil, "", 0, fmt.Errorf("get gitea file: %w", err)
 	}
 
-	// 5. 打开文件
-	file, err := os.Open(absPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, "", 0, errors.New("file not found")
-		}
-		return nil, "", 0, fmt.Errorf("open file: %w", err)
-	}
-
-	// 6. 获取文件信息
-	info, err := file.Stat()
-	if err != nil {
-		file.Close()
-		return nil, "", 0, fmt.Errorf("stat file: %w", err)
-	}
-	if info.IsDir() {
-		file.Close()
-		return nil, "", 0, errors.New("cannot download a directory")
-	}
-
-	// 7. 检测 MIME 类型
-	mimeType := mime.TypeByExtension(filepath.Ext(absPath))
+	mimeType := mime.TypeByExtension(filepath.Ext(filePath))
 	if mimeType == "" {
-		// 通过内容嗅探
-		buf := make([]byte, 512)
-		n, _ := file.Read(buf)
-		if n > 0 {
-			mimeType = http.DetectContentType(buf[:n])
-		}
-		// 回退到文件开头
-		file.Seek(0, io.SeekStart)
+		mimeType = "application/octet-stream"
 	}
 
-	return file, mimeType, info.Size(), nil
+	return reader, mimeType, 0, nil
 }
 
 // UploadProjectFile 上传文件到 storage。
@@ -748,6 +707,44 @@ func (s *projectService) AddFile(ctx context.Context, publicID string, filePubli
 
 func generateProjectPublicID() string {
 	return fmt.Sprintf("prj_%s", snowflake.GenerateIDBase58())
+}
+
+func (s *projectService) buildRepoName(orgID uint, projectPublicID string) string {
+	return fmt.Sprintf("%s-%s-%d-%s", s.giteaCfg.OrgPrefix, s.env, orgID, projectPublicID)
+}
+
+func (s *projectService) initRepoStructure(ctx context.Context, fullName string) {
+	parts := strings.SplitN(fullName, "/", 2)
+	if len(parts) != 2 {
+		return
+	}
+	owner, repo := parts[0], parts[1]
+
+	emptyContent := base64.StdEncoding.EncodeToString([]byte(""))
+
+	initFiles := []struct {
+		path    string
+		content string
+		msg     string
+	}{
+		{".leros/memory/.gitkeep", emptyContent, "chore: init .leros/memory/"},
+		{"assets/artifacts/.gitkeep", emptyContent, "chore: init assets/artifacts/"},
+		{"README.md", base64.StdEncoding.EncodeToString([]byte("# " + repo + "\n")), "chore: init README"},
+	}
+
+	for _, f := range initFiles {
+		if err := s.giteaClient.CreateFile(ctx, owner, repo, f.path, f.content, f.msg); err != nil {
+			logs.WarnContextf(ctx, "[project] init gitea file %s failed: %v", f.path, err)
+		}
+	}
+}
+
+func mimeTypeByExt(filename string) string {
+	ext := filepath.Ext(filename)
+	if mimeType := mime.TypeByExtension(ext); mimeType != "" {
+		return mimeType
+	}
+	return ""
 }
 
 // ensure project implements contract.ProjectService at compile time
