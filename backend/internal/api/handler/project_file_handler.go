@@ -24,13 +24,12 @@ func NewProjectFileHandler(service contract.ProjectService) *ProjectFileHandler 
 }
 
 // RegisterRoutes 注册路由
-// 注意：精确路由必须先于 wildcard 路由注册
 func (h *ProjectFileHandler) RegisterRoutes(r gin.IRouter) {
 	r.GET("/projects/:project_id/files", h.GetProjectFileTree)
 	r.POST("/projects/:project_id/files/upload", h.UploadProjectFile)
-	r.GET("/projects/:project_id/files/*filepath", h.DownloadProjectFile)
+	r.GET("/projects/:project_id/files/download", h.DownloadProjectFile)
 	r.GET("/projects/:project_id/memory", h.GetProjectMemory)
-	r.POST("/projects/:project_id/AddFile", h.AddProjectFile)
+	r.POST("/projects/:project_id/AddFile", h.DeprecatedAddProjectFile)
 }
 
 // GetProjectFileTree 获取项目文件树
@@ -94,7 +93,7 @@ func (h *ProjectFileHandler) DownloadProjectFile(ctx *gin.Context) {
 		return
 	}
 
-	filePath := strings.TrimPrefix(ctx.Param("filepath"), "/")
+	filePath := strings.TrimSpace(ctx.Query("path"))
 	if filePath == "" {
 		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, "file path is required"))
 		return
@@ -202,23 +201,7 @@ func (h *ProjectFileHandler) GetProjectMemory(ctx *gin.Context) {
 // @Failure 404 {object} dto.ErrorResponse "资源不存在"
 // @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
 // @Router /projects/{project_id}/AddFile [post]
-func (h *ProjectFileHandler) AddProjectFile(ctx *gin.Context) {
-	projectID := strings.TrimSpace(ctx.Param("project_id"))
-	if projectID == "" {
-		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, "project_id is required"))
-		return
-	}
-
-	var req contract.AddFileRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, "invalid request body"))
-		return
-	}
-
-	if err := h.service.AddFile(ctx, projectID, req.PublicID); err != nil {
-		handleProjectFileServiceError(ctx, err)
-		return
-	}
+func (h *ProjectFileHandler) DeprecatedAddProjectFile(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, dto.Success(nil))
 }
 
