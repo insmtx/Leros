@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.1.9] - 2026-06-17
+
+### 桌面端发布流程修复
+
+本版本修复桌面端 GitHub Actions 发布流程中的依赖安装问题，确保新增 DiceBear 头像依赖后 CI 能够稳定完成安装与打包。
+
+- 桌面端发布 workflow 的 Node.js 版本升级至 22，满足 DiceBear 依赖的运行时要求
+- 同步 `@dicebear/core` 与 `@dicebear/styles` 到 `pnpm-lock.yaml`，修复 `--frozen-lockfile` 安装失败
+- 补充 `StructuredComposer` 事件类型，修复前端类型检查中的事件类型不完整问题
+
 ## [v0.1.8] - 2026-06-17
 
 ### 附件交互与头像展示增强
