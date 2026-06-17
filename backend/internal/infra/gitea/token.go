@@ -13,7 +13,7 @@ func (c *Client) GenerateAccessToken(ctx context.Context, username, name string,
 		Scopes: scopes,
 	}
 	var result TokenResponse
-	if err := c.doJSON(ctx, "POST", apiPath, req, &result); err != nil {
+	if err := c.doTokenAuthJSON(ctx, "POST", apiPath, req, &result); err != nil {
 		return nil, fmt.Errorf("generate token: %w", err)
 	}
 	return &GeneratedToken{

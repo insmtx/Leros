@@ -320,33 +320,39 @@ func ensureGitRepo(ctx context.Context, plan *TaskWorkspace) error {
 	}
 	gitDir := filepath.Join(plan.RepoDir, ".git")
 	if info, err := os.Stat(gitDir); err == nil && info.IsDir() {
-		cmd := exec.CommandContext(ctx, "git", "pull", "origin", "main")
-		cmd.Dir = plan.RepoDir
-		if output, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git pull: %w: %s", err, strings.TrimSpace(string(output)))
+		if hasRemote(ctx, plan.RepoDir, "origin") {
+			cmd := exec.CommandContext(ctx, "git", "pull", "origin", "main")
+			cmd.Dir = plan.RepoDir
+			if output, err := cmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("git pull: %w: %s", err, strings.TrimSpace(string(output)))
+			}
+			return nil
 		}
-		return nil
+		if err := os.RemoveAll(plan.RepoDir); err != nil {
+			return fmt.Errorf("remove broken repo: %w", err)
+		}
 	}
 
-	if strings.TrimSpace(plan.CloneURL) != "" {
-		parent := filepath.Dir(plan.RepoDir)
-		if err := os.MkdirAll(parent, 0o755); err != nil {
-			return fmt.Errorf("create parent dir: %w", err)
-		}
-		cmd := exec.CommandContext(ctx, "git", "clone", plan.CloneURL, plan.RepoDir)
-		if output, err := cmd.CombinedOutput(); err != nil {
-			os.RemoveAll(plan.RepoDir)
-			return fmt.Errorf("git clone: %w: %s", err, strings.TrimSpace(string(output)))
-		}
-		return nil
+	if strings.TrimSpace(plan.CloneURL) == "" {
+		return fmt.Errorf("no clone URL for project repo, ensure gitea is configured")
 	}
 
-	cmd := exec.CommandContext(ctx, "git", "init")
-	cmd.Dir = plan.RepoDir
+	parent := filepath.Dir(plan.RepoDir)
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return fmt.Errorf("create parent dir: %w", err)
+	}
+	cmd := exec.CommandContext(ctx, "git", "clone", plan.CloneURL, plan.RepoDir)
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git init workspace: %w: %s", err, strings.TrimSpace(string(output)))
+		os.RemoveAll(plan.RepoDir)
+		return fmt.Errorf("git clone: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 	return nil
+}
+
+func hasRemote(ctx context.Context, repoDir string, remote string) bool {
+	cmd := exec.CommandContext(ctx, "git", "remote", "get-url", remote)
+	cmd.Dir = repoDir
+	return cmd.Run() == nil
 }
 
 // defaultGitignore 定义项目仓库初始化时创建的默认 .gitignore 内容。
