@@ -12,6 +12,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/api/auth"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/infra/db"
+	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	"github.com/insmtx/Leros/backend/pkg/dm"
@@ -107,6 +108,8 @@ func (p *MessagePoster) RunNewMessage(
 		logs.ErrorContextf(ctx, "NewMessage resolveOrCreateProject failed: %v", err)
 		return nil, err
 	}
+	// 无项目预上传的附件，需要在项目创建完成后回填项目归属，确保后续文件树可见。
+	p.attachFilesToProject(ctx, caller.OrgID, o.project.PublicID, req.Attachments)
 	if err := o.ensureProjectSession(); err != nil {
 		logs.ErrorContextf(ctx, "NewMessage ensureProjectSession failed: %v", err)
 		return nil, err
@@ -120,6 +123,9 @@ func (p *MessagePoster) RunNewMessage(
 		return nil, err
 	}
 
+	// 先补齐附件的可访问 URL，再把附件写入用户消息，避免前端回显和后续上下文拿不到附件信息。
+	p.resolveAttachmentURLs(ctx, caller.OrgID, req.Attachments)
+
 	message, err := p.PostMessage(ctx, o.taskSession, func(sequence int64) *types.SessionMessage {
 		msgType := req.MessageType
 		if msgType == "" {
@@ -129,6 +135,7 @@ func (p *MessagePoster) RunNewMessage(
 			Role:        string(types.MessageRoleUser),
 			Content:     req.Content,
 			MessageType: msgType,
+			Attachments: req.Attachments,
 			Status:      string(types.MessageStatusPending),
 			Sequence:    sequence,
 			Timestamp:   time.Now().UnixMilli(),
@@ -438,6 +445,67 @@ func convertMessageToProtocolAttachments(attachments types.MessageAttachmentSlic
 		})
 	}
 	return result
+}
+
+func (p *MessagePoster) resolveAttachmentURLs(
+	ctx context.Context,
+	orgID uint,
+	attachments []types.MessageAttachment,
+) {
+	if len(attachments) == 0 {
+		return
+	}
+	for i := range attachments {
+		if attachments[i].FileUploadID == "" {
+			continue
+		}
+		fileUpload, err := db.GetFileUploadByPublicID(ctx, p.db, orgID, attachments[i].FileUploadID)
+		if err != nil {
+			logs.WarnContextf(ctx, "resolve attachment file %s: %v", attachments[i].FileUploadID, err)
+			continue
+		}
+		if fileUpload == nil {
+			logs.WarnContextf(ctx, "resolve attachment file %s: not found", attachments[i].FileUploadID)
+			continue
+		}
+		publicURL, err := filestore.ResolvePublicURL(ctx, fileUpload.StoragePath)
+		if err != nil {
+			logs.WarnContextf(ctx, "resolve attachment public url for %s: %v", attachments[i].FileUploadID, err)
+			continue
+		}
+		attachments[i].PublicURL = publicURL
+	}
+}
+
+func (p *MessagePoster) attachFilesToProject(
+	ctx context.Context,
+	orgID uint,
+	projectPublicID string,
+	attachments []types.MessageAttachment,
+) {
+	if strings.TrimSpace(projectPublicID) == "" || len(attachments) == 0 {
+		return
+	}
+	for i := range attachments {
+		if attachments[i].FileUploadID == "" {
+			continue
+		}
+		fileUpload, err := db.GetFileUploadByPublicID(ctx, p.db, orgID, attachments[i].FileUploadID)
+		if err != nil {
+			logs.WarnContextf(ctx, "attach file %s to project %s failed: %v", attachments[i].FileUploadID, projectPublicID, err)
+			continue
+		}
+		if fileUpload == nil {
+			continue
+		}
+		if fileUpload.Metadata.Extra == nil {
+			fileUpload.Metadata.Extra = make(map[string]interface{})
+		}
+		fileUpload.Metadata.Extra["project_public_id"] = projectPublicID
+		if err := db.UpdateFileUpload(ctx, p.db, fileUpload); err != nil {
+			logs.WarnContextf(ctx, "persist file %s project_public_id failed: %v", attachments[i].FileUploadID, err)
+		}
+	}
 }
 
 func (p *MessagePoster) resolveWorkspaceIDs(ctx context.Context, session *types.Session) (string, string, error) {

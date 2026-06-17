@@ -1,10 +1,12 @@
 "use client";
 
-import { formatTime } from "@leros/store";
-import type { Message } from "@leros/store/types/chat";
+import { fetchFileDownload, formatFileSize, formatTime } from "@leros/store";
+import type { Message, MessageAttachment } from "@leros/store/types/chat";
 import { Button } from "@leros/ui/components/ui/button";
-import { Check, Copy } from "lucide-react";
-import { useState } from "react";
+import { Check, Copy, ImageIcon, LoaderCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ProjectFileTypeIcon } from "../layout/project-file-type-icon";
+import { MessageAttachmentPreviewDialog } from "./MessageAttachmentPreviewDialog";
 
 function CopyButton({ text }: { text: string }) {
 	const [copied, setCopied] = useState(false);
@@ -30,18 +32,175 @@ function CopyButton({ text }: { text: string }) {
 }
 
 export function UserMessageBubble({ message }: { message: Message }) {
+	const [previewAttachment, setPreviewAttachment] = useState<MessageAttachment | null>(null);
+	const visibleText = message.content.trim();
+	const attachments = message.attachments ?? [];
+
 	return (
-		<div data-slot="user-message" className="flex justify-end group">
-			<div className="flex max-w-[min(720px,78%)] flex-col items-end">
-				<div className="mb-1.5 flex items-center gap-2">
-					<CopyButton text={message.content} />
-					<span className="text-xs text-slate-400">{formatTime(message.timestamp)}</span>
-					<span className="text-xs font-medium text-slate-500">你</span>
-				</div>
-				<div className="w-fit rounded-2xl rounded-tr-md bg-blue-600 px-4 py-3 text-sm leading-7 text-white shadow-sm shadow-blue-600/10">
-					{message.content}
+		<>
+			<div data-slot="user-message" className="flex justify-end group">
+				<div className="flex max-w-[min(720px,78%)] flex-col items-end">
+					<div className="mb-1.5 flex items-center gap-2">
+						{visibleText && <CopyButton text={message.content} />}
+						<span className="text-xs text-slate-400">{formatTime(message.timestamp)}</span>
+						<span className="text-xs font-medium text-slate-500">你</span>
+					</div>
+					{attachments.length > 0 && (
+						<div className="mb-2 flex flex-col items-end gap-2">
+							{attachments.map((attachment) =>
+								attachment.mimeType.startsWith("image/") ? (
+									<ImageAttachmentCard
+										key={attachment.id}
+										attachment={attachment}
+										onClick={() => setPreviewAttachment(attachment)}
+									/>
+								) : (
+									<FileAttachmentCard
+										key={attachment.id}
+										attachment={attachment}
+										onClick={() => setPreviewAttachment(attachment)}
+									/>
+								),
+							)}
+						</div>
+					)}
+					{visibleText && (
+						<div className="w-fit rounded-2xl rounded-tr-md bg-blue-600 px-4 py-3 text-sm leading-7 text-white shadow-sm shadow-blue-600/10">
+							{message.content}
+						</div>
+					)}
 				</div>
 			</div>
+			<MessageAttachmentPreviewDialog
+				attachment={previewAttachment}
+				open={previewAttachment !== null}
+				onOpenChange={(open) => {
+					if (!open) setPreviewAttachment(null);
+				}}
+			/>
+		</>
+	);
+}
+
+function ImageAttachmentCard({
+	attachment,
+	onClick,
+}: {
+	attachment: MessageAttachment;
+	onClick: () => void;
+}) {
+	const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(
+		isInlinePreviewableUrl(attachment.url) ? (attachment.url ?? null) : null,
+	);
+	const [thumbnailLoading, setThumbnailLoading] = useState(false);
+
+	useEffect(() => {
+		if (attachment.url && isInlinePreviewableUrl(attachment.url)) {
+			setThumbnailUrl(attachment.url);
+			return;
+		}
+		if (!attachment.fileUploadId) {
+			setThumbnailUrl(null);
+			return;
+		}
+
+		let cancelled = false;
+		let objectUrl: string | null = null;
+
+		// 历史消息中的图片补拉一次 blob 生成缩略图，避免只剩存储路径时消息区展示不出来。
+		async function loadThumbnail() {
+			setThumbnailLoading(true);
+			try {
+				const response = await fetchFileDownload(attachment.fileUploadId);
+				const blob = await response.blob();
+				objectUrl = URL.createObjectURL(blob);
+				if (!cancelled) setThumbnailUrl(objectUrl);
+			} catch (error) {
+				if (!cancelled) {
+					console.error("Load user attachment thumbnail error:", error);
+					setThumbnailUrl(null);
+				}
+			} finally {
+				if (!cancelled) setThumbnailLoading(false);
+			}
+		}
+
+		void loadThumbnail();
+
+		return () => {
+			cancelled = true;
+			if (objectUrl) URL.revokeObjectURL(objectUrl);
+		};
+	}, [attachment.fileUploadId, attachment.url]);
+
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className="group/attachment relative size-[92px] overflow-hidden rounded-2xl border border-blue-200/70 bg-white shadow-sm transition-colors hover:border-blue-300"
+			title={attachment.name}
+		>
+			{thumbnailUrl ? (
+				<img src={thumbnailUrl} alt={attachment.name} className="h-full w-full object-cover" />
+			) : (
+				<div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400">
+					{thumbnailLoading ? (
+						<LoaderCircle className="size-5 animate-spin" />
+					) : (
+						<ImageIcon className="size-6" />
+					)}
+				</div>
+			)}
+			<AttachmentHoverMask />
+		</button>
+	);
+}
+
+function FileAttachmentCard({
+	attachment,
+	onClick,
+}: {
+	attachment: MessageAttachment;
+	onClick: () => void;
+}) {
+	const sizeText = attachment.size > 0 ? formatFileSize(attachment.size) : "";
+
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className="group/attachment relative flex w-[260px] min-w-0 items-center gap-3 overflow-hidden rounded-xl border border-slate-200/70 bg-white/90 px-3.5 py-3 text-left shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50/60"
+			title={attachment.name}
+		>
+			<AttachmentHoverMask />
+			<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--leros-primary-softer)]">
+				<ProjectFileTypeIcon fileName={attachment.name} />
+			</div>
+			<div className="min-w-0">
+				<div className="truncate text-sm font-normal leading-5 text-[var(--leros-text-strong)]">
+					{attachment.name}
+				</div>
+				{sizeText ? (
+					<div className="mt-1 truncate text-xs leading-4 text-[var(--leros-text-muted)]">
+						{sizeText}
+					</div>
+				) : null}
+			</div>
+		</button>
+	);
+}
+
+function AttachmentHoverMask() {
+	return (
+		<div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-[rgba(15,23,42,0.16)] opacity-0 transition-opacity duration-200 group-hover/attachment:opacity-100">
+			<span className="rounded-full bg-[rgba(15,23,42,0.72)] px-3 py-1 text-xs font-medium tracking-[0.02em] text-white shadow-sm">
+				点击预览
+			</span>
 		</div>
 	);
+}
+
+function isInlinePreviewableUrl(url?: string): boolean {
+	if (!url) return false;
+	return url.startsWith("blob:") || url.startsWith("data:") || /^https?:\/\//.test(url);
 }

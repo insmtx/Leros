@@ -7,6 +7,11 @@ export type NewMessageParams = {
 	task_id?: string;
 	message_type?: string;
 	assistant_id?: number;
+	attachments?: {
+		file_upload_id: string;
+		name: string;
+		mime_type: string;
+	}[];
 };
 
 const WORK_ENDPOINTS = {

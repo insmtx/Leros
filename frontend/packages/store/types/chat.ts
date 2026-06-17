@@ -63,6 +63,15 @@ export type MessageUsage = {
 	totalTokens?: number;
 };
 
+export type MessageAttachment = {
+	id: string;
+	fileUploadId: string;
+	name: string;
+	mimeType: string;
+	size: number;
+	url?: string;
+};
+
 export type Message = {
 	id: string;
 	conversationId: string;
@@ -74,6 +83,7 @@ export type Message = {
 	todos?: RuntimeTodoItem[];
 	approvals?: ApprovalRequest[];
 	artifacts?: MessageArtifact[];
+	attachments?: MessageAttachment[];
 	thinking?: string;
 	metadata?: MessageMetadata;
 	usage?: MessageUsage;

@@ -72,6 +72,7 @@ export type {
 	Attachment,
 	Message,
 	MessageArtifact,
+	MessageAttachment,
 	MessageMetadata,
 	MessageRole,
 	MessageUsage,

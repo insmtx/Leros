@@ -57,9 +57,10 @@ export function ChatInput({ variant = "default" }: { variant?: "default" | "proj
 	const pendingApproval = findPendingApproval(messageIds, messagesMap, activeSessionId);
 
 	const submitMessage = useCallback(() => {
-		if (inputText.trim() || inputAttachments.length > 0) {
+		// 仅上传附件而无文字时接口会报错，因此必须输入内容才可发送
+		if (inputText.trim()) {
 			if (isProjectVariant && currentView === "project") {
-				sendProjectMessage(inputText, activeProjectId);
+				sendProjectMessage(inputText, activeProjectId, inputAttachments);
 			} else {
 				sendMessage(inputText, inputAttachments);
 			}
@@ -74,7 +75,7 @@ export function ChatInput({ variant = "default" }: { variant?: "default" | "proj
 		sendProjectMessage,
 	]);
 
-	const handlePaste = useCallback(
+	const handlePasteFiles = useCallback(
 		(e: React.ClipboardEvent<HTMLElement>) => {
 			const files = Array.from(e.clipboardData.files);
 			for (const file of files) {
@@ -147,7 +148,7 @@ export function ChatInput({ variant = "default" }: { variant?: "default" | "proj
 						value={inputText}
 						onChange={setInputText}
 						onSubmit={submitMessage}
-						onPaste={handlePaste}
+						onPasteFiles={handlePasteFiles}
 						onFocus={() => setInputFocused(true)}
 						onBlur={() => setInputFocused(false)}
 						placeholder={
@@ -259,7 +260,7 @@ export function ChatInput({ variant = "default" }: { variant?: "default" | "proj
 										isProjectVariant && "size-11 min-w-0 rounded-2xl",
 									)}
 									onClick={handleSend}
-									disabled={!inputText.trim() && inputAttachments.length === 0}
+									disabled={!inputText.trim()}
 								>
 									<SendHorizonal className={cn("size-4", !isProjectVariant && "mr-1")} />
 									{!isProjectVariant && "发送"}

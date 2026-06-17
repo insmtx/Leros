@@ -6,6 +6,7 @@ import type {
   BackendApprovalDecisionPayload,
   BackendApprovalRequestPayload,
   BackendMessage,
+  BackendMessageAttachment,
   BackendMessageChunk,
   BackendRuntimeTodoItem,
   BackendSessionArtifactPayload,
@@ -22,6 +23,7 @@ import type {
   Attachment,
   Message,
   MessageArtifact,
+  MessageAttachment,
   MessageMetadata,
   MessageRole,
   MessageUsage,
@@ -117,7 +119,88 @@ function mapBackendMessage(msg: BackendMessage): Message {
       };
     }
   }
+  if (msg.attachments?.length) {
+    const attachments = msg.attachments
+      .map(mapBackendAttachment)
+      .filter(
+        (attachment): attachment is MessageAttachment =>
+          attachment !== undefined,
+      );
+    if (attachments.length) {
+      mapped = { ...mapped, attachments };
+    }
+  }
   return enrichAssistantMessageMetrics(mapped);
+}
+
+function mapBackendAttachment(
+  attachment: BackendMessageAttachment,
+): MessageAttachment | undefined {
+  const fileUploadId = attachment.file_upload_id?.trim();
+  if (!fileUploadId) return undefined;
+
+  return {
+    id: fileUploadId,
+    fileUploadId,
+    name: attachment.name?.trim() || fileUploadId,
+    mimeType: attachment.mime_type?.trim() || "application/octet-stream",
+    size: attachment.size ?? 0,
+    url:
+      attachment.PublicURL?.trim() ||
+      attachment.public_url?.trim() ||
+      undefined,
+  };
+}
+
+function mapComposerAttachment(
+  attachment: Attachment,
+): MessageAttachment | undefined {
+  const fileUploadId = attachment.fileUploadId?.trim();
+  if (!fileUploadId) return undefined;
+
+  return {
+    id: attachment.id,
+    fileUploadId,
+    name: attachment.name,
+    mimeType:
+      attachment.mimeType ||
+      attachment.file?.type ||
+      "application/octet-stream",
+    size: attachment.size,
+    url: attachment.url,
+  };
+}
+
+function mapComposerAttachments(
+  attachments?: Attachment[],
+): MessageAttachment[] | undefined {
+  const mapped = attachments
+    ?.map(mapComposerAttachment)
+    .filter(
+      (attachment): attachment is MessageAttachment => attachment !== undefined,
+    );
+  return mapped?.length ? mapped : undefined;
+}
+
+function mapOutgoingAttachments(
+  attachments?: Attachment[],
+):
+  | Array<{ file_upload_id: string; name: string; mime_type: string }>
+  | undefined {
+  const mapped = attachments
+    ?.filter(
+      (attachment): attachment is Attachment & { fileUploadId: string } =>
+        Boolean(attachment.fileUploadId?.trim()),
+    )
+    .map((attachment) => ({
+      file_upload_id: attachment.fileUploadId.trim(),
+      name: attachment.name,
+      mime_type:
+        attachment.mimeType ||
+        attachment.file?.type ||
+        "application/octet-stream",
+    }));
+  return mapped?.length ? mapped : undefined;
 }
 
 function mapToolCalls(tcList?: BackendToolCall[]): ToolCall[] | undefined {
@@ -714,14 +797,82 @@ function countMatchingMessages(
   return count;
 }
 
+function countMessagesByRole(
+  messages: Message[],
+  role: MessageRole,
+  targetIndex?: number,
+): number {
+  let count = 0;
+  const end = targetIndex ?? messages.length - 1;
+  for (let index = 0; index <= end; index += 1) {
+    if (messages[index]?.role === role) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function findMessageByRoleOccurrence(
+  messages: Message[],
+  role: MessageRole,
+  occurrence: number,
+): Message | undefined {
+  if (occurrence <= 0) return undefined;
+
+  let count = 0;
+  for (const message of messages) {
+    if (message.role !== role) continue;
+    count += 1;
+    if (count === occurrence) {
+      return message;
+    }
+  }
+  return undefined;
+}
+
+function findPersistedMessageMatch(
+  persistedMessages: Message[],
+  localMessages: Message[],
+  localMessage: Message,
+  localIndex?: number,
+): Message | undefined {
+  const exactMatch = persistedMessages.find(
+    (message) => message.id === localMessage.id,
+  );
+  if (exactMatch) return exactMatch;
+
+  if (!isOptimisticMessage(localMessage)) return undefined;
+
+  // 中文注释：流式阶段的 optimistic 消息和落库消息 id 不同，这里按同角色出现顺序兜底配对，
+  // 避免 markdown/空白字符略有差异时把同一轮回复渲染成两条。
+  const roleOccurrence = countMessagesByRole(
+    localMessages,
+    localMessage.role,
+    localIndex,
+  );
+  return findMessageByRoleOccurrence(
+    persistedMessages,
+    localMessage.role,
+    roleOccurrence,
+  );
+}
+
 function shouldKeepLocalMessage(
   persistedMessages: Message[],
   localMessages: Message[],
   localMessage: Message,
   localIndex: number,
 ): boolean {
-  if (persistedMessages.some((message) => message.id === localMessage.id))
+  if (
+    findPersistedMessageMatch(
+      persistedMessages,
+      localMessages,
+      localMessage,
+      localIndex,
+    )
+  ) {
     return false;
+  }
   if (!isOptimisticMessage(localMessage)) return true;
   if (!messageMergeKey(localMessage)) return true;
 
@@ -744,15 +895,89 @@ function compareMessages(a: Message, b: Message): number {
   return a.timestamp - b.timestamp;
 }
 
+function mergeMessageAttachments(
+  persistedAttachments: MessageAttachment[] | undefined,
+  localAttachments: MessageAttachment[] | undefined,
+): MessageAttachment[] | undefined {
+  if (!persistedAttachments?.length) return persistedAttachments;
+  if (!localAttachments?.length) return persistedAttachments;
+
+  const localByUploadId = new Map(
+    localAttachments.map(
+      (attachment) => [attachment.fileUploadId, attachment] as const,
+    ),
+  );
+
+  return persistedAttachments.map((attachment) => {
+    const localAttachment = localByUploadId.get(attachment.fileUploadId);
+    if (!localAttachment?.url?.startsWith("blob:")) return attachment;
+    return {
+      ...attachment,
+      url: localAttachment.url,
+      size: attachment.size || localAttachment.size,
+    };
+  });
+}
+
+function reconcilePersistedMessagesWithLocal(
+  persistedMessages: Message[],
+  localMessages: Message[],
+): Message[] {
+  return persistedMessages.map((persistedMessage, persistedIndex) => {
+    const roleOccurrence = countMessagesByRole(
+      persistedMessages,
+      persistedMessage.role,
+      persistedIndex,
+    );
+    const localMatch =
+      localMessages.find(
+        (localMessage) => localMessage.id === persistedMessage.id,
+      ) ??
+      localMessages.find((localMessage) => {
+        if (localMessage.role !== persistedMessage.role) return false;
+        if (messageMergeKey(localMessage) !== messageMergeKey(persistedMessage))
+          return false;
+        return (
+          countMatchingMessages(localMessages, localMessage) ===
+          countMatchingMessages(persistedMessages, persistedMessage)
+        );
+      }) ??
+      findMessageByRoleOccurrence(
+        localMessages,
+        persistedMessage.role,
+        roleOccurrence,
+      );
+
+    if (
+      !localMatch?.attachments?.length ||
+      !persistedMessage.attachments?.length
+    ) {
+      return persistedMessage;
+    }
+
+    return {
+      ...persistedMessage,
+      attachments: mergeMessageAttachments(
+        persistedMessage.attachments,
+        localMatch.attachments,
+      ),
+    };
+  });
+}
+
 function mergeSessionMessages(
   persistedMessages: Message[],
   localMessages: Message[],
 ): Message[] {
-  const merged = [...persistedMessages];
+  const reconciledPersistedMessages = reconcilePersistedMessagesWithLocal(
+    persistedMessages,
+    localMessages,
+  );
+  const merged = [...reconciledPersistedMessages];
   localMessages.forEach((localMessage, index) => {
     if (
       !shouldKeepLocalMessage(
-        persistedMessages,
+        reconciledPersistedMessages,
         localMessages,
         localMessage,
         index,
@@ -799,7 +1024,8 @@ export class ChatActionImpl {
   };
 
   sendMessage = async (content: string, attachments?: Attachment[]) => {
-    if (!content.trim() && !attachments?.length) return;
+    // 仅上传附件而无文字时后端会报错，必须要求有文本内容
+    if (!content.trim()) return;
 
     const state = this.#get();
     let { activeSessionId } = state;
@@ -842,19 +1068,7 @@ export class ChatActionImpl {
         role: "user",
         content,
         message_type: "text",
-        attachments: attachments
-          ?.filter(
-            (attachment): attachment is Attachment & { fileUploadId: string } =>
-              Boolean(attachment.fileUploadId?.trim()),
-          )
-          .map((attachment) => ({
-            file_upload_id: attachment.fileUploadId.trim(),
-            name: attachment.name,
-            mime_type:
-              attachment.mimeType ||
-              attachment.file?.type ||
-              "application/octet-stream",
-          })),
+        attachments: mapOutgoingAttachments(attachments),
       });
     } catch (err) {
       console.error("sendMessage addMessage error:", err);
@@ -868,6 +1082,7 @@ export class ChatActionImpl {
       role: "user",
       content,
       timestamp: now,
+      attachments: mapComposerAttachments(attachments),
     };
 
     const assistantMsg: Message = {
@@ -890,7 +1105,11 @@ export class ChatActionImpl {
     this.#startSSE(activeSessionId, assistantMsg.id);
   };
 
-  sendProjectMessage = async (content: string, projectId?: string | null) => {
+  sendProjectMessage = async (
+    content: string,
+    projectId?: string | null,
+    attachments?: Attachment[],
+  ) => {
     const trimmed = content.trim();
     if (!trimmed || !projectId) return;
 
@@ -898,6 +1117,7 @@ export class ChatActionImpl {
       const res = await workApi.newMessage({
         content: trimmed,
         project_id: projectId,
+        attachments: mapOutgoingAttachments(attachments),
       });
       const data = res.data.data;
       if (!data?.project_id || !data?.task_id || !data?.session_id) return;
@@ -907,7 +1127,7 @@ export class ChatActionImpl {
         activeTaskDetailProjectId: data.project_id,
         activeTaskDetailTaskId: data.task_id,
         activeTaskDetailSessionId: data.session_id,
-        // 标记“刚创建并准备开流”的 session，避免切页 useEffect 先把旧历史覆盖进来。
+        // 先标记这个新 session 正在接管流式响应，避免切页副作用把旧消息列表提前刷回来。
         pendingBootstrapSessionId: data.session_id,
         currentView: "taskDetail",
         activeProjectTab: "chat",
@@ -916,7 +1136,11 @@ export class ChatActionImpl {
         inputAttachments: [],
       });
 
-      await this.startSessionResponseStream(data.session_id, trimmed);
+      await this.startSessionResponseStream(
+        data.session_id,
+        trimmed,
+        attachments,
+      );
 
       const fullState = this.#fullGet() as {
         fetchProjectDetail?: (projectId: string) => Promise<void>;
@@ -927,7 +1151,11 @@ export class ChatActionImpl {
     }
   };
 
-  startSessionResponseStream = async (sessionId: string, content: string) => {
+  startSessionResponseStream = async (
+    sessionId: string,
+    content: string,
+    attachments?: Attachment[],
+  ) => {
     const trimmed = content.trim();
     if (!sessionId || !trimmed) return;
 
@@ -955,6 +1183,7 @@ export class ChatActionImpl {
       role: "user",
       content: trimmed,
       timestamp: now,
+      attachments: mapComposerAttachments(attachments),
     };
     const assistantMsg: Message = {
       id: `msg-assistant-${now}`,

@@ -60,7 +60,18 @@ export type BackendMessage = {
 	};
 	chunks?: BackendMessageChunk[];
 	artifacts?: BackendSessionArtifactPayload[];
+	attachments?: BackendMessageAttachment[];
 	created_at: string;
+};
+
+export type BackendMessageAttachment = {
+	file_upload_id?: string;
+	name?: string;
+	mime_type?: string;
+	size?: number;
+	purpose?: string;
+	PublicURL?: string;
+	public_url?: string;
 };
 
 export type BackendSessionEvent = {
