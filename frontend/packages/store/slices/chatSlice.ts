@@ -108,7 +108,10 @@ function mapBackendMessage(msg: BackendMessage): Message {
 			.map(mapArtifactPayload)
 			.filter((artifact): artifact is MessageArtifact => artifact !== undefined);
 		if (artifacts.length) {
-			mapped = { ...mapped, artifacts: mergeArtifacts(mapped.artifacts, artifacts) };
+			mapped = {
+				...mapped,
+				artifacts: mergeArtifacts(mapped.artifacts, artifacts),
+			};
 		}
 	}
 	if (msg.attachments?.length) {
@@ -170,6 +173,53 @@ function mapOutgoingAttachments(
 			mime_type: attachment.mimeType || attachment.file?.type || "application/octet-stream",
 		}));
 	return mapped?.length ? mapped : undefined;
+}
+
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeSkillDirectiveName(skillName: string): string {
+	return skillName.trim().replace(/^\/+/, "");
+}
+
+function appendSkillDirectiveToInput(inputText: string, skillName: string): string {
+	const normalizedName = normalizeSkillDirectiveName(skillName);
+	if (!normalizedName) return inputText;
+
+	const token = `/${normalizedName}`;
+	const tokenPattern = new RegExp(`(^|\\s)${escapeRegExp(token)}(?=\\s|$)`);
+	const trimmed = inputText.trimStart();
+	if (tokenPattern.test(trimmed)) {
+		return trimmed.endsWith(" ") ? trimmed : `${trimmed} `;
+	}
+
+	const directivePrefixMatch = trimmed.match(/^((?:\/[^\s/]+\s+)*)/);
+	const directivePrefix = directivePrefixMatch?.[0] ?? "";
+	const rest = trimmed.slice(directivePrefix.length);
+	const nextDirectivePrefix = directivePrefix
+		? `${directivePrefix.trimEnd()} ${token} `
+		: `${token} `;
+
+	return `${nextDirectivePrefix}${rest}`;
+}
+
+function replaceSkillDirectiveInInput(inputText: string, skillName: string): string {
+	const normalizedName = normalizeSkillDirectiveName(skillName);
+	if (!normalizedName) return inputText;
+
+	const token = `/${normalizedName}`;
+	const trimmed = inputText.trimStart();
+	const rest = trimmed.replace(/^(?:\/[^\s/]+\s+)*/, "");
+	return rest ? `${token} ${rest}` : `${token} `;
+}
+
+function revokeLocalAttachmentUrls(attachments: Attachment[]) {
+	for (const attachment of attachments) {
+		if (attachment.url?.startsWith("blob:")) {
+			URL.revokeObjectURL(attachment.url);
+		}
+	}
 }
 
 function mapToolCalls(tcList?: BackendToolCall[]): ToolCall[] | undefined {
@@ -582,7 +632,10 @@ function applySessionEventToMessage(
 				("tool_calls" in normalizedEvent ? normalizedEvent.tool_calls : undefined),
 		);
 		if (toolCalls?.length) {
-			return { ...message, toolCalls: mergeToolCalls(message.toolCalls, toolCalls) };
+			return {
+				...message,
+				toolCalls: mergeToolCalls(message.toolCalls, toolCalls),
+			};
 		}
 	}
 
@@ -596,19 +649,28 @@ function applySessionEventToMessage(
 		case "artifact.declared": {
 			const artifact = mapArtifactPayload(payload);
 			if (!artifact) return message;
-			return { ...message, artifacts: mergeArtifacts(message.artifacts, [artifact]) };
+			return {
+				...message,
+				artifacts: mergeArtifacts(message.artifacts, [artifact]),
+			};
 		}
 		case "approval.requested": {
 			const approvalPayload = getApprovalRequestPayload(payload);
 			const approval = approvalPayload ? mapApprovalRequestPayload(approvalPayload) : undefined;
 			if (!approval) return message;
-			return { ...message, approvals: mergeApprovalRequest(message.approvals, approval) };
+			return {
+				...message,
+				approvals: mergeApprovalRequest(message.approvals, approval),
+			};
 		}
 		case "approval.resolved": {
 			const decisionPayload = getApprovalDecisionPayload(payload);
 			const decision = decisionPayload ? mapApprovalDecisionPayload(decisionPayload) : undefined;
 			if (!decision) return message;
-			return { ...message, approvals: mergeApprovalDecision(message.approvals, decision) };
+			return {
+				...message,
+				approvals: mergeApprovalDecision(message.approvals, decision),
+			};
 		}
 		case "message.delta":
 		case "message.result": {
@@ -630,7 +692,10 @@ function applySessionEventToMessage(
 		case "tool_call.failed": {
 			const toolCall = mapToolCallEvent(normalizedEventType, payload);
 			if (!toolCall) return message;
-			return { ...message, toolCalls: upsertToolCall(message.toolCalls, toolCall) };
+			return {
+				...message,
+				toolCalls: upsertToolCall(message.toolCalls, toolCall),
+			};
 		}
 		case "run.completed": {
 			const resultMessage = getRunResultMessage(payload);
@@ -1053,7 +1118,7 @@ export class ChatActionImpl {
 		this.#startSSE(sessionId, assistantMsg.id);
 	};
 
-	#startSSE = async (sessionId: string, assistantMsgId: string) => {
+	#startSSE = async (sessionId: string, assistantMsgId: string, replay = false) => {
 		if (this.#sseClient) {
 			this.#sseClient.close();
 			this.#sseClient = null;
@@ -1068,7 +1133,7 @@ export class ChatActionImpl {
 		const client = new FetchSSEClient(url, {
 			method: "POST",
 			headers: { Authorization: `Bearer ${token}` },
-			body: { session_id: sessionId },
+			body: { session_id: sessionId, ...(replay ? { replay: true } : {}) },
 			onMessage: (event) => {
 				try {
 					const data = JSON.parse(event.data) as SSEMessageEvent;
@@ -1093,7 +1158,9 @@ export class ChatActionImpl {
 						this.#sseClient?.close();
 						this.#sseClient = null;
 						// 会话结束后回拉历史消息，确保持久化 usage 能立即参与页面汇总展示。
-						void this.loadConversationMessages(sessionId);
+						void this.loadConversationMessages(sessionId, {
+							resumeStream: false,
+						});
 					}
 				} catch {
 					const msg = this.#get().messagesMap[assistantMsgId];
@@ -1146,20 +1213,31 @@ export class ChatActionImpl {
 		this.#finishStream();
 	};
 
-	loadConversationMessages = async (sessionId: string) => {
+	loadConversationMessages = async (sessionId: string, options?: { resumeStream?: boolean }) => {
 		if (this.#get().pendingBootstrapSessionId === sessionId) return;
 		const loading = this.#messageLoadPromises.get(sessionId);
 		if (loading) return loading;
 
-		const loadPromise = this.#loadConversationMessages(sessionId).finally(() => {
+		const loadPromise = this.#loadConversationMessages(sessionId, options).finally(() => {
 			this.#messageLoadPromises.delete(sessionId);
 		});
 		this.#messageLoadPromises.set(sessionId, loadPromise);
 		return loadPromise;
 	};
 
-	#loadConversationMessages = async (sessionId: string) => {
+	#loadConversationMessages = async (sessionId: string, options?: { resumeStream?: boolean }) => {
 		try {
+			const shouldCheckRuntime = options?.resumeStream !== false;
+			let runtimeStatus: string | undefined;
+			if (shouldCheckRuntime) {
+				try {
+					const sessionRes = await sessionApi.get({ session_id: sessionId });
+					runtimeStatus = sessionRes.data.data?.runtime_status;
+				} catch (err) {
+					console.error("loadConversationMessages get session error:", err);
+				}
+			}
+
 			const stateBeforeLoad = this.#get();
 			const optimisticCountBeforeLoad = getSessionLocalMessages(stateBeforeLoad, sessionId).filter(
 				isOptimisticMessage,
@@ -1192,6 +1270,25 @@ export class ChatActionImpl {
 			const messages = reconcilingLocalMessages.length
 				? mergeSessionMessages(persistedMessages, reconcilingLocalMessages)
 				: persistedMessages;
+			const shouldResumeStream =
+				runtimeStatus === "responding" &&
+				!(
+					state.isGenerating &&
+					state.activeSessionId === sessionId &&
+					state.streamingMessageId !== null
+				);
+			const resumeMessage: Message | undefined = shouldResumeStream
+				? {
+						id: `msg-assistant-resume-${Date.now()}`,
+						conversationId: sessionId,
+						role: "assistant",
+						content: "",
+						timestamp: Date.now(),
+					}
+				: undefined;
+			if (resumeMessage) {
+				messages.push(resumeMessage);
+			}
 
 			const maps: Record<string, Message> = {};
 			const ids: string[] = [];
@@ -1200,7 +1297,19 @@ export class ChatActionImpl {
 				ids.push(m.id);
 			}
 
-			this.#set({ messagesMap: maps, messageIds: ids });
+			this.#set({
+				messagesMap: maps,
+				messageIds: ids,
+				...(resumeMessage
+					? {
+							streamingMessageId: resumeMessage.id,
+							isGenerating: true,
+						}
+					: {}),
+			});
+			if (resumeMessage) {
+				this.#startSSE(sessionId, resumeMessage.id, true);
+			}
 		} catch (err) {
 			console.error("loadConversationMessages error:", err);
 		}
@@ -1224,6 +1333,24 @@ export class ChatActionImpl {
 
 	setInputText = (text: string) => {
 		this.#set({ inputText: text });
+	};
+
+	clearComposerInput = () => {
+		const state = this.#get();
+		revokeLocalAttachmentUrls(state.inputAttachments);
+		this.#set({ inputText: "", inputAttachments: [] });
+	};
+
+	appendSkillDirective = (skillName: string) => {
+		this.#set((state) => ({
+			inputText: appendSkillDirectiveToInput(state.inputText, skillName),
+		}));
+	};
+
+	replaceSkillDirective = (skillName: string) => {
+		this.#set((state) => ({
+			inputText: replaceSkillDirectiveInInput(state.inputText, skillName),
+		}));
 	};
 
 	addAttachment = (file: File) => {
