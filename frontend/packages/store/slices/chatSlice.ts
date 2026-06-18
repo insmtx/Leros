@@ -355,61 +355,6 @@ function appendProcessToolCallStep(
 	];
 }
 
-function trimDuplicatedProcessText(
-	processText: string,
-	finalContent: string | undefined,
-): string | undefined {
-	if (!processText) return processText;
-	if (!finalContent?.trim()) return processText;
-
-	const normalizedProcess = processText.replace(/\r\n/g, "\n").trimEnd();
-	const normalizedFinal = finalContent.replace(/\r\n/g, "\n").trim();
-	if (!normalizedProcess || !normalizedFinal) return processText;
-
-	if (normalizedProcess === normalizedFinal) {
-		return undefined;
-	}
-
-	// 中文注释：过程文本尾部如果已经开始输出最终答案，就在 run.completed 到来后裁掉这段重复尾巴。
-	for (
-		let overlap = Math.min(normalizedProcess.length, normalizedFinal.length);
-		overlap > 0;
-		overlap -= 1
-	) {
-		if (!normalizedProcess.endsWith(normalizedFinal.slice(0, overlap))) continue;
-		const trimmed = normalizedProcess.slice(0, normalizedProcess.length - overlap).trimEnd();
-		return trimmed || undefined;
-	}
-
-	return processText;
-}
-
-function trimDuplicatedProcessSteps(
-	steps: MessageProcessStep[] | undefined,
-	finalContent: string | undefined,
-): MessageProcessStep[] | undefined {
-	if (!steps?.length || !finalContent?.trim()) return steps;
-
-	const next = [...steps];
-	for (let index = next.length - 1; index >= 0; index -= 1) {
-		const step = next[index];
-		if (step?.type !== "thinking") continue;
-
-		const trimmed = trimDuplicatedProcessText(step.content, finalContent);
-		if (trimmed === step.content) {
-			return next;
-		}
-		if (!trimmed) {
-			next.splice(index, 1);
-			continue;
-		}
-		next[index] = { ...step, content: trimmed };
-		return next;
-	}
-
-	return next;
-}
-
 function metadataFromPayload(payload: BackendSessionEventPayload): MessageMetadata | undefined {
 	const usage = mapUsage(payload.usage ?? payload);
 	const streamLatency = latencyFromRunCompletedTimes(payload.started_at, payload.completed_at);
@@ -742,8 +687,7 @@ function applySessionEventToMessage(
 				approvals: mergeApprovalDecision(message.approvals, decision),
 			};
 		}
-		case "message.delta":
-		case "message.result": {
+		case "message.delta": {
 			const content = getEventContent(normalizedEvent, payload);
 			if (!content) return message;
 			return {
@@ -785,7 +729,6 @@ function applySessionEventToMessage(
 			return enrichAssistantMessageMetrics({
 				...message,
 				content: finalContent,
-				processSteps: trimDuplicatedProcessSteps(message.processSteps, finalContent),
 				artifacts: artifacts?.length
 					? mergeArtifacts(message.artifacts, artifacts)
 					: message.artifacts,
@@ -953,29 +896,15 @@ function reconcilePersistedMessagesWithLocal(
 			findMessageByRoleOccurrence(localMessages, persistedMessage.role, roleOccurrence);
 
 		if (!localMatch?.attachments?.length || !persistedMessage.attachments?.length) {
-			if (!localMatch) {
-				return persistedMessage;
-			}
-			return {
-				...persistedMessage,
-				// 中文注释：run.completed 后会回拉历史消息，这里优先保留流式阶段已经排好的过程步骤顺序，
-				// 避免历史 chunks 的排列方式把“思考/工具交叉过程”覆盖成分组展示。
-				processSteps: localMatch.processSteps?.length
-					? localMatch.processSteps
-					: persistedMessage.processSteps,
-			};
+			return persistedMessage;
 		}
 
 		return {
 			...persistedMessage,
-			processSteps: localMatch.processSteps?.length
-				? localMatch.processSteps
-				: persistedMessage.processSteps,
 			attachments: mergeMessageAttachments(persistedMessage.attachments, localMatch.attachments),
 		};
 	});
 }
-
 function mergeSessionMessages(persistedMessages: Message[], localMessages: Message[]): Message[] {
 	const reconciledPersistedMessages = reconcilePersistedMessagesWithLocal(
 		persistedMessages,
