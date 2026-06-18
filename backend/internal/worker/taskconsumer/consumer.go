@@ -327,7 +327,7 @@ func (c *Consumer) executeWithTracker(ctx context.Context, taskMsg protocol.Work
 // runTask executes the agent run for a consolidated task message. Existing logic preserved.
 func (c *Consumer) runTask(ctx context.Context, taskMsg protocol.WorkerTaskMessage) error {
 	req := RequestFromWorkerTask(taskMsg)
-	plan, err := c.prepareWorkspace(ctx, taskMsg, req)
+	_, err := c.prepareWorkspace(ctx, taskMsg, req)
 	if err != nil {
 		return err
 	}
@@ -344,12 +344,6 @@ func (c *Consumer) runTask(ctx context.Context, taskMsg protocol.WorkerTaskMessa
 	result, err := c.runner.Run(ctx, req)
 	if err != nil {
 		return err
-	}
-
-	if plan != nil {
-		if pushErr := agentworkspace.PushWorkspace(ctx, plan); pushErr != nil {
-			logs.WarnContextf(ctx, "git push workspace failed: %v", pushErr)
-		}
 	}
 
 	if result != nil {
@@ -401,6 +395,7 @@ func (c *Consumer) prepareWorkspace(ctx context.Context, taskMsg protocol.Worker
 		return nil, err
 	}
 	req.Runtime.WorkDir = plan.EffectiveWorkDir
+	req.Workspace.RepoDir = plan.RepoDir
 	return plan, nil
 }
 
