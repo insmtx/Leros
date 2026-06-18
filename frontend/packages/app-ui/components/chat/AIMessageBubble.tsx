@@ -40,6 +40,9 @@ import { ArtifactPreviewDialog } from "../layout/ArtifactPreviewDialog";
 import { ProjectFileTypeIcon } from "../layout/project-file-type-icon";
 import { ToolCallBlock } from "./ToolCallBlock";
 
+// Button 的 size 只支持预设枚举，这里用受支持的尺寸并通过 className 微调成更紧凑的操作按钮。
+const compactActionButtonClassName = "size-[26px]";
+
 function CopyButton({ text }: { text: string }) {
 	const [copied, setCopied] = useState(false);
 	const handleCopy = () => {
@@ -50,8 +53,8 @@ function CopyButton({ text }: { text: string }) {
 	return (
 		<Button
 			variant="ghost"
-			size="icon-[13px]"
-			className={copied ? "text-green-500" : "text-slate-400 hover:text-slate-600"}
+			size="icon-xs"
+			className={`${compactActionButtonClassName} ${copied ? "text-green-500" : "text-slate-400 hover:text-slate-600"}`}
 			onClick={handleCopy}
 		>
 			{copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
@@ -137,8 +140,8 @@ export function AIMessageBubble({
 							{SHOW_ASSISTANT_MESSAGE_REGENERATE_BUTTON && (
 								<Button
 									variant="ghost"
-									size="icon-[13px]"
-									className="text-slate-400 hover:text-slate-600"
+									size="icon-xs"
+									className={`${compactActionButtonClassName} text-slate-400 hover:text-slate-600`}
 									onClick={() => resendMessage(message.id)}
 								>
 									<RefreshCw className="size-3.5" />

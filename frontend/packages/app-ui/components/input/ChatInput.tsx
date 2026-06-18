@@ -57,6 +57,8 @@ export function ChatInput({ variant = "default" }: { variant?: "default" | "proj
 	const pendingApproval = findPendingApproval(messageIds, messagesMap, activeSessionId);
 
 	const submitMessage = useCallback(() => {
+		// 中文注释：输入区先做一次生成态拦截，避免回车绕过按钮态再次触发发送。
+		if (isGenerating) return;
 		// 仅上传附件而无文字时接口会报错，因此必须输入内容才可发送
 		if (inputText.trim()) {
 			if (isProjectVariant && currentView === "project") {
@@ -71,6 +73,7 @@ export function ChatInput({ variant = "default" }: { variant?: "default" | "proj
 		isProjectVariant,
 		currentView,
 		activeProjectId,
+		isGenerating,
 		sendMessage,
 		sendProjectMessage,
 	]);
