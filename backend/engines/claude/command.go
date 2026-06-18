@@ -16,6 +16,7 @@ func buildArgs(req engines.RunRequest) []string {
 		"--verbose",
 		"--output-format", "stream-json",
 		"--input-format", "stream-json",
+		"--include-partial-messages",
 		"--permission-prompt-tool", "stdio",
 		"--disallowedTools", "EnterPlanMode,ExitPlanMode,WebSearch",
 	}

@@ -141,6 +141,14 @@ func TestBuildArgsBypassesPermissionsByDefault(t *testing.T) {
 	}
 }
 
+func TestBuildArgsIncludesPartialMessages(t *testing.T) {
+	args := buildArgs(engines.RunRequest{})
+
+	if !containsArg(args, "--include-partial-messages") {
+		t.Fatalf("expected --include-partial-messages in args: %#v", args)
+	}
+}
+
 func TestBuildArgsSkipsEmptySystemPrompt(t *testing.T) {
 	args := buildArgs(engines.RunRequest{
 		SystemPrompt: "   ",
@@ -174,6 +182,102 @@ func TestParseClaudeLineTracksAssistantFallback(t *testing.T) {
 	}
 	if state.lastAssistantText != "answer" {
 		t.Fatalf("got %q, want answer", state.lastAssistantText)
+	}
+}
+
+func TestParseClaudeStreamTextDeltasShareMessageIDUntilBoundary(t *testing.T) {
+	state := &claudeStreamState{}
+	first := parseClaudeLine(`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"也没有"}}}`, state)
+	second := parseClaudeLine(`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"发现"}}}`, state)
+
+	firstPayload := decodeMessageDeltaPayload(t, first)
+	secondPayload := decodeMessageDeltaPayload(t, second)
+	if firstPayload.Content != "也没有" || secondPayload.Content != "发现" {
+		t.Fatalf("unexpected contents: %#v %#v", firstPayload, secondPayload)
+	}
+	if firstPayload.MessageID == "" || firstPayload.MessageID != secondPayload.MessageID {
+		t.Fatalf("expected shared message_id, got %q and %q", firstPayload.MessageID, secondPayload.MessageID)
+	}
+}
+
+func TestParseClaudeStreamTextDeltaStartsNewMessageAfterToolBoundary(t *testing.T) {
+	state := &claudeStreamState{}
+	first := parseClaudeLine(`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"第一段"}}}`, state)
+	parseClaudeLineEvents(`{"type":"stream_event","event":{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"call_1","name":"Bash","input":{}}}}`, state)
+	second := parseClaudeLine(`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"第二段"}}}`, state)
+
+	firstPayload := decodeMessageDeltaPayload(t, first)
+	secondPayload := decodeMessageDeltaPayload(t, second)
+	if firstPayload.MessageID == "" || secondPayload.MessageID == "" || firstPayload.MessageID == secondPayload.MessageID {
+		t.Fatalf("expected different message_id after tool boundary, got %q and %q", firstPayload.MessageID, secondPayload.MessageID)
+	}
+}
+
+func TestParseClaudeStreamTextDeltaStartsNewMessageAfterResultBoundary(t *testing.T) {
+	state := &claudeStreamState{}
+	first := parseClaudeLine(`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"第一段"}}}`, state)
+	parseClaudeLineEvents(`{"type":"result","result":"","is_error":false}`, state)
+	second := parseClaudeLine(`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"第二段"}}}`, state)
+
+	firstPayload := decodeMessageDeltaPayload(t, first)
+	secondPayload := decodeMessageDeltaPayload(t, second)
+	if firstPayload.MessageID == "" || secondPayload.MessageID == "" || firstPayload.MessageID == secondPayload.MessageID {
+		t.Fatalf("expected different message_id after result boundary, got %q and %q", firstPayload.MessageID, secondPayload.MessageID)
+	}
+}
+
+func TestParseClaudeStreamTextDeltaStartsNewMessageAfterContentBlockStopBoundary(t *testing.T) {
+	state := &claudeStreamState{}
+	first := parseClaudeLine(`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"第一段"}}}`, state)
+	parseClaudeLineEvents(`{"type":"stream_event","event":{"type":"content_block_stop","index":0}}`, state)
+	second := parseClaudeLine(`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"第二段"}}}`, state)
+
+	firstPayload := decodeMessageDeltaPayload(t, first)
+	secondPayload := decodeMessageDeltaPayload(t, second)
+	if firstPayload.MessageID == "" || secondPayload.MessageID == "" || firstPayload.MessageID == secondPayload.MessageID {
+		t.Fatalf("expected different message_id after content block stop boundary, got %q and %q", firstPayload.MessageID, secondPayload.MessageID)
+	}
+}
+
+func TestParseClaudeAssistantSnapshotOnlyEmitsMissingSuffixAfterPartialDeltas(t *testing.T) {
+	state := &claudeStreamState{}
+	first := parseClaudeLine(`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"你好"}}}`, state)
+	parseClaudeLineEvents(`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"，世界"}}}`, state)
+
+	parsed := parseClaudeLineEvents(`{"type":"assistant","message":{"content":[{"type":"text","text":"你好，世界！"}]}}`, state)
+	if len(parsed) != 1 {
+		t.Fatalf("expected one suffix event, got %#v", parsed)
+	}
+	firstPayload := decodeMessageDeltaPayload(t, first)
+	suffixPayload := decodeMessageDeltaPayload(t, parsed[0])
+	if suffixPayload.Content != "！" {
+		t.Fatalf("expected suffix only, got %#v", suffixPayload)
+	}
+	if suffixPayload.MessageID != firstPayload.MessageID {
+		t.Fatalf("expected suffix to use same message_id, got %q and %q", suffixPayload.MessageID, firstPayload.MessageID)
+	}
+}
+
+func TestParseClaudeAssistantSnapshotDoesNotRepeatCoveredPartialDeltas(t *testing.T) {
+	state := &claudeStreamState{}
+	parseClaudeLineEvents(`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"你好"}}}`, state)
+	parseClaudeLineEvents(`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"，世界"}}}`, state)
+
+	parsed := parseClaudeLineEvents(`{"type":"assistant","message":{"content":[{"type":"text","text":"你好，世界"}]}}`, state)
+	if len(parsed) != 0 {
+		t.Fatalf("expected covered snapshot to emit nothing, got %#v", parsed)
+	}
+}
+
+func TestParseClaudeAssistantSnapshotDoesNotRepeatCoveredPartialDeltasAfterStop(t *testing.T) {
+	state := &claudeStreamState{}
+	parseClaudeLineEvents(`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"你好"}}}`, state)
+	parseClaudeLineEvents(`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"，世界"}}}`, state)
+	parseClaudeLineEvents(`{"type":"stream_event","event":{"type":"content_block_stop","index":0}}`, state)
+
+	parsed := parseClaudeLineEvents(`{"type":"assistant","message":{"content":[{"type":"text","text":"你好，世界"}]}}`, state)
+	if len(parsed) != 0 {
+		t.Fatalf("expected covered snapshot after stop to emit nothing, got %#v", parsed)
 	}
 }
 
@@ -317,6 +421,18 @@ func decodeEventContent(t *testing.T, content string) map[string]any {
 		t.Fatalf("decode event content: %v", err)
 	}
 	return decoded
+}
+
+func decodeMessageDeltaPayload(t *testing.T, event events.Event) events.MessageDeltaPayload {
+	t.Helper()
+	if event.Type != events.EventMessageDelta {
+		t.Fatalf("expected message delta, got %#v", event)
+	}
+	payload, err := events.DecodePayload[events.MessageDeltaPayload](&event)
+	if err != nil {
+		t.Fatalf("decode message delta payload: %v", err)
+	}
+	return payload
 }
 
 func findClaudeTestEvent(eventList []events.Event, eventType events.EventType) *events.Event {
