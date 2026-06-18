@@ -56,9 +56,8 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 		switchProject,
 		clearTaskDetailRoute,
 	} = useLayoutStore((s) => s);
-	const { startSessionResponseStream, resetLocalMessages, addUploadedAttachment } = useChatStore(
-		(s) => s,
-	);
+	const { startSessionResponseStream, resetLocalMessages, addUploadedAttachment, isGenerating } =
+		useChatStore((s) => s);
 	const { isAuthenticated, openAuthDialog, requireAuth, user } = useAuth();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const attachmentsRef = useRef<Attachment[]>([]);
@@ -82,6 +81,18 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 		setAttachments([]);
 	};
 
+	const cloneAttachmentsForOptimisticMessage = (items: Attachment[]) =>
+		items.map((attachment) => {
+			// 中文注释：工作台清空输入区时会释放原 blob 预览，这里为任务页首屏回显复制一份独立预览地址。
+			if (attachment.type === "image" && attachment.file) {
+				return {
+					...attachment,
+					url: URL.createObjectURL(attachment.file),
+				};
+			}
+			return { ...attachment };
+		});
+
 	useEffect(() => {
 		attachmentsRef.current = attachments;
 	}, [attachments]);
@@ -96,9 +107,12 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 	}, [clearTaskDetailRoute, resetLocalMessages]);
 
 	const performSend = async (content: string) => {
+		if (isGenerating) return;
 		const data = await sendWorkbenchMessage(content, activeWorkbenchProjectId, attachments);
 		if (data?.session_id) {
-			await startSessionResponseStream(data.session_id, content);
+			const optimisticAttachments = cloneAttachmentsForOptimisticMessage(attachments);
+			// 中文注释：工作台跳转任务页前，先把附件一起写入 optimistic 消息，避免首屏只显示文本。
+			await startSessionResponseStream(data.session_id, content, optimisticAttachments);
 		}
 		if (navigation && data?.project_id && data?.task_id && data?.session_id) {
 			navigation.goToTaskDetail(data.project_id, data.task_id, data.session_id);
@@ -109,7 +123,7 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 
 	const handleSend = async () => {
 		const content = input.trim();
-		if (!content) return;
+		if (!content || isGenerating) return;
 		if (!isAuthenticated) {
 			requireAuth(() => {
 				void performSend(content);
@@ -510,7 +524,7 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 									<Button
 										size="icon"
 										onClick={handleSend}
-										disabled={!input.trim() && attachments.length === 0}
+										disabled={isGenerating || (!input.trim() && attachments.length === 0)}
 										className="size-9 rounded-xl bg-[var(--leros-primary)] text-white shadow-sm hover:bg-[var(--leros-primary-strong)] disabled:bg-[var(--leros-chat-control-bg)] disabled:text-[var(--leros-text-subtle)]"
 									>
 										<SendHorizonal className="size-4" />

@@ -341,6 +341,13 @@ function getRunResultMessage(payload: BackendSessionEventPayload): string | unde
 	return typeof value.message === "string" ? value.message : undefined;
 }
 
+function getRunFailedMessage(payload: BackendSessionEventPayload): string | undefined {
+	if (typeof payload.error === "string" && payload.error.trim()) {
+		return payload.error;
+	}
+	return getRunResultMessage(payload);
+}
+
 function splitThinkingStepContent(content: string): string[] {
 	const normalized = content.replace(/\r\n/g, "\n");
 	const withStageBoundaries = normalized.replace(
@@ -829,6 +836,15 @@ function applySessionEventToMessage(
 				usage: usage ?? message.usage,
 			});
 		}
+		case "run.failed": {
+			const failedMessage = getRunFailedMessage(payload);
+			if (!failedMessage) return message;
+			return {
+				...message,
+				// 中文注释：失败事件也要回填到当前 assistant 消息里，避免界面只剩空占位。
+				content: failedMessage,
+			};
+		}
 		default:
 			return message;
 	}
@@ -1048,6 +1064,8 @@ export class ChatActionImpl {
 		if (!content.trim()) return;
 
 		const state = this.#get();
+		// 中文注释：生成中禁止再次发送，避免新的请求把上一条流式响应直接顶掉。
+		if (state.isGenerating) return;
 		let { activeSessionId } = state;
 
 		if (!activeSessionId) {
@@ -1132,6 +1150,7 @@ export class ChatActionImpl {
 	) => {
 		const trimmed = content.trim();
 		if (!trimmed || !projectId) return;
+		if (this.#get().isGenerating) return;
 
 		try {
 			const res = await workApi.newMessage({
@@ -1176,6 +1195,7 @@ export class ChatActionImpl {
 		if (!sessionId || !trimmed) return;
 
 		const state = this.#get();
+		if (state.isGenerating) return;
 		if (state.activeSessionId === sessionId && state.isGenerating) {
 			if (state.pendingBootstrapSessionId === sessionId) {
 				this.#set({ pendingBootstrapSessionId: null });
@@ -1331,6 +1351,30 @@ export class ChatActionImpl {
 		return loadPromise;
 	};
 
+	#fetchAllConversationMessages = async (sessionId: string) => {
+		const perPage = 100;
+		let page = 1;
+		let total = Number.POSITIVE_INFINITY;
+		const items: BackendMessage[] = [];
+
+		while (items.length < total) {
+			const res = await sessionApi.getMessages(sessionId, page, perPage);
+			const data = res.data.data;
+			const pageItems = data?.items ?? [];
+			total = data?.total ?? items.length + pageItems.length;
+			items.push(...pageItems);
+
+			// 中文注释：当最后一页不足 perPage 或后端未返回更多记录时，直接停止翻页，避免无意义请求。
+			if (pageItems.length < perPage || pageItems.length === 0) {
+				break;
+			}
+
+			page += 1;
+		}
+
+		return items;
+	};
+
 	#loadConversationMessages = async (sessionId: string, options?: { resumeStream?: boolean }) => {
 		try {
 			const shouldCheckRuntime = options?.resumeStream !== false;
@@ -1348,8 +1392,7 @@ export class ChatActionImpl {
 			const optimisticCountBeforeLoad = getSessionLocalMessages(stateBeforeLoad, sessionId).filter(
 				isOptimisticMessage,
 			).length;
-			const res = await sessionApi.getMessages(sessionId, 1, 100);
-			const items = res.data.data?.items ?? [];
+			const items = await this.#fetchAllConversationMessages(sessionId);
 			const persistedMessages = items.map(mapBackendMessage);
 			const state = this.#get();
 			if (state.pendingBootstrapSessionId === sessionId) return;
@@ -1519,6 +1562,7 @@ export class ChatActionImpl {
 
 	resendMessage = async (messageId: string) => {
 		const state = this.#get();
+		if (state.isGenerating) return;
 		const oldMsg = state.messagesMap[messageId];
 		if (oldMsg?.role !== "assistant") return;
 
