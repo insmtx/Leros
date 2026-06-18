@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -12,20 +13,28 @@ import (
 	"github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/worker"
 	"github.com/insmtx/Leros/backend/types"
-	"github.com/ygpkg/yg-go/logs"
 )
 
 var _ contract.DigitalAssistantService = (*digitalAssistantService)(nil)
 
 type digitalAssistantService struct {
-	db              *gorm.DB
-	workerScheduler worker.WorkerScheduler
+	db                 *gorm.DB
+	workerScheduler    worker.WorkerScheduler
+	workerProvisioning *WorkerProvisioningService
 }
 
 func NewDigitalAssistantService(db *gorm.DB, workerScheduler worker.WorkerScheduler) contract.DigitalAssistantService {
 	return &digitalAssistantService{
 		db:              db,
 		workerScheduler: workerScheduler,
+	}
+}
+
+func NewDigitalAssistantServiceWithProvisioning(db *gorm.DB, workerScheduler worker.WorkerScheduler, provisioning *WorkerProvisioningService) contract.DigitalAssistantService {
+	return &digitalAssistantService{
+		db:                 db,
+		workerScheduler:    workerScheduler,
+		workerProvisioning: provisioning,
 	}
 }
 
@@ -40,6 +49,12 @@ func (s *digitalAssistantService) CreateDigitalAssistant(ctx context.Context, re
 	}
 	if req.Name == "" {
 		return nil, errors.New("name is required")
+	}
+
+	if s.workerProvisioning != nil {
+		if _, err := s.workerProvisioning.EnsureDefaultWorkerForOrg(ctx, caller.OrgID, caller.Uin); err != nil {
+			return nil, fmt.Errorf("ensure default worker deployment: %w", err)
+		}
 	}
 
 	exists, err := db.DigitalAssistantCodeExists(ctx, s.db, req.Code, 0)
@@ -66,14 +81,9 @@ func (s *digitalAssistantService) CreateDigitalAssistant(ctx context.Context, re
 		return nil, err
 	}
 
-	if s.workerScheduler != nil && da.Status == string(contract.DigitalAssistantStatusActive) {
-		spec := &worker.WorkerSpec{
-			ID:      da.Code,
-			Name:    da.Name,
-			EnvType: worker.WorkerEnvProcess,
-		}
-		if _, err := s.workerScheduler.Start(ctx, spec); err != nil {
-			logs.Warnf("Failed to start worker for assistant %s: %v", da.Code, err)
+	if s.workerProvisioning != nil {
+		if _, err := s.workerProvisioning.EnsureForAssistant(ctx, da); err != nil {
+			return nil, fmt.Errorf("ensure worker deployment: %w", err)
 		}
 	}
 
@@ -255,7 +265,32 @@ func (s *digitalAssistantService) UpdateDigitalAssistantStatus(ctx context.Conte
 	da.Status = req.Status
 	da.UpdatedAt = time.Now()
 
-	return db.UpdateDigitalAssistant(ctx, s.db, da)
+	if err := db.UpdateDigitalAssistant(ctx, s.db, da); err != nil {
+		return err
+	}
+
+	if s.workerProvisioning != nil {
+		switch da.Status {
+		case string(contract.DigitalAssistantStatusActive):
+			if err := s.workerProvisioning.MarkAssistantActive(ctx, da); err != nil {
+				return fmt.Errorf("mark worker deployment active: %w", err)
+			}
+		case string(contract.DigitalAssistantStatusInactive), string(contract.DigitalAssistantStatusArchived), string(contract.DigitalAssistantStatusDraft):
+			if err := s.workerProvisioning.MarkAssistantStopped(ctx, da); err != nil {
+				return fmt.Errorf("mark worker deployment stopped: %w", err)
+			}
+			if s.workerScheduler != nil {
+				if deployment, err := db.GetWorkerDeploymentByAssistantID(ctx, s.db, da.ID); err != nil {
+					return err
+				} else if deployment != nil {
+					if err := s.workerScheduler.Stop(ctx, deployment.DeploymentName); err != nil {
+						return fmt.Errorf("stop worker deployment: %w", err)
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func convertToContractDigitalAssistant(da *types.DigitalAssistant) *contract.DigitalAssistant {

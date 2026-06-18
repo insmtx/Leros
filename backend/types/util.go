@@ -9,11 +9,22 @@ const (
 	AuthStateFailed AuthState = 2
 )
 
+// CallerKind identifies the authenticated principal type.
+type CallerKind string
+
+const (
+	CallerKindUser   CallerKind = "user"
+	CallerKindWorker CallerKind = "worker"
+	CallerKindSystem CallerKind = "system"
+)
+
 // Caller 定义了一个执行身份，包含用户 ID、租户 ID 和认证状态。
 type Caller struct {
-	Uin   uint      `json:"uin"`
-	OrgID uint      `json:"org_id"`
-	State AuthState `json:"state"`
+	Uin      uint       `json:"uin"`
+	OrgID    uint       `json:"org_id"`
+	WorkerID uint       `json:"worker_id,omitempty"`
+	Kind     CallerKind `json:"kind,omitempty"`
+	State    AuthState  `json:"state"`
 }
 
 // Trace 定义了一个跟踪信息结构体，用于在请求链路中传递跟踪标识符，帮助进行分布式追踪和日志关联。
@@ -34,6 +45,7 @@ func SystemIdentity() *Caller {
 	return &Caller{
 		Uin:   SystemUin,
 		OrgID: SystemOrgID,
+		Kind:  CallerKindSystem,
 		State: AuthStateSucc,
 	}
 }

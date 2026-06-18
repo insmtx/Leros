@@ -27,6 +27,8 @@ const (
 	TableNameDigitalAssistant = tablenamePrefix + "digital_assistant"
 	// TableNameDigitalAssistantInstance 数字助手实例表名
 	TableNameDigitalAssistantInstance = tablenamePrefix + "digital_assistant_instance"
+	// TableNameWorkerDeployment Worker 部署表名
+	TableNameWorkerDeployment = tablenamePrefix + "worker_deployment"
 
 	// TableNameEvent 事件表名
 	TableNameEvent = tablenamePrefix + "event"

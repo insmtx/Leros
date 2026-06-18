@@ -31,11 +31,16 @@ import (
 type skillMarketplaceService struct {
 	db        *gorm.DB
 	publisher eventbus.Publisher
+	inferrer  AssistantInferrer
 }
 
 // NewSkillMarketplaceService 创建 Skill 市场服务。
 func NewSkillMarketplaceService(db *gorm.DB, publisher eventbus.Publisher) contract.SkillMarketplaceService {
 	return &skillMarketplaceService{db: db, publisher: publisher}
+}
+
+func NewSkillMarketplaceServiceWithInferrer(db *gorm.DB, publisher eventbus.Publisher, inferrer AssistantInferrer) contract.SkillMarketplaceService {
+	return &skillMarketplaceService{db: db, publisher: publisher, inferrer: inferrer}
 }
 
 func (s *skillMarketplaceService) SearchSkillMarketplace(ctx context.Context, req *contract.SearchSkillMarketplaceRequest) (*contract.SearchSkillMarketplaceResponse, error) {
@@ -254,7 +259,10 @@ func (s *skillMarketplaceService) InstallSkill(ctx context.Context, req *contrac
 		return nil, err
 	}
 
-	workerID := uint(1)
+	_, workerID, err := resolveDefaultRuntimeWorker(ctx, s.db, caller.OrgID, s.inferrer)
+	if err != nil {
+		return nil, err
+	}
 
 	topic, err := dm.WorkerSkillSubject(caller.OrgID, workerID)
 	if err != nil {
@@ -292,7 +300,10 @@ func (s *skillMarketplaceService) InstalledSkills(ctx context.Context, req *cont
 		return nil, err
 	}
 
-	workerID := uint(1)
+	_, workerID, err := resolveDefaultRuntimeWorker(ctx, s.db, caller.OrgID, s.inferrer)
+	if err != nil {
+		return nil, err
+	}
 
 	topic, err := dm.WorkerSkillSubject(caller.OrgID, workerID)
 	if err != nil {
@@ -342,7 +353,10 @@ func (s *skillMarketplaceService) UninstallSkill(ctx context.Context, req *contr
 		return nil, err
 	}
 
-	workerID := uint(1)
+	_, workerID, err := resolveDefaultRuntimeWorker(ctx, s.db, caller.OrgID, s.inferrer)
+	if err != nil {
+		return nil, err
+	}
 
 	topic, err := dm.WorkerSkillSubject(caller.OrgID, workerID)
 	if err != nil {
@@ -452,7 +466,10 @@ func (s *skillMarketplaceService) getInstalledSkillDetail(ctx context.Context, s
 		return nil, err
 	}
 
-	workerID := uint(1)
+	_, workerID, err := resolveDefaultRuntimeWorker(ctx, s.db, caller.OrgID, s.inferrer)
+	if err != nil {
+		return nil, err
+	}
 
 	topic, err := dm.WorkerSkillSubject(caller.OrgID, workerID)
 	if err != nil {
@@ -562,7 +579,10 @@ func (s *skillMarketplaceService) ImportSkill(ctx context.Context, req *contract
 	}
 
 	// 5. 发送 NATS 消息给 Worker
-	workerID := uint(1)
+	_, workerID, err := resolveDefaultRuntimeWorker(ctx, s.db, caller.OrgID, s.inferrer)
+	if err != nil {
+		return nil, err
+	}
 	topic, err := dm.WorkerSkillSubject(caller.OrgID, workerID)
 	if err != nil {
 		return nil, fmt.Errorf("build skill topic: %w", err)

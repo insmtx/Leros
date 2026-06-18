@@ -149,6 +149,42 @@ func TestCallerMiddleware_ValidToken(t *testing.T) {
 	if caller.State != types.AuthStateSucc {
 		t.Errorf("expected State AuthStateSucc, got %v", caller.State)
 	}
+	if caller.Kind != types.CallerKindUser {
+		t.Errorf("expected Kind user, got %q", caller.Kind)
+	}
+}
+
+func TestCallerMiddleware_WorkerToken(t *testing.T) {
+	database := setupTestDB(t)
+	token, _, err := localauth.GenerateWorkerToken(3, 7, testJWTSecret, time.Hour)
+	if err != nil {
+		t.Fatalf("failed to generate worker token: %v", err)
+	}
+
+	ctx, _ := setupTestContext()
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	ctx.Request = req
+
+	middleware := CallerMiddleware(testJWTSecret, database)
+	middleware(ctx)
+
+	caller, _ := localauth.FromGinContext(ctx)
+	if caller == nil {
+		t.Fatal("caller should not be nil")
+	}
+	if caller.Kind != types.CallerKindWorker {
+		t.Fatalf("expected Kind worker, got %q", caller.Kind)
+	}
+	if caller.OrgID != 3 || caller.WorkerID != 7 {
+		t.Fatalf("caller identity = org %d worker %d, want org 3 worker 7", caller.OrgID, caller.WorkerID)
+	}
+	if caller.Uin != 0 {
+		t.Fatalf("worker caller Uin = %d, want 0", caller.Uin)
+	}
+	if caller.State != types.AuthStateSucc {
+		t.Fatalf("worker caller state = %v, want success", caller.State)
+	}
 }
 
 func TestCallerMiddleware_RequestIDAndTraceID(t *testing.T) {

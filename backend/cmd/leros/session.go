@@ -16,21 +16,20 @@ import (
 )
 
 var (
-	sessionJSON           bool
-	sessionKeyword        string
-	sessionStatus         string
-	sessionType           string
-	sessionAssistantID    uint
-	sessionOffset         int
-	sessionLimit          int
-	sessionMessagesPage   int
+	sessionJSON            bool
+	sessionKeyword         string
+	sessionStatus          string
+	sessionType            string
+	sessionAssistantID     uint
+	sessionOffset          int
+	sessionLimit           int
+	sessionMessagesPage    int
 	sessionMessagesPerPage int
 )
 
 type sessionDetailOutput struct {
 	Session   *contract.Session                `json:"session,omitempty"`
 	Assistant *contract.DigitalAssistantDetail `json:"assistant,omitempty"`
-	Allocated *contract.DigitalAssistantDetail `json:"allocated_assistant,omitempty"`
 	Messages  *contract.MessageList            `json:"messages,omitempty"`
 	UserName  string                           `json:"user_name,omitempty"`
 }
@@ -112,15 +111,6 @@ func newSessionCommand() *cobra.Command {
 						out.Assistant = ast
 					}
 				}
-				if sess.AllocatedAssistantID > 0 && sess.AllocatedAssistantID != sess.AssistantID {
-					ast, err := cli.GetDigitalAssistantByID(ctx, cliServerAddr(), cliAuthToken(), sess.AllocatedAssistantID)
-					if err != nil {
-						logs.Warnf("get allocated assistant: %v", err)
-					} else {
-						out.Allocated = ast
-					}
-				}
-
 				msgs, err := cli.GetSessionMessages(ctx, cliServerAddr(), cliAuthToken(), sessionID, 1, 10)
 				if err != nil {
 					logs.Warnf("get session messages: %v", err)
@@ -144,7 +134,7 @@ func newSessionCommand() *cobra.Command {
 
 Requires a session ID argument:
   leros session messages <session_id> --json --page 1 --per-page 20`,
-		Args:  cobra.ExactArgs(1),
+		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			go func() {
 				ctx := lifecycle.Std().Context()
@@ -235,10 +225,8 @@ func printSessionDetail(out *sessionDetailOutput) {
 		fmt.Fprintf(w, "AssistantID:\t%d\n", s.AssistantID)
 	}
 
-	if out.Allocated != nil {
-		fmt.Fprintf(w, "AllocatedAssistant:\t%s (ID=%d, Code=%s)\n", out.Allocated.Name, out.Allocated.ID, out.Allocated.Code)
-	} else if s.AllocatedAssistantID > 0 {
-		fmt.Fprintf(w, "AllocatedAssistantID:\t%d\n", s.AllocatedAssistantID)
+	if s.AllocatedAssistantID > 0 {
+		fmt.Fprintf(w, "AllocatedWorkerID:\t%d\n", s.AllocatedAssistantID)
 	}
 
 	fmt.Fprintf(w, "AssistantCode:\t%s\n", s.AssistantCode)
@@ -278,9 +266,9 @@ type sessionMessageItem struct {
 }
 
 type sessionMessagesOutput struct {
-	Total int64                 `json:"total"`
-	Page  int                   `json:"page"`
-	Items []sessionMessageItem  `json:"items"`
+	Total int64                `json:"total"`
+	Page  int                  `json:"page"`
+	Items []sessionMessageItem `json:"items"`
 }
 
 func printSessionMessages(list *contract.MessageList) {

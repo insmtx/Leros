@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -126,7 +128,11 @@ func (ps *ProcessScheduler) List(ctx context.Context) ([]*worker.WorkerInstance,
 }
 
 func (ps *ProcessScheduler) startProcess(instance *ProcessInstance, spec *worker.WorkerSpec) error {
-	cmdPath := ps.config.WorkerBinary
+	cfg := ps.config
+	if cfg == nil {
+		cfg = &config.SchedulerConfig{}
+	}
+	cmdPath := cfg.WorkerBinary
 	if cmdPath == "" {
 		cmdPath = "./bundles/leros"
 	}
@@ -136,20 +142,35 @@ func (ps *ProcessScheduler) startProcess(instance *ProcessInstance, spec *worker
 	}
 
 	env := os.Environ()
-	for key, value := range ps.config.Env {
+	for key, value := range cfg.Env {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
 	}
+	if spec.BootstrapToken != "" {
+		env = append(env, "LEROS_WORKER_BOOTSTRAP_TOKEN="+spec.BootstrapToken)
+	}
 
-	workDir := ps.config.WorkingDir
+	workDir := cfg.WorkingDir
 	if workDir == "" {
 		workDir = filepath.Dir(cmdPath)
 	}
 
 	args := []string{cmdPath, "worker"}
-	if spec.ID != "" {
-		args = append(args, "--assistant-code", spec.ID)
+	if spec.OrgID != 0 {
+		args = append(args, "--org-id", strconv.FormatUint(uint64(spec.OrgID), 10))
 	}
-	args = append(args, "--server-addr", ps.config.ServerAddr)
+	if spec.WorkerID != 0 {
+		args = append(args, "--worker-id", strconv.FormatUint(uint64(spec.WorkerID), 10))
+	}
+	serverAddr := strings.TrimSpace(spec.ServerAddr)
+	if serverAddr == "" {
+		serverAddr = strings.TrimSpace(cfg.ServerAddr)
+	}
+	if serverAddr != "" {
+		args = append(args, "--server-addr", serverAddr)
+	}
+	if spec.BootstrapToken != "" {
+		args = append(args, "--bootstrap-token", spec.BootstrapToken)
+	}
 
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = workDir

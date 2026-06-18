@@ -51,6 +51,7 @@ func parseCallerFromRequest(ctx *gin.Context, jwtSecret string, database *gorm.D
 		return &types.Caller{
 			Uin:   1,
 			OrgID: 1,
+			Kind:  types.CallerKindUser,
 			State: types.AuthStateSucc,
 		}
 	}
@@ -75,20 +76,19 @@ func parseCallerFromRequest(ctx *gin.Context, jwtSecret string, database *gorm.D
 
 	userClaims, err := parseJWTToken(tokenStr, jwtSecret)
 	if err != nil {
-		logs.Warnw("parse jwt token failed", "error", err)
-		return &types.Caller{
-			Uin:   0,
-			OrgID: 0,
-			State: types.AuthStateFailed,
+		if workerCaller, workerErr := parseWorkerCaller(tokenStr, jwtSecret); workerErr == nil {
+			return workerCaller
+		} else {
+			logs.Warnw("parse auth token failed", "user_error", err, "worker_error", workerErr)
 		}
+		return failedCaller()
 	}
 
 	if userClaims.Uin == 0 {
-		return &types.Caller{
-			Uin:   0,
-			OrgID: 0,
-			State: types.AuthStateFailed,
+		if workerCaller, workerErr := parseWorkerCaller(tokenStr, jwtSecret); workerErr == nil {
+			return workerCaller
 		}
+		return failedCaller()
 	}
 
 	queryCtx, cancel := context.WithTimeout(ctx.Request.Context(), 3*time.Second)
@@ -100,6 +100,7 @@ func parseCallerFromRequest(ctx *gin.Context, jwtSecret string, database *gorm.D
 		return &types.Caller{
 			Uin:   userClaims.Uin,
 			OrgID: 0,
+			Kind:  types.CallerKindUser,
 			State: types.AuthStateFailed,
 		}
 	}
@@ -109,6 +110,7 @@ func parseCallerFromRequest(ctx *gin.Context, jwtSecret string, database *gorm.D
 		return &types.Caller{
 			Uin:   userClaims.Uin,
 			OrgID: 0,
+			Kind:  types.CallerKindUser,
 			State: types.AuthStateFailed,
 		}
 	}
@@ -116,7 +118,30 @@ func parseCallerFromRequest(ctx *gin.Context, jwtSecret string, database *gorm.D
 	return &types.Caller{
 		Uin:   userClaims.Uin,
 		OrgID: userOrg.OrgID,
+		Kind:  types.CallerKindUser,
 		State: types.AuthStateSucc,
+	}
+}
+
+func parseWorkerCaller(tokenStr, jwtSecret string) (*types.Caller, error) {
+	claims, err := localauth.ParseWorkerToken(tokenStr, jwtSecret)
+	if err != nil {
+		return nil, err
+	}
+	return &types.Caller{
+		Uin:      0,
+		OrgID:    claims.OrgID,
+		WorkerID: claims.WorkerID,
+		Kind:     types.CallerKindWorker,
+		State:    types.AuthStateSucc,
+	}, nil
+}
+
+func failedCaller() *types.Caller {
+	return &types.Caller{
+		Uin:   0,
+		OrgID: 0,
+		State: types.AuthStateFailed,
 	}
 }
 

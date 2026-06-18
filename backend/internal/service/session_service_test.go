@@ -99,6 +99,10 @@ func (m *replayEventBus) SubscribeFrom(ctx context.Context, topic string, startS
 	return nil
 }
 
+func (m *replayEventBus) Request(_ context.Context, _ string, _ any) (*nats.Msg, error) {
+	return nil, fmt.Errorf("replayEventBus: Request not supported")
+}
+
 // mockInferrer returns a fixed assistant ID.
 type mockInferrer struct {
 	assistantID uint

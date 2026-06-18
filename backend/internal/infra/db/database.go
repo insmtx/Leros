@@ -5,6 +5,7 @@
 package db
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ygpkg/yg-go/dbtools"
@@ -75,6 +76,7 @@ func runMigrations(db *gorm.DB) error {
 		&types.AuthLoginAttempt{},
 		&types.Event{},
 		&types.DigitalAssistant{},
+		&types.WorkerDeployment{},
 		&types.Skill{},
 		&types.SkillRegistry{},
 		&types.SkillExecutionLog{},
@@ -184,6 +186,10 @@ func InitDevData(db *gorm.DB, llmCfg *config.LLMConfig) error {
 		logs.Infof("Default user-org association created (uin=%d, user_id=%d, org_id=%d)", userOrg.Uin, userOrg.UserID, userOrg.OrgID)
 	}
 
+	if err := seedDefaultWorkerDeployment(db); err != nil {
+		return err
+	}
+
 	// 初始化默认 LLM 模型（仅在表为空且配置中提供 LLM 配置时执行）
 	var modelCount int64
 	db.Model(&types.LLMModel{}).Count(&modelCount)
@@ -221,6 +227,74 @@ func InitDevData(db *gorm.DB, llmCfg *config.LLMConfig) error {
 		return fmt.Errorf("failed to seed builtin skill marketplace: %w", err)
 	}
 
+	return nil
+}
+
+func seedDefaultWorkerDeployment(d *gorm.DB) error {
+	var org types.Organization
+	if err := d.Where("code = ?", "default_org").First(&org).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("failed to find default org for worker: %w", err)
+		}
+		if err := d.Order("id ASC").First(&org).Error; err != nil {
+			return fmt.Errorf("failed to find any org for worker: %w", err)
+		}
+	}
+
+	var user types.User
+	if err := d.Where("github_login = ?", "admin").First(&user).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("failed to find default user for worker: %w", err)
+		}
+		if err := d.Order("id ASC").First(&user).Error; err != nil {
+			return fmt.Errorf("failed to find any user for worker: %w", err)
+		}
+	}
+
+	var deploymentCount int64
+	if err := d.Model(&types.WorkerDeployment{}).
+		Where("org_id = ? AND worker_id = ?", org.ID, 1).
+		Count(&deploymentCount).Error; err != nil {
+		return fmt.Errorf("count default worker deployment: %w", err)
+	}
+	if deploymentCount > 0 {
+		return nil
+	}
+
+	assistant := &types.DigitalAssistant{}
+	code := fmt.Sprintf("org_%d_default_worker", org.ID)
+	err := d.Where("org_id = ? AND code = ?", org.ID, code).First(assistant).Error
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("find default worker assistant: %w", err)
+		}
+		assistant = &types.DigitalAssistant{
+			Code:         code,
+			OrgID:        org.ID,
+			OwnerID:      user.ID,
+			Name:         "默认AI队友",
+			Description:  "组织默认 AI 队友",
+			Status:       "active",
+			SystemPrompt: "你是组织默认 AI 队友，负责接收并处理默认协作任务。",
+		}
+		if err := d.Create(assistant).Error; err != nil {
+			return fmt.Errorf("create default worker assistant: %w", err)
+		}
+	}
+
+	deployment := &types.WorkerDeployment{
+		OrgID:              org.ID,
+		DigitalAssistantID: assistant.ID,
+		WorkerID:           1,
+		DeploymentName:     fmt.Sprintf("leros-worker-o%d-w%d", org.ID, 1),
+		Namespace:          "default",
+		Status:             string(types.WorkerDeploymentStatusPending),
+		WorkspacePath:      fmt.Sprintf("/data/leros-workspaces/%d/1/workspace", org.ID),
+	}
+	if err := d.Create(deployment).Error; err != nil {
+		return fmt.Errorf("create default worker deployment: %w", err)
+	}
+	logs.Infof("Default worker deployment created (org_id=%d, worker_id=1)", org.ID)
 	return nil
 }
 

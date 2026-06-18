@@ -357,16 +357,20 @@ func (s *WorkerManager) shutdownWorker(c *gin.Context) {
 }
 
 type CreateWorkerRequest struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	Labels      map[string]string `json:"labels"`
-	Annotations map[string]string `json:"annotations"`
-	EnvType     string            `json:"env_type"`
-	Image       string            `json:"image"`
-	Command     []string          `json:"command"`
-	Args        []string          `json:"args"`
-	Env         map[string]string `json:"env"`
-	WorkingDir  string            `json:"working_dir"`
+	ID             string            `json:"id"`
+	OrgID          uint              `json:"org_id"`
+	WorkerID       uint              `json:"worker_id"`
+	Name           string            `json:"name"`
+	Labels         map[string]string `json:"labels"`
+	Annotations    map[string]string `json:"annotations"`
+	ServerAddr     string            `json:"server_addr"`
+	BootstrapToken string            `json:"bootstrap_token"`
+	EnvType        string            `json:"env_type"`
+	Image          string            `json:"image"`
+	Command        []string          `json:"command"`
+	Args           []string          `json:"args"`
+	Env            map[string]string `json:"env"`
+	WorkingDir     string            `json:"working_dir"`
 }
 
 func (s *WorkerManager) createWorker(c *gin.Context) {
@@ -382,16 +386,20 @@ func (s *WorkerManager) createWorker(c *gin.Context) {
 	}
 
 	spec := &worker.WorkerSpec{
-		ID:          req.ID,
-		Name:        req.Name,
-		Labels:      req.Labels,
-		Annotations: req.Annotations,
-		EnvType:     worker.WorkerEnvType(req.EnvType),
-		Image:       req.Image,
-		Command:     req.Command,
-		Args:        req.Args,
-		Env:         req.Env,
-		WorkingDir:  req.WorkingDir,
+		ID:             req.ID,
+		OrgID:          req.OrgID,
+		WorkerID:       req.WorkerID,
+		Name:           req.Name,
+		Labels:         req.Labels,
+		Annotations:    req.Annotations,
+		ServerAddr:     req.ServerAddr,
+		BootstrapToken: req.BootstrapToken,
+		EnvType:        worker.WorkerEnvType(req.EnvType),
+		Image:          req.Image,
+		Command:        req.Command,
+		Args:           req.Args,
+		Env:            req.Env,
+		WorkingDir:     req.WorkingDir,
 	}
 
 	spec.EnvType = worker.WorkerEnvProcess

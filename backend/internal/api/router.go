@@ -6,6 +6,7 @@ package api
 
 import (
 	"context"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/insmtx/Leros/backend/config"
@@ -16,6 +17,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/infra/websocket"
 	"github.com/insmtx/Leros/backend/internal/runnable"
 	"github.com/insmtx/Leros/backend/internal/service"
+	"github.com/insmtx/Leros/backend/internal/worker"
 	"github.com/insmtx/Leros/backend/internal/worker/scheduler"
 	workerserver "github.com/insmtx/Leros/backend/internal/worker/server"
 	ygmiddleware "github.com/ygpkg/yg-go/apis/runtime/middleware"
@@ -44,7 +46,14 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		logs.Info("WebSocket connector registered successfully")
 	}
 	{
-		workerScheduler := scheduler.NewProcessScheduler(cfg.Scheduler)
+		var workerScheduler worker.WorkerScheduler
+		if cfg.Scheduler != nil && strings.TrimSpace(cfg.Scheduler.Mode) != "" {
+			var err error
+			workerScheduler, err = scheduler.New(cfg.Scheduler)
+			if err != nil {
+				logs.Errorf("Worker scheduler initialization failed: %v", err)
+			}
+		}
 
 		workerManager := workerserver.NewServer(workerScheduler)
 		workerManager.RegisterRoutes(r)
@@ -54,7 +63,14 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		handler.RegisterAuthRoutes(v1, authService)
 		logs.Info("Auth routes registered successfully")
 
-		digitalAssistantService := service.NewDigitalAssistantService(db, workerScheduler)
+		handler.RegisterWorkerAuthRoutes(v1, cfg.WorkerAuth, cfg.Server.JWT.Secret, db)
+		logs.Info("Worker auth routes registered successfully")
+
+		var workerProvisioningService *service.WorkerProvisioningService
+		if db != nil {
+			workerProvisioningService = service.NewWorkerProvisioningService(db, cfg.Scheduler)
+		}
+		digitalAssistantService := service.NewDigitalAssistantServiceWithProvisioning(db, workerScheduler, workerProvisioningService)
 		handler.RegisterDigitalAssistantRoutes(v1, digitalAssistantService)
 		logs.Info("Digital assistant routes registered successfully")
 
@@ -67,7 +83,7 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		handler.RegisterSessionRoutes(v1, sessionService)
 		logs.Info("Session routes registered successfully")
 
-		projectService := service.NewProjectService(db)
+		projectService := service.NewProjectServiceWithInferrer(db, inferrer)
 		handler.RegisterProjectRoutes(v1, projectService)
 		logs.Info("Project routes registered successfully")
 
@@ -92,7 +108,7 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		fileHandler.RegisterRoutes(v1)
 		logs.Info("File routes registered successfully")
 
-		orgService := service.NewOrgService(db)
+		orgService := service.NewOrgServiceWithProvisioning(db, workerProvisioningService)
 		handler.RegisterOrgRoutes(v1, orgService)
 		logs.Info("Organization routes registered successfully")
 
@@ -100,19 +116,26 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		handler.RegisterUserRoutes(v1, userService)
 		logs.Info("User routes registered successfully")
 
-		skillMarketplaceService := service.NewSkillMarketplaceService(db, eventbus)
+		skillMarketplaceService := service.NewSkillMarketplaceServiceWithInferrer(db, eventbus, inferrer)
 		handler.RegisterSkillMarketplaceRoutes(v1, skillMarketplaceService)
 		logs.Info("Skill marketplace routes registered successfully")
 
-		// Start background consumers
-		go runnable.StartSessionArtifactDeclared(context.Background(), eventbus, db)
-		logs.Info("Session artifact declared runnable started")
-		go runnable.StartSessionRunStarted(context.Background(), sessionService, eventbus)
-		logs.Info("Session run started runnable started")
-		go runnable.StartSessionCompleted(context.Background(), sessionService, eventbus)
-		logs.Info("Session completed runnable started")
-		go runnable.StartSessionTitleHandler(context.Background(), sessionService, eventbus, db)
-		logs.Info("Session title handler runnable started")
+		if !cfg.Server.DisableEventConsumers {
+			go runnable.StartSessionArtifactDeclared(context.Background(), eventbus, db)
+			logs.Info("Session artifact declared runnable started")
+			go runnable.StartSessionRunStarted(context.Background(), sessionService, eventbus)
+			logs.Info("Session run started runnable started")
+			go runnable.StartSessionCompleted(context.Background(), sessionService, eventbus)
+			logs.Info("Session completed runnable started")
+			go runnable.StartSessionTitleHandler(context.Background(), sessionService, eventbus, db)
+			logs.Info("Session title handler runnable started")
+		} else {
+			logs.Info("Session event consumers disabled by config")
+		}
+		if workerScheduler != nil {
+			go service.StartWorkerDeploymentReconciler(context.Background(), db, workerScheduler, cfg.Scheduler)
+			logs.Info("Worker deployment reconciler started")
+		}
 	}
 
 	staticGroup := v1.Group("/static", middleware.StaticAuth(

@@ -8,7 +8,7 @@ import (
 
 func TestWorkerConfigParsesWorkspaceRoot(t *testing.T) {
 	var cfg WorkerConfig
-	body := []byte("org_id: 1\nworker_id: 2\nworkspace_root: /tmp/leros-workspace\n")
+	body := []byte("org_id: 1\nworker_id: 2\nworkspace_root: /tmp/leros-workspace\nbootstrap_token: test-bootstrap\n")
 
 	if err := yaml.Unmarshal(body, &cfg); err != nil {
 		t.Fatalf("unmarshal worker config: %v", err)
@@ -16,5 +16,8 @@ func TestWorkerConfigParsesWorkspaceRoot(t *testing.T) {
 
 	if cfg.WorkspaceRoot != "/tmp/leros-workspace" {
 		t.Fatalf("workspace root = %q", cfg.WorkspaceRoot)
+	}
+	if cfg.BootstrapToken != "test-bootstrap" {
+		t.Fatalf("bootstrap token = %q", cfg.BootstrapToken)
 	}
 }

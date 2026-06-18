@@ -20,20 +20,35 @@ type LLMConfig struct {
 // Config 是 Leros 的主配置结构，包含所有子系统的配置
 type Config struct {
 	Server struct {
-		Port string    `yaml:"port,omitempty"` // 服务器端口
-		JWT  JWTConfig `yaml:"jwt,omitempty"`  // JWT 认证配置
+		Port                  string    `yaml:"port,omitempty"`                    // 服务器端口
+		DisableEventConsumers bool      `yaml:"disable_event_consumers,omitempty"` // 是否禁用后台事件消费者
+		JWT                   JWTConfig `yaml:"jwt,omitempty"`                     // JWT 认证配置
 	} `yaml:"server,omitempty"` // 服务器地址
-	WorkspaceRoot string           `yaml:"workspace_root,omitempty" json:"workspace_root,omitempty"`
-	NATS          *NATSConfig      `yaml:"nats,omitempty"`
-	Database      *DatabaseConfig  `yaml:"database,omitempty"`
-	LLM           *LLMConfig       `yaml:"llm,omitempty"`
-	Scheduler     *SchedulerConfig `yaml:"scheduler,omitempty"`
-	Storage       *StorageConfig   `yaml:"storage,omitempty"`
+	WorkspaceRoot string            `yaml:"workspace_root,omitempty" json:"workspace_root,omitempty"`
+	NATS          *NATSConfig       `yaml:"nats,omitempty"`
+	Database      *DatabaseConfig   `yaml:"database,omitempty"`
+	LLM           *LLMConfig        `yaml:"llm,omitempty"`
+	Scheduler     *SchedulerConfig  `yaml:"scheduler,omitempty"`
+	Storage       *StorageConfig    `yaml:"storage,omitempty"`
+	WorkerAuth    *WorkerAuthConfig `yaml:"worker_auth,omitempty" json:"worker_auth,omitempty"`
 }
 
 // JWTConfig JWT 认证配置
 type JWTConfig struct {
 	Secret string `yaml:"secret,omitempty"` // JWT 签名密钥
+}
+
+// WorkerAuthConfig configures worker bootstrap-token based authentication.
+type WorkerAuthConfig struct {
+	BootstrapTokens []WorkerBootstrapToken `yaml:"bootstrap_tokens,omitempty" json:"bootstrap_tokens,omitempty"`
+	TokenTTLSeconds int                    `yaml:"token_ttl_seconds,omitempty" json:"token_ttl_seconds,omitempty"`
+}
+
+// WorkerBootstrapToken binds a bootstrap token to one worker/AI teammate identity.
+type WorkerBootstrapToken struct {
+	OrgID    uint   `yaml:"org_id" json:"org_id"`
+	WorkerID uint   `yaml:"worker_id" json:"worker_id"`
+	Token    string `yaml:"token" json:"token"`
 }
 
 // DatabaseConfig 是数据库的配置结构
@@ -44,16 +59,16 @@ type DatabaseConfig struct {
 
 // StorageConfig 是存储的配置结构
 type StorageConfig struct {
-	Driver    string `yaml:"driver"`
-	Endpoint  string `yaml:"endpoint,omitempty"`
-	AccessKey string `yaml:"access_key,omitempty"`
-	SecretKey string `yaml:"secret_key,omitempty"`
-	UseSSL    bool   `yaml:"use_ssl,omitempty"`
-	Bucket    string `yaml:"bucket,omitempty"`
-	BaseURL    string `yaml:"base_url,omitempty"`
-	URLStyle   string `yaml:"url_style,omitempty"`
-	LocalDir   string `yaml:"local_dir,omitempty"`
-	SignSecret string `yaml:"sign_secret,omitempty"`
+	Driver       string `yaml:"driver"`
+	Endpoint     string `yaml:"endpoint,omitempty"`
+	AccessKey    string `yaml:"access_key,omitempty"`
+	SecretKey    string `yaml:"secret_key,omitempty"`
+	UseSSL       bool   `yaml:"use_ssl,omitempty"`
+	Bucket       string `yaml:"bucket,omitempty"`
+	BaseURL      string `yaml:"base_url,omitempty"`
+	URLStyle     string `yaml:"url_style,omitempty"`
+	LocalDir     string `yaml:"local_dir,omitempty"`
+	SignSecret   string `yaml:"sign_secret,omitempty"`
 	StaticAPIKey string `yaml:"static_api_key,omitempty"`
 }
 

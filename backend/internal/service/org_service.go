@@ -18,11 +18,16 @@ import (
 var _ contract.OrgService = (*orgService)(nil)
 
 type orgService struct {
-	db *gorm.DB
+	db                 *gorm.DB
+	workerProvisioning *WorkerProvisioningService
 }
 
 func NewOrgService(d *gorm.DB) contract.OrgService {
 	return &orgService{db: d}
+}
+
+func NewOrgServiceWithProvisioning(d *gorm.DB, provisioning *WorkerProvisioningService) contract.OrgService {
+	return &orgService{db: d, workerProvisioning: provisioning}
 }
 
 func (s *orgService) CreateOrg(ctx context.Context, req *contract.CreateOrgRequest) (*contract.Org, error) {
@@ -65,6 +70,11 @@ func (s *orgService) CreateOrg(ctx context.Context, req *contract.CreateOrgReque
 
 	if err := db.CreateOrg(ctx, s.db, org); err != nil {
 		return nil, err
+	}
+	if s.workerProvisioning != nil {
+		if _, err := s.workerProvisioning.EnsureDefaultWorkerForOrg(ctx, org.ID, caller.Uin); err != nil {
+			return nil, fmt.Errorf("ensure default worker deployment: %w", err)
+		}
 	}
 
 	return convertToContractOrg(org), nil

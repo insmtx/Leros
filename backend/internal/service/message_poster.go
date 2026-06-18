@@ -154,7 +154,7 @@ func (p *MessagePoster) RunNewMessage(
 		TaskID:      o.task.PublicID,
 		SessionID:   o.taskSession.PublicID,
 		MessageID:   fmt.Sprintf("%d", message.ID),
-		AssistantID: o.taskSession.AllocatedAssistantID,
+		AssistantID: o.taskSession.AssistantID,
 	}, nil
 }
 
@@ -230,14 +230,18 @@ func (o *newMessageOrchestrator) ensureProjectSession() error {
 		return nil
 	}
 
+	assistantID, workerID, err := o.poster.resolveRuntimeWorker(o.ctx, o.caller.OrgID, o.req.AssistantID)
+	if err != nil {
+		return err
+	}
 	projectSessionID := fmt.Sprintf("sess_%s", snowflake.GenerateIDBase58())
 	projectSession = &types.Session{
 		PublicID:             projectSessionID,
 		Type:                 types.SessionTypeProject,
 		Uin:                  o.caller.Uin,
 		OrgID:                o.caller.OrgID,
-		AssistantID:          o.req.AssistantID,
-		AllocatedAssistantID: o.req.AssistantID,
+		AssistantID:          assistantID,
+		AllocatedAssistantID: workerID,
 		ProjectID:            &o.project.ID,
 		Status:               string(types.SessionStatusActive),
 		Title:                "项目协作",
@@ -292,14 +296,18 @@ func (o *newMessageOrchestrator) resolveOrCreateTask() error {
 }
 
 func (o *newMessageOrchestrator) createTaskSession() error {
+	assistantID, workerID, err := o.poster.resolveRuntimeWorker(o.ctx, o.caller.OrgID, o.req.AssistantID)
+	if err != nil {
+		return err
+	}
 	taskSessionID := fmt.Sprintf("sess_%s", snowflake.GenerateIDBase58())
 	o.taskSession = &types.Session{
 		PublicID:             taskSessionID,
 		Type:                 types.SessionTypeTask,
 		Uin:                  o.caller.Uin,
 		OrgID:                o.caller.OrgID,
-		AssistantID:          o.req.AssistantID,
-		AllocatedAssistantID: o.req.AssistantID,
+		AssistantID:          assistantID,
+		AllocatedAssistantID: workerID,
 		ProjectID:            &o.project.ID,
 		TaskID:               &o.task.ID,
 		Status:               string(types.SessionStatusActive),
@@ -316,6 +324,13 @@ func (o *newMessageOrchestrator) createTaskSession() error {
 
 	logs.InfoContextf(o.ctx, "created task session=%s for task=%s", taskSessionID, o.task.PublicID)
 	return nil
+}
+
+func (p *MessagePoster) resolveRuntimeWorker(ctx context.Context, orgID, assistantID uint) (uint, uint, error) {
+	if p == nil {
+		return assistantID, assistantID, nil
+	}
+	return resolveRuntimeWorker(ctx, p.db, orgID, assistantID, p.inferrer)
 }
 
 func (p *MessagePoster) publishWorkerTask(ctx context.Context, session *types.Session, message *types.SessionMessage) error {

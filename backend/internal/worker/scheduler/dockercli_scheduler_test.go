@@ -118,7 +118,10 @@ func TestBuildEnvVars(t *testing.T) {
 	}
 
 	spec := &worker.WorkerSpec{
-		ID: "worker-123",
+		ID:             "worker-123",
+		OrgID:          3,
+		WorkerID:       7,
+		BootstrapToken: "bootstrap-token",
 		Env: map[string]string{
 			"WORKER_KEY": "worker_value",
 			"COMMON_KEY": "worker_override",
@@ -129,12 +132,14 @@ func TestBuildEnvVars(t *testing.T) {
 	env := scheduler.buildEnvVars(spec)
 
 	expected := map[string]string{
-		"APP_ENV":           "production",
-		"LOG_LEVEL":         "info",
-		"COMMON_KEY":        "worker_override",
-		"WORKER_KEY":        "worker_value",
-		"LEROS_SERVER_ADDR": "localhost:8080",
-		"LEROS_WORKER_ID":   "worker-123",
+		"APP_ENV":                      "production",
+		"LOG_LEVEL":                    "info",
+		"COMMON_KEY":                   "worker_override",
+		"WORKER_KEY":                   "worker_value",
+		"LEROS_SERVER_ADDR":            "localhost:8080",
+		"LEROS_WORKER_BOOTSTRAP_TOKEN": "bootstrap-token",
+		"LEROS_ORG_ID":                 "3",
+		"LEROS_WORKER_ID":              "7",
 	}
 
 	if len(env) != len(expected) {

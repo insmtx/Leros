@@ -77,6 +77,33 @@ func (s *sessionService) getSessionForCaller(ctx context.Context, sessionID stri
 	return session, caller, nil
 }
 
+func (s *sessionService) getSessionMessagesForCaller(ctx context.Context, sessionID string) (*types.Session, error) {
+	caller, err := requireCallerOrg(ctx)
+	if err != nil {
+		return nil, err
+	}
+	session, err := db.GetSessionByPublicID(ctx, s.db, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if session == nil {
+		return nil, errors.New("session not found")
+	}
+	if session.OrgID != caller.OrgID {
+		return nil, errors.New("permission denied")
+	}
+	if caller.Kind == types.CallerKindWorker {
+		if caller.WorkerID == 0 || session.AllocatedAssistantID != caller.WorkerID {
+			return nil, errors.New("permission denied")
+		}
+		return session, nil
+	}
+	if err := verifyUserPermission(session.Uin, caller.Uin); err != nil {
+		return nil, err
+	}
+	return session, nil
+}
+
 func (s *sessionService) CreateSession(ctx context.Context, req *contract.CreateSessionRequest) (*contract.Session, error) {
 	if req.Type == "" {
 		return nil, errors.New("type is required")
@@ -100,13 +127,17 @@ func (s *sessionService) CreateSession(ctx context.Context, req *contract.Create
 		return nil, errors.New("session with this public_id already exists")
 	}
 
+	assistantID, workerID, err := s.resolveRuntimeWorker(ctx, caller.OrgID, req.AssistantID)
+	if err != nil {
+		return nil, err
+	}
 	session := &types.Session{
 		PublicID:             sessionID,
 		Type:                 types.SessionType(req.Type),
 		Uin:                  caller.Uin,
 		OrgID:                caller.OrgID,
-		AssistantID:          req.AssistantID,
-		AllocatedAssistantID: req.AssistantID,
+		AssistantID:          assistantID,
+		AllocatedAssistantID: workerID,
 		Status:               string(types.SessionStatusActive),
 		Title:                req.Title,
 		MessageCount:         0,
@@ -122,6 +153,13 @@ func (s *sessionService) CreateSession(ctx context.Context, req *contract.Create
 	}
 
 	return convertToContractSession(session), nil
+}
+
+func (s *sessionService) resolveRuntimeWorker(ctx context.Context, orgID, assistantID uint) (uint, uint, error) {
+	if s == nil {
+		return assistantID, assistantID, nil
+	}
+	return resolveRuntimeWorker(ctx, s.db, orgID, assistantID, s.inferrer)
 }
 
 func (s *sessionService) GetSession(ctx context.Context, sessionID string) (*contract.Session, error) {
@@ -443,7 +481,11 @@ func (s *sessionService) SubmitApproval(ctx context.Context, req *contract.Submi
 		req.WorkerID = session.AllocatedAssistantID
 	}
 	if req.WorkerID == 0 {
-		req.WorkerID = 1
+		_, workerID, err := resolveDefaultRuntimeWorker(ctx, s.db, caller.OrgID, s.inferrer)
+		if err != nil {
+			return err
+		}
+		req.WorkerID = workerID
 	}
 	topic, err := dm.WorkerApprovalSubject(req.OrgID, req.WorkerID)
 	if err != nil {
@@ -508,7 +550,7 @@ func (s *sessionService) HandleSessionRunStarted(ctx context.Context, req *contr
 	})
 }
 func (s *sessionService) GetSessionMessages(ctx context.Context, sessionID string, page, perPage int) (*contract.MessageList, error) {
-	session, _, err := s.getSessionForCaller(ctx, sessionID)
+	session, err := s.getSessionMessagesForCaller(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}

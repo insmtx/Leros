@@ -4,9 +4,10 @@ type WorkerConfig struct {
 	OrgID    uint `yaml:"org_id" json:"org_id"`
 	WorkerID uint `yaml:"worker_id" json:"worker_id"`
 
-	ServerAddr    string `yaml:"server_addr,omitempty" json:"server_addr,omitempty"`
-	AuthToken     string `yaml:"auth_token,omitempty" json:"auth_token,omitempty"`
-	WorkspaceRoot string `yaml:"workspace_root,omitempty" json:"workspace_root,omitempty"`
+	ServerAddr     string `yaml:"server_addr,omitempty" json:"server_addr,omitempty"`
+	AuthToken      string `yaml:"auth_token,omitempty" json:"auth_token,omitempty"`
+	BootstrapToken string `yaml:"bootstrap_token,omitempty" json:"bootstrap_token,omitempty"`
+	WorkspaceRoot  string `yaml:"workspace_root,omitempty" json:"workspace_root,omitempty"`
 
 	NATS *NATSConfig       `yaml:"nats,omitempty"`
 	CLI  *CLIEnginesConfig `yaml:"cli,omitempty"`

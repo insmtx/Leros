@@ -70,7 +70,12 @@ func (ds *DockerCLIScheduler) containerWorkingDir(workid string) string {
 func (ds *DockerCLIScheduler) buildEnvVars(spec *worker.WorkerSpec) map[string]string {
 	env := make(map[string]string)
 
-	for key, value := range ds.config.Env {
+	cfg := ds.config
+	if cfg == nil {
+		cfg = &config.SchedulerConfig{}
+	}
+
+	for key, value := range cfg.Env {
 		env[key] = value
 	}
 
@@ -78,10 +83,24 @@ func (ds *DockerCLIScheduler) buildEnvVars(spec *worker.WorkerSpec) map[string]s
 		env[key] = value
 	}
 
-	if ds.config.ServerAddr != "" {
-		env["LEROS_SERVER_ADDR"] = ds.config.ServerAddr
+	serverAddr := strings.TrimSpace(spec.ServerAddr)
+	if serverAddr == "" {
+		serverAddr = strings.TrimSpace(cfg.ServerAddr)
 	}
-	env["LEROS_WORKER_ID"] = spec.ID
+	if serverAddr != "" {
+		env["LEROS_SERVER_ADDR"] = serverAddr
+	}
+	if spec.BootstrapToken != "" {
+		env["LEROS_WORKER_BOOTSTRAP_TOKEN"] = spec.BootstrapToken
+	}
+	if spec.OrgID != 0 {
+		env["LEROS_ORG_ID"] = fmt.Sprintf("%d", spec.OrgID)
+	}
+	if spec.WorkerID != 0 {
+		env["LEROS_WORKER_ID"] = fmt.Sprintf("%d", spec.WorkerID)
+	} else {
+		env["LEROS_WORKER_ID"] = spec.ID
+	}
 
 	return env
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -15,9 +16,13 @@ import (
 )
 
 const (
-	envServerURL = "LEROS_SERVER_URL"
-	envAuthToken = "LEROS_AUTH_TOKEN"
-	envDev       = "LEROS_DEV"
+	envServerURL            = "LEROS_SERVER_URL"
+	envServerAddr           = "LEROS_SERVER_ADDR"
+	envAuthToken            = "LEROS_AUTH_TOKEN"
+	envWorkerBootstrapToken = "LEROS_WORKER_BOOTSTRAP_TOKEN"
+	envOrgID                = "LEROS_ORG_ID"
+	envWorkerID             = "LEROS_WORKER_ID"
+	envDev                  = "LEROS_DEV"
 
 	defaultServerAddr    = "127.0.0.1:8080"
 	defaultCLIConfigDir  = ".leros"
@@ -64,11 +69,27 @@ func loadCLIConfig(path string) *config.WorkerConfig {
 
 // applyEnvOverrides 用环境变量覆盖配置文件中的值。
 func applyEnvOverrides(cfg *config.WorkerConfig) {
+	if v := os.Getenv(envOrgID); v != "" {
+		if orgID, err := strconv.ParseUint(v, 10, 64); err == nil {
+			cfg.OrgID = uint(orgID)
+		}
+	}
+	if v := os.Getenv(envWorkerID); v != "" {
+		if workerID, err := strconv.ParseUint(v, 10, 64); err == nil {
+			cfg.WorkerID = uint(workerID)
+		}
+	}
+	if v := os.Getenv(envServerAddr); v != "" {
+		cfg.ServerAddr = v
+	}
 	if v := os.Getenv(envServerURL); v != "" {
 		cfg.ServerAddr = v
 	}
 	if v := os.Getenv(envAuthToken); v != "" {
 		cfg.AuthToken = v
+	}
+	if v := os.Getenv(envWorkerBootstrapToken); v != "" {
+		cfg.BootstrapToken = v
 	}
 }
 

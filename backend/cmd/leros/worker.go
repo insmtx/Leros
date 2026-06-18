@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -31,7 +34,11 @@ import (
 var (
 	workerDefaultRuntime string
 	workerListenAddr     string
+	workerOrgID          uint
 	workerWorkerID       uint
+	workerServerAddr     string
+	workerAuthToken      string
+	workerBootstrapToken string
 	workerWorkspaceRoot  string
 )
 
@@ -47,7 +54,11 @@ func newWorkerCommand() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().StringVar(&workerListenAddr, "listen-addr", ":8081", "Worker HTTP server listen address (MCP + model router)")
+	cmd.PersistentFlags().UintVar(&workerOrgID, "org-id", 0, "Organization ID (overrides config file)")
 	cmd.PersistentFlags().UintVar(&workerWorkerID, "worker-id", 0, "Worker ID (overrides config file)")
+	cmd.PersistentFlags().StringVar(&workerServerAddr, "server-addr", "", "Leros server address (overrides config file)")
+	cmd.PersistentFlags().StringVar(&workerAuthToken, "auth-token", "", "Worker auth token for server API calls (overrides config file)")
+	cmd.PersistentFlags().StringVar(&workerBootstrapToken, "bootstrap-token", "", "Worker bootstrap token used to request an auth token (overrides config file)")
 	cmd.PersistentFlags().StringVar(&workerWorkspaceRoot, "workspace-root", "", "Worker workspace root (overrides config file)")
 	cmd.PersistentFlags().StringVar(&workerDefaultRuntime, "default-runtime", "", "Default agent runtime kind, for example leros, claude, or codex")
 	cmd.AddCommand(newCodexWorkerCommand())
@@ -87,6 +98,18 @@ func loadWorkerConfig() (*config.WorkerConfig, error) {
 
 	if workerWorkerID != 0 {
 		cfg.WorkerID = workerWorkerID
+	}
+	if workerOrgID != 0 {
+		cfg.OrgID = workerOrgID
+	}
+	if strings.TrimSpace(workerServerAddr) != "" {
+		cfg.ServerAddr = workerServerAddr
+	}
+	if strings.TrimSpace(workerAuthToken) != "" {
+		cfg.AuthToken = workerAuthToken
+	}
+	if strings.TrimSpace(workerBootstrapToken) != "" {
+		cfg.BootstrapToken = workerBootstrapToken
 	}
 	if strings.TrimSpace(workerWorkspaceRoot) != "" {
 		cfg.WorkspaceRoot = workerWorkspaceRoot
@@ -134,11 +157,21 @@ func runTaskWorker(defaultRuntime string) {
 		logs.Fatalf("Invalid worker config: %v", err)
 		return
 	}
+	if err := ensureWorkerAuthToken(context.Background(), cfg); err != nil {
+		logs.Fatalf("Failed to prepare worker auth token: %v", err)
+		return
+	}
 	go saveEffectiveConfig(cfg)
 	// root.go PersistentPreRunE 已从配置文件设置了 LEROS_WORKSPACE_ROOT。
 	// 这里仅在 CLI flag --workspace-root 显式覆盖时重新设置，确保子进程（如 leros skill list）继承正确的值。
 	if strings.TrimSpace(workerWorkspaceRoot) != "" {
 		os.Setenv(leros.EnvWorkspaceRoot, workerWorkspaceRoot)
+	}
+	if strings.TrimSpace(cfg.ServerAddr) != "" {
+		os.Setenv(envServerAddr, cfg.ServerAddr)
+	}
+	if strings.TrimSpace(cfg.AuthToken) != "" {
+		os.Setenv(envAuthToken, cfg.AuthToken)
 	}
 	if _, err := leros.EnsureStateDir(); err != nil {
 		logs.Fatalf("Failed to ensure state dir: %v", err)
@@ -288,6 +321,99 @@ func validateTaskWorkerConfig(cfg *config.WorkerConfig) error {
 		return fmt.Errorf("worker.org_id is required")
 	}
 	return nil
+}
+
+type issueWorkerTokenRequest struct {
+	OrgID    uint `json:"org_id"`
+	WorkerID uint `json:"worker_id"`
+}
+
+type issueWorkerTokenAPIResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    struct {
+		AuthToken string `json:"auth_token"`
+		ExpiredAt int64  `json:"expired_at"`
+		TokenType string `json:"token_type"`
+	} `json:"data"`
+}
+
+func ensureWorkerAuthToken(ctx context.Context, cfg *config.WorkerConfig) error {
+	if cfg == nil {
+		return fmt.Errorf("config is required")
+	}
+	if strings.TrimSpace(cfg.AuthToken) != "" {
+		return nil
+	}
+	bootstrapToken := strings.TrimSpace(cfg.BootstrapToken)
+	if bootstrapToken == "" {
+		return nil
+	}
+	if strings.TrimSpace(cfg.ServerAddr) == "" {
+		return fmt.Errorf("worker.server_addr is required to request auth token")
+	}
+
+	token, err := requestWorkerAuthToken(ctx, cfg.ServerAddr, bootstrapToken, cfg.OrgID, cfg.WorkerID)
+	if err != nil {
+		return err
+	}
+	cfg.AuthToken = token
+	return nil
+}
+
+func requestWorkerAuthToken(ctx context.Context, serverAddr, bootstrapToken string, orgID, workerID uint) (string, error) {
+	body, err := json.Marshal(issueWorkerTokenRequest{
+		OrgID:    orgID,
+		WorkerID: workerID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("marshal worker token request: %w", err)
+	}
+
+	requestCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	url := workerTokenEndpoint(serverAddr)
+	req, err := http.NewRequestWithContext(requestCtx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("create worker token request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Worker-Bootstrap-Token", bootstrapToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request worker token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read worker token response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("worker token request failed with status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var apiResp issueWorkerTokenAPIResponse
+	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		return "", fmt.Errorf("decode worker token response: %w", err)
+	}
+	if apiResp.Code != 0 {
+		return "", fmt.Errorf("worker token request failed: %s", apiResp.Message)
+	}
+	if strings.TrimSpace(apiResp.Data.AuthToken) == "" {
+		return "", fmt.Errorf("worker token response missing auth_token")
+	}
+	return apiResp.Data.AuthToken, nil
+}
+
+func workerTokenEndpoint(serverAddr string) string {
+	serverAddr = strings.TrimRight(strings.TrimSpace(serverAddr), "/")
+	if strings.HasPrefix(serverAddr, "http://") || strings.HasPrefix(serverAddr, "https://") {
+		return serverAddr + "/v1/workers/token"
+	}
+	return fmt.Sprintf("http://%s/v1/workers/token", serverAddr)
 }
 
 func startWorkerHTTPServer(addr string) (*http.Server, error) {

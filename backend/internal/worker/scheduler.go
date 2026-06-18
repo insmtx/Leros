@@ -21,16 +21,20 @@ type WorkerScheduler interface {
 }
 
 type WorkerSpec struct {
-	ID          string
-	Name        string
-	Labels      map[string]string
-	Annotations map[string]string
-	EnvType     WorkerEnvType
-	Image       string
-	Command     []string
-	Args        []string
-	Env         map[string]string
-	WorkingDir  string
+	ID             string
+	OrgID          uint
+	WorkerID       uint
+	Name           string
+	Labels         map[string]string
+	Annotations    map[string]string
+	ServerAddr     string
+	BootstrapToken string
+	EnvType        WorkerEnvType
+	Image          string
+	Command        []string
+	Args           []string
+	Env            map[string]string
+	WorkingDir     string
 }
 
 type WorkerInstance struct {
