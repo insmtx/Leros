@@ -44,6 +44,7 @@ export class AuthActionImpl {
 
 	setAuthToken = (token: AuthTokenResponse) => {
 		this.setAuthUser({
+			publicId: token.user_info.public_id,
 			name: token.user_info.name || token.user_info.email || "Leros 用户",
 			email: token.user_info.email,
 			avatarUrl: token.user_info.avatar_url,

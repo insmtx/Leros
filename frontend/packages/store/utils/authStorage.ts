@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "../api/config";
 
 export type StoredAuthUser = {
+	publicId?: string;
 	name: string;
 	email: string;
 	avatarUrl?: string;
@@ -117,7 +118,7 @@ async function refreshStoredAuthToken(user: StoredAuthUser): Promise<string | nu
 				refresh_token?: string;
 				expired_at?: number;
 				uin?: number;
-				user_info?: { name?: string; email?: string; avatar_url?: string };
+				user_info?: { public_id?: string; name?: string; email?: string; avatar_url?: string };
 			};
 		};
 		const token = payload.data;
@@ -128,6 +129,7 @@ async function refreshStoredAuthToken(user: StoredAuthUser): Promise<string | nu
 
 		writeStoredAuthUser({
 			...user,
+			publicId: token.user_info?.public_id || user.publicId,
 			name: token.user_info?.name || user.name,
 			email: token.user_info?.email || user.email,
 			avatarUrl: token.user_info?.avatar_url || user.avatarUrl,

@@ -32,6 +32,7 @@ export type {
 	ListSessionsParams,
 	UpdateSessionParams,
 } from "./sessionApi";
+export { sessionApi } from "./sessionApi";
 export type {
 	InstalledSkillsResponse,
 	SearchSkillMarketplaceParams,
@@ -42,7 +43,6 @@ export type {
 	UninstallSkillResponse,
 } from "./skillMarketplaceApi";
 export { installedToCardItem, skillMarketplaceApi } from "./skillMarketplaceApi";
-export { sessionApi } from "./sessionApi";
 export type {
 	CreateTaskParams,
 	DeleteTaskParams,
@@ -77,5 +77,7 @@ export type {
 	SSEEventPayload,
 	SSEMessageEvent,
 } from "./types";
+export type { UpdateUserParams, UserInfo } from "./userApi";
+export { userApi } from "./userApi";
 export type { NewMessageParams } from "./workApi";
 export { workApi } from "./workApi";

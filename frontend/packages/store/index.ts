@@ -26,6 +26,8 @@ export type {
 	UninstallSkillResponse,
 } from "./api/skillMarketplaceApi";
 export { installedToCardItem, skillMarketplaceApi } from "./api/skillMarketplaceApi";
+export type { UpdateUserParams, UserInfo } from "./api/userApi";
+export { userApi } from "./api/userApi";
 export type { AppAction, AppStore } from "./appStore";
 export {
 	useAppStore,
@@ -96,7 +98,11 @@ export {
 	mergeProjectArtifacts,
 	messageArtifactToProjectArtifact,
 } from "./utils/artifacts";
-export { AUTH_SESSION_EXPIRED_EVENT, authenticatedFetch, getValidJwtToken } from "./utils/authStorage";
+export {
+	AUTH_SESSION_EXPIRED_EVENT,
+	authenticatedFetch,
+	getValidJwtToken,
+} from "./utils/authStorage";
 export {
 	formatDate,
 	formatFileSize,

@@ -317,7 +317,8 @@
 	}
 
 	.leros-profile-menu {
-		width: 180px;
+		width: var(--leros-sidebar-menu-width, 180px);
+		min-width: var(--leros-sidebar-menu-width, 180px);
 		border-color: var(--leros-control-border);
 		border-radius: var(--leros-radius-md);
 		background: var(--leros-surface);
