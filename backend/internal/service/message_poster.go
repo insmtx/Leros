@@ -219,7 +219,7 @@ func (o *newMessageOrchestrator) resolveOrCreateProject() error {
 		Name:        repoName,
 		Description: "",
 		Private:     true,
-		AutoInit:    true,
+		AutoInit:    false,
 	})
 	if err != nil {
 		return fmt.Errorf("create gitea repo: %w", err)

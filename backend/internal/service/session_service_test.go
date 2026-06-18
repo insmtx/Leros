@@ -84,7 +84,7 @@ func setupTestService(t *testing.T) contract.SessionService {
 	t.Helper()
 	db := setupTestDB(t)
 	inferrer := &mockInferrer{assistantID: 1}
-	return NewSessionService(db, &mockEventBus{}, inferrer)
+	return NewSessionService(db, &mockEventBus{}, inferrer, nil, nil, "test")
 }
 
 func setupTestServiceWithSubscriber(t *testing.T, subscriber mq.Subscriber) contract.SessionService {
@@ -98,7 +98,7 @@ func setupTestServiceWithSubscriber(t *testing.T, subscriber mq.Subscriber) cont
 		Publisher:  &mockEventBus{},
 		Subscriber: subscriber,
 	}
-	return NewSessionService(db, eb, inferrer)
+	return NewSessionService(db, eb, inferrer, nil, nil, "test")
 }
 
 func setupTestContextWithoutCaller(t *testing.T) context.Context {
@@ -952,7 +952,7 @@ func TestCompleteSessionMessageStoresChunksAndUsage(t *testing.T) {
 
 func TestCompleteSessionMessageBindsExistingDeclaredArtifact(t *testing.T) {
 	database := setupTestDB(t)
-	service := NewSessionService(database, &mockEventBus{}, &mockInferrer{assistantID: 1})
+	service := NewSessionService(database, &mockEventBus{}, &mockInferrer{assistantID: 1}, nil, nil, "test")
 	ctx := setupTestContextWithCaller(t)
 	projectID := uint(10)
 	taskID := uint(20)
