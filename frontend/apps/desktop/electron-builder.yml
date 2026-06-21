@@ -21,6 +21,7 @@ mac:
   notarize: true
   target:
     - target: dmg
+    - target: zip
   artifactName: ${productName}-${version}-mac-${arch}.${ext}
 win:
   signAndEditExecutable: false
@@ -45,4 +46,8 @@ linux:
       arch:
         - x64
   artifactName: ${productName}-${version}-linux-${arch}.${ext}
+publish:
+  provider: generic
+  url: https://leros-1395325824.cos.ap-beijing.myqcloud.com/application/stable
+electronUpdaterCompatibility: ">=2.16"
 npmRebuild: false

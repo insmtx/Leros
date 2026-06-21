@@ -1,6 +1,6 @@
 {
   "name": "@leros/desktop",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Leros desktop application",
   "author": "insmtx",
   "private": true,
@@ -36,6 +36,7 @@
     "@leros/store": "workspace:*",
     "@leros/app-ui": "workspace:*",
     "@leros/styles": "workspace:*",
+    "electron-updater": "^6.6.2",
     "react-router-dom": "^7.6.0",
     "react": "catalog:",
     "react-dom": "catalog:",

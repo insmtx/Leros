@@ -178,36 +178,33 @@ jobs:
           spctl --assess --type execute --verbose=2 "$app_path"
           xcrun stapler validate "$app_path"
 
-      - name: Upload package artifact
+      - name: Collect release payload
+        shell: bash
+        run: |
+          release_dir="${RUNNER_TEMP}/desktop-release/${{ matrix.name }}"
+          mkdir -p "$release_dir"
+
+          case "${{ matrix.name }}" in
+            mac-*)
+              cp frontend/apps/desktop/dist/*.dmg "$release_dir"/
+              cp frontend/apps/desktop/dist/*.zip "$release_dir"/
+              cp frontend/apps/desktop/dist/*.blockmap "$release_dir"/
+              cp frontend/apps/desktop/dist/latest-mac.yml "$release_dir"/
+              ;;
+            win-*)
+              cp frontend/apps/desktop/dist/*.exe "$release_dir"/
+              cp frontend/apps/desktop/dist/*.blockmap "$release_dir"/
+              cp frontend/apps/desktop/dist/latest.yml "$release_dir"/
+              ;;
+            *)
+              echo "::error::Unsupported build matrix target: ${{ matrix.name }}"
+              exit 1
+              ;;
+          esac
+
+      - name: Upload release payload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-${{ matrix.name }}
+          name: desktop-update-files-${{ matrix.name }}
           if-no-files-found: error
-          path: |
-            frontend/apps/desktop/dist/*.dmg
-            frontend/apps/desktop/dist/*.exe
-
-  publish:
-    name: Publish GitHub Release
-    runs-on: ubuntu-latest
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/')
-
-    steps:
-      - name: Download package artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: release-assets
-          merge-multiple: true
-
-      - name: Generate checksums
-        run: |
-          cd release-assets
-          find . -type f ! -name "SHA256SUMS.txt" -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
-
-      - name: Publish release assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: release-assets/*
-          generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          path: ${{ runner.temp }}/desktop-release/${{ matrix.name }}/*
