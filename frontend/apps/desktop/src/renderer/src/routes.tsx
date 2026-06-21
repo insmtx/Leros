@@ -17,6 +17,7 @@ import {
 	useParams,
 	useSearchParams,
 } from "react-router-dom";
+import { DesktopSettingsPage } from "./components/DesktopSettingsPage";
 
 export function AppRoutes() {
 	const navigation = useDesktopNavigation();
@@ -35,7 +36,7 @@ export function AppRoutes() {
 				<Route path="/tasks" element={<EmptyRoutePage />} />
 				<Route path="/skills" element={<SkillMarketView navigation={navigation} />} />
 				<Route path="/knowledge" element={<EmptyRoutePage />} />
-				<Route path="/settings" element={<EmptyRoutePage />} />
+				<Route path="/settings" element={<DesktopSettingsPage />} />
 				<Route path="*" element={<Navigate to="/workbench" replace />} />
 			</Routes>
 		</Shell>

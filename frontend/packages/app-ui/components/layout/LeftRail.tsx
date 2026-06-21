@@ -35,7 +35,10 @@ import {
 	MoreHorizontal,
 	Network,
 	Pencil,
+	RefreshCcw,
+	RotateCw,
 	Trash2,
+	Upload,
 	UserRound,
 	Zap,
 } from "lucide-react";
@@ -388,6 +391,8 @@ export function LeftRail({
 								<UserRound className="size-4" />
 								<span>账户管理</span>
 							</DropdownMenuItem>
+							<DropdownMenuSeparator />
+							<DesktopUpdateMenuSection />
 							<DropdownMenuSeparator />
 							<DropdownMenuItem variant="destructive" onClick={handleLogout}>
 								<LogOut className="size-4" />
@@ -773,13 +778,188 @@ function getAvatarInitial(label: string) {
 	return (trimmed[0] ?? "L").toUpperCase();
 }
 
+type DesktopUpdatePhase =
+	| "idle"
+	| "checking"
+	| "available"
+	| "downloading"
+	| "downloaded"
+	| "up-to-date"
+	| "error"
+	| "unsupported";
+
+type DesktopUpdateState = {
+	currentVersion: string;
+	phase: DesktopUpdatePhase;
+	message: string;
+	availableVersion?: string;
+	downloadedVersion?: string;
+	progressPercent?: number;
+	releaseNotes?: string;
+	canCheck: boolean;
+	canRestart: boolean;
+};
+
+type DesktopUpdateApi = {
+	getState: () => Promise<DesktopUpdateState>;
+	checkForUpdates: () => Promise<DesktopUpdateState>;
+	quitAndInstall: () => Promise<boolean>;
+	subscribe: (listener: (state: DesktopUpdateState) => void) => () => void;
+};
+
+const initialDesktopUpdateState: DesktopUpdateState = {
+	currentVersion: "0.0.0",
+	phase: "idle",
+	message: "正在读取更新状态",
+	canCheck: false,
+	canRestart: false,
+};
+
+function getDesktopUpdateApi(): DesktopUpdateApi | null {
+	if (typeof window === "undefined") {
+		return null;
+	}
+
+	return ((window as Window & { lerosDesktop?: DesktopUpdateApi }).lerosDesktop ?? null) as DesktopUpdateApi | null;
+}
+
+function DesktopUpdateMenuSection() {
+	const desktopApi = getDesktopUpdateApi();
+	const [updateState, setUpdateState] = useState<DesktopUpdateState>(initialDesktopUpdateState);
+	const [checking, setChecking] = useState(false);
+	const [restarting, setRestarting] = useState(false);
+	const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
+
+	useEffect(() => {
+		if (!desktopApi) {
+			return;
+		}
+
+		let mounted = true;
+		void desktopApi.getState().then((state) => {
+			if (mounted) {
+				setUpdateState(state);
+			}
+		});
+
+		const unsubscribe = desktopApi.subscribe((state) => {
+			setUpdateState(state);
+		});
+
+		return () => {
+			mounted = false;
+			unsubscribe();
+		};
+	}, [desktopApi]);
+
+	if (!desktopApi) {
+		return null;
+	}
+
+	const handleCheckForUpdates = async () => {
+		setChecking(true);
+		try {
+			const nextState = await desktopApi.checkForUpdates();
+			setUpdateState(nextState);
+			if (nextState.phase === "up-to-date") {
+				toast.success("当前已经是最新版本");
+			}
+			if (nextState.phase === "unsupported") {
+				toast.message(nextState.message);
+			}
+		} finally {
+			setChecking(false);
+		}
+	};
+
+	const handleRestartToUpdate = async () => {
+		setRestarting(true);
+		try {
+			const accepted = await desktopApi.quitAndInstall();
+			if (!accepted) {
+				toast.message("当前还没有可安装的更新");
+			}
+		} finally {
+			setRestarting(false);
+		}
+	};
+
+	const versionLabel = updateState.downloadedVersion ?? updateState.availableVersion;
+
+	return (
+		<>
+			<div className="space-y-1">
+				{typeof updateState.progressPercent === "number" ? (
+					<div className="px-2 pb-1">
+						<div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+							<div
+								className="h-full rounded-full bg-[#34c59a] transition-all"
+								style={{ width: `${Math.max(0, Math.min(updateState.progressPercent, 100))}%` }}
+							/>
+						</div>
+					</div>
+				) : null}
+
+				{updateState.canRestart ? (
+					<>
+						<button
+							type="button"
+							className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm text-slate-700 outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+							onClick={() => setReleaseNotesOpen(true)}
+						>
+							<RefreshCcw className="size-4" />
+							<span>更新日志</span>
+						</button>
+						<button
+							type="button"
+							className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm font-medium text-[#34c59a] outline-none transition-colors hover:bg-[#34c59a]/8"
+							onClick={handleRestartToUpdate}
+							disabled={restarting}
+						>
+							{restarting ? <RotateCw className="size-4 animate-spin" /> : <Upload className="size-4" />}
+							<span>重启升级</span>
+						</button>
+					</>
+				) : (
+					<button
+						type="button"
+						className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm text-slate-700 outline-none transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+						onClick={handleCheckForUpdates}
+						disabled={!updateState.canCheck || checking}
+					>
+						{checking || updateState.phase === "checking" ? (
+							<Loader2 className="size-4 animate-spin" />
+						) : (
+							<RefreshCcw className="size-4" />
+						)}
+						<span>检查更新</span>
+					</button>
+				)}
+			</div>
+
+			<Dialog open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen}>
+				<DialogContent className="sm:max-w-lg" showCloseButton>
+					<DialogHeader>
+						<DialogTitle>更新日志</DialogTitle>
+						<DialogDescription>
+							{versionLabel ? `即将安装 v${versionLabel}` : "即将安装最新版本"}
+						</DialogDescription>
+					</DialogHeader>
+					<pre className="max-h-[360px] overflow-auto whitespace-pre-wrap rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+						{updateState.releaseNotes || "当前版本没有附带更新日志。"}
+					</pre>
+				</DialogContent>
+			</Dialog>
+		</>
+	);
+}
+
 function getRouteActive(path: string, view: ViewMode) {
 	if (view === "workbench") return path === "/" || path.startsWith("/workbench");
 	if (view === "chat") return path.startsWith("/chat");
 	if (view === "digitalAssistant") return path.startsWith("/assistants");
 	if (view === "skills") return path.startsWith("/skills");
 	if (view === "knowledge") return path.startsWith("/knowledge");
-	if (view === "settings") return path.startsWith("/settings");
 	if (view === "tasks") return path.startsWith("/tasks");
 	return false;
 }

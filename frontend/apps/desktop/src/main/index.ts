@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { electronApp, is, optimizer } from "@electron-toolkit/utils";
 import { app, BrowserWindow } from "electron";
+import { registerDesktopAutoUpdate } from "./auto-update";
 
 function createWindow(): void {
 	const mainWindow = new BrowserWindow({
@@ -41,6 +42,7 @@ app.whenReady().then(() => {
 	});
 
 	createWindow();
+	registerDesktopAutoUpdate();
 
 	app.on("activate", () => {
 		if (BrowserWindow.getAllWindows().length === 0) createWindow();
