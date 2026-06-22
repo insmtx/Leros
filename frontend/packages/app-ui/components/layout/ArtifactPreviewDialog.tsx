@@ -171,7 +171,7 @@ export function ArtifactPreviewDialog({
 								<SheetTitle className="truncate text-sm font-medium text-[var(--leros-text-muted)]">
 									{artifact.title || artifact.name}
 								</SheetTitle>
-								<SheetDescription className="sr-only">{artifact.name} 产物预览</SheetDescription>
+								<SheetDescription className="sr-only">{artifact.name} 文件预览</SheetDescription>
 							</div>
 							<Button
 								variant="ghost"

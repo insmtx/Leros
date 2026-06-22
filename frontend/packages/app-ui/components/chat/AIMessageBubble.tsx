@@ -340,7 +340,7 @@ function MessageArtifactList({
 		[artifacts],
 	);
 	const visibleArtifacts = useMemo(() => {
-		// 中文注释：旧历史消息里如果没有独立的产物时间，这里回退到所属消息时间，保证卡片稳定展示时间。
+		// 中文注释：旧历史消息里如果没有独立的文件时间，这里回退到所属消息时间，保证卡片稳定展示时间。
 		const sessionArtifacts = artifacts.map((artifact) => ({
 			...messageArtifactToProjectArtifact(artifact),
 			updatedAt: artifact.updatedAt ?? fallbackTimestamp,
@@ -390,7 +390,7 @@ function MessageArtifactList({
 						onClick={() => setPreviewArtifact(artifact)}
 						disabled={loadingArtifactId === artifact.id}
 						className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200/70 bg-white/90 px-3.5 py-3 text-left shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50/60"
-						title="预览产物"
+						title="预览文件"
 					>
 						<div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-slate-600">
 							{loadingArtifactId === artifact.id ? (

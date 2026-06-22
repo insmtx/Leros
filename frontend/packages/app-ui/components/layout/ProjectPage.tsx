@@ -521,7 +521,7 @@ export function ProjectPage({
 							<div className="flex items-start justify-between gap-3">
 								<div>
 									<p className="text-sm font-semibold text-[var(--leros-text-strong)]">项目侧栏</p>
-									<p className="mt-1 text-xs text-[var(--leros-text-muted)]">查看任务和产物概览</p>
+									<p className="mt-1 text-xs text-[var(--leros-text-muted)]">查看任务和文件概览</p>
 								</div>
 								<button
 									type="button"
@@ -559,7 +559,7 @@ export function ProjectPage({
 										!isWideRightSidebar && "mx-auto max-w-[250px]",
 									)}
 								>
-									<h2 className="text-xs font-semibold text-[var(--leros-text-muted)]">产物</h2>
+									<h2 className="text-xs font-semibold text-[var(--leros-text-muted)]">文件</h2>
 									<span className="rounded-md bg-[var(--leros-primary-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--leros-primary)]">
 										{taskArtifacts.length} 个
 									</span>
@@ -1206,7 +1206,7 @@ function ProjectDocxPreview({
 	useEffect(() => {
 		let cancelled = false;
 		setError(null);
-		// 这里复用和产物预览一致的懒加载模式，保证文件 tab 的 DOCX 体验对齐。
+		// 这里复用和文件预览一致的懒加载模式，保证文件 tab 的 DOCX 体验对齐。
 		loadDocxEditor()
 			.then((component) => {
 				if (!cancelled) setDocxEditor(() => component);
@@ -1353,7 +1353,7 @@ function clampProjectRightSidebarWidth(width: number): number {
 
 function ProjectArtifactList({
 	artifacts,
-	emptyText = "暂无产物",
+	emptyText = "暂无文件",
 	compact = false,
 }: {
 	artifacts: ProjectArtifact[];
@@ -1383,7 +1383,7 @@ function ProjectArtifactList({
 								"group relative flex w-full cursor-pointer items-center overflow-hidden border border-[var(--leros-control-border)] bg-[var(--leros-surface)] text-left shadow-sm transition-colors hover:border-[var(--leros-primary-soft)] hover:bg-[var(--leros-primary-softer)]/35",
 								compact ? "gap-3 rounded-lg px-3.5 py-3" : "gap-3.5 rounded-lg px-4 py-3.5",
 							)}
-							title="预览产物"
+							title="预览文件"
 						>
 							{/* hover 时补一个轻量蒙层，明确提示当前整卡可点击预览 */}
 							<div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[rgba(15,23,42,0.16)] opacity-0 transition-opacity duration-200 group-hover:opacity-100">

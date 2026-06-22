@@ -48,7 +48,7 @@ export function mergeProjectArtifacts(
 		const existing = merged.get(artifact.id);
 		merged.set(artifact.id, existing ? { ...existing, ...artifact } : artifact);
 	}
-	// 中文注释：任务接口与会话消息的产物合并后，统一在这里做“最新优先”排序，避免页面各自处理。
+	// 中文注释：任务接口与会话消息的文件合并后，统一在这里做“最新优先”排序，避免页面各自处理。
 	return sortProjectArtifactsByNewestFirst([...merged.values()]);
 }
 
