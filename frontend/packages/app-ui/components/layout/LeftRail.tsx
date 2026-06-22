@@ -29,7 +29,6 @@ import {
 	ClipboardList,
 	Database,
 	Hash,
-	LayoutGrid,
 	Loader2,
 	LogOut,
 	MoreHorizontal,
@@ -59,7 +58,6 @@ export type AppNavigation = {
 };
 
 const iconMap: Record<string, React.ReactNode> = {
-	IconWorkbench: <LayoutGrid className="size-5" />,
 	IconTask: <ClipboardList className="size-5" />,
 	IconSkill: <Zap className="size-5" />,
 	IconKnowledge: <Database className="size-5" />,
@@ -68,7 +66,6 @@ const iconMap: Record<string, React.ReactNode> = {
 
 const navIdToView: Record<string, ViewMode> = {
 	workbench: "workbench",
-	tasks: "tasks",
 	knowledge: "knowledge",
 	skills: "skills",
 	"ai-1": "digitalAssistant",
@@ -76,7 +73,7 @@ const navIdToView: Record<string, ViewMode> = {
 	"ai-3": "digitalAssistant",
 };
 
-const protectedNavIds = new Set(["tasks", "skills", "knowledge"]);
+const protectedNavIds = new Set(["skills", "knowledge"]);
 
 export function LeftRail({
 	logoSrc = APP_LOGO_SRC,
