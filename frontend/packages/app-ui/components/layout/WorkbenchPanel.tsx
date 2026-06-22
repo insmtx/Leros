@@ -6,7 +6,6 @@ import { Button } from "@leros/ui/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@leros/ui/components/ui/popover";
 import { cn } from "@leros/ui/lib/utils";
 import {
-	Bell,
 	Check,
 	ChevronDown,
 	Folder,
