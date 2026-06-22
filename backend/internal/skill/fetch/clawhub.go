@@ -538,7 +538,9 @@ func (c *ClawHubSource) GetDetail(ctx context.Context, slug, version string) (*S
 	if err != nil {
 		return nil, nil, fmt.Errorf("clawhub detail fetch version: %w", err)
 	}
-	defer os.RemoveAll(bundle.TempDir)
+	// TempDir 由调用方负责清理，因为 bundle 会作为返回值传给上层使用。
+	// 调用方 getClawHubSkillDetailWithBundle 的调用者 refillMarketplaceSkillDetail
+	// 在异步缓存写入完成后会清理该目录。
 
 	manifest, skillMDBody, parseErr := catalog.ParseDocument(bundle.Content)
 	if parseErr != nil {
@@ -584,7 +586,8 @@ func (c *ClawHubSource) GetDetail(ctx context.Context, slug, version string) (*S
 		tags = manifest.Metadata.Tags
 	}
 
-	files := make([]string, 0, len(bundle.Files))
+	files := make([]string, 0, len(bundle.Files)+1)
+	files = append(files, "SKILL.md")
 	for relPath := range bundle.Files {
 		files = append(files, relPath)
 	}

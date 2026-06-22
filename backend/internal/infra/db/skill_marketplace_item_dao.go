@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -110,7 +111,7 @@ func GetSkillMarketplaceItemBySourceSkillVersion(ctx context.Context, db *gorm.D
 		Where("source = ? AND skill_id = ? AND version = ?", source, skillID, version).
 		First(&item).Error
 	if err != nil {
-		if strings.Contains(err.Error(), "record not found") {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err

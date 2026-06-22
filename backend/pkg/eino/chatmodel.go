@@ -31,12 +31,14 @@ const (
 
 // ChatModelConfig contains provider-neutral chat model settings.
 type ChatModelConfig struct {
-	Provider       string
-	APIKey         string
-	Model          string
-	BaseURL        string
-	MaxTokens      int
-	ResponseFormat *einoopenai.ChatCompletionResponseFormat
+	Provider        string
+	APIKey          string
+	Model           string
+	BaseURL         string
+	MaxTokens       int
+	ResponseFormat  *einoopenai.ChatCompletionResponseFormat
+	Temperature     *float32
+	ReasoningEffort einoopenai.ReasoningEffortLevel
 }
 
 // NewChatModel creates an Eino tool-calling chat model for a supported provider.
@@ -68,10 +70,12 @@ func NewChatModel(ctx context.Context, cfg *ChatModelConfig) (einomodel.ToolCall
 
 func newOpenAICompatibleChatModel(ctx context.Context, cfg *ChatModelConfig) (einomodel.ToolCallingChatModel, error) {
 	chatModel, err := einoopenai.NewChatModel(ctx, &einoopenai.ChatModelConfig{
-		APIKey:         cfg.APIKey,
-		BaseURL:        cfg.BaseURL,
-		Model:          cfg.Model,
-		ResponseFormat: cfg.ResponseFormat,
+		APIKey:          cfg.APIKey,
+		BaseURL:         cfg.BaseURL,
+		Model:           cfg.Model,
+		ResponseFormat:  cfg.ResponseFormat,
+		ReasoningEffort: cfg.ReasoningEffort,
+		Temperature:     cfg.Temperature,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create eino openai chat model: %w", err)

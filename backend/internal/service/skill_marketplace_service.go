@@ -231,7 +231,7 @@ func (s *skillMarketplaceService) resolveCacheAndTranslation(ctx context.Context
 			continue
 		}
 
-		if utils.CJKRatio(item.Description) >= 0.6 {
+		if utils.CJKRatio(item.Description) >= 0.45 {
 			// 已中文 → 直接写库
 			alreadyChinese = append(alreadyChinese, itemToCacheItem(item, item.Description))
 			continue
@@ -602,36 +602,37 @@ func (s *skillMarketplaceService) getMarketplaceSkillDetail(ctx context.Context,
 // 优先读取 SKILL.zh-CN.md（缓存同目录），未命中时回退读取 package.zip 内 SKILL.md。
 // 元数据来自表记录 item，文件列表来自 zip。
 func (s *skillMarketplaceService) readDetailFromCache(ctx context.Context, item *types.SkillMarketplaceItem, source string) (*contract.SkillDetailResponse, error) {
-	skillMDBody := ""
 	description := item.Description
 	if item.TranslatedDescription != "" {
 		description = item.TranslatedDescription
 	}
 
-	// 1. 优先尝试读取同目录 SKILL.zh-CN.md
+	// 始终从 zip 读取以获取完整文件列表。SKILL.zh-CN.md 仅用于覆盖正文内容。
+	zipBody, files, rawZip, err := skillcache.ReadPackageFromStorage(ctx, s.st, item.PackageStoragePath)
+	if err != nil {
+		return nil, err
+	}
+	skillMDBody := zipBody
+
+	// 1. 优先使用 SKILL.zh-CN.md 覆盖正文和描述
 	if item.PackageStoragePath != "" {
 		zhBody, zhDesc, zhErr := skillcache.ReadChineseDocumentFromStorage(ctx, s.st, item.PackageStoragePath)
 		if zhErr == nil && zhBody != "" {
-			// 缓存命中 SKILL.zh-CN.md
 			skillMDBody = zhBody
 			if zhDesc != "" {
 				description = zhDesc
 			}
 		} else {
-			logs.WarnContextf(ctx, "read SKILL.zh-CN.md for %s/%s@%s: %v, fallback to package.zip", source, item.SkillID, item.Version, zhErr)
+			logs.WarnContextf(ctx, "read SKILL.zh-CN.md for %s/%s@%s: %v", source, item.SkillID, item.Version, zhErr)
 		}
 	}
 
-	// 2. SKILL.zh-CN.md 未命中或为空，回退到 zip 内 SKILL.md
-	if skillMDBody == "" {
-		zipBody, _, rawZip, err := skillcache.ReadPackageFromStorage(ctx, s.st, item.PackageStoragePath)
-		if err != nil {
-			return nil, err
+	// 2. 正文非中文时，同步翻译
+	if skillMDBody == "" || utils.CJKRatioMarkdown(skillMDBody) < 0.45 {
+		if skillMDBody == "" {
+			skillMDBody = zipBody
 		}
-		skillMDBody = zipBody
-
-		// 回退到英文后，检查是否需要同步翻译
-		if s.translator != nil && utils.CJKRatio(skillMDBody) < 0.6 {
+		if s.translator != nil {
 			// 从 rawZip 中提取完整 SKILL.md（含 frontmatter）用于翻译
 			fullSkillMD := skillcache.ExtractSkillMDFromZip(rawZip)
 			if fullSkillMD != "" {
@@ -659,7 +660,7 @@ func (s *skillMarketplaceService) readDetailFromCache(ctx context.Context, item 
 		Installs:    item.Installs,
 		Verified:    source == "Leros",
 		SourceType:  source,
-		Files:       []string{"SKILL.md"},
+		Files:       files,
 	}, nil
 }
 
@@ -712,7 +713,7 @@ func (s *skillMarketplaceService) refillMarketplaceSkillDetail(ctx context.Conte
 	// 统一 eager 翻译：有 translator、原文非中文时同步翻译
 	needEagerTranslate := s.translator != nil && bundle != nil &&
 		len(bundle.Content) > 0 &&
-		utils.CJKRatio(string(bundle.Content)) < 0.6
+		utils.CJKRatioMarkdown(string(bundle.Content)) < 0.45
 
 	var translatedContent string // eager translate 的完整翻译结果，用于异步缓存写入
 
@@ -749,6 +750,10 @@ func (s *skillMarketplaceService) refillMarketplaceSkillDetail(ctx context.Conte
 					logs.WarnContextf(ctx, "cache write panic for %s/%s@%s: %v", source, skillID, resp.Version, r)
 				}
 			}()
+			// 缓存写入完成后清理 TempDir（由 clawhub.GetDetail 创建的临时目录）
+			if bundle.TempDir != "" {
+				defer os.RemoveAll(bundle.TempDir)
+			}
 			uri := skillcache.CachePackage(ctx, s.st, s.bucket, s.db, source, skillID, resp.Version, bundle)
 			if uri != "" {
 				if translatedContent != "" {

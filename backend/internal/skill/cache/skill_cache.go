@@ -14,7 +14,6 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
-	"unicode"
 
 	"github.com/ygpkg/storage-go"
 	"github.com/ygpkg/yg-go/logs"
@@ -23,13 +22,13 @@ import (
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/skill/catalog"
 	"github.com/insmtx/Leros/backend/internal/skill/fetch"
+	"github.com/insmtx/Leros/backend/pkg/utils"
 	"github.com/insmtx/Leros/backend/types"
 )
 
 // SkillCacheKey 生成统一的 storage-go object key。
 // 格式: skills/marketplace/{source}/{skill_id}/{version}/skill/package.zip
 func SkillCacheKey(source, skillID, version string) string {
-	source = normalizeSource(source)
 	if version == "" || version == "latest" {
 		version = "latest"
 	}
@@ -43,7 +42,6 @@ func SkillCacheKey(source, skillID, version string) string {
 // SkillChineseCacheKey 生成 SKILL.zh-CN.md 的 storage-go object key。
 // 与 package.zip 同级，格式: skills/marketplace/{source}/{skill_id}/{version}/skill/SKILL.zh-CN.md
 func SkillChineseCacheKey(source, skillID, version string) string {
-	source = normalizeSource(source)
 	if version == "" || version == "latest" {
 		version = "latest"
 	}
@@ -186,8 +184,8 @@ func CacheChineseDocument(ctx context.Context, st storage.Storage, bucket string
 		return
 	}
 
-	// 决定内容：CJK >= 0.6 用原文，否则调用翻译
-	useOriginal := cjkRatio(body) >= 0.6
+	// 决定内容：CJK >= 0.45 用原文，否则调用翻译
+	useOriginal := utils.CJKRatioMarkdown(body) >= 0.45
 
 	var chineseContent string
 	var zhDescription string
@@ -195,7 +193,7 @@ func CacheChineseDocument(ctx context.Context, st storage.Storage, bucket string
 	if useOriginal {
 		chineseContent = string(bundle.Content) // 保持完整 frontmatter + body
 		zhDescription = manifest.Description
-		logs.Infof("cache chinese doc: SKILL.md for %s/%s@%s is already %.0f%% Chinese, using original", source, skillID, version, cjkRatio(body)*100)
+		logs.Infof("cache chinese doc: SKILL.md for %s/%s@%s is already %.0f%% Chinese, using original", source, skillID, version, utils.CJKRatio(body)*100)
 	} else if translateFn != nil {
 		// 调用翻译
 		translated, zhDesc, tErr := translateFn(ctx, string(bundle.Content))
@@ -244,12 +242,11 @@ func upsertPackagePath(ctx context.Context, db *gorm.DB, source, skillID, versio
 	}
 
 	// 没有现成记录，用 BatchUpsert 创建一条
-	normalizedSource := normalizeSource(source)
 	items := []types.SkillMarketplaceItem{
 		{
 			SkillID:             skillID,
 			Name:                "",
-			Source:              normalizedSource,
+			Source:              source,
 			Description:         "",
 			TranslatedDescription: "",
 			Author:              "",
@@ -308,35 +305,6 @@ func CacheChineseDocumentWithContent(ctx context.Context, st storage.Storage, bu
 	if err := upsertChineseMetadata(ctx, db, source, skillID, version, zhDescription); err != nil {
 		logs.WarnContextf(ctx, "cache chinese doc: update db metadata for %s/%s@%s: %v", source, skillID, version, err)
 	}
-}
-
-// cjkRatio 计算字符串中中文字符（CJK Unified Ideographs）占比，忽略空白字符。
-func cjkRatio(s string) float64 {
-	if s == "" {
-		return 0
-	}
-	runes := []rune(s)
-	total := 0
-	cjk := 0
-	for _, r := range runes {
-		if r == ' ' || r == '\t' || r == '\n' || r == '\r' {
-			continue
-		}
-		total++
-		if unicode.Is(unicode.Han, r) {
-			cjk++
-		}
-	}
-	if total == 0 {
-		return 0
-	}
-	return float64(cjk) / float64(total)
-}
-
-// normalizeSource 确保 source 值为规范的大驼峰形式。
-func normalizeSource(source string) string {
-	// fetch 包现在直接返回 "Leros" 和 "ClawHub"，此函数只做安全透传。
-	return source
 }
 
 // isAllowedSubdir 检查文件路径是否在允许的子目录内。

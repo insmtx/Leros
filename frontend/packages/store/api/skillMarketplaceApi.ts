@@ -150,6 +150,7 @@ export const skillMarketplaceApi = {
     apiClient.post<BackendDataResponse<SkillDetailData>>(
       "/skill-marketplace/skill-detail",
       params,
+      { timeout: 120_000 },
     ),
 
   import: (params: ImportSkillParams) =>

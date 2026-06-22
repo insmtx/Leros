@@ -86,12 +86,16 @@ func (t *defaultSkillDescriptionTranslator) buildChatModel(ctx context.Context, 
 		Type: einoopenai.ChatCompletionResponseFormatTypeJSONObject,
 	}
 
+	temperature := float32(0.1)
+
 	chatModel, err := pkgeino.NewChatModel(ctx, &pkgeino.ChatModelConfig{
-		Provider:       m.Provider,
-		APIKey:         m.APIKeyEncrypted,
-		Model:          m.ModelName,
-		BaseURL:        endpointURL,
-		ResponseFormat: &jsonFormat,
+		Provider:        m.Provider,
+		APIKey:          m.APIKeyEncrypted,
+		Model:           m.ModelName,
+		BaseURL:         endpointURL,
+		ResponseFormat:  &jsonFormat,
+		Temperature:     &temperature,
+		ReasoningEffort: einoopenai.ReasoningEffortLevelLow,
 	})
 	if err != nil {
 		logs.WarnContextf(ctx, "skill translator: create chat model: %v", err)
