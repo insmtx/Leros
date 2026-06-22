@@ -36,9 +36,7 @@ import {
 	Network,
 	Pencil,
 	RefreshCcw,
-	RotateCw,
 	Trash2,
-	Upload,
 	UserRound,
 	Zap,
 } from "lucide-react";
@@ -827,8 +825,6 @@ function DesktopUpdateMenuSection() {
 	const desktopApi = getDesktopUpdateApi();
 	const [updateState, setUpdateState] = useState<DesktopUpdateState>(initialDesktopUpdateState);
 	const [checking, setChecking] = useState(false);
-	const [restarting, setRestarting] = useState(false);
-	const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
 
 	useEffect(() => {
 		if (!desktopApi) {
@@ -872,85 +868,33 @@ function DesktopUpdateMenuSection() {
 		}
 	};
 
-	const handleRestartToUpdate = async () => {
-		setRestarting(true);
-		try {
-			const accepted = await desktopApi.quitAndInstall();
-			if (!accepted) {
-				toast.message("当前还没有可安装的更新");
-			}
-		} finally {
-			setRestarting(false);
-		}
-	};
-
-	const versionLabel = updateState.downloadedVersion ?? updateState.availableVersion;
-
 	return (
-		<>
-			<div className="space-y-1">
-				{typeof updateState.progressPercent === "number" ? (
-					<div className="px-2 pb-1">
-						<div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
-							<div
-								className="h-full rounded-full bg-[#34c59a] transition-all"
-								style={{ width: `${Math.max(0, Math.min(updateState.progressPercent, 100))}%` }}
-							/>
-						</div>
+		<div className="space-y-1">
+			{updateState.phase === "downloading" && typeof updateState.progressPercent === "number" ? (
+				<div className="px-2 pb-1">
+					<div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+						<div
+							className="h-full rounded-full bg-[#34c59a] transition-all"
+							style={{ width: `${Math.max(0, Math.min(updateState.progressPercent, 100))}%` }}
+						/>
 					</div>
-				) : null}
+				</div>
+			) : null}
 
-				{updateState.canRestart ? (
-					<>
-						<button
-							type="button"
-							className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm text-slate-700 outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
-							onClick={() => setReleaseNotesOpen(true)}
-						>
-							<RefreshCcw className="size-4" />
-							<span>更新日志</span>
-						</button>
-						<button
-							type="button"
-							className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm font-medium text-[#34c59a] outline-none transition-colors hover:bg-[#34c59a]/8"
-							onClick={handleRestartToUpdate}
-							disabled={restarting}
-						>
-							{restarting ? <RotateCw className="size-4 animate-spin" /> : <Upload className="size-4" />}
-							<span>重启升级</span>
-						</button>
-					</>
+			<button
+				type="button"
+				className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm text-slate-700 outline-none transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+				onClick={handleCheckForUpdates}
+				disabled={!updateState.canCheck || checking}
+			>
+				{checking || updateState.phase === "checking" ? (
+					<Loader2 className="size-4 animate-spin" />
 				) : (
-					<button
-						type="button"
-						className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm text-slate-700 outline-none transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-						onClick={handleCheckForUpdates}
-						disabled={!updateState.canCheck || checking}
-					>
-						{checking || updateState.phase === "checking" ? (
-							<Loader2 className="size-4 animate-spin" />
-						) : (
-							<RefreshCcw className="size-4" />
-						)}
-						<span>检查更新</span>
-					</button>
+					<RefreshCcw className="size-4" />
 				)}
-			</div>
-
-			<Dialog open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen}>
-				<DialogContent className="sm:max-w-lg" showCloseButton>
-					<DialogHeader>
-						<DialogTitle>更新日志</DialogTitle>
-						<DialogDescription>
-							{versionLabel ? `即将安装 v${versionLabel}` : "即将安装最新版本"}
-						</DialogDescription>
-					</DialogHeader>
-					<pre className="max-h-[360px] overflow-auto whitespace-pre-wrap rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-						{updateState.releaseNotes || "当前版本没有附带更新日志。"}
-					</pre>
-				</DialogContent>
-			</Dialog>
-		</>
+				<span>检查更新</span>
+			</button>
+		</div>
 	);
 }
 
