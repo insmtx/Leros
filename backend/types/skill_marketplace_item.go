@@ -37,6 +37,11 @@ type SkillMarketplaceItem struct {
 
 	// Tags 是 Skill 标签列表。
 	Tags SkillStringList `gorm:"column:tags;type:jsonb" json:"tags"`
+
+	// PackageStoragePath 是缓存到 storage-go 的标准化 zip 包 URI，由 server 在获取详情后异步写入。
+	// 格式为 storage-go URI，例如 "s3://bucket/skills/marketplace/{source}/{skill_id}/{version}/skill/package.zip"。
+	// 空表示尚未缓存。Worker 安装时优先从此路径读取。
+	PackageStoragePath string `gorm:"column:package_storage_path;type:varchar(500)" json:"package_storage_path"`
 }
 
 // TableName 返回数据库表名。

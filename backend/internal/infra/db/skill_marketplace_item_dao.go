@@ -92,7 +92,7 @@ func BatchUpsertSkillMarketplaceItems(ctx context.Context, db *gorm.DB, items []
 		},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"name", "description", "translated_description", "author",
-			"installs", "category", "tags", "updated_at",
+			"installs", "category", "tags", "package_storage_path", "updated_at",
 		}),
 	}).Create(&items).Error
 	if err != nil {
@@ -100,4 +100,43 @@ func BatchUpsertSkillMarketplaceItems(ctx context.Context, db *gorm.DB, items []
 		return err
 	}
 	return nil
+}
+
+// GetSkillMarketplaceItemBySourceSkillVersion 按 (source, skill_id, version) 查询单条缓存记录。
+// 未命中时返回 nil, nil。
+func GetSkillMarketplaceItemBySourceSkillVersion(ctx context.Context, db *gorm.DB, source, skillID, version string) (*types.SkillMarketplaceItem, error) {
+	var item types.SkillMarketplaceItem
+	err := db.WithContext(ctx).
+		Where("source = ? AND skill_id = ? AND version = ?", source, skillID, version).
+		First(&item).Error
+	if err != nil {
+		if strings.Contains(err.Error(), "record not found") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &item, nil
+}
+
+// UpdateSkillMarketplacePackagePath 只更新指定记录的 package_storage_path。
+func UpdateSkillMarketplacePackagePath(ctx context.Context, db *gorm.DB, id uint, path string) error {
+	return db.WithContext(ctx).
+		Model(&types.SkillMarketplaceItem{}).
+		Where("id = ?", id).
+		Update("package_storage_path", path).Error
+}
+
+// UpdateSkillMarketplaceTranslatedDescription 按 (source, skill_id, version) 更新 translated_description。
+func UpdateSkillMarketplaceTranslatedDescription(ctx context.Context, db *gorm.DB, source, skillID, version, translatedDescription string) error {
+	item, err := GetSkillMarketplaceItemBySourceSkillVersion(ctx, db, source, skillID, version)
+	if err != nil {
+		return err
+	}
+	if item == nil {
+		return nil
+	}
+	return db.WithContext(ctx).
+		Model(&types.SkillMarketplaceItem{}).
+		Where("id = ?", item.ID).
+		Update("translated_description", translatedDescription).Error
 }

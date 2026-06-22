@@ -35,7 +35,7 @@ func NewClawHubSource() *ClawHubSource {
 
 // SourceID 返回源标识。
 func (c *ClawHubSource) SourceID() string {
-	return "clawhub"
+	return "ClawHub"
 }
 
 // CanHandle 处理纯 skill 名称（不含 / 和 https:// 前缀的标识符）。
@@ -455,7 +455,7 @@ func (i *clawhubSkillItem) toSkillMeta() SkillMeta {
 		SkillID:     i.Slug,
 		Name:        name,
 		Identifier:  i.Slug,
-		Source:      "clawhub",
+		Source:      "ClawHub",
 		TrustLevel:  "community",
 		Description: desc,
 		Version:     version,
@@ -479,118 +479,129 @@ type SkillDetail struct {
 	Files       []string `json:"files"`
 }
 
-// GetDetail 下载指定版本 ClawHub skill 的 zip 包并解析出完整详情（元数据 + SKILL.md + 文件列表）。
-// 与 Fetch 不同，GetDetail 不会将文件写入磁盘，仅返回解析后的信息。
-func (c *ClawHubSource) GetDetail(ctx context.Context, slug, version string) (*SkillDetail, error) {
-	var downloadURL string
-	if version == "" || version == "latest" {
-		downloadURL = fmt.Sprintf("%s/download?slug=%s", clawhubAPIBase, url.QueryEscape(slug))
-	} else {
-		downloadURL = fmt.Sprintf("%s/download?slug=%s&version=%s", clawhubAPIBase, url.QueryEscape(slug), url.QueryEscape(version))
-	}
+// clawhubSkillResponse GET /api/v1/skills/{slug} 的响应结构。
+type clawhubSkillResponse struct {
+	Skill struct {
+		Slug        string `json:"slug"`
+		DisplayName string `json:"displayName"`
+		Summary     string `json:"summary"`
+		Description string `json:"description"`
+		Tags        map[string]string `json:"tags"`
+		Stats       *struct {
+			Downloads       int64 `json:"downloads"`
+			InstallsAllTime int64 `json:"installsAllTime"`
+			InstallsCurrent int64 `json:"installsCurrent"`
+			Stars           int64 `json:"stars"`
+		} `json:"stats,omitempty"`
+	} `json:"skill"`
+	LatestVersion *struct {
+		Version string `json:"version"`
+	} `json:"latestVersion,omitempty"`
+	Owner *struct {
+		Handle      string `json:"handle"`
+		DisplayName string `json:"displayName"`
+		Image       string `json:"image"`
+	} `json:"owner,omitempty"`
+}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+// GetDetail 通过 ClawHub API 获取 skill 元数据，并下载 zip 返回完整详情及 bundle。
+// 从 /api/v1/skills/{slug} 获取 Author、Installs、Version、Tags、Icon 等字段，
+// 再下载 zip 解析 SKILL.md 和文件列表。
+func (c *ClawHubSource) GetDetail(ctx context.Context, slug, version string) (*SkillDetail, *SkillBundle, error) {
+	// 1. 调用元数据接口
+	u := fmt.Sprintf("%s/skills/%s", clawhubAPIBase, url.PathEscape(slug))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("create download request: %w", err)
+		return nil, nil, fmt.Errorf("clawhub detail request: %w", err)
 	}
-
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("clawhub download: %w", err)
+		return nil, nil, fmt.Errorf("clawhub detail: %w", err)
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("clawhub skill %q version %q not found (404)", slug, version)
-	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("clawhub download returned status %d for %s@%s", resp.StatusCode, slug, version)
+		return nil, nil, fmt.Errorf("clawhub detail returned status %d for %q", resp.StatusCode, slug)
 	}
 
-	zipBytes, err := io.ReadAll(io.LimitReader(resp.Body, 100_000_000))
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read zip: %w", err)
+		return nil, nil, fmt.Errorf("clawhub detail read body: %w", err)
 	}
 
-	reader, err := zip.NewReader(bytes.NewReader(zipBytes), int64(len(zipBytes)))
+	var meta clawhubSkillResponse
+	if err := json.Unmarshal(body, &meta); err != nil {
+		return nil, nil, fmt.Errorf("clawhub detail unmarshal: %w", err)
+	}
+
+	// 2. 下载 zip 获取 SKILL.md
+	bundle, err := c.FetchVersion(ctx, slug, version)
 	if err != nil {
-		return nil, fmt.Errorf("open zip: %w", err)
+		return nil, nil, fmt.Errorf("clawhub detail fetch version: %w", err)
+	}
+	defer os.RemoveAll(bundle.TempDir)
+
+	manifest, skillMDBody, parseErr := catalog.ParseDocument(bundle.Content)
+	if parseErr != nil {
+		return nil, nil, fmt.Errorf("parse clawhub SKILL.md: %w", parseErr)
 	}
 
-	// 获取顶层目录前缀（如 slug-main），用于去除。
-	var rootPrefix string
-	for _, f := range reader.File {
-		parts := strings.SplitN(f.Name, "/", 2)
-		if parts[0] != "" {
-			rootPrefix = parts[0] + "/"
-			break
-		}
+	// 3. 合并元数据
+	displayName := meta.Skill.DisplayName
+	if displayName == "" {
+		displayName = manifest.Name
 	}
 
-	// 遍历 zip 文件，查找 SKILL.md 并收集文件列表。
-	var skillMDRaw []byte
-	var files []string
-	allowedSubdirs := map[string]bool{"assets": true, "references": true, "scripts": true, "templates": true}
-
-	for _, f := range reader.File {
-		if f.FileInfo().IsDir() {
-			continue
-		}
-
-		fName := f.Name
-		if rootPrefix != "" {
-			fName = strings.TrimPrefix(fName, rootPrefix)
-		}
-		if fName == "" {
-			continue
-		}
-
-		// 收集文件列表
-		dirPart := filepath.Dir(fName)
-		if dirPart == "." || allowedSubdirs[dirPart] {
-			files = append(files, filepath.ToSlash(fName))
-		}
-
-		// 读取 SKILL.md
-		if strings.EqualFold(filepath.Base(fName), "SKILL.md") {
-			rc, openErr := f.Open()
-			if openErr != nil {
-				return nil, fmt.Errorf("open SKILL.md in zip: %w", openErr)
-			}
-			skillMDRaw, err = io.ReadAll(io.LimitReader(rc, 1_048_576))
-			rc.Close()
-			if err != nil {
-				return nil, fmt.Errorf("read SKILL.md: %w", err)
-			}
-		}
-	}
-
-	if skillMDRaw == nil {
-		return nil, fmt.Errorf("SKILL.md not found in clawhub skill %s@%s", slug, version)
-	}
-
-	// 解析 frontmatter
-	manifest, skillMDBody, err := catalog.ParseDocument(skillMDRaw)
-	if err != nil {
-		return nil, fmt.Errorf("parse SKILL.md: %w", err)
-	}
-
-	// 确保版本有值
 	resolvedVersion := version
-	if resolvedVersion == "latest" && manifest.Version != "" {
-		resolvedVersion = manifest.Version
+	if resolvedVersion == "" || resolvedVersion == "latest" {
+		if meta.LatestVersion != nil && meta.LatestVersion.Version != "" {
+			resolvedVersion = meta.LatestVersion.Version
+		} else if manifest.Version != "" {
+			resolvedVersion = manifest.Version
+		} else {
+			resolvedVersion = "latest"
+		}
 	}
 
-	return &SkillDetail{
+	author := ""
+	if meta.Owner != nil {
+		if meta.Owner.DisplayName != "" {
+			author = meta.Owner.DisplayName
+		} else {
+			author = meta.Owner.Handle
+		}
+	}
+
+	description := meta.Skill.Summary
+	if description == "" {
+		description = manifest.Description
+	}
+
+	var tags []string
+	for k := range meta.Skill.Tags {
+		tags = append(tags, k)
+	}
+	if len(tags) == 0 {
+		tags = manifest.Metadata.Tags
+	}
+
+	files := make([]string, 0, len(bundle.Files))
+	for relPath := range bundle.Files {
+		files = append(files, relPath)
+	}
+
+	detail := &SkillDetail{
 		SkillID:     slug,
-		Name:        manifest.Name,
-		Description: manifest.Description,
+		Name:        displayName,
+		Description: description,
 		Version:     resolvedVersion,
-		Author:      "",
+		Author:      author,
 		Category:    manifest.Metadata.Category,
-		Tags:        manifest.Metadata.Tags,
+		Tags:        tags,
 		Icon:        "",
 		SkillMD:     skillMDBody,
 		Files:       files,
-	}, nil
+	}
+
+	return detail, bundle, nil
 }
+

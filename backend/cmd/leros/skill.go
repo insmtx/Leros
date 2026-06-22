@@ -90,7 +90,7 @@ Use --source to force a specific source and --version to install a specific vers
 
 	installCmd.Flags().BoolVar(&skillForce, "force", false, "Overwrite existing skill")
 	installCmd.Flags().BoolVar(&skillYes, "yes", false, "Skip confirmation prompts")
-	installCmd.Flags().StringVar(&skillSource, "source", "", "Force a specific source (builtin, github, clawhub, url)")
+	installCmd.Flags().StringVar(&skillSource, "source", "", "Force a specific source (Leros, ClawHub, github, url)")
 	installCmd.Flags().StringVar(&skillVersion, "version", "", "Install a specific version (tag/branch for GitHub sources)")
 
 	searchCmd.Flags().IntVar(&skillLimit, "limit", 10, "Maximum number of results")

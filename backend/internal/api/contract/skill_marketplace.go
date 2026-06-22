@@ -39,11 +39,19 @@ type ImportSkillResponse struct {
 type SkillMarketplaceService interface {
 	SearchSkillMarketplace(ctx context.Context, req *SearchSkillMarketplaceRequest) (*SearchSkillMarketplaceResponse, error)
 	DownloadBuiltinSkill(ctx context.Context, skillID string) (*SkillPackageDownload, error)
+	DownloadSkillPackage(ctx context.Context, req *DownloadSkillRequest) (*SkillPackageDownload, error)
 	InstallSkill(ctx context.Context, req *InstallSkillRequest) (*InstallSkillResponse, error)
 	InstalledSkills(ctx context.Context, req *InstalledSkillsRequest) (*InstalledSkillsResponse, error)
 	UninstallSkill(ctx context.Context, req *UninstallSkillRequest) (*UninstallSkillResponse, error)
 	GetSkillDetail(ctx context.Context, req *SkillDetailRequest) (*SkillDetailResponse, error)
 	ImportSkill(ctx context.Context, req *ImportSkillRequest) (*ImportSkillResponse, error)
+}
+
+// DownloadSkillRequest 从缓存下载 Skill 包的请求。
+type DownloadSkillRequest struct {
+	Source  string `form:"source" json:"source"`
+	SkillID string `form:"skill_id" json:"skill_id"`
+	Version string `form:"version" json:"version"`
 }
 
 // SearchSkillMarketplaceRequest Skill 市场搜索请求。

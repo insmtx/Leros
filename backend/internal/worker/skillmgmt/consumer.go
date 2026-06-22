@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 	"github.com/nats-io/nats.go"
 
 	"github.com/insmtx/Leros/backend/engines"
+	"github.com/insmtx/Leros/backend/internal/worker/identity"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/internal/skill/catalog"
 	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
@@ -119,16 +121,35 @@ func (c *Consumer) handleInstall(ctx context.Context, req protocol.SkillManageme
 		return c.replyError(req.Body.ReplyTo, "skill_id is empty", nil)
 	}
 
+	source := strings.TrimSpace(req.Body.Source)
+	version := strings.TrimSpace(req.Body.Version)
+
+	// 优先尝试从 server download 缓存
+	serverAddr := identity.ServerAddr()
+	if serverAddr != "" && source != "" {
+		downloaded, err := c.tryDownloadFromServer(ctx, skillID, source, version)
+		if err == nil && downloaded != nil {
+			logs.InfoContextf(ctx, "Cache HIT for %s/%s@%s from server %s", source, skillID, version, serverAddr)
+			return c.installFromZip(ctx, downloaded, req.Body.ReplyTo)
+		}
+		if err != nil {
+			logs.InfoContextf(ctx, "Cache MISS for %s/%s@%s: %v, falling back to remote fetch", source, skillID, version, err)
+		} else {
+			logs.InfoContextf(ctx, "Cache MISS for %s/%s@%s, falling back to remote fetch", source, skillID, version)
+		}
+	}
+
+	// 回退到 CLI 远程拉取
 	lerosBin, err := os.Executable()
 	if err != nil {
 		return c.replyError(req.Body.ReplyTo, "find leros binary", err)
 	}
 
 	args := []string{"skill", "install", skillID, "--force", "--yes"}
-	if source := strings.TrimSpace(req.Body.Source); source != "" {
+	if source != "" {
 		args = append(args, "--source", source)
 	}
-	if version := strings.TrimSpace(req.Body.Version); version != "" {
+	if version != "" {
 		args = append(args, "--version", version)
 	}
 
@@ -145,6 +166,105 @@ func (c *Consumer) handleInstall(ctx context.Context, req protocol.SkillManageme
 	logs.InfoContextf(ctx, "leros skill install succeeded for %q", skillID)
 	if req.Body.ReplyTo != "" {
 		return c.replySuccess(req.Body.ReplyTo, "install", fmt.Sprintf("skill %q installed", skillID))
+	}
+	return nil
+}
+
+// tryDownloadFromServer 尝试从 server download 接口获取缓存 zip。
+// 成功返回 zip 字节，失败返回 error（调用方据此回退远程拉取）。
+func (c *Consumer) tryDownloadFromServer(ctx context.Context, skillID, source, version string) ([]byte, error) {
+	serverAddr := identity.ServerAddr()
+	if serverAddr == "" {
+		return nil, fmt.Errorf("server addr not configured")
+	}
+
+	baseURL := fmt.Sprintf("http://%s/v1/skill-marketplace/skills/%s/download", serverAddr, skillID)
+	reqURL := fmt.Sprintf("%s?source=%s&version=%s", baseURL, url.QueryEscape(source), url.QueryEscape(version))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http get: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("not found (404)")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 100_000_000))
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+	return data, nil
+}
+
+// installFromZip 将 zip 字节解压并安装 skill，同步外部 symlink。
+func (c *Consumer) installFromZip(ctx context.Context, zipBytes []byte, replyTo string) error {
+	skillContent, supportingFiles, err := extractZipSkill(zipBytes)
+	if err != nil {
+		return c.replyError(replyTo, "extract zip skill", err)
+	}
+
+	manifest, _, err := catalog.ParseDocument(skillContent)
+	if err != nil {
+		return c.replyError(replyTo, "parse SKILL.md", err)
+	}
+	name := strings.TrimSpace(manifest.Name)
+	if name == "" {
+		return c.replyError(replyTo, "SKILL.md has no name", nil)
+	}
+
+	skillsDir, err := leros.SkillsDir()
+	if err != nil {
+		return c.replyError(replyTo, "resolve skills dir", err)
+	}
+	store, err := skillstore.NewSkillStore(skillsDir)
+	if err != nil {
+		return c.replyError(replyTo, "create skill store", err)
+	}
+
+	files := make(map[string]string, len(supportingFiles))
+	for relPath, data := range supportingFiles {
+		files[relPath] = string(data)
+	}
+
+	result, err := store.Install(ctx, skillstore.InstallRequest{
+		Name:    name,
+		Content: string(skillContent),
+		Files:   files,
+		Force:   true,
+	})
+	if err != nil {
+		return c.replyError(replyTo, "install skill", err)
+	}
+	if !result.Success {
+		errMsg := result.Error
+		if errMsg == "" {
+			errMsg = "unknown install error"
+		}
+		return c.replyError(replyTo, fmt.Sprintf("install skill: %s", errMsg), nil)
+	}
+
+	// 同步外部 skill symlink
+	knownCLISkillDirs := []string{
+		"~/.claude/skills",
+		"~/.agents/skills",
+	}
+	if err := engines.EnsureExternalSkillLink(name, knownCLISkillDirs); err != nil {
+		logs.WarnContextf(ctx, "sync external links for %q: %v", name, err)
+	}
+
+	logs.InfoContextf(ctx, "Skill installed from cache: %q", name)
+	if replyTo != "" {
+		return c.replySuccess(replyTo, "install", fmt.Sprintf("skill %q installed", name))
 	}
 	return nil
 }

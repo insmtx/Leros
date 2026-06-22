@@ -32,6 +32,36 @@ func downloadBuiltinSkill(service contract.SkillMarketplaceService) gin.HandlerF
 			return
 		}
 
+		// 如果传了 source/version 参数，走缓存 download 接口
+		source := strings.TrimSpace(ctx.Query("source"))
+		version := strings.TrimSpace(ctx.Query("version"))
+		if source != "" || version != "" {
+			if source == "" {
+				source = "Leros"
+			}
+			if version == "" {
+				version = "latest"
+			}
+			download, err := service.DownloadSkillPackage(ctx, &contract.DownloadSkillRequest{
+				Source:  source,
+				SkillID: skillID,
+				Version: version,
+			})
+			if err != nil {
+				ctx.JSON(http.StatusNotFound, dto.Error(dto.CodeNotFound, err.Error()))
+				return
+			}
+			defer download.Reader.Close()
+			ctx.Header("Content-Type", "application/zip")
+			ctx.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, download.FileName))
+			ctx.Status(http.StatusOK)
+			if _, err := io.Copy(ctx.Writer, download.Reader); err != nil {
+				logs.ErrorContextf(ctx.Request.Context(), "failed to stream cached skill download %q: %v", skillID, err)
+			}
+			return
+		}
+
+		// 旧调用（不带参数）走原有内置 skill 下载逻辑
 		download, err := service.DownloadBuiltinSkill(ctx, skillID)
 		if err != nil {
 			if err.Error() == "skill not found" {

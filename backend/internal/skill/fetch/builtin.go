@@ -33,7 +33,7 @@ func NewBuiltinSource(serverAddr string) *BuiltinSource {
 
 // SourceID 返回源标识。
 func (s *BuiltinSource) SourceID() string {
-	return "leros_builtin"
+	return "Leros"
 }
 
 // CanHandle 处理不含 "/"、"://" 和 ":" 的短名称/skill_id。

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ygpkg/storage-go"
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
 
@@ -22,6 +23,7 @@ import (
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
+	skillcache "github.com/insmtx/Leros/backend/internal/skill/cache"
 	catalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
 	"github.com/insmtx/Leros/backend/internal/skill/fetch"
 	"github.com/insmtx/Leros/backend/internal/worker/protocol"
@@ -35,19 +37,21 @@ type skillMarketplaceService struct {
 	publisher  eventbus.Publisher
 	inferrer   AssistantInferrer
 	translator SkillDescriptionTranslator
+	st         storage.Storage
+	bucket     string
 }
 
 // NewSkillMarketplaceService 创建 Skill 市场服务。
-func NewSkillMarketplaceService(db *gorm.DB, publisher eventbus.Publisher) contract.SkillMarketplaceService {
-	return &skillMarketplaceService{db: db, publisher: publisher}
+func NewSkillMarketplaceService(db *gorm.DB, publisher eventbus.Publisher, st storage.Storage, bucket string) contract.SkillMarketplaceService {
+	return &skillMarketplaceService{db: db, publisher: publisher, st: st, bucket: bucket}
 }
 
-func NewSkillMarketplaceServiceWithInferrer(db *gorm.DB, publisher eventbus.Publisher, inferrer AssistantInferrer) contract.SkillMarketplaceService {
-	return &skillMarketplaceService{db: db, publisher: publisher, inferrer: inferrer}
+func NewSkillMarketplaceServiceWithInferrer(db *gorm.DB, publisher eventbus.Publisher, inferrer AssistantInferrer, st storage.Storage, bucket string) contract.SkillMarketplaceService {
+	return &skillMarketplaceService{db: db, publisher: publisher, inferrer: inferrer, st: st, bucket: bucket}
 }
 
-func NewSkillMarketplaceServiceWithTranslator(db *gorm.DB, publisher eventbus.Publisher, inferrer AssistantInferrer, translator SkillDescriptionTranslator) contract.SkillMarketplaceService {
-	return &skillMarketplaceService{db: db, publisher: publisher, inferrer: inferrer, translator: translator}
+func NewSkillMarketplaceServiceWithTranslator(db *gorm.DB, publisher eventbus.Publisher, inferrer AssistantInferrer, translator SkillDescriptionTranslator, st storage.Storage, bucket string) contract.SkillMarketplaceService {
+	return &skillMarketplaceService{db: db, publisher: publisher, inferrer: inferrer, translator: translator, st: st, bucket: bucket}
 }
 
 func (s *skillMarketplaceService) SearchSkillMarketplace(ctx context.Context, req *contract.SearchSkillMarketplaceRequest) (*contract.SearchSkillMarketplaceResponse, error) {
@@ -139,7 +143,7 @@ func (s *skillMarketplaceService) resolveSources(sourceTypes []string) (builtin,
 		switch t {
 		case "Leros":
 			builtin = true
-		case "ClawHub", "Skills.sh":
+		case "ClawHub":
 			external = true
 		}
 	}
@@ -227,7 +231,7 @@ func (s *skillMarketplaceService) resolveCacheAndTranslation(ctx context.Context
 			continue
 		}
 
-		if utils.CJKRatio(item.Description) >= 0.3 {
+		if utils.CJKRatio(item.Description) >= 0.6 {
 			// 已中文 → 直接写库
 			alreadyChinese = append(alreadyChinese, itemToCacheItem(item, item.Description))
 			continue
@@ -329,6 +333,49 @@ func (s *skillMarketplaceService) DownloadBuiltinSkill(ctx context.Context, skil
 	return &contract.SkillPackageDownload{
 		Reader:   pr,
 		FileName: skillID + ".zip",
+	}, nil
+}
+
+// DownloadSkillPackage 从 storage-go 缓存中下载 Skill 包。
+// 只查 DB 的 package_storage_path，不触发远程拉取。
+// 未命中时返回错误，调用方可回退到远程拉取。
+func (s *skillMarketplaceService) DownloadSkillPackage(ctx context.Context, req *contract.DownloadSkillRequest) (*contract.SkillPackageDownload, error) {
+	if req == nil || strings.TrimSpace(req.SkillID) == "" {
+		return nil, fmt.Errorf("skill_id is required")
+	}
+
+	source := strings.TrimSpace(req.Source)
+	if source == "" {
+		source = "Leros"
+	}
+	version := strings.TrimSpace(req.Version)
+	if version == "" {
+		version = "latest"
+	}
+	skillID := strings.TrimSpace(req.SkillID)
+
+	// 查 DB 缓存记录
+	item, err := infradb.GetSkillMarketplaceItemBySourceSkillVersion(ctx, s.db, source, skillID, version)
+	if err != nil {
+		return nil, fmt.Errorf("query cache record: %w", err)
+	}
+	if item == nil || item.PackageStoragePath == "" {
+		return nil, fmt.Errorf("cached package not found for %s/%s@%s", source, skillID, version)
+	}
+
+	// 从 storage-go 读取
+	_, bucket, key, err := storage.ParseURI(item.PackageStoragePath)
+	if err != nil {
+		return nil, fmt.Errorf("parse storage uri: %w", err)
+	}
+	result, err := s.st.GetObject(ctx, bucket, key)
+	if err != nil {
+		return nil, fmt.Errorf("get object from storage: %w", err)
+	}
+
+	return &contract.SkillPackageDownload{
+		Reader:   result.Body,
+		FileName: fmt.Sprintf("%s-%s-%s.zip", source, skillID, version),
 	}, nil
 }
 
@@ -512,71 +559,239 @@ func (s *skillMarketplaceService) GetSkillDetail(ctx context.Context, req *contr
 	skillID := strings.TrimSpace(req.SkillID)
 	version := strings.TrimSpace(req.Version)
 
-	switch source {
-	case "Leros":
-		return s.getLerosSkillDetail(ctx, skillID)
-	case "installed":
+	// installed 走 NATS worker 路径，不变
+	if strings.EqualFold(source, "installed") {
 		return s.getInstalledSkillDetail(ctx, skillID)
-	case "clawhub":
-		return s.getClawHubSkillDetail(ctx, skillID, version)
-	default:
+	}
+
+	// marketplace 路径（Leros / ClawHub）
+	normalizedSource := normalizeMarketplaceSource(source)
+	if normalizedSource == "" {
 		return nil, fmt.Errorf("unsupported source: %s", source)
 	}
+	if version == "" {
+		version = "latest"
+	}
+
+	return s.getMarketplaceSkillDetail(ctx, normalizedSource, skillID, version)
 }
 
-// getClawHubSkillDetail 从 ClawHub 远程获取 skill 详情。
-func (s *skillMarketplaceService) getClawHubSkillDetail(ctx context.Context, skillID, version string) (*contract.SkillDetailResponse, error) {
-	detail, err := fetch.NewClawHubSource().GetDetail(ctx, skillID, version)
-	if err != nil {
-		return nil, fmt.Errorf("clawhub skill detail: %w", err)
+// getMarketplaceSkillDetail 统一处理 marketplace skill 详情查询。
+// 先查 leros_skill_marketplace_item 缓存表，有缓存从 storage 读，无缓存回填。
+func (s *skillMarketplaceService) getMarketplaceSkillDetail(ctx context.Context, source, skillID, version string) (*contract.SkillDetailResponse, error) {
+	// 1. 尝试查缓存表
+	item, cacheErr := infradb.GetSkillMarketplaceItemBySourceSkillVersion(ctx, s.db, source, skillID, version)
+	if cacheErr != nil {
+		logs.WarnContextf(ctx, "query marketplace cache for %s/%s@%s: %v", source, skillID, version, cacheErr)
+	}
+
+	// 2. 有缓存路径 → 从 storage 读
+	if item != nil && item.PackageStoragePath != "" && s.st != nil {
+		resp, err := s.readDetailFromCache(ctx, item, source)
+		if err == nil {
+			return resp, nil
+		}
+		logs.WarnContextf(ctx, "read cached package for %s/%s@%s failed: %v, fallback to refill", source, skillID, version, err)
+	}
+
+	// 3. 无缓存或读取失败 → 回填
+	return s.refillMarketplaceSkillDetail(ctx, source, skillID, version, item)
+}
+
+// readDetailFromCache 从 storage 读取 detail 并组装响应。
+// 优先读取 SKILL.zh-CN.md（缓存同目录），未命中时回退读取 package.zip 内 SKILL.md。
+// 元数据来自表记录 item，文件列表来自 zip。
+func (s *skillMarketplaceService) readDetailFromCache(ctx context.Context, item *types.SkillMarketplaceItem, source string) (*contract.SkillDetailResponse, error) {
+	skillMDBody := ""
+	description := item.Description
+	if item.TranslatedDescription != "" {
+		description = item.TranslatedDescription
+	}
+
+	// 1. 优先尝试读取同目录 SKILL.zh-CN.md
+	if item.PackageStoragePath != "" {
+		zhBody, zhDesc, zhErr := skillcache.ReadChineseDocumentFromStorage(ctx, s.st, item.PackageStoragePath)
+		if zhErr == nil && zhBody != "" {
+			// 缓存命中 SKILL.zh-CN.md
+			skillMDBody = zhBody
+			if zhDesc != "" {
+				description = zhDesc
+			}
+		} else {
+			logs.WarnContextf(ctx, "read SKILL.zh-CN.md for %s/%s@%s: %v, fallback to package.zip", source, item.SkillID, item.Version, zhErr)
+		}
+	}
+
+	// 2. SKILL.zh-CN.md 未命中或为空，回退到 zip 内 SKILL.md
+	if skillMDBody == "" {
+		zipBody, _, rawZip, err := skillcache.ReadPackageFromStorage(ctx, s.st, item.PackageStoragePath)
+		if err != nil {
+			return nil, err
+		}
+		skillMDBody = zipBody
+
+		// 回退到英文后，检查是否需要同步翻译
+		if s.translator != nil && utils.CJKRatio(skillMDBody) < 0.6 {
+			// 从 rawZip 中提取完整 SKILL.md（含 frontmatter）用于翻译
+			fullSkillMD := skillcache.ExtractSkillMDFromZip(rawZip)
+			if fullSkillMD != "" {
+				if translatedBody, zhDesc, tErr := s.translateBodyAndCache(ctx, item, fullSkillMD); tErr == nil {
+					skillMDBody = translatedBody
+					if zhDesc != "" {
+						description = zhDesc
+					}
+				}
+			}
+		}
 	}
 
 	return &contract.SkillDetailResponse{
-		SkillID:     detail.SkillID,
-		Source:      "clawhub",
-		Name:        detail.Name,
-		Description: detail.Description,
-		SkillMD:     detail.SkillMD,
-		Version:     detail.Version,
-		Author:      detail.Author,
-		Category:    detail.Category,
-		Tags:        detail.Tags,
-		Icon:        detail.Icon,
-		Installs:    0,
-		Verified:    false,
-		SourceType:  "clawhub",
-		Files:       detail.Files,
+		SkillID:     item.SkillID,
+		Source:      source,
+		Name:        item.Name,
+		Description: description,
+		SkillMD:     skillMDBody,
+		Version:     item.Version,
+		Author:      item.Author,
+		Category:    item.Category,
+		Tags:        item.Tags,
+		Icon:        "",
+		Installs:    item.Installs,
+		Verified:    source == "Leros",
+		SourceType:  source,
+		Files:       []string{"SKILL.md"},
 	}, nil
 }
 
-// getLerosSkillDetail returns the full detail of a built-in marketplace skill.
-func (s *skillMarketplaceService) getLerosSkillDetail(ctx context.Context, skillID string) (*contract.SkillDetailResponse, error) {
+// refillMarketplaceSkillDetail 回填：远程/本地拉取后写缓存并返回。
+// switch 只做数据获取，Eager 翻译和异步写缓存在 switch 后统一执行。
+func (s *skillMarketplaceService) refillMarketplaceSkillDetail(ctx context.Context, source, skillID, version string, existingItem *types.SkillMarketplaceItem) (*contract.SkillDetailResponse, error) {
+	var resp *contract.SkillDetailResponse
+	var bundle *fetch.SkillBundle
+
+	switch source {
+	case "Leros":
+		r, b, err := s.getLerosSkillDetailWithBundle(ctx, skillID)
+		if err != nil {
+			return nil, err
+		}
+		resp, bundle = r, b
+
+	case "ClawHub":
+		detail, b, err := s.getClawHubSkillDetailWithBundle(ctx, skillID, version)
+		if err != nil {
+			return nil, err
+		}
+		bundle = b
+		resp = &contract.SkillDetailResponse{
+			SkillID:     detail.SkillID,
+			Source:      "ClawHub",
+			Name:        detail.Name,
+			Description: detail.Description,
+			SkillMD:     detail.SkillMD,
+			Version:     detail.Version,
+			Author:      detail.Author,
+			Category:    detail.Category,
+			Tags:        detail.Tags,
+			Icon:        "",
+			Installs:    0,
+			Verified:    false,
+			SourceType:  "ClawHub",
+			Files:       detail.Files,
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported source: %s", source)
+	}
+
+	// 统一 version fallback
+	if resp.Version == "" {
+		resp.Version = "latest"
+	}
+
+	// 统一 eager 翻译：有 translator、原文非中文时同步翻译
+	needEagerTranslate := s.translator != nil && bundle != nil &&
+		len(bundle.Content) > 0 &&
+		utils.CJKRatio(string(bundle.Content)) < 0.6
+
+	var translatedContent string // eager translate 的完整翻译结果，用于异步缓存写入
+
+	if needEagerTranslate {
+		translationMap, tErr := s.translator.TranslateDocument(ctx, []TranslateDocumentItem{
+			{SkillID: skillID, Content: string(bundle.Content)},
+		})
+		if tErr == nil {
+			if translated, ok := translationMap[skillID]; ok && translated != "" {
+				if manifest, body, pErr := catalog.ParseDocument([]byte(translated)); pErr == nil {
+					resp.SkillMD = body
+					if manifest.Description != "" {
+						resp.Description = manifest.Description
+					}
+					translatedContent = translated // 保存完整翻译结果，供异步缓存复用
+				}
+			}
+		} else {
+			logs.WarnContextf(ctx, "refill: eager translate SKILL.md for %s/%s@%s: %v", source, skillID, resp.Version, tErr)
+		}
+	}
+
+	// Description fallback：eager 翻译未命中时，用已有的 translated_description
+	if existingItem != nil && existingItem.TranslatedDescription != "" &&
+		(resp.Description == "" || !needEagerTranslate) {
+		resp.Description = existingItem.TranslatedDescription
+	}
+
+	// 统一异步写缓存
+	if s.st != nil && s.db != nil && bundle != nil {
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logs.WarnContextf(ctx, "cache write panic for %s/%s@%s: %v", source, skillID, resp.Version, r)
+				}
+			}()
+			uri := skillcache.CachePackage(ctx, s.st, s.bucket, s.db, source, skillID, resp.Version, bundle)
+			if uri != "" {
+				if translatedContent != "" {
+					// 使用 eager translate 的结果，避免重复 LLM 调用
+					s.cacheChineseDocumentWithTranslated(ctx, source, skillID, resp.Version, uri, translatedContent)
+				} else {
+					s.cacheChineseDocument(ctx, source, skillID, resp.Version, uri, bundle)
+				}
+			}
+		}()
+	}
+
+	return resp, nil
+}
+
+// getLerosSkillDetailWithBundle 从本地文件读取 Leros 内置 skill 详情，同时返回 bundle 用于写缓存。
+func (s *skillMarketplaceService) getLerosSkillDetailWithBundle(ctx context.Context, skillID string) (*contract.SkillDetailResponse, *fetch.SkillBundle, error) {
 	item, err := infradb.GetBuiltinSkillByID(ctx, s.db, skillID)
 	if err != nil {
-		return nil, fmt.Errorf("query builtin skill: %w", err)
+		return nil, nil, fmt.Errorf("query builtin skill: %w", err)
 	}
 	if item == nil {
-		return nil, fmt.Errorf("skill %q not found", skillID)
+		return nil, nil, fmt.Errorf("skill %q not found", skillID)
 	}
 
 	serverDir, err := infradb.ResolveSkillsServerDir()
 	if err != nil {
-		return nil, fmt.Errorf("resolve skills server dir: %w", err)
+		return nil, nil, fmt.Errorf("resolve skills server dir: %w", err)
 	}
 
 	skillMDPath := filepath.Join(serverDir, skillID, "SKILL.md")
 	skillMDRaw, err := os.ReadFile(skillMDPath)
 	if err != nil {
-		return nil, fmt.Errorf("read SKILL.md for %q: %w", skillID, err)
+		return nil, nil, fmt.Errorf("read SKILL.md for %q: %w", skillID, err)
 	}
-	// Use catalog.ParseDocument to safely strip YAML frontmatter
-	// without false-positive matching on body content like "---".
+
+	// 去 frontmatter
 	skillMDContent := string(skillMDRaw)
 	if _, body, parseErr := catalog.ParseDocument(skillMDRaw); parseErr == nil {
 		skillMDContent = body
 	}
 
-	// Collect files from the skill directory (include SKILL.md as the primary file).
+	// 收集文件列表
 	var files []string
 	skillDir := filepath.Join(serverDir, skillID)
 	files = append(files, "SKILL.md")
@@ -589,22 +804,40 @@ func (s *skillMarketplaceService) getLerosSkillDetail(ctx context.Context, skill
 		}
 	}
 
-	return &contract.SkillDetailResponse{
-		SkillID:     item.SkillID,
-		Source:      "Leros",
-		Name:        item.Name,
+	// 构建 bundle 用于写缓存
+	bundle := buildBundleFromLocalSkill(skillDir, skillID, item)
+
+	resp := &contract.SkillDetailResponse{
+		SkillID:    item.SkillID,
+		Source:     "Leros",
+		Name:       item.Name,
 		Description: item.Description,
-		SkillMD:     skillMDContent,
-		Version:     item.Version,
-		Author:      item.Author,
-		Category:    item.Category,
-		Tags:        []string(item.Tags),
-		Icon:        item.Icon,
-		Installs:    item.Installs,
-		Verified:    item.Verified,
-		SourceType:  "Leros",
-		Files:       files,
-	}, nil
+		SkillMD:    skillMDContent,
+		Version:    item.Version,
+		Author:     item.Author,
+		Category:   item.Category,
+		Tags:       []string(item.Tags),
+		Icon:       item.Icon,
+		Installs:   item.Installs,
+		Verified:   item.Verified,
+		SourceType: "Leros",
+		Files:      files,
+	}
+	return resp, bundle, nil
+}
+
+// getClawHubSkillDetailWithBundle 从 ClawHub 远程获取 skill 详情，同时返回 bundle 用于写缓存。
+func (s *skillMarketplaceService) getClawHubSkillDetailWithBundle(ctx context.Context, skillID, version string) (*fetch.SkillDetail, *fetch.SkillBundle, error) {
+	clawhub := fetch.NewClawHubSource()
+
+	// GetDetail 通过 GET /api/v1/skills/{slug} 获取 Author 等元数据，
+	// 内部只下载一次 zip（FetchVersion），已同时返回 bundle，无需再次下载。
+	detail, bundle, err := clawhub.GetDetail(ctx, skillID, version)
+	if err != nil {
+		return nil, nil, fmt.Errorf("clawhub skill detail: %w", err)
+	}
+
+	return detail, bundle, nil
 }
 
 // getInstalledSkillDetail sends a NATS request to the worker for installed skill detail.
@@ -839,6 +1072,165 @@ func validateZipSkill(zipBytes []byte) error {
 		return fmt.Errorf("zip does not contain SKILL.md")
 	}
 	return nil
+}
+
+// buildBundleFromLocalSkill 从本地 skill 目录构建 *fetch.SkillBundle。
+// 用于 Leros 内置 skill 写入缓存。返回 nil 表示构建失败（已记录 warning）。
+func buildBundleFromLocalSkill(skillDir, skillID string, _ *types.BuiltinSkillMarketplaceItem) *fetch.SkillBundle {
+	content, err := os.ReadFile(filepath.Join(skillDir, "SKILL.md"))
+	if err != nil {
+		logs.Warnf("build bundle for %s: read SKILL.md: %v", skillID, err)
+		return nil
+	}
+
+	files := make(map[string][]byte)
+	allowedSubdirs := map[string]bool{"assets": true, "references": true, "scripts": true, "templates": true}
+	filepath.Walk(skillDir, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil || info.IsDir() {
+			return nil
+		}
+		rel, relErr := filepath.Rel(skillDir, path)
+		if relErr != nil {
+			return nil
+		}
+		if rel == "SKILL.md" {
+			return nil
+		}
+		topDir, _, _ := strings.Cut(filepath.ToSlash(rel), "/")
+		if !allowedSubdirs[topDir] {
+			return nil
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr == nil && len(data) <= 1_048_576 {
+			files[filepath.ToSlash(rel)] = data
+		}
+		return nil
+	})
+
+	return &fetch.SkillBundle{
+		Content: content,
+		Files:   files,
+	}
+}
+
+// normalizeMarketplaceSource 统一 source 名称做缓存表查询。
+func normalizeMarketplaceSource(source string) string {
+	switch strings.ToLower(strings.TrimSpace(source)) {
+	case "leros":
+		return "Leros"
+	case "clawhub":
+		return "ClawHub"
+	default:
+		return ""
+	}
+}
+
+// translateBodyAndCache 同步翻译 SKILL.md 内容，更新返回值，并异步写入 SKILL.zh-CN.md。
+// fullSkillMD 为完整 SKILL.md 内容（含 frontmatter）。
+// 返回翻译后的 body（不含 frontmatter）和 description。
+func (s *skillMarketplaceService) translateBodyAndCache(ctx context.Context, item *types.SkillMarketplaceItem, fullSkillMD string) (body string, description string, err error) {
+	translationMap, tErr := s.translator.TranslateDocument(ctx, []TranslateDocumentItem{
+		{SkillID: item.SkillID, Content: fullSkillMD},
+	})
+	if tErr != nil {
+		logs.WarnContextf(ctx, "translateBodyAndCache: TranslateDocument for %s/%s@%s: %v", item.Source, item.SkillID, item.Version, tErr)
+		return "", "", tErr
+	}
+
+	translated, ok := translationMap[item.SkillID]
+	if !ok || translated == "" {
+		return "", "", fmt.Errorf("translate returned empty result for %s", item.SkillID)
+	}
+
+	manifest, bodyContent, pErr := catalog.ParseDocument([]byte(translated))
+	if pErr != nil {
+		logs.WarnContextf(ctx, "translateBodyAndCache: ParseDocument for %s/%s@%s: %v", item.Source, item.SkillID, item.Version, pErr)
+		return "", "", pErr
+	}
+
+	// 异步写入 SKILL.zh-CN.md，直接使用本次翻译结果，不重复调用 LLM
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logs.WarnContextf(ctx, "translateBodyAndCache: write SKILL.zh-CN.md panic for %s/%s@%s: %v", item.Source, item.SkillID, item.Version, r)
+			}
+		}()
+		s.cacheChineseDocumentWithContent(ctx, item, translated, manifest.Description)
+	}()
+
+	return bodyContent, manifest.Description, nil
+}
+
+// cacheChineseDocumentWithContent 使用已有的翻译内容写入 SKILL.zh-CN.md。
+// 与 cacheChineseDocument 不同，该方法直接使用 preTranslatedContent，不调用 LLM。
+func (s *skillMarketplaceService) cacheChineseDocumentWithContent(ctx context.Context, item *types.SkillMarketplaceItem, chineseContent string, zhDescription string) {
+	if s.st == nil || s.db == nil || item.PackageStoragePath == "" || chineseContent == "" {
+		return
+	}
+	skillcache.CacheChineseDocumentWithContent(ctx, s.st, s.bucket, s.db, item.Source, item.SkillID, item.Version, item.PackageStoragePath, chineseContent, zhDescription)
+}
+
+// cacheChineseDocumentWithTranslated 使用 eager translate 的翻译结果写入 SKILL.zh-CN.md。
+// 与 cacheChineseDocument 不同，该方法直接使用传入的完整翻译内容，不调用 LLM。
+func (s *skillMarketplaceService) cacheChineseDocumentWithTranslated(ctx context.Context, source, skillID, version, packageURI string, translatedContent string) {
+	if s.st == nil || s.db == nil || packageURI == "" || translatedContent == "" {
+		return
+	}
+
+	// 从翻译内容中提取 description
+	zhDescription := ""
+	if manifest, _, pErr := catalog.ParseDocument([]byte(translatedContent)); pErr == nil {
+		zhDescription = manifest.Description
+	}
+
+	// 写入 storage
+	chineseKey := skillcache.SkillChineseCacheKey(source, skillID, version)
+	_, cErr := s.st.PutObject(ctx, s.bucket, chineseKey, strings.NewReader(translatedContent),
+		storage.WithContentType("text/markdown; charset=utf-8"),
+	)
+	if cErr != nil {
+		logs.WarnContextf(ctx, "cache chinese doc: put object failed for %s/%s@%s: %v", source, skillID, version, cErr)
+		return
+	}
+
+	logs.Infof("cache chinese doc: written SKILL.zh-CN.md for %s/%s@%s", source, skillID, version)
+
+	// 回写 DB
+	if err := infradb.UpdateSkillMarketplaceTranslatedDescription(ctx, s.db, source, skillID, version, zhDescription); err != nil {
+		logs.WarnContextf(ctx, "cache chinese doc: update db metadata for %s/%s@%s: %v", source, skillID, version, err)
+	}
+}
+
+// cacheChineseDocument 将 SKILL.zh-CN.md 写入 storage。
+// 内部错误只记 warning，不影响主流程。
+func (s *skillMarketplaceService) cacheChineseDocument(ctx context.Context, source, skillID, version, packageURI string, bundle *fetch.SkillBundle) {
+	if s.st == nil || s.db == nil || bundle == nil || packageURI == "" {
+		return
+	}
+
+	// 构建 ChineseWriter
+	translateFn := func(ctx context.Context, content string) (string, string, error) {
+		if s.translator == nil {
+			return "", "", fmt.Errorf("translator not available")
+		}
+		result, tErr := s.translator.TranslateDocument(ctx, []TranslateDocumentItem{
+			{SkillID: skillID, Content: content},
+		})
+		if tErr != nil {
+			return "", "", tErr
+		}
+		translated, ok := result[skillID]
+		if !ok || translated == "" {
+			return "", "", fmt.Errorf("translate returned empty result")
+		}
+		// 提取 translated description
+		if manifest, _, pErr := catalog.ParseDocument([]byte(translated)); pErr == nil {
+			return translated, manifest.Description, nil
+		}
+		return translated, "", nil
+	}
+
+	skillcache.CacheChineseDocument(ctx, s.st, s.bucket, s.db, source, skillID, version, packageURI, bundle, translateFn)
 }
 
 var _ contract.SkillMarketplaceService = (*skillMarketplaceService)(nil)
