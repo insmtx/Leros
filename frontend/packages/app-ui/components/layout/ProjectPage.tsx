@@ -3,6 +3,7 @@
 import type { ProjectArtifact, ProjectTask } from "@leros/store";
 import {
 	fetchFileDownload,
+	formatArtifactTime,
 	mapBackendArtifactToProjectArtifact,
 	projectFileApi,
 	useChatStore,
@@ -1399,7 +1400,7 @@ function ProjectArtifactList({
 								</div>
 								<div className="mt-1 truncate text-xs leading-4 text-[var(--leros-text-muted)]">
 									{artifact.size}
-									{artifact.updatedAt ? ` · ${artifact.updatedAt}` : ""}
+									{artifact.updatedAt ? ` · ${formatArtifactTime(artifact.updatedAt)}` : ""}
 								</div>
 							</div>
 						</button>

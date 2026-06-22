@@ -3,6 +3,7 @@
 import type { ProjectArtifact, ProjectTask } from "@leros/store";
 import {
 	collectSessionArtifacts,
+	formatArtifactTime,
 	formatTokenCount,
 	mapBackendArtifactToProjectArtifact,
 	mergeProjectArtifacts,
@@ -704,6 +705,9 @@ function TaskArtifactList({
 							{artifact.name}
 						</div>
 						<div className="mt-1 truncate text-xs leading-4 text-[var(--leros-text-muted)]">
+							{/* 中文注释：任务产物列表补充生成时间，方便和“最新在上”的排序保持一致认知。 */}
+							{formatArtifactTime(artifact.updatedAt)}
+							{artifact.updatedAt && artifact.size ? " · " : ""}
 							{artifact.size}
 						</div>
 					</div>

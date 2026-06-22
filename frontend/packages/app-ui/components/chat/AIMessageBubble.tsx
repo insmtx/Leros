@@ -1,6 +1,7 @@
 "use client";
 
 import {
+	formatArtifactTime,
 	formatTime,
 	getAssistantMessageFooterSegments,
 	mapBackendArtifactToProjectArtifact,
@@ -116,7 +117,10 @@ export function AIMessageBubble({
 
 				{hasArtifacts && message.artifacts && (
 					<div className="mb-3">
-						<MessageArtifactList artifacts={message.artifacts} />
+						<MessageArtifactList
+							artifacts={message.artifacts}
+							fallbackTimestamp={message.timestamp}
+						/>
 					</div>
 				)}
 
@@ -318,7 +322,13 @@ function compactText(value: string): string {
 	return value.replace(/\s+/g, " ").trim();
 }
 
-function MessageArtifactList({ artifacts }: { artifacts: MessageArtifact[] }) {
+function MessageArtifactList({
+	artifacts,
+	fallbackTimestamp,
+}: {
+	artifacts: MessageArtifact[];
+	fallbackTimestamp: number;
+}) {
 	const [previewArtifact, setPreviewArtifact] = useState<ProjectArtifact | null>(null);
 	const [taskArtifacts, setTaskArtifacts] = useState<ProjectArtifact[]>([]);
 	const [loadingArtifactId, setLoadingArtifactId] = useState<string | null>(null);
@@ -328,11 +338,15 @@ function MessageArtifactList({ artifacts }: { artifacts: MessageArtifact[] }) {
 		[artifacts],
 	);
 	const visibleArtifacts = useMemo(() => {
-		const sessionArtifacts = artifacts.map(messageArtifactToProjectArtifact);
+		// 中文注释：旧历史消息里如果没有独立的产物时间，这里回退到所属消息时间，保证卡片稳定展示时间。
+		const sessionArtifacts = artifacts.map((artifact) => ({
+			...messageArtifactToProjectArtifact(artifact),
+			updatedAt: artifact.updatedAt ?? fallbackTimestamp,
+		}));
 		const artifactIds = new Set(sessionArtifacts.map((artifact) => artifact.id));
 		const enrichedTaskArtifacts = taskArtifacts.filter((artifact) => artifactIds.has(artifact.id));
 		return mergeProjectArtifacts(enrichedTaskArtifacts, sessionArtifacts);
-	}, [artifacts, taskArtifacts]);
+	}, [artifacts, fallbackTimestamp, taskArtifacts]);
 
 	useEffect(() => {
 		if (!activeTaskDetailTaskId) {
@@ -389,6 +403,7 @@ function MessageArtifactList({ artifacts }: { artifacts: MessageArtifact[] }) {
 							</div>
 							<div className="mt-0.5 truncate text-[13px] leading-4 text-slate-400">
 								{artifact.name}
+								{artifact.updatedAt ? ` · ${formatArtifactTime(artifact.updatedAt)}` : ""}
 								{artifact.size ? ` · ${artifact.size}` : ""}
 							</div>
 						</div>

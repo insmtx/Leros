@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -88,7 +89,9 @@ func artifactPayloadFromRecord(record agentworkspace.ArtifactRecord) events.Arti
 		Description:  strings.TrimSpace(record.Description),
 		MimeType:     strings.TrimSpace(record.MimeType),
 		ArtifactType: artifactType(record.ArtifactType),
-		StorageKey:   strings.TrimSpace(record.StorageKey),
+		// 中文注释：产物在运行期声明时就附带时间，供历史消息直接展示，无需再依赖任务接口二次补齐。
+		CreatedAt:  time.Now().UTC(),
+		StorageKey: strings.TrimSpace(record.StorageKey),
 	}
 }
 

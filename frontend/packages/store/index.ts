@@ -104,6 +104,7 @@ export {
 	getValidJwtToken,
 } from "./utils/authStorage";
 export {
+	formatArtifactTime,
 	formatDate,
 	formatFileSize,
 	formatLatency,

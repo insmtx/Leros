@@ -116,6 +116,7 @@ func convertToContractArtifact(artifact *types.Artifact) *contract.Artifact {
 		MimeType:     artifact.MimeType,
 		FileSize:     artifact.FileSize,
 		Sha256:       artifact.Sha256,
+		CreatedAt:    artifact.CreatedAt,
 	}
 }
 
