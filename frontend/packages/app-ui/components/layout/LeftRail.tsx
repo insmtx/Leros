@@ -46,6 +46,7 @@ import {
 	RefreshCcw,
 	Trash2,
 	UserRound,
+	X,
 	Zap,
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, PointerEvent as ReactPointerEvent } from "react";
@@ -123,6 +124,98 @@ export function LeftRail({
 	const [renameValue, setRenameValue] = useState("");
 	const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
 	const [accountDialogOpen, setAccountDialogOpen] = useState(false);
+
+	/* ── Desktop update notifier ── */
+	const [promptOpen, setPromptOpen] = useState(false);
+	const [downloadedVersion, setDownloadedVersion] = useState<string | undefined>(undefined);
+	const [installing, setInstalling] = useState(false);
+	const [installError, setInstallError] = useState<string | null>(null);
+	const previousPhaseRef = useRef<DesktopUpdateState["phase"] | null>(null);
+	const previousVersionRef = useRef<string | undefined>(undefined);
+	const snoozeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const updatePromptSnoozeMs = 5 * 60 * 1000;
+	const versionUpdateImageSrc = new URL(
+		"../../../../apps/desktop/resources/octopus_version_update.png",
+		import.meta.url,
+	).href;
+
+	const clearSnoozeTimer = () => {
+		if (snoozeTimerRef.current) {
+			clearTimeout(snoozeTimerRef.current);
+			snoozeTimerRef.current = null;
+		}
+	};
+
+	const openUpdatePrompt = (version?: string) => {
+		clearSnoozeTimer();
+		setDownloadedVersion(version);
+		setInstallError(null);
+		setPromptOpen(true);
+	};
+
+	const snoozeUpdatePrompt = () => {
+		setPromptOpen(false);
+		if (!downloadedVersion || installing) return;
+		clearSnoozeTimer();
+		snoozeTimerRef.current = setTimeout(() => {
+			setPromptOpen(true);
+			snoozeTimerRef.current = null;
+		}, updatePromptSnoozeMs);
+	};
+
+	useEffect(() => {
+		const api = getDesktopUpdateApi();
+		if (!api) return;
+
+		let mounted = true;
+
+		void api.getState().then((state) => {
+			if (!mounted) return;
+			previousPhaseRef.current = state.phase;
+			previousVersionRef.current = state.availableVersion ?? state.downloadedVersion;
+			if (state.phase === "downloaded") {
+				openUpdatePrompt(state.downloadedVersion ?? state.availableVersion);
+			}
+		});
+
+		const unsubscribe = api.subscribe((state) => {
+			const previousPhase = previousPhaseRef.current;
+			const previousVersion = previousVersionRef.current;
+			const nextVersion = state.availableVersion ?? state.downloadedVersion;
+
+			if (
+				state.phase === "downloaded" &&
+				(previousPhase !== "downloaded" || previousVersion !== nextVersion)
+			) {
+				openUpdatePrompt(nextVersion);
+			}
+
+			previousPhaseRef.current = state.phase;
+			previousVersionRef.current = nextVersion;
+		});
+
+		return () => {
+			mounted = false;
+			clearSnoozeTimer();
+			unsubscribe();
+		};
+	}, []);
+
+	const handleInstallNow = async () => {
+		setInstalling(true);
+		setInstallError(null);
+		try {
+			const accepted = await getDesktopUpdateApi()!.quitAndInstall();
+			if (!accepted) {
+				setInstalling(false);
+				setInstallError("当前还没有可安装的更新");
+			}
+		} catch (error) {
+			setInstalling(false);
+			setInstallError(error instanceof Error ? error.message : "启动安装失败，请稍后重试");
+		}
+	};
+	/* ── end Desktop update notifier ── */
 
 	useEffect(() => {
 		fetchProjects();
@@ -280,7 +373,7 @@ export function LeftRail({
 
 	return (
 		<aside
-			className="leros-sidebar"
+			className="leros-sidebar relative"
 			data-collapsed={leftRailCollapsed}
 			style={{ width: `${sidebarWidth}px` }}
 		>
@@ -515,6 +608,55 @@ export function LeftRail({
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+			{promptOpen ? (
+				<div className="absolute inset-x-2 bottom-2 z-50 overflow-hidden rounded-2xl border border-[#4F46E5]/20 bg-[#EEEDFF]/95 text-slate-950 shadow-[0_12px_30px_rgba(79,70,229,0.2)] backdrop-blur">
+					<div className="flex">
+						<img
+							src={versionUpdateImageSrc}
+							alt=""
+							className="h-[68px] w-[68px] shrink-0 self-end object-contain object-bottom-left"
+							aria-hidden="true"
+						/>
+						<div className="min-w-0 flex-1 px-2.5 py-2">
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon-xs"
+								className="absolute top-1.5 right-2.5 rounded-full text-slate-950/65 hover:bg-white/50 hover:text-slate-950"
+								onClick={snoozeUpdatePrompt}
+								disabled={installing}
+								aria-label="稍后安装"
+							>
+								<X className="size-3.5" />
+							</Button>
+							<div className="pr-7">
+								<div className="truncate text-[14px] font-semibold leading-5">新版本已就绪</div>
+								<div className="truncate text-[13px] leading-4 text-slate-900/60">
+									{downloadedVersion
+										? `V${downloadedVersion.replace(/^v/i, "")}`
+										: "V"}
+								</div>
+							</div>
+							<div className="mt-1 flex items-center justify-end">
+								<Button
+									type="button"
+									size="sm"
+									className="h-7 min-w-20 rounded-lg bg-slate-950 px-3.5 text-sm text-white hover:bg-slate-800"
+									onClick={handleInstallNow}
+									disabled={installing}
+								>
+									<RefreshCcw className={installing ? "size-3.5 animate-spin" : "size-3.5"} />
+									{installing ? "更新中" : "更新"}
+								</Button>
+							</div>
+							{installError ? (
+								<div className="mt-2 truncate text-xs text-red-500">{installError}</div>
+							) : null}
+						</div>
+					</div>
+				</div>
+			) : null}
 		</aside>
 	);
 }

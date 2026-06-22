@@ -15,7 +15,7 @@ import {
 } from "../shared/auto-update";
 
 const autoUpdateIntervalMs = 30 * 60 * 1000;
-const initialAutoUpdateDelayMs = 3 * 1000;
+const initialAutoUpdateDelayMs = 1 * 1000;
 const desktopUpdateBaseURL = "https://leros-1395325824.cos.ap-beijing.myqcloud.com/application/stable";
 const enableDevAutoUpdate = !app.isPackaged;
 

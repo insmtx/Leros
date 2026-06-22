@@ -10,7 +10,6 @@ export type StoredAuthUser = {
 	refreshToken?: string;
 	expiredAt?: number;
 	uin?: number;
-	apiBaseUrl?: string;
 };
 
 export const AUTH_STORAGE_KEY = "leros-auth-user";
@@ -25,12 +24,7 @@ export function readStoredAuthUser(): StoredAuthUser | null {
 	try {
 		const stored = window.localStorage.getItem(AUTH_STORAGE_KEY);
 		if (!stored) return null;
-		const user = JSON.parse(stored) as StoredAuthUser;
-		if (user.apiBaseUrl && user.apiBaseUrl !== API_BASE_URL) {
-			clearStoredAuthUser();
-			return null;
-		}
-		return user;
+		return JSON.parse(stored) as StoredAuthUser;
 	} catch (err) {
 		console.error("read auth user error:", err);
 		return null;
@@ -41,10 +35,7 @@ export function writeStoredAuthUser(user: StoredAuthUser) {
 	if (typeof window === "undefined") return;
 
 	try {
-		window.localStorage.setItem(
-			AUTH_STORAGE_KEY,
-			JSON.stringify({ ...user, apiBaseUrl: API_BASE_URL }),
-		);
+		window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
 	} catch (err) {
 		console.error("save auth user error:", err);
 	}
