@@ -1,7 +1,15 @@
 "use client";
 
 import type { AuthUser, NavItem, Project, ViewMode } from "@leros/store";
-import { useAuthStore, useChatStore, useLayoutStore, userApi } from "@leros/store";
+import {
+	authenticatedFetch,
+	getFileDownloadUrl,
+	projectFileApi,
+	useAuthStore,
+	useChatStore,
+	useLayoutStore,
+	userApi,
+} from "@leros/store";
 import { Button } from "@leros/ui/components/ui/button";
 import {
 	Dialog,
@@ -37,6 +45,7 @@ import {
 	RefreshCcw,
 	Trash2,
 	UserRound,
+	X,
 	Zap,
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, PointerEvent as ReactPointerEvent } from "react";
@@ -48,7 +57,12 @@ import { DiceBearAvatar } from "../avatar/DiceBearAvatar";
 
 const LEFT_RAIL_WIDTH_STORAGE_KEY = "leros-left-rail-width";
 const LEFT_RAIL_COLLAPSED_STORAGE_KEY = "leros-left-rail-collapsed";
+const AVATAR_CACHE_PREFIX = "leros-avatar-cache:";
 const LEFT_RAIL_COLLAPSED_WIDTH = 72;
+
+type PublicEnv = {
+	readonly VITE_LEROS_APP_VERSION?: string;
+};
 
 export type AppNavigation = {
 	currentPath: string;
@@ -74,6 +88,8 @@ const navIdToView: Record<string, ViewMode> = {
 };
 
 const protectedNavIds = new Set(["skills", "knowledge"]);
+const appVersion = getAppVersion();
+const brandVersionLabel = appVersion.startsWith("v") ? appVersion : `v${appVersion}`;
 
 export function LeftRail({
 	logoSrc = APP_LOGO_SRC,
@@ -99,12 +115,104 @@ export function LeftRail({
 	} = useLayoutStore((s) => s);
 	const clearComposerInput = useChatStore((s) => s.clearComposerInput);
 	const setAuthUser = useAuthStore((s) => s.setAuthUser);
-	const { isAuthenticated, openAuthDialog, requireAuth, logout, user } = useAuth();
+	const { isHydrated, isAuthenticated, openAuthDialog, requireAuth, logout, user } = useAuth();
 	const hasLoadedPreferenceRef = useRef(false);
 	const [renameProject, setRenameProject] = useState<Project | null>(null);
 	const [renameValue, setRenameValue] = useState("");
 	const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
 	const [accountDialogOpen, setAccountDialogOpen] = useState(false);
+
+	/* ── Desktop update notifier ── */
+	const [promptOpen, setPromptOpen] = useState(false);
+	const [downloadedVersion, setDownloadedVersion] = useState<string | undefined>(undefined);
+	const [installing, setInstalling] = useState(false);
+	const [installError, setInstallError] = useState<string | null>(null);
+	const previousPhaseRef = useRef<DesktopUpdateState["phase"] | null>(null);
+	const previousVersionRef = useRef<string | undefined>(undefined);
+	const snoozeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const updatePromptSnoozeMs = 5 * 60 * 1000;
+	const versionUpdateImageSrc = new URL(
+		"../../../../apps/desktop/resources/octopus_version_update.png",
+		import.meta.url,
+	).href;
+
+	const clearSnoozeTimer = () => {
+		if (snoozeTimerRef.current) {
+			clearTimeout(snoozeTimerRef.current);
+			snoozeTimerRef.current = null;
+		}
+	};
+
+	const openUpdatePrompt = (version?: string) => {
+		clearSnoozeTimer();
+		setDownloadedVersion(version);
+		setInstallError(null);
+		setPromptOpen(true);
+	};
+
+	const snoozeUpdatePrompt = () => {
+		setPromptOpen(false);
+		if (!downloadedVersion || installing) return;
+		clearSnoozeTimer();
+		snoozeTimerRef.current = setTimeout(() => {
+			setPromptOpen(true);
+			snoozeTimerRef.current = null;
+		}, updatePromptSnoozeMs);
+	};
+
+	useEffect(() => {
+		const api = getDesktopUpdateApi();
+		if (!api) return;
+
+		let mounted = true;
+
+		void api.getState().then((state) => {
+			if (!mounted) return;
+			previousPhaseRef.current = state.phase;
+			previousVersionRef.current = state.availableVersion ?? state.downloadedVersion;
+			if (state.phase === "downloaded") {
+				openUpdatePrompt(state.downloadedVersion ?? state.availableVersion);
+			}
+		});
+
+		const unsubscribe = api.subscribe((state) => {
+			const previousPhase = previousPhaseRef.current;
+			const previousVersion = previousVersionRef.current;
+			const nextVersion = state.availableVersion ?? state.downloadedVersion;
+
+			if (
+				state.phase === "downloaded" &&
+				(previousPhase !== "downloaded" || previousVersion !== nextVersion)
+			) {
+				openUpdatePrompt(nextVersion);
+			}
+
+			previousPhaseRef.current = state.phase;
+			previousVersionRef.current = nextVersion;
+		});
+
+		return () => {
+			mounted = false;
+			clearSnoozeTimer();
+			unsubscribe();
+		};
+	}, []);
+
+	const handleInstallNow = async () => {
+		setInstalling(true);
+		setInstallError(null);
+		try {
+			const accepted = await getDesktopUpdateApi()!.quitAndInstall();
+			if (!accepted) {
+				setInstalling(false);
+				setInstallError("当前还没有可安装的更新");
+			}
+		} catch (error) {
+			setInstalling(false);
+			setInstallError(error instanceof Error ? error.message : "启动安装失败，请稍后重试");
+		}
+	};
+	/* ── end Desktop update notifier ── */
 
 	useEffect(() => {
 		fetchProjects();
@@ -177,10 +285,7 @@ export function LeftRail({
 		const name = renameValue.trim();
 		if (!renameProject || !name) return;
 
-		const updatedProject = await updateProject({
-			public_id: renameProject.id,
-			name,
-		});
+		const updatedProject = await updateProject({ public_id: renameProject.id, name });
 		if (updatedProject) {
 			setRenameProject(null);
 			setRenameValue("");
@@ -265,7 +370,7 @@ export function LeftRail({
 
 	return (
 		<aside
-			className="leros-sidebar"
+			className="leros-sidebar relative"
 			data-collapsed={leftRailCollapsed}
 			style={{ width: `${sidebarWidth}px` }}
 		>
@@ -284,7 +389,7 @@ export function LeftRail({
 					</div>
 					<div className="leros-sidebar-expandable min-w-0">
 						<div className="leros-brand-title">Lework</div>
-						<div className="leros-brand-version">v0.1.11</div>
+						<div className="leros-brand-version">{brandVersionLabel}</div>
 					</div>
 				</div>
 				<button
@@ -338,7 +443,15 @@ export function LeftRail({
 			</ScrollArea>
 
 			<div className="leros-sidebar-footer shrink-0">
-				{isAuthenticated ? (
+				{!isHydrated ? (
+					<div className="leros-profile-trigger" aria-hidden="true">
+						<span className="leros-avatar animate-pulse bg-slate-200" />
+						<div className="leros-sidebar-expandable flex-1 space-y-1.5 overflow-hidden">
+							<span className="block h-3.5 w-24 rounded bg-slate-200" />
+							<span className="block h-2.5 w-16 rounded bg-slate-100" />
+						</div>
+					</div>
+				) : isAuthenticated ? (
 					<DropdownMenu>
 						<DropdownMenuTrigger
 							render={
@@ -353,7 +466,7 @@ export function LeftRail({
 											{user?.name ?? "Leros 用户"}
 										</p>
 										<p className="truncate text-[11px] text-[var(--leros-text-subtle)]">
-											{user?.email ?? "已登录"}
+											{getDisplayPhone(user) ?? "已登录"}
 										</p>
 									</div>
 								</button>
@@ -420,7 +533,7 @@ export function LeftRail({
 			</div>
 
 			<hr
-				className="leros-sidebar-resize-handle border-0"
+				className="leros-sidebar-resize-handle"
 				tabIndex={0}
 				aria-orientation="vertical"
 				aria-label="调整侧边栏宽度"
@@ -492,6 +605,55 @@ export function LeftRail({
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+			{promptOpen ? (
+				<div className="absolute inset-x-2 bottom-2 z-50 overflow-hidden rounded-2xl border border-[#4F46E5]/20 bg-[#EEEDFF]/95 text-slate-950 shadow-[0_12px_30px_rgba(79,70,229,0.2)] backdrop-blur">
+					<div className="flex">
+						<img
+							src={versionUpdateImageSrc}
+							alt=""
+							className="h-[68px] w-[68px] shrink-0 self-end object-contain object-bottom-left"
+							aria-hidden="true"
+						/>
+						<div className="min-w-0 flex-1 px-2.5 py-2">
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon-xs"
+								className="absolute top-1.5 right-2.5 rounded-full text-slate-950/65 hover:bg-white/50 hover:text-slate-950"
+								onClick={snoozeUpdatePrompt}
+								disabled={installing}
+								aria-label="稍后安装"
+							>
+								<X className="size-3.5" />
+							</Button>
+							<div className="pr-7">
+								<div className="truncate text-[14px] font-semibold leading-5">新版本已就绪</div>
+								<div className="truncate text-[13px] leading-4 text-slate-900/60">
+									{downloadedVersion
+										? `V${downloadedVersion.replace(/^v/i, "")}`
+										: "V"}
+								</div>
+							</div>
+							<div className="mt-1 flex items-center justify-end">
+								<Button
+									type="button"
+									size="sm"
+									className="h-7 min-w-20 rounded-lg bg-slate-950 px-3.5 text-sm text-white hover:bg-slate-800"
+									onClick={handleInstallNow}
+									disabled={installing}
+								>
+									<RefreshCcw className={installing ? "size-3.5 animate-spin" : "size-3.5"} />
+									{installing ? "更新中" : "更新"}
+								</Button>
+							</div>
+							{installError ? (
+								<div className="mt-2 truncate text-xs text-red-500">{installError}</div>
+							) : null}
+						</div>
+					</div>
+				</div>
+			) : null}
 		</aside>
 	);
 }
@@ -513,6 +675,7 @@ function AccountManagementDialog({
 	const [savingName, setSavingName] = useState(false);
 	const [uploadingAvatar, setUploadingAvatar] = useState(false);
 	const [previewAvatarUrl, setPreviewAvatarUrl] = useState<string | undefined>();
+	const displayPhone = getDisplayPhone(user);
 
 	useEffect(() => {
 		if (!open) {
@@ -544,16 +707,14 @@ function AccountManagementDialog({
 
 		setSavingName(true);
 		try {
-			const response = await userApi.update({
-				public_id: publicId,
-				name: nextName,
-			});
+			const response = await userApi.update({ public_id: publicId, name: nextName });
 			const updatedUser = response.data.data;
 			if (updatedUser?.name) {
 				updateLocalUser({
 					publicId: updatedUser.public_id || publicId,
 					name: updatedUser.name,
 					email: updatedUser.email || user?.email || "",
+					phone: updatedUser.phone || user?.phone,
 					avatarUrl: updatedUser.avatar_url || user?.avatarUrl,
 				});
 			} else {
@@ -573,19 +734,42 @@ function AccountManagementDialog({
 		const file = event.target.files?.[0];
 		event.target.value = "";
 		if (!file) return;
+		if (!isImageFile(file)) {
+			toast.error("请选择图片文件");
+			return;
+		}
 
 		setUploadingAvatar(true);
+		const previewURL = URL.createObjectURL(file);
+		setPreviewAvatarUrl(previewURL);
 		try {
-			const avatarUrl = await readFileAsDataUrl(file);
-			setPreviewAvatarUrl(avatarUrl);
-			updateLocalUser({ avatarUrl });
-			setPreviewAvatarUrl(undefined);
+			const uploadResponse = await projectFileApi.uploadLoose({ file, purpose: "avatar" });
+			const uploaded = uploadResponse.data;
+			if (!uploaded?.public_id) {
+				throw new Error("头像上传失败");
+			}
+
+			const publicId = requirePublicId();
+			if (!publicId) return;
+
+			const avatarUrl = getFileDownloadUrl(uploaded.public_id);
+			const response = await userApi.update({ public_id: publicId, avatar_url: avatarUrl });
+			const updatedUser = response.data.data;
+			cacheAvatarDataURL(avatarUrl, await blobToDataURL(file));
+			updateLocalUser({
+				publicId: updatedUser?.public_id || publicId,
+				name: updatedUser?.name || user?.name || "",
+				email: updatedUser?.email || user?.email || "",
+				phone: updatedUser?.phone || user?.phone,
+				avatarUrl: updatedUser?.avatar_url || avatarUrl,
+			});
 			toast.success("头像已更新");
 		} catch (err) {
-			setPreviewAvatarUrl(undefined);
 			const message = err instanceof Error ? err.message : "头像更新失败";
 			toast.error(message);
 		} finally {
+			setPreviewAvatarUrl(undefined);
+			URL.revokeObjectURL(previewURL);
 			setUploadingAvatar(false);
 		}
 	};
@@ -614,7 +798,7 @@ function AccountManagementDialog({
 								fallback={
 									user ? (
 										<DiceBearAvatar
-											seed={`user:${user.email || user.name}`}
+											seed={`user:${displayPhone || user.name}`}
 											alt={user.name ?? "Avatar"}
 											className="h-full w-full"
 											size={128}
@@ -690,9 +874,9 @@ function AccountManagementDialog({
 						</div>
 
 						<div>
-							<div className="mb-1.5 text-xs font-medium text-slate-500">邮箱</div>
+							<div className="mb-1.5 text-xs font-medium text-slate-500">手机号</div>
 							<div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-								{user?.email ?? "未绑定邮箱"}
+								{displayPhone ?? "未绑定手机号"}
 							</div>
 						</div>
 					</div>
@@ -702,23 +886,9 @@ function AccountManagementDialog({
 	);
 }
 
-function readFileAsDataUrl(file: File): Promise<string> {
-	return new Promise((resolve, reject) => {
-		const reader = new FileReader();
-		reader.addEventListener("load", () => {
-			if (typeof reader.result === "string") {
-				resolve(reader.result);
-				return;
-			}
-			reject(new Error("头像读取失败"));
-		});
-		reader.addEventListener("error", () => reject(new Error("头像读取失败")));
-		reader.readAsDataURL(file);
-	});
-}
-
 function ProfileAvatar({ user }: { user: AuthUser | null }) {
-	const fallbackLabel = getAvatarInitial(user?.name ?? user?.email ?? "Leros");
+	const displayPhone = getDisplayPhone(user);
+	const fallbackLabel = getAvatarInitial(user?.name ?? displayPhone ?? "Leros");
 
 	return (
 		<span
@@ -732,7 +902,7 @@ function ProfileAvatar({ user }: { user: AuthUser | null }) {
 				fallback={
 					user ? (
 						<DiceBearAvatar
-							seed={`user:${user.email || user.name}`}
+							seed={`user:${displayPhone || user.name}`}
 							alt={user.name ?? "Avatar"}
 							className="h-full w-full"
 							size={96}
@@ -744,6 +914,22 @@ function ProfileAvatar({ user }: { user: AuthUser | null }) {
 			/>
 		</span>
 	);
+}
+
+function getDisplayPhone(user: AuthUser | null): string | undefined {
+	if (user?.phone) return user.phone;
+	if (user?.name && /^1[3-9]\d{9}$/.test(user.name)) return user.name;
+	return undefined;
+}
+
+function getAppVersion(): string {
+	const version = (import.meta as ImportMeta & { readonly env?: PublicEnv }).env?.VITE_LEROS_APP_VERSION;
+	return version?.trim() || "0.0.0";
+}
+
+function isImageFile(file: File): boolean {
+	if (file.type.startsWith("image/")) return true;
+	return /\.(avif|bmp|gif|jpe?g|png|svg|webp)$/i.test(file.name);
 }
 
 function ImageWithFallback({
@@ -758,12 +944,49 @@ function ImageWithFallback({
 	fallback: React.ReactNode;
 }) {
 	const [failed, setFailed] = useState(false);
+	const [imageURL, setImageURL] = useState<string | null>(() => getCachedAvatarDataURL(src));
+
+	useEffect(() => {
+		setFailed(false);
+		if (!src || !isProtectedFileURL(src)) {
+			setImageURL(null);
+			return;
+		}
+
+		const cachedAvatarURL = getCachedAvatarDataURL(src);
+		if (cachedAvatarURL) {
+			setImageURL(cachedAvatarURL);
+		}
+
+		let cancelled = false;
+		authenticatedFetch(src)
+			.then(async (response) => {
+				if (!response.ok) throw new Error(`HTTP ${response.status}`);
+				return response.blob();
+			})
+			.then(async (blob) => {
+				if (cancelled) return;
+				const dataURL = await blobToDataURL(blob);
+				if (cancelled) return;
+				cacheAvatarDataURL(src, dataURL);
+				setImageURL(dataURL);
+			})
+			.catch(() => {
+				if (!cancelled && !cachedAvatarURL) setFailed(true);
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [src]);
 
 	if (!src || failed) return <>{fallback}</>;
+	const imageSrc = imageURL || src;
+	if (isProtectedFileURL(src) && !imageURL) return <>{fallback}</>;
 
 	return (
 		<img
-			src={src}
+			src={imageSrc}
 			alt={alt}
 			className={className}
 			loading="lazy"
@@ -772,6 +995,47 @@ function ImageWithFallback({
 			onError={() => setFailed(true)}
 		/>
 	);
+}
+
+function isProtectedFileURL(src: string): boolean {
+	return src.includes("/files/") && src.includes("/download");
+}
+
+function getAvatarCacheKey(src: string): string {
+	return `${AVATAR_CACHE_PREFIX}${src}`;
+}
+
+function getCachedAvatarDataURL(src?: string | null): string | null {
+	if (!src || typeof window === "undefined" || !isProtectedFileURL(src)) return null;
+	try {
+		return window.localStorage.getItem(getAvatarCacheKey(src));
+	} catch {
+		return null;
+	}
+}
+
+function cacheAvatarDataURL(src: string, dataURL: string) {
+	if (typeof window === "undefined" || !isProtectedFileURL(src)) return;
+	try {
+		window.localStorage.setItem(getAvatarCacheKey(src), dataURL);
+	} catch {
+		// Avatar cache is an optional UX optimization.
+	}
+}
+
+function blobToDataURL(blob: Blob): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.addEventListener("load", () => {
+			if (typeof reader.result === "string") {
+				resolve(reader.result);
+				return;
+			}
+			reject(new Error("头像缓存失败"));
+		});
+		reader.addEventListener("error", () => reject(new Error("头像缓存失败")));
+		reader.readAsDataURL(blob);
+	});
 }
 
 function getAvatarInitial(label: string) {
@@ -821,8 +1085,7 @@ function getDesktopUpdateApi(): DesktopUpdateApi | null {
 		return null;
 	}
 
-	return ((window as Window & { lerosDesktop?: DesktopUpdateApi }).lerosDesktop ??
-		null) as DesktopUpdateApi | null;
+	return ((window as Window & { lerosDesktop?: DesktopUpdateApi }).lerosDesktop ?? null) as DesktopUpdateApi | null;
 }
 
 function DesktopUpdateMenuSection() {
@@ -879,9 +1142,7 @@ function DesktopUpdateMenuSection() {
 					<div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
 						<div
 							className="h-full rounded-full bg-[#34c59a] transition-all"
-							style={{
-								width: `${Math.max(0, Math.min(updateState.progressPercent, 100))}%`,
-							}}
+							style={{ width: `${Math.max(0, Math.min(updateState.progressPercent, 100))}%` }}
 						/>
 					</div>
 				</div>
