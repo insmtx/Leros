@@ -24,14 +24,15 @@ type Config struct {
 		DisableEventConsumers bool      `yaml:"disable_event_consumers,omitempty"` // 是否禁用后台事件消费者
 		JWT                   JWTConfig `yaml:"jwt,omitempty"`                     // JWT 认证配置
 	} `yaml:"server,omitempty"` // 服务器地址
-	WorkspaceRoot string            `yaml:"workspace_root,omitempty" json:"workspace_root,omitempty"`
-	NATS          *NATSConfig       `yaml:"nats,omitempty"`
-	Database      *DatabaseConfig   `yaml:"database,omitempty"`
-	LLM           *LLMConfig        `yaml:"llm,omitempty"`
-	Scheduler     *SchedulerConfig  `yaml:"scheduler,omitempty"`
-	Storage       *StorageConfig    `yaml:"storage,omitempty"`
-	WorkerAuth    *WorkerAuthConfig `yaml:"worker_auth,omitempty" json:"worker_auth,omitempty"`
-	Aliyun        *AliyunConfig     `yaml:"aliyun,omitempty" json:"aliyun,omitempty"`
+	WorkspaceRoot string              `yaml:"workspace_root,omitempty" json:"workspace_root,omitempty"`
+	NATS          *NATSConfig         `yaml:"nats,omitempty"`
+	Database      *DatabaseConfig     `yaml:"database,omitempty"`
+	LLM           *LLMConfig          `yaml:"llm,omitempty"`
+	Scheduler     *SchedulerConfig    `yaml:"scheduler,omitempty"`
+	Storage       *StorageConfig      `yaml:"storage,omitempty"`
+	WorkerAuth    *WorkerAuthConfig   `yaml:"worker_auth,omitempty" json:"worker_auth,omitempty"`
+	Aliyun        *AliyunConfig       `yaml:"aliyun,omitempty" json:"aliyun,omitempty"`
+	ClientUpdate  *ClientUpdateConfig `yaml:"client_update,omitempty" json:"client_update,omitempty"`
 }
 
 // JWTConfig JWT 认证配置
@@ -50,6 +51,20 @@ type WorkerBootstrapToken struct {
 	OrgID    uint   `yaml:"org_id" json:"org_id"`
 	WorkerID uint   `yaml:"worker_id" json:"worker_id"`
 	Token    string `yaml:"token" json:"token"`
+}
+
+// ClientUpdateConfig configures client version compatibility policies.
+type ClientUpdateConfig struct {
+	Desktop ClientUpdatePolicy `yaml:"desktop,omitempty" json:"desktop,omitempty"`
+	Web     ClientUpdatePolicy `yaml:"web,omitempty" json:"web,omitempty"`
+}
+
+// ClientUpdatePolicy describes update requirements for one client app.
+type ClientUpdatePolicy struct {
+	MinSupportedVersion string `yaml:"min_supported_version,omitempty" json:"min_supported_version,omitempty"`
+	LatestVersion       string `yaml:"latest_version,omitempty" json:"latest_version,omitempty"`
+	UpdateURL           string `yaml:"update_url,omitempty" json:"update_url,omitempty"`
+	ForceMessage        string `yaml:"force_message,omitempty" json:"force_message,omitempty"`
 }
 
 // DatabaseConfig 是数据库的配置结构

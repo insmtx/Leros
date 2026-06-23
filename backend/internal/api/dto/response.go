@@ -18,6 +18,13 @@ type ErrorResponse struct {
 	Details      string `json:"details,omitempty"`
 }
 
+// ErrorDataResponse is an error response with structured machine-readable data.
+type ErrorDataResponse struct {
+	BaseResponse `json:",inline"`
+	Data         interface{} `json:"data,omitempty"`
+	Details      string      `json:"details,omitempty"`
+}
+
 // Success 成功响应
 func Success(data interface{}) *Response {
 	return &Response{
@@ -47,5 +54,16 @@ func ErrorWithDetails(code int, message string, details string) *ErrorResponse {
 			Message: message,
 		},
 		Details: details,
+	}
+}
+
+// ErrorWithData returns an error response that carries structured remediation data.
+func ErrorWithData(code int, message string, data interface{}) *ErrorDataResponse {
+	return &ErrorDataResponse{
+		BaseResponse: BaseResponse{
+			Code:    code,
+			Message: message,
+		},
+		Data: data,
 	}
 }

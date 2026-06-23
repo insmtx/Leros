@@ -10,6 +10,14 @@ export type {
 	SendPhoneLoginCodeResponse,
 } from "./api/authApi";
 export { authApi } from "./api/authApi";
+export { clientUpdateApi } from "./api/clientUpdateApi";
+export type {
+	ClientApp,
+	ClientUpdatePolicy,
+	ClientUpgradeRequiredEvent,
+	ClientVersionReportParams,
+} from "./api/clientUpdatePolicy";
+export { CLIENT_UPGRADE_REQUIRED_EVENT } from "./api/clientUpdatePolicy";
 export { API_BASE_URL } from "./api/config";
 export { digitalAssistantApi } from "./api/digitalAssistantApi";
 export { fetchFileDownload, fileApi, getFileDownloadUrl } from "./api/fileApi";
