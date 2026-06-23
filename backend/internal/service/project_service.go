@@ -495,6 +495,7 @@ func (s *projectService) GetProjectMemory(ctx context.Context, publicID string) 
 }
 
 func (s *projectService) GetProjectFileTree(ctx context.Context, publicID string, parentPath string, depth int) ([]*contract.FileTreeNode, error) {
+	_ = depth // depth is ignored with recursive tree API
 	caller, err := requireCallerOrg(ctx)
 	if err != nil {
 		return nil, err
@@ -524,49 +525,24 @@ func (s *projectService) GetProjectFileTree(ctx context.Context, publicID string
 	}
 	owner, repo := parts[0], parts[1]
 
-	treePath := strings.Trim(parentPath, "/")
-	entries, err := s.giteaClient.ListContents(ctx, owner, repo, treePath, project.GiteaDefaultBranch)
+	entries, err := s.giteaClient.ListRepoTree(ctx, owner, repo, project.GiteaDefaultBranch)
 	if err != nil {
-		return nil, fmt.Errorf("list gitea contents: %w", err)
+		return nil, fmt.Errorf("list repo tree: %w", err)
 	}
 
-	nodes := make([]*contract.FileTreeNode, 0, len(entries))
+	filtered := make([]gitea.RepoEntry, 0, len(entries))
 	for _, e := range entries {
-		node := &contract.FileTreeNode{
-			Name: e.Name,
-			Path: e.Path,
-			Type: "file",
-			Size: e.Size,
+		if isPathAllowed(e.Path) {
+			filtered = append(filtered, e)
 		}
-		if e.Type == "dir" {
-			node.Type = "directory"
-			node.Children = make([]*contract.FileTreeNode, 0)
-			if depth > 1 {
-				children, err := s.giteaClient.ListContents(ctx, owner, repo, e.Path, project.GiteaDefaultBranch)
-				if err == nil {
-					for _, child := range children {
-						childNode := &contract.FileTreeNode{
-							Name: child.Name,
-							Path: child.Path,
-							Type: "file",
-							Size: child.Size,
-						}
-						if child.Type == "dir" {
-							childNode.Type = "directory"
-							childNode.Children = make([]*contract.FileTreeNode, 0)
-						} else {
-							childNode.MimeType = mimeTypeByExt(child.Name)
-						}
-						node.Children = append(node.Children, childNode)
-					}
-				}
-			}
-		} else {
-			node.MimeType = mimeTypeByExt(e.Name)
-		}
-		nodes = append(nodes, node)
 	}
-	return nodes, nil
+
+	allRoots := buildFileTree(filtered)
+	roots := filterByParentPaths(allRoots, strings.Trim(parentPath, "/"))
+	if roots == nil {
+		return nil, errors.New("directory not found")
+	}
+	return roots, nil
 }
 
 // DownloadProjectFile 下载项目中的文件。
@@ -752,6 +728,107 @@ func (s *projectService) initRepoStructure(ctx context.Context, fullName string)
 			logs.WarnContextf(ctx, "[project] init gitea file %s failed: %v", f.path, err)
 		}
 	}
+}
+
+var visibleFolders = []string{"uploads/", "outputs/"}
+
+func isPathAllowed(filePath string) bool {
+	for _, prefix := range visibleFolders {
+		if strings.HasPrefix(filePath, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func buildFileTree(entries []gitea.RepoEntry) []*contract.FileTreeNode {
+	nodeMap := make(map[string]*contract.FileTreeNode)
+	var roots []*contract.FileTreeNode
+
+	for _, entry := range entries {
+		parts := strings.Split(entry.Path, "/")
+		name := parts[len(parts)-1]
+
+		var parentPath string
+		if len(parts) > 1 {
+			parentPath = strings.Join(parts[:len(parts)-1], "/")
+		}
+
+		node := &contract.FileTreeNode{
+			Name: name,
+			Path: entry.Path,
+		}
+		if entry.Type == "tree" {
+			node.Type = "directory"
+			node.Children = make([]*contract.FileTreeNode, 0)
+		} else {
+			node.Type = "file"
+			node.Size = entry.Size
+			if mt := mimeTypeByExt(name); mt != "" {
+				node.MimeType = mt
+			}
+		}
+
+		nodeMap[entry.Path] = node
+
+		if parentPath == "" {
+			roots = append(roots, node)
+		} else if parent, ok := nodeMap[parentPath]; ok {
+			parent.Children = append(parent.Children, node)
+		} else {
+			ancestors := strings.Split(entry.Path, "/")
+			for i := 1; i < len(ancestors); i++ {
+				prefix := strings.Join(ancestors[:i], "/")
+				if _, exists := nodeMap[prefix]; exists {
+					continue
+				}
+				dirName := ancestors[i-1]
+				dirNode := &contract.FileTreeNode{
+					Name:     dirName,
+					Path:     prefix,
+					Type:     "directory",
+					Children: make([]*contract.FileTreeNode, 0),
+				}
+				nodeMap[prefix] = dirNode
+
+				var grandParent string
+				if i > 1 {
+					grandParent = strings.Join(ancestors[:i-1], "/")
+				}
+				if grandParent == "" {
+					roots = append(roots, dirNode)
+				} else if gp, ok := nodeMap[grandParent]; ok {
+					gp.Children = append(gp.Children, dirNode)
+				}
+			}
+			if parent, ok := nodeMap[parentPath]; ok {
+				parent.Children = append(parent.Children, node)
+			}
+		}
+	}
+	return roots
+}
+
+func filterByParentPaths(roots []*contract.FileTreeNode, parentPath string) []*contract.FileTreeNode {
+	if parentPath == "" {
+		return roots
+	}
+	parts := strings.Split(strings.Trim(parentPath, "/"), "/")
+	current := roots
+	for _, part := range parts {
+		found := false
+		for _, node := range current {
+			if node.Name == part && node.Type == "directory" {
+				current = node.Children
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil
+		}
+	}
+	return current
 }
 
 func mimeTypeByExt(filename string) string {
