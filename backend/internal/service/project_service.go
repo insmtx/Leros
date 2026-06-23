@@ -537,7 +537,11 @@ func (s *projectService) GetProjectFileTree(ctx context.Context, publicID string
 		}
 	}
 
-	roots := buildFileTree(filtered)
+	allRoots := buildFileTree(filtered)
+	roots := filterByParentPaths(allRoots, strings.Trim(parentPath, "/"))
+	if roots == nil {
+		return nil, errors.New("directory not found")
+	}
 	return roots, nil
 }
 

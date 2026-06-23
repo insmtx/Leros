@@ -33,10 +33,11 @@ func (h *ProjectFileHandler) RegisterRoutes(r gin.IRouter) {
 
 // GetProjectFileTree 获取项目文件树
 // @Summary 获取项目文件树
-// @Description 获取项目 artifacts/ 和 uploads/ 目录的文件树
+// @Description 获取项目 artifacts/ 和 uploads/ 目录的文件树，可通过 path 参数指定子目录
 // @Tags Project
 // @Produce json
 // @Param project_id path string true "项目 public_id"
+// @Param path query string false "起始目录相对路径，如 artifacts，默认返回全量"
 // @Success 200 {object} dto.Response "成功响应"
 // @Failure 400 {object} dto.ErrorResponse "请求参数错误"
 // @Failure 401 {object} dto.ErrorResponse "未认证"
@@ -50,7 +51,9 @@ func (h *ProjectFileHandler) GetProjectFileTree(ctx *gin.Context) {
 		return
 	}
 
-	result, err := h.service.GetProjectFileTree(ctx, projectID, "", 0)
+	parentPath := strings.TrimSpace(ctx.Query("path"))
+
+	result, err := h.service.GetProjectFileTree(ctx, projectID, parentPath, 0)
 	if err != nil {
 		handleProjectFileServiceError(ctx, err)
 		return
