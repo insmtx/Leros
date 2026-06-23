@@ -11,10 +11,19 @@ type NATSConfig struct {
 
 // LLMConfig is the configuration structure for LLM providers
 type LLMConfig struct {
-	Provider string `yaml:"provider"`           // LLM Provider (openai, anthropic, etc.)
-	APIKey   string `yaml:"api_key"`            // API Key
-	Model    string `yaml:"model,omitempty"`    // Default model
-	BaseURL  string `yaml:"base_url,omitempty"` // Custom base URL
+	Provider    string                `yaml:"provider"`              // LLM Provider (openai, anthropic, etc.)
+	APIKey      string                `yaml:"api_key"`               // API Key
+	Model       string                `yaml:"model,omitempty"`       // Default model
+	BaseURL     string                `yaml:"base_url,omitempty"`    // Custom base URL
+	Translation *LLMTranslationConfig `yaml:"translation,omitempty"` // Built-in translation model
+}
+
+// LLMTranslationConfig configures the built-in fast translation model.
+type LLMTranslationConfig struct {
+	Provider string `yaml:"provider,omitempty"` // LLM Provider for translation
+	APIKey   string `yaml:"api_key,omitempty"`  // API Key for translation
+	Model    string `yaml:"model,omitempty"`    // Translation model
+	BaseURL  string `yaml:"base_url,omitempty"` // Translation base URL
 }
 
 // Config 是 Leros 的主配置结构，包含所有子系统的配置

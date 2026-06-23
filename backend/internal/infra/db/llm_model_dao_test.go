@@ -7,6 +7,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
+	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/types"
 )
 
@@ -187,6 +188,154 @@ func TestGetDefaultLLMModel(t *testing.T) {
 	}
 	if missing != nil {
 		t.Fatalf("expected nil for inactive default model, got %#v", missing)
+	}
+}
+
+func TestGetSystemTranslationLLMModel(t *testing.T) {
+	database := setupLLMModelTestDB(t)
+	ctx := context.Background()
+
+	fallback := newTestLLMModel(1, SystemTranslationLLMModelCode)
+	fallback.IsSystem = true
+	fallback.Provider = string(types.LLMProviderDeepSeek)
+	fallback.ModelName = "deepseek-v4-flash"
+
+	orgModel := newTestLLMModel(2, SystemTranslationLLMModelCode)
+	orgModel.IsSystem = true
+	orgModel.Provider = string(types.LLMProviderDeepSeek)
+	orgModel.ModelName = "deepseek-v4-flash"
+
+	nonSystem := newTestLLMModel(3, SystemTranslationLLMModelCode)
+	inactive := newTestLLMModel(4, SystemTranslationLLMModelCode)
+	inactive.IsSystem = true
+	inactive.Status = string(types.LLMModelStatusInactive)
+
+	for _, model := range []*types.LLMModel{fallback, orgModel, nonSystem, inactive} {
+		if err := CreateLLMModel(ctx, database, model); err != nil {
+			t.Fatalf("CreateLLMModel failed: %v", err)
+		}
+	}
+
+	retrieved, err := GetSystemTranslationLLMModel(ctx, database, 2)
+	if err != nil {
+		t.Fatalf("GetSystemTranslationLLMModel failed: %v", err)
+	}
+	if retrieved == nil || retrieved.OrgID != 2 || retrieved.ModelName != "deepseek-v4-flash" {
+		t.Fatalf("unexpected org translation model: %#v", retrieved)
+	}
+
+	retrieved, err = GetSystemTranslationLLMModel(ctx, database, 3)
+	if err != nil {
+		t.Fatalf("GetSystemTranslationLLMModel fallback failed: %v", err)
+	}
+	if retrieved == nil || retrieved.OrgID != 1 {
+		t.Fatalf("expected fallback system translation model, got %#v", retrieved)
+	}
+
+	missing, err := GetSystemTranslationLLMModel(ctx, database, 4)
+	if err != nil {
+		t.Fatalf("GetSystemTranslationLLMModel inactive fallback failed: %v", err)
+	}
+	if missing == nil || missing.OrgID != 1 {
+		t.Fatalf("expected fallback for inactive org model, got %#v", missing)
+	}
+}
+
+func TestSeedSystemLLMModelsCreatesTranslationModel(t *testing.T) {
+	database := setupLLMModelTestDB(t)
+
+	err := seedSystemLLMModels(database, &config.LLMConfig{
+		APIKey:  "main-key",
+		BaseURL: "https://gateway.example.com/v1/",
+		Translation: &config.LLMTranslationConfig{
+			Provider: string(types.LLMProviderDeepSeek),
+			APIKey:   "translation-key",
+			Model:    "deepseek-v4-flash",
+			BaseURL:  "https://api.deepseek.com/v1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("seedSystemLLMModels failed: %v", err)
+	}
+
+	model, err := GetSystemTranslationLLMModel(context.Background(), database, 1)
+	if err != nil {
+		t.Fatalf("GetSystemTranslationLLMModel failed: %v", err)
+	}
+	if model == nil {
+		t.Fatal("expected system translation model")
+	}
+	if model.Provider != string(types.LLMProviderDeepSeek) || model.ModelName != "deepseek-v4-flash" {
+		t.Fatalf("unexpected translation model: %#v", model)
+	}
+	if model.APIKeyEncrypted != "translation-key" || model.IsDefault || !model.IsSystem {
+		t.Fatalf("unexpected translation model flags/key: %#v", model)
+	}
+}
+
+func TestSeedSystemLLMModelsUpdatesSystemTranslationModel(t *testing.T) {
+	database := setupLLMModelTestDB(t)
+
+	existing := newTestLLMModel(1, SystemTranslationLLMModelCode)
+	existing.IsSystem = true
+	existing.Provider = string(types.LLMProviderOpenAI)
+	existing.ModelName = "old-model"
+	existing.APIKeyEncrypted = "old-key"
+	if err := CreateLLMModel(context.Background(), database, existing); err != nil {
+		t.Fatalf("CreateLLMModel failed: %v", err)
+	}
+
+	err := seedSystemLLMModels(database, &config.LLMConfig{
+		APIKey: "main-key",
+		Translation: &config.LLMTranslationConfig{
+			Provider: string(types.LLMProviderDeepSeek),
+			APIKey:   "new-key",
+			Model:    "deepseek-v4-flash",
+			BaseURL:  "https://api.deepseek.com/v1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("seedSystemLLMModels failed: %v", err)
+	}
+
+	model, err := GetLLMModelByCode(context.Background(), database, 1, SystemTranslationLLMModelCode)
+	if err != nil {
+		t.Fatalf("GetLLMModelByCode failed: %v", err)
+	}
+	if model.Provider != string(types.LLMProviderDeepSeek) || model.ModelName != "deepseek-v4-flash" || model.APIKeyEncrypted != "new-key" {
+		t.Fatalf("expected system model to be updated, got %#v", model)
+	}
+}
+
+func TestSeedSystemLLMModelsDoesNotOverwriteNonSystemModel(t *testing.T) {
+	database := setupLLMModelTestDB(t)
+
+	existing := newTestLLMModel(1, SystemTranslationLLMModelCode)
+	existing.IsSystem = false
+	existing.Provider = string(types.LLMProviderOpenAI)
+	existing.ModelName = "user-model"
+	if err := CreateLLMModel(context.Background(), database, existing); err != nil {
+		t.Fatalf("CreateLLMModel failed: %v", err)
+	}
+
+	err := seedSystemLLMModels(database, &config.LLMConfig{
+		APIKey: "main-key",
+		Translation: &config.LLMTranslationConfig{
+			Provider: string(types.LLMProviderDeepSeek),
+			APIKey:   "translation-key",
+			Model:    "deepseek-v4-flash",
+		},
+	})
+	if err != nil {
+		t.Fatalf("seedSystemLLMModels failed: %v", err)
+	}
+
+	model, err := GetLLMModelByCode(context.Background(), database, 1, SystemTranslationLLMModelCode)
+	if err != nil {
+		t.Fatalf("GetLLMModelByCode failed: %v", err)
+	}
+	if model.IsSystem || model.ModelName != "user-model" {
+		t.Fatalf("expected non-system model to remain unchanged, got %#v", model)
 	}
 }
 

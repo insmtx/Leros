@@ -7,6 +7,7 @@ package db
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/encryptor/snowflake"
@@ -224,12 +225,116 @@ func InitDevData(db *gorm.DB, llmCfg *config.LLMConfig) error {
 		logs.Infof("Default LLM model created (provider=%s, model=%s)", llmCfg.Provider, modelName)
 	}
 
+	if err := seedSystemLLMModels(db, llmCfg); err != nil {
+		return err
+	}
+
 	// 初始化内置 Skill 市场条目（从 backend/skills/server/ 下的 SKILL.md 解析）
 	if err := SeedBuiltinSkillMarketplace(db); err != nil {
 		return fmt.Errorf("failed to seed builtin skill marketplace: %w", err)
 	}
 
 	return nil
+}
+
+func seedSystemLLMModels(d *gorm.DB, llmCfg *config.LLMConfig) error {
+	spec, ok := buildSystemTranslationLLMModelSpec(llmCfg)
+	if !ok {
+		logs.Warn("System translation LLM model skipped: no api_key configured")
+		return nil
+	}
+
+	var existing types.LLMModel
+	err := d.Where("org_id = ? AND code = ?", spec.OrgID, spec.Code).First(&existing).Error
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("find system translation LLM model: %w", err)
+		}
+		if err := d.Create(spec).Error; err != nil {
+			return fmt.Errorf("create system translation LLM model: %w", err)
+		}
+		logs.Infof("System translation LLM model created (provider=%s, model=%s)", spec.Provider, spec.ModelName)
+		return nil
+	}
+
+	if !existing.IsSystem {
+		logs.Warnf("System translation LLM model skipped: code %q is occupied by non-system model", spec.Code)
+		return nil
+	}
+
+	existing.Name = spec.Name
+	existing.Description = spec.Description
+	existing.Provider = spec.Provider
+	existing.ModelName = spec.ModelName
+	existing.BaseURL = spec.BaseURL
+	existing.BaseURLHasV1 = spec.BaseURLHasV1
+	existing.APIKeyEncrypted = spec.APIKeyEncrypted
+	existing.APIKeyMasked = spec.APIKeyMasked
+	existing.MaxTokens = spec.MaxTokens
+	existing.Temperature = spec.Temperature
+	existing.TimeoutSec = spec.TimeoutSec
+	existing.Status = spec.Status
+	existing.IsDefault = false
+	existing.IsSystem = true
+	existing.Config = spec.Config
+
+	if err := d.Save(&existing).Error; err != nil {
+		return fmt.Errorf("update system translation LLM model: %w", err)
+	}
+	logs.Infof("System translation LLM model updated (provider=%s, model=%s)", spec.Provider, spec.ModelName)
+	return nil
+}
+
+func buildSystemTranslationLLMModelSpec(llmCfg *config.LLMConfig) (*types.LLMModel, bool) {
+	if llmCfg == nil {
+		return nil, false
+	}
+
+	provider := strings.TrimSpace(string(types.LLMProviderDeepSeek))
+	modelName := "deepseek-v4-flash"
+	baseURL := strings.TrimSpace(llmCfg.BaseURL)
+	apiKey := strings.TrimSpace(llmCfg.APIKey)
+
+	if llmCfg.Translation != nil {
+		if v := strings.TrimSpace(llmCfg.Translation.Provider); v != "" {
+			provider = v
+		}
+		if v := strings.TrimSpace(llmCfg.Translation.Model); v != "" {
+			modelName = v
+		}
+		if v := strings.TrimSpace(llmCfg.Translation.BaseURL); v != "" {
+			baseURL = v
+		}
+		if v := strings.TrimSpace(llmCfg.Translation.APIKey); v != "" {
+			apiKey = v
+		}
+	}
+
+	if apiKey == "" {
+		return nil, false
+	}
+
+	return &types.LLMModel{
+		OrgID:           1,
+		Code:            SystemTranslationLLMModelCode,
+		Name:            "内置翻译模型",
+		Description:     "用于 Skill 描述和文档翻译的快速系统模型",
+		Provider:        provider,
+		ModelName:       modelName,
+		BaseURL:         strings.TrimRight(baseURL, "/"),
+		BaseURLHasV1:    true,
+		APIKeyEncrypted: apiKey,
+		APIKeyMasked:    maskAPIKey(apiKey),
+		MaxTokens:       4096,
+		Temperature:     0.1,
+		TimeoutSec:      60,
+		Status:          string(types.LLMModelStatusActive),
+		IsDefault:       false,
+		IsSystem:        true,
+		Config: types.LLMModelConfig{
+			"purpose": "translation",
+		},
+	}, true
 }
 
 func seedDefaultWorkerDeployment(d *gorm.DB) error {

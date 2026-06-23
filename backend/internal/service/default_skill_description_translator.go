@@ -60,13 +60,13 @@ func (t *defaultSkillDescriptionTranslator) Translate(ctx context.Context, items
 		return map[string]string{}, nil
 	}
 
-	model, err := infradb.GetDefaultLLMModel(ctx, t.db, caller.OrgID)
+	model, err := infradb.GetSystemTranslationLLMModel(ctx, t.db, caller.OrgID)
 	if err != nil {
-		logs.WarnContextf(ctx, "skill translator: get default LLM model: %v", err)
+		logs.WarnContextf(ctx, "skill translator: get system translation LLM model: %v", err)
 		return map[string]string{}, nil
 	}
 	if model == nil {
-		logs.WarnContextf(ctx, "skill translator: no default LLM model for org %d", caller.OrgID)
+		logs.WarnContextf(ctx, "skill translator: no system translation LLM model for org %d", caller.OrgID)
 		return map[string]string{}, nil
 	}
 
@@ -222,13 +222,13 @@ func (t *defaultSkillDescriptionTranslator) TranslateDocument(ctx context.Contex
 		return map[string]string{}, nil
 	}
 
-	model, err := infradb.GetDefaultLLMModel(ctx, t.db, caller.OrgID)
+	model, err := infradb.GetSystemTranslationLLMModel(ctx, t.db, caller.OrgID)
 	if err != nil {
-		logs.WarnContextf(ctx, "skill translator: get default LLM model: %v", err)
+		logs.WarnContextf(ctx, "skill translator: get system translation LLM model: %v", err)
 		return map[string]string{}, nil
 	}
 	if model == nil {
-		logs.WarnContextf(ctx, "skill translator: no default LLM model for org %d", caller.OrgID)
+		logs.WarnContextf(ctx, "skill translator: no system translation LLM model for org %d", caller.OrgID)
 		return map[string]string{}, nil
 	}
 
