@@ -8,9 +8,9 @@ import { cn } from "@leros/ui/lib/utils";
 import {
 	Check,
 	ChevronDown,
+	Files,
 	Folder,
 	FolderOpen,
-	Files,
 	ListTodo,
 	Paperclip,
 	Plus,
@@ -20,10 +20,11 @@ import {
 	Target,
 	X,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "../auth";
 import { PROJECT_ATTACHMENT_ACCEPT } from "../input/ChatInput";
+import { StructuredComposer } from "../input/StructuredComposer";
 import type { AppNavigation } from "./LeftRail";
 
 export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
@@ -114,28 +115,7 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 		await performSend(content);
 	};
 
-	const handleAttachmentSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-		const files = Array.from(event.target.files ?? []);
-		if (!files.length) return;
-
-		for (const file of files) {
-			try {
-				const uploaded = activeWorkbenchProjectId
-					? await addUploadedAttachment(activeWorkbenchProjectId, file)
-					: await uploadWorkbenchAttachment(file);
-				const { attachment, message } = uploaded;
-				setAttachments((prev) => [...prev, attachment]);
-				toast.success(message || "文件上传成功");
-			} catch (err) {
-				const message = err instanceof Error ? err.message : "文件上传失败";
-				console.error("Workbench upload attachment error:", err);
-				toast.error(message);
-			}
-		}
-		event.target.value = "";
-	};
-
-	const uploadWorkbenchAttachment = async (file: File) => {
+	const uploadWorkbenchAttachment = useCallback(async (file: File) => {
 		// 无项目时先走通用上传，后续随 NewMessage 自动关联到新建项目。
 		const response = await projectFileApi.uploadLoose({ file, purpose: "attachment" });
 		const payload = response.data;
@@ -151,7 +131,51 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 			mimeType: payload.mime_type || file.type,
 		};
 		return { attachment, message: response.message };
+	}, []);
+
+	const uploadAttachments = useCallback(
+		async (files: File[]) => {
+			if (!files.length) return;
+
+			for (const file of files) {
+				try {
+					const uploaded = activeWorkbenchProjectId
+						? await addUploadedAttachment(activeWorkbenchProjectId, file)
+						: await uploadWorkbenchAttachment(file);
+					const { attachment, message } = uploaded;
+					setAttachments((prev) => [...prev, attachment]);
+					toast.success(message || "文件上传成功");
+				} catch (err) {
+					const message = err instanceof Error ? err.message : "文件上传失败";
+					console.error("Workbench upload attachment error:", err);
+					toast.error(message);
+				}
+			}
+		},
+		[activeWorkbenchProjectId, addUploadedAttachment, uploadWorkbenchAttachment],
+	);
+
+	const handleAttachmentSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+		const files = Array.from(event.target.files ?? []);
+		if (!files.length) return;
+
+		await uploadAttachments(files);
+		event.target.value = "";
 	};
+
+	const handlePasteFiles = useCallback(
+		(event: React.ClipboardEvent<HTMLElement>) => {
+			const files = Array.from(event.clipboardData.files);
+			if (!files.length) return;
+
+			if (!isAuthenticated) {
+				openAuthDialog("login");
+				return;
+			}
+			void uploadAttachments(files);
+		},
+		[isAuthenticated, openAuthDialog, uploadAttachments],
+	);
 
 	const handleRemoveAttachment = (attachmentId: string) => {
 		setAttachments((prev) => {
@@ -326,18 +350,18 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 									))}
 								</div>
 							)}
-							<div className="flex gap-3">
-								<textarea
+							<div className="min-w-0">
+								<StructuredComposer
 									value={input}
-									onChange={(event) => setInput(event.target.value)}
-									onKeyDown={(event) => {
-										if (event.key === "Enter" && !event.shiftKey) {
-											event.preventDefault();
-											handleSend();
-										}
+									onChange={setInput}
+									onSubmit={() => {
+										void handleSend();
 									}}
+									onPasteFiles={handlePasteFiles}
+									onFocus={() => undefined}
+									onBlur={() => undefined}
 									placeholder="在这里开始新任务，或输入指令以同步您的项目进度..."
-									className="min-h-[80px] flex-1 resize-none border-none bg-transparent text-sm leading-6 text-slate-700 outline-none placeholder:text-[var(--leros-chat-placeholder)] focus:ring-0"
+									isProjectVariant
 								/>
 							</div>
 							<div className="flex items-center justify-between border-t border-[var(--leros-chat-ai-border)] pt-3">
@@ -517,7 +541,7 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 									<Button
 										size="icon"
 										onClick={handleSend}
-										disabled={isGenerating || (!input.trim() && attachments.length === 0)}
+										disabled={isGenerating || !input.trim()}
 										className="size-9 rounded-xl bg-[var(--leros-primary)] text-white shadow-sm hover:bg-[var(--leros-primary-strong)] disabled:bg-[var(--leros-chat-control-bg)] disabled:text-[var(--leros-text-subtle)]"
 									>
 										<SendHorizonal className="size-4" />
@@ -533,7 +557,9 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 						<div className="flex h-full flex-col rounded-[24px] border border-[var(--leros-control-border)] bg-[var(--leros-surface)] p-6 shadow-sm">
 							<div className="mb-5 flex items-center justify-between">
 								<div>
-									<h3 className="text-lg font-semibold text-[var(--leros-text-strong)]">开始建议</h3>
+									<h3 className="text-lg font-semibold text-[var(--leros-text-strong)]">
+										开始建议
+									</h3>
 									<p className="mt-1 text-sm text-[var(--leros-text-muted)]">
 										点一下即可填入输入框，适合用来启动工作台对话。
 									</p>
@@ -551,7 +577,9 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 										onClick={() => applyPrompt(prompt)}
 										className="rounded-2xl border border-[var(--leros-control-border)] bg-[var(--leros-surface)] px-4 py-4 text-left transition-colors hover:border-[var(--leros-primary)] hover:bg-[var(--leros-primary-softer)]"
 									>
-										<p className="text-sm font-medium leading-6 text-[var(--leros-text)]">{prompt}</p>
+										<p className="text-sm font-medium leading-6 text-[var(--leros-text)]">
+											{prompt}
+										</p>
 									</button>
 								))}
 							</div>
@@ -562,7 +590,9 @@ export function WorkbenchPanel({ navigation }: { navigation?: AppNavigation }) {
 						<div className="flex h-full flex-col rounded-[24px] border border-[var(--leros-control-border)] bg-[var(--leros-surface)] p-6 shadow-sm">
 							<div className="mb-5 flex items-center justify-between">
 								<div>
-									<h3 className="text-lg font-semibold text-[var(--leros-text-strong)]">最近项目</h3>
+									<h3 className="text-lg font-semibold text-[var(--leros-text-strong)]">
+										最近项目
+									</h3>
 									<p className="mt-1 text-sm text-[var(--leros-text-muted)]">
 										从最近同步的项目里快速恢复上下文。
 									</p>

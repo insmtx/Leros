@@ -70,6 +70,7 @@ type EditorSnapshot = {
 
 export type StructuredComposerHandle = {
 	openAssistantPicker: () => void;
+	openCommandPicker: () => void;
 };
 
 type StructuredComposerProps = {
@@ -754,6 +755,7 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 			ref,
 			() => ({
 				openAssistantPicker: () => insertTrigger("assistant"),
+				openCommandPicker: () => insertTrigger("command"),
 			}),
 			[insertTrigger],
 		);
