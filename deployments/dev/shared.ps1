@@ -46,6 +46,10 @@ function Get-PnpmExe {
     ))
 }
 
+function Get-Sqlite3Exe {
+    return (Resolve-ToolPath -CommandName 'sqlite3')
+}
+
 function Set-OptionalGoBuildEnvironment {
     $fallbackGoroot = 'E:\DevEnv\Go\goroot'
     $fallbackGopath = 'E:\DevEnv\Go\gopath'
@@ -241,6 +245,24 @@ function Initialize-DevRuntimeState {
     }
     Save-DevRuntimeState -State $state
     return $state
+}
+
+function Get-WorkerWorkspaceRoot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot
+    )
+
+    return Join-Path $RepoRoot '.leros-workspace\1\1\workspace'
+}
+
+function Get-WorkerRecoveryDbPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot
+    )
+
+    return Join-Path (Get-WorkerWorkspaceRoot -RepoRoot $RepoRoot) '.leros\leros.db'
 }
 
 function Get-ConfiguredDevRuntimeState {
