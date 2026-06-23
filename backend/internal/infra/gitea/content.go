@@ -53,3 +53,15 @@ func (c *Client) GetRawFile(ctx context.Context, owner, repo, ref, filePath stri
 
 	return io.NopCloser(bytes.NewReader(decoded)), nil
 }
+
+func (c *Client) ListRepoTree(ctx context.Context, owner, repo, ref string) ([]RepoEntry, error) {
+	apiPath := fmt.Sprintf("/repos/%s/%s/git/trees/%s",
+		url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(ref))
+	apiPath += "?recursive=1"
+
+	var result RepoTreeResponse
+	if err := c.doJSON(ctx, "GET", apiPath, nil, &result); err != nil {
+		return nil, fmt.Errorf("list repo tree %s/%s: %w", owner, repo, err)
+	}
+	return result.Items, nil
+}
