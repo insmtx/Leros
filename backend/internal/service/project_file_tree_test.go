@@ -21,6 +21,7 @@ func TestIsPathAllowed(t *testing.T) {
 		{"uploads", false},
 		{"outputs", false},
 		{"config.yaml", false},
+		{"uploads_evil/file.txt", false},
 	}
 
 	for _, tt := range tests {
