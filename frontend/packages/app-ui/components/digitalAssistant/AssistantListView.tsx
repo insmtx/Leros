@@ -61,10 +61,10 @@ export function AssistantListView() {
 	return (
 		<div data-slot="assistant-list-view" className="flex h-full flex-1 flex-col bg-white">
 			<div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-				<h2 className="text-lg font-semibold text-slate-900">AI 员工</h2>
+				<h2 className="text-lg font-semibold text-slate-900">AI 队友</h2>
 				<Button size="sm" onClick={() => setCreateDialogOpen(true)}>
 					<Plus className="size-4 mr-1" />
-					新建员工
+					新建队友
 				</Button>
 			</div>
 
@@ -75,7 +75,7 @@ export function AssistantListView() {
 						type="text"
 						value={assistantSearchQuery}
 						onChange={(e) => setAssistantSearchQuery(e.target.value)}
-						placeholder="搜索员工"
+						placeholder="搜索队友"
 						className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-7 pr-2 text-xs text-slate-600 placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:outline-none transition-colors"
 					/>
 				</div>
@@ -94,7 +94,7 @@ export function AssistantListView() {
 				<div className="grid grid-cols-1 gap-3 p-6 lg:grid-cols-2 xl:grid-cols-3">
 					{filteredAssistants.length === 0 && (
 						<div className="col-span-full flex flex-col items-center justify-center py-16 text-slate-400">
-							<span className="text-sm">暂无 AI 员工</span>
+							<span className="text-sm">暂无 AI 队友</span>
 							<Button
 								variant="outline"
 								size="sm"
@@ -102,7 +102,7 @@ export function AssistantListView() {
 								onClick={() => setCreateDialogOpen(true)}
 							>
 								<Plus className="size-4 mr-1" />
-								创建第一个员工
+								创建第一个队友
 							</Button>
 						</div>
 					)}
@@ -124,9 +124,9 @@ export function AssistantListView() {
 			>
 				<SheetContent side="right" className="w-[min(100vw,420px)] gap-0 p-0 sm:max-w-[420px]">
 					<SheetTitle className="sr-only">
-						{selectedAssistant ? `${selectedAssistant.name} 详情` : "AI 员工详情"}
+						{selectedAssistant ? `${selectedAssistant.name} 详情` : "AI 队友详情"}
 					</SheetTitle>
-					<SheetDescription className="sr-only">查看并编辑所选 AI 员工的配置详情</SheetDescription>
+					<SheetDescription className="sr-only">查看并编辑所选 AI 队友的配置详情</SheetDescription>
 					{selectedAssistant && <AssistantDetailPanel assistant={selectedAssistant} />}
 				</SheetContent>
 			</Sheet>

@@ -190,7 +190,10 @@ function AuthDialog({
 
 	useEffect(() => {
 		if (countdown <= 0) return;
-		const timer = window.setTimeout(() => setCountdown((current) => Math.max(0, current - 1)), 1000);
+		const timer = window.setTimeout(
+			() => setCountdown((current) => Math.max(0, current - 1)),
+			1000,
+		);
 		return () => window.clearTimeout(timer);
 	}, [countdown]);
 
@@ -264,9 +267,9 @@ function AuthDialog({
 				showCloseButton
 			>
 				<div className="mx-auto flex w-full max-w-[430px] flex-col items-center">
-					<img src={logoSrc} alt="Leros" className="size-[60px] object-contain" />
+					<img src={logoSrc} alt="Lework" className="size-[60px] object-contain" />
 					<DialogTitle className="mt-5 text-center text-3xl font-bold tracking-normal">
-						欢迎来到Leros
+						欢迎来到Lework
 					</DialogTitle>
 					<DialogDescription className="mt-2 text-center text-sm text-[#8b95a5]">
 						手机号验证码登录，首次登录将自动创建账号

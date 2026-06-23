@@ -202,7 +202,14 @@ export function LeftRail({
 		setInstalling(true);
 		setInstallError(null);
 		try {
-			const accepted = await getDesktopUpdateApi()!.quitAndInstall();
+			const desktopUpdateApi = getDesktopUpdateApi();
+			if (!desktopUpdateApi) {
+				setInstalling(false);
+				setInstallError("当前环境暂不支持自动安装更新");
+				return;
+			}
+
+			const accepted = await desktopUpdateApi.quitAndInstall();
 			if (!accepted) {
 				setInstalling(false);
 				setInstallError("当前还没有可安装的更新");
@@ -463,7 +470,7 @@ export function LeftRail({
 									<ProfileAvatar user={user} />
 									<div className="leros-sidebar-expandable flex-1 overflow-hidden text-left">
 										<p className="truncate text-[14px] font-bold text-[var(--leros-text-strong)]">
-											{user?.name ?? "Leros 用户"}
+											{user?.name ?? "Lework 用户"}
 										</p>
 										<p className="truncate text-[11px] text-[var(--leros-text-subtle)]">
 											{getDisplayPhone(user) ?? "已登录"}
@@ -630,9 +637,7 @@ export function LeftRail({
 							<div className="pr-7">
 								<div className="truncate text-[14px] font-semibold leading-5">新版本已就绪</div>
 								<div className="truncate text-[13px] leading-4 text-slate-900/60">
-									{downloadedVersion
-										? `V${downloadedVersion.replace(/^v/i, "")}`
-										: "V"}
+									{downloadedVersion ? `V${downloadedVersion.replace(/^v/i, "")}` : "V"}
 								</div>
 							</div>
 							<div className="mt-1 flex items-center justify-end">
@@ -804,7 +809,7 @@ function AccountManagementDialog({
 											size={128}
 										/>
 									) : (
-										<span className="text-xl font-bold">{getAvatarInitial("Leros")}</span>
+										<span className="text-xl font-bold">{getAvatarInitial("Lework")}</span>
 									)
 								}
 							/>
@@ -859,7 +864,7 @@ function AccountManagementDialog({
 							) : (
 								<div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
 									<span className="truncate text-sm font-medium text-slate-900">
-										{user?.name ?? "Leros 用户"}
+										{user?.name ?? "Lework 用户"}
 									</span>
 									<Button
 										variant="ghost"
@@ -888,7 +893,7 @@ function AccountManagementDialog({
 
 function ProfileAvatar({ user }: { user: AuthUser | null }) {
 	const displayPhone = getDisplayPhone(user);
-	const fallbackLabel = getAvatarInitial(user?.name ?? displayPhone ?? "Leros");
+	const fallbackLabel = getAvatarInitial(user?.name ?? displayPhone ?? "Lework");
 
 	return (
 		<span
@@ -923,7 +928,8 @@ function getDisplayPhone(user: AuthUser | null): string | undefined {
 }
 
 function getAppVersion(): string {
-	const version = (import.meta as ImportMeta & { readonly env?: PublicEnv }).env?.VITE_LEROS_APP_VERSION;
+	const version = (import.meta as ImportMeta & { readonly env?: PublicEnv }).env
+		?.VITE_LEROS_APP_VERSION;
 	return version?.trim() || "0.0.0";
 }
 
@@ -1085,7 +1091,8 @@ function getDesktopUpdateApi(): DesktopUpdateApi | null {
 		return null;
 	}
 
-	return ((window as Window & { lerosDesktop?: DesktopUpdateApi }).lerosDesktop ?? null) as DesktopUpdateApi | null;
+	return ((window as Window & { lerosDesktop?: DesktopUpdateApi }).lerosDesktop ??
+		null) as DesktopUpdateApi | null;
 }
 
 function DesktopUpdateMenuSection() {

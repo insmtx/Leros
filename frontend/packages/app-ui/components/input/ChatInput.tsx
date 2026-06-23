@@ -413,7 +413,7 @@ function ApprovalDecisionInput({
 							<ApprovalStatusBadge approval={approval} />
 						</div>
 						<div className="text-[15px] leading-6 text-slate-950">
-							允许 Leros 执行
+							允许 Lework 执行
 							<span className="mx-1 font-medium">{approval.description}</span>
 							吗？
 						</div>

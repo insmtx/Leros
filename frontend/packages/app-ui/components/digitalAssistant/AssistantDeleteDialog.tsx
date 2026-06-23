@@ -34,7 +34,7 @@ export function AssistantDeleteDialog({
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-md" showCloseButton={false}>
 				<DialogHeader>
-					<DialogTitle>删除 AI 员工</DialogTitle>
+					<DialogTitle>删除 AI 队友</DialogTitle>
 					<DialogDescription>
 						确定要删除 <strong>{assistant.name}</strong> 吗？此操作不可撤销。
 					</DialogDescription>

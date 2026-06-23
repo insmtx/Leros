@@ -11,7 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-	title: "Leros",
+	title: "Lework",
 	description: "AI OS for Software Engineering",
 };
 

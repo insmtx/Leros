@@ -43,7 +43,7 @@ export function AssistantListPanel({ onCreateClick }: AssistantListPanelProps) {
 						type="text"
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
-						placeholder="搜索员工"
+						placeholder="搜索队友"
 						className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-7 pr-2 text-xs text-slate-600 placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:outline-none transition-colors"
 					/>
 				</div>

@@ -40,8 +40,8 @@ export function AssistantEditDialog({ assistant, open, onOpenChange }: Assistant
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-md" showCloseButton={false}>
 				<DialogHeader>
-					<DialogTitle>编辑 AI 员工</DialogTitle>
-					<DialogDescription>修改员工信息</DialogDescription>
+					<DialogTitle>编辑 AI 队友</DialogTitle>
+					<DialogDescription>修改队友信息</DialogDescription>
 				</DialogHeader>
 				<div className="mt-4 space-y-3">
 					<div className="space-y-1.5">
@@ -50,7 +50,7 @@ export function AssistantEditDialog({ assistant, open, onOpenChange }: Assistant
 							type="text"
 							value={name}
 							onChange={(e) => setName(e.target.value)}
-							placeholder="员工名称"
+							placeholder="队友名称"
 							className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-300 focus:outline-none transition-colors"
 						/>
 					</div>
