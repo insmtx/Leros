@@ -10,7 +10,6 @@ import type {
 export type GetProjectFilesParams = {
 	projectId: string;
 	path?: string;
-	depth?: number;
 };
 
 export type UploadProjectFileParams = {
@@ -83,19 +82,16 @@ async function uploadLooseFile({
 }
 
 export const projectFileApi = {
-	list: ({ projectId, path, depth = 2 }: GetProjectFilesParams) =>
+	list: ({ projectId, path }: GetProjectFilesParams) =>
 		apiClient.get<BackendDataResponse<BackendProjectFileNode[]>>(
 			`/projects/${encodeURIComponent(projectId)}/files`,
 			{
-				params: {
-					...(path ? { path } : {}),
-					depth,
-				},
+				params: path ? { path } : undefined,
 			},
 		),
 
 	download: (projectId: string, filePath: string): string =>
-		`${API_BASE_URL}/projects/${encodeURIComponent(projectId)}/files/download?path=${encodeURIComponent(filePath)}`,
+		`${API_BASE_URL}/projects/${encodeURIComponent(projectId)}/files/preview?path=${encodeURIComponent(filePath)}`,
 
 	async fetchDownload(
 		projectId: string,
