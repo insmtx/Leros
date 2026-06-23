@@ -14,12 +14,12 @@ func TestIsPathAllowed(t *testing.T) {
 	}{
 		{"uploads/readme.md", true},
 		{"uploads/sub/dir/file.txt", true},
-		{"outputs/report.pdf", true},
-		{"outputs/", true},
+		{"artifacts/report.pdf", true},
+		{"artifacts/", true},
 		{"src/main.go", false},
 		{"", false},
 		{"uploads", false},
-		{"outputs", false},
+		{"artifacts", false},
 		{"config.yaml", false},
 		{"uploads_evil/file.txt", false},
 	}
@@ -38,8 +38,8 @@ func TestBuildFileTree(t *testing.T) {
 		{Path: "uploads/readme.md", Type: "blob", Size: 100},
 		{Path: "uploads/images", Type: "tree"},
 		{Path: "uploads/images/logo.png", Type: "blob", Size: 2048},
-		{Path: "outputs", Type: "tree"},
-		{Path: "outputs/report.pdf", Type: "blob", Size: 4096},
+		{Path: "artifacts", Type: "tree"},
+		{Path: "artifacts/report.pdf", Type: "blob", Size: 4096},
 	}
 
 	roots := buildFileTree(entries)
@@ -76,16 +76,16 @@ func TestBuildFileTree(t *testing.T) {
 		t.Errorf("images child expected logo.png file size=2048, got %+v", images.Children[0])
 	}
 
-	// root: outputs
-	outputs := roots[1]
-	if outputs.Name != "outputs" || outputs.Type != "directory" {
-		t.Errorf("root[1] expected outputs directory, got %+v", outputs)
+	// root: artifacts
+	artifacts := roots[1]
+	if artifacts.Name != "artifacts" || artifacts.Type != "directory" {
+		t.Errorf("root[1] expected artifacts directory, got %+v", artifacts)
 	}
-	if len(outputs.Children) != 1 {
-		t.Errorf("outputs expected 1 child, got %d", len(outputs.Children))
+	if len(artifacts.Children) != 1 {
+		t.Errorf("artifacts expected 1 child, got %d", len(artifacts.Children))
 	}
-	if outputs.Children[0].Name != "report.pdf" || outputs.Children[0].Type != "file" || outputs.Children[0].Size != 4096 {
-		t.Errorf("outputs child expected report.pdf file size=4096, got %+v", outputs.Children[0])
+	if artifacts.Children[0].Name != "report.pdf" || artifacts.Children[0].Type != "file" || artifacts.Children[0].Size != 4096 {
+		t.Errorf("artifacts child expected report.pdf file size=4096, got %+v", artifacts.Children[0])
 	}
 }
 

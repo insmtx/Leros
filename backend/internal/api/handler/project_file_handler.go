@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -34,12 +33,10 @@ func (h *ProjectFileHandler) RegisterRoutes(r gin.IRouter) {
 
 // GetProjectFileTree 获取项目文件树
 // @Summary 获取项目文件树
-// @Description 按 path + depth 获取项目文件目录层级结构
+// @Description 获取项目 artifacts/ 和 uploads/ 目录的文件树
 // @Tags Project
 // @Produce json
 // @Param project_id path string true "项目 public_id"
-// @Param path query string false "起始目录相对路径，默认根目录"
-// @Param depth query int false "查询深度，默认2"
 // @Success 200 {object} dto.Response "成功响应"
 // @Failure 400 {object} dto.ErrorResponse "请求参数错误"
 // @Failure 401 {object} dto.ErrorResponse "未认证"
@@ -53,19 +50,7 @@ func (h *ProjectFileHandler) GetProjectFileTree(ctx *gin.Context) {
 		return
 	}
 
-	parentPath := strings.TrimSpace(ctx.Query("path"))
-	depthStr := strings.TrimSpace(ctx.Query("depth"))
-	depth := 2 // 默认 depth=2
-	if depthStr != "" {
-		var err error
-		depth, err = strconv.Atoi(depthStr)
-		if err != nil || depth < 1 {
-			ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, "depth must be a positive integer"))
-			return
-		}
-	}
-
-	result, err := h.service.GetProjectFileTree(ctx, projectID, parentPath, depth)
+	result, err := h.service.GetProjectFileTree(ctx, projectID, "", 0)
 	if err != nil {
 		handleProjectFileServiceError(ctx, err)
 		return

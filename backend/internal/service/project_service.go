@@ -537,11 +537,7 @@ func (s *projectService) GetProjectFileTree(ctx context.Context, publicID string
 		}
 	}
 
-	allRoots := buildFileTree(filtered)
-	roots := filterByParentPaths(allRoots, strings.Trim(parentPath, "/"))
-	if roots == nil {
-		return nil, errors.New("directory not found")
-	}
+	roots := buildFileTree(filtered)
 	return roots, nil
 }
 
@@ -734,7 +730,7 @@ func (s *projectService) initRepoStructure(ctx context.Context, fullName string)
 	}
 }
 
-var visibleFolders = []string{"uploads/", "outputs/"}
+var visibleFolders = []string{"artifacts/", "uploads/"}
 
 func isPathAllowed(filePath string) bool {
 	for _, prefix := range visibleFolders {
