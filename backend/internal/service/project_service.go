@@ -580,6 +580,10 @@ func (s *projectService) DownloadProjectFile(ctx context.Context, publicID strin
 	}
 	owner, repo := parts[0], parts[1]
 
+	if !isPathAllowed(filePath) {
+		return nil, "", 0, errors.New("file access denied")
+	}
+
 	reader, err := s.giteaClient.GetRawFile(ctx, owner, repo, project.GiteaDefaultBranch, filePath)
 	if err != nil {
 		return nil, "", 0, fmt.Errorf("get gitea file: %w", err)
