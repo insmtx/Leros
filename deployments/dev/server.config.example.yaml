@@ -27,3 +27,11 @@ gitea:
   endpoint: "<your_gitea_endpoint>"
   admin_token: "<your_admin_token>"
   default_owner: "admin"
+
+storage:
+  driver: local
+  local_dir: ./leros-storage
+  bucket: dev-bucket
+  static_api_key: "leros-static-api-key"
+  sign_secret: "leros-local-presign"
+  base_url: "http://localhost:8080"
