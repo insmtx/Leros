@@ -12,6 +12,11 @@ import (
 	"github.com/insmtx/Leros/backend/types"
 )
 
+const (
+	// SystemTranslationLLMModelCode is the built-in LLM model code reserved for fast translation tasks.
+	SystemTranslationLLMModelCode = "llm_translation"
+)
+
 // CreateLLMModel 创建LLM模型配置
 func CreateLLMModel(ctx context.Context, db *gorm.DB, model *types.LLMModel) error {
 	baseURLHasV1 := model.BaseURLHasV1
@@ -58,6 +63,34 @@ func GetDefaultLLMModel(ctx context.Context, db *gorm.DB, orgID uint) (*types.LL
 	var entity types.LLMModel
 	err := db.WithContext(ctx).
 		Where("org_id = ? AND is_default = ? AND status = ?", orgID, true, string(types.LLMModelStatusActive)).
+		Order("updated_at DESC").
+		First(&entity).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &entity, nil
+}
+
+// GetSystemTranslationLLMModel 获取系统内置翻译模型配置。
+func GetSystemTranslationLLMModel(ctx context.Context, db *gorm.DB, orgID uint) (*types.LLMModel, error) {
+	model, err := getSystemTranslationLLMModelByOrg(ctx, db, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if model != nil || orgID == 1 {
+		return model, nil
+	}
+	return getSystemTranslationLLMModelByOrg(ctx, db, 1)
+}
+
+func getSystemTranslationLLMModelByOrg(ctx context.Context, db *gorm.DB, orgID uint) (*types.LLMModel, error) {
+	var entity types.LLMModel
+	err := db.WithContext(ctx).
+		Where("org_id = ? AND code = ? AND is_system = ? AND status = ?",
+			orgID, SystemTranslationLLMModelCode, true, string(types.LLMModelStatusActive)).
 		Order("updated_at DESC").
 		First(&entity).Error
 	if err != nil {

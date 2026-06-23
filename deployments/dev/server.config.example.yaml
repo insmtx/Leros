@@ -21,3 +21,9 @@ llm:
   api_key: "${LLM_API_KEY}"
   model: "qwen3.6-plus"
   base_url: "https://api.yygu.cn/v3/llm.chat/"
+
+  translation:
+    provider: "deepseek"
+    api_key: "${LLM_API_KEY}"
+    model: "deepseek-v4-flash"
+    base_url: "https://api.yygu.cn/v3/llm.chat/"
