@@ -198,12 +198,12 @@ func TestGetSystemTranslationLLMModel(t *testing.T) {
 	fallback := newTestLLMModel(1, SystemTranslationLLMModelCode)
 	fallback.IsSystem = true
 	fallback.Provider = string(types.LLMProviderDeepSeek)
-	fallback.ModelName = "deepseek-flash"
+	fallback.ModelName = "deepseek-v4-flash"
 
 	orgModel := newTestLLMModel(2, SystemTranslationLLMModelCode)
 	orgModel.IsSystem = true
 	orgModel.Provider = string(types.LLMProviderDeepSeek)
-	orgModel.ModelName = "deepseek-flash"
+	orgModel.ModelName = "deepseek-v4-flash"
 
 	nonSystem := newTestLLMModel(3, SystemTranslationLLMModelCode)
 	inactive := newTestLLMModel(4, SystemTranslationLLMModelCode)
@@ -220,7 +220,7 @@ func TestGetSystemTranslationLLMModel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSystemTranslationLLMModel failed: %v", err)
 	}
-	if retrieved == nil || retrieved.OrgID != 2 || retrieved.ModelName != "deepseek-flash" {
+	if retrieved == nil || retrieved.OrgID != 2 || retrieved.ModelName != "deepseek-v4-flash" {
 		t.Fatalf("unexpected org translation model: %#v", retrieved)
 	}
 
@@ -250,7 +250,7 @@ func TestSeedSystemLLMModelsCreatesTranslationModel(t *testing.T) {
 		Translation: &config.LLMTranslationConfig{
 			Provider: string(types.LLMProviderDeepSeek),
 			APIKey:   "translation-key",
-			Model:    "deepseek-flash",
+			Model:    "deepseek-v4-flash",
 			BaseURL:  "https://api.deepseek.com/v1",
 		},
 	})
@@ -265,7 +265,7 @@ func TestSeedSystemLLMModelsCreatesTranslationModel(t *testing.T) {
 	if model == nil {
 		t.Fatal("expected system translation model")
 	}
-	if model.Provider != string(types.LLMProviderDeepSeek) || model.ModelName != "deepseek-flash" {
+	if model.Provider != string(types.LLMProviderDeepSeek) || model.ModelName != "deepseek-v4-flash" {
 		t.Fatalf("unexpected translation model: %#v", model)
 	}
 	if model.APIKeyEncrypted != "translation-key" || model.IsDefault || !model.IsSystem {
@@ -290,7 +290,7 @@ func TestSeedSystemLLMModelsUpdatesSystemTranslationModel(t *testing.T) {
 		Translation: &config.LLMTranslationConfig{
 			Provider: string(types.LLMProviderDeepSeek),
 			APIKey:   "new-key",
-			Model:    "deepseek-flash",
+			Model:    "deepseek-v4-flash",
 			BaseURL:  "https://api.deepseek.com/v1",
 		},
 	})
@@ -302,7 +302,7 @@ func TestSeedSystemLLMModelsUpdatesSystemTranslationModel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetLLMModelByCode failed: %v", err)
 	}
-	if model.Provider != string(types.LLMProviderDeepSeek) || model.ModelName != "deepseek-flash" || model.APIKeyEncrypted != "new-key" {
+	if model.Provider != string(types.LLMProviderDeepSeek) || model.ModelName != "deepseek-v4-flash" || model.APIKeyEncrypted != "new-key" {
 		t.Fatalf("expected system model to be updated, got %#v", model)
 	}
 }
@@ -323,7 +323,7 @@ func TestSeedSystemLLMModelsDoesNotOverwriteNonSystemModel(t *testing.T) {
 		Translation: &config.LLMTranslationConfig{
 			Provider: string(types.LLMProviderDeepSeek),
 			APIKey:   "translation-key",
-			Model:    "deepseek-flash",
+			Model:    "deepseek-v4-flash",
 		},
 	})
 	if err != nil {

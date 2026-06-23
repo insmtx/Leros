@@ -291,7 +291,7 @@ func buildSystemTranslationLLMModelSpec(llmCfg *config.LLMConfig) (*types.LLMMod
 	}
 
 	provider := strings.TrimSpace(string(types.LLMProviderDeepSeek))
-	modelName := "deepseek-flash"
+	modelName := "deepseek-v4-flash"
 	baseURL := strings.TrimSpace(llmCfg.BaseURL)
 	apiKey := strings.TrimSpace(llmCfg.APIKey)
 
