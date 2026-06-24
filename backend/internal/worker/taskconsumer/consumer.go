@@ -18,6 +18,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/agent"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	runtimeevents "github.com/insmtx/Leros/backend/internal/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/worker/identity"
 	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	agentworkspace "github.com/insmtx/Leros/backend/internal/workspace"
 	"github.com/insmtx/Leros/backend/pkg/dm"
@@ -511,6 +512,7 @@ func commitAttachments(ctx context.Context, repoDir string, count int) {
 	msg := fmt.Sprintf("task: %d user attachment(s)", count)
 	commitCmd := exec.CommandContext(ctx, "git", "commit", "-m", msg)
 	commitCmd.Dir = repoDir
+	commitCmd.Env = identity.GitAuthorEnv()
 	commitCmd.CombinedOutput()
 	pushCmd := exec.CommandContext(ctx, "git", "push", "origin", "main")
 	pushCmd.Dir = repoDir

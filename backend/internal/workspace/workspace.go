@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/insmtx/Leros/backend/internal/agent"
+	"github.com/insmtx/Leros/backend/internal/worker/identity"
 	"github.com/insmtx/Leros/backend/pkg/leros"
 )
 
@@ -444,6 +445,7 @@ func PushWorkspace(ctx context.Context, plan *TaskWorkspace) error {
 
 	commitCmd := exec.CommandContext(ctx, "git", "commit", "-m", "task: agent run artifacts")
 	commitCmd.Dir = plan.RepoDir
+	commitCmd.Env = identity.GitAuthorEnv()
 	commitCmd.CombinedOutput()
 
 	pushCmd := exec.CommandContext(ctx, "git", "push", "origin", "main")
