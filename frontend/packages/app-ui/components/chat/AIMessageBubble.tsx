@@ -167,7 +167,8 @@ function ProcessTimelineBlock({
 	toolCalls: ToolCall[];
 	isStreaming: boolean;
 }) {
-	const [expanded, setExpanded] = useState(isStreaming);
+	// 中文注释：执行过程默认收起，后续只尊重用户手动展开/收起，不再被流式状态强制覆盖。
+	const [expanded, setExpanded] = useState(false);
 	const [autoFollow, setAutoFollow] = useState(true);
 	const [showBottomFade, setShowBottomFade] = useState(false);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -187,10 +188,6 @@ function ProcessTimelineBlock({
 		}
 		return "";
 	}, [steps, toolCallMap]);
-
-	useEffect(() => {
-		setExpanded(isStreaming);
-	}, [isStreaming]);
 
 	useEffect(() => {
 		const container = scrollContainerRef.current;
