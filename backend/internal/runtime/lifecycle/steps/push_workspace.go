@@ -19,15 +19,21 @@ func (PushWorkspaceStep) Name() string {
 }
 
 func (s PushWorkspaceStep) Run(ctx context.Context, state *State) error {
-	if state == nil || state.Err != nil || state.Request == nil {
+	if state == nil || state.Request == nil {
+		return nil
+	}
+	if state.Err != nil {
+		logs.ErrorContextf(ctx, "push_workspace skipped: previous error: %v", state.Err)
 		return nil
 	}
 	repoDir := strings.TrimSpace(state.Request.Workspace.RepoDir)
 	if repoDir == "" {
+		logs.ErrorContextf(ctx, "push_workspace skipped: repo dir is empty")
 		return nil
 	}
 	gitDir := filepath.Join(repoDir, ".git")
 	if _, err := os.Stat(gitDir); err != nil {
+		logs.ErrorContextf(ctx, "push_workspace skipped: .git directory not found: %s", gitDir)
 		return nil
 	}
 
@@ -40,7 +46,10 @@ func (s PushWorkspaceStep) Run(ctx context.Context, state *State) error {
 	commitCmd := exec.CommandContext(ctx, "git", "commit", "-m", "task: agent run artifacts")
 	commitCmd.Dir = repoDir
 	commitCmd.Env = identity.GitAuthorEnv()
-	commitCmd.CombinedOutput()
+	if output, err := commitCmd.CombinedOutput(); err != nil {
+		logs.ErrorContextf(ctx, "git commit artifacts: %v: %s", err, strings.TrimSpace(string(output)))
+		return nil
+	}
 
 	pushCmd := exec.CommandContext(ctx, "git", "push", "origin", "main")
 	pushCmd.Dir = repoDir
@@ -48,5 +57,6 @@ func (s PushWorkspaceStep) Run(ctx context.Context, state *State) error {
 		logs.ErrorContextf(ctx, "git push failed: %v: %s", err, strings.TrimSpace(string(output)))
 		return fmt.Errorf("git push: %w: %s", err, strings.TrimSpace(string(output)))
 	}
+	logs.InfoContextf(ctx, "push_workspace completed: repo_dir=%s", repoDir)
 	return nil
 }
