@@ -199,6 +199,7 @@ type ArtifactPayload struct {
 	CreatedAt    time.Time `json:"created_at,omitempty"`
 	RelativePath string    `json:"relative_path,omitempty"`
 	StorageKey   string    `json:"storage_key,omitempty"`
+	StorageURI   string    `json:"storage_uri,omitempty"`
 	Sha256       string    `json:"sha256,omitempty"`
 	Source       string    `json:"source,omitempty"`
 	Status       string    `json:"status,omitempty"`

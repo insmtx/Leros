@@ -163,3 +163,12 @@ func storageKeyFromURI(uri string) (string, error) {
 	}
 	return key, nil
 }
+
+// ParseStorageURI 解析 filestore URI，返回 bucket 和 key。
+func ParseStorageURI(uri string) (string, string, error) {
+	_, bucket, key, err := storage.ParseURI(uri)
+	if err != nil {
+		return "", "", fmt.Errorf("parse storage uri: %w", err)
+	}
+	return bucket, key, nil
+}

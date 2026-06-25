@@ -1,15 +1,23 @@
 package steps
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ygpkg/yg-go/logs"
 
 	"github.com/insmtx/Leros/backend/internal/agent"
+	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/worker/identity"
 	agentworkspace "github.com/insmtx/Leros/backend/internal/workspace"
 	"github.com/insmtx/Leros/backend/types"
 )
@@ -58,7 +66,7 @@ func NewWorkspaceArtifactRecorder() *WorkspaceArtifactRecorder {
 	return &WorkspaceArtifactRecorder{}
 }
 
-// Record 收集单次运行的最终 manifest 产物。
+// Record 收集单次运行的最终 manifest 产物，并上传到 filestore。
 func (r *WorkspaceArtifactRecorder) Record(ctx context.Context, req *agent.RequestContext) ([]events.ArtifactPayload, error) {
 	if r == nil || req == nil {
 		return nil, nil
@@ -76,9 +84,98 @@ func (r *WorkspaceArtifactRecorder) Record(ctx context.Context, req *agent.Reque
 	}
 	payloads := make([]events.ArtifactPayload, 0, len(records))
 	for _, record := range records {
-		payloads = append(payloads, artifactPayloadFromRecord(record))
+		payload := artifactPayloadFromRecord(record)
+		payloads = append(payloads, payload)
 	}
+
+	serverAddr := identity.ServerAddr()
+	serverOrgID := identity.OrgID()
+	projectPublicID := strings.TrimSpace(req.Workspace.ProjectID)
+	if serverAddr != "" && serverOrgID > 0 && projectPublicID != "" {
+		for i, record := range records {
+			storageURI, err := uploadArtifactToServer(ctx, serverAddr, projectPublicID, record)
+			if err != nil {
+				logs.WarnContextf(ctx, "upload artifact %s to server: %v", record.RelativePath, err)
+				continue
+			}
+			payloads[i].StorageURI = storageURI
+		}
+	}
+
 	return payloads, nil
+}
+
+func uploadArtifactToServer(ctx context.Context, serverAddr string, projectPublicID string, record agentworkspace.ArtifactRecord) (string, error) {
+	absolute, err := agentworkspace.SafeJoin("", record.RelativePath)
+	if err != nil {
+		return "", err
+	}
+	data, err := os.ReadFile(absolute)
+	if err != nil {
+		return "", fmt.Errorf("read artifact file: %w", err)
+	}
+
+	reqBody := contract.PresignArtifactUploadRequest{
+		OrgID:           identity.OrgID(),
+		ProjectPublicID: projectPublicID,
+		Filename:        record.Filename,
+		Sha256:          record.Sha256,
+		MimeType:        record.MimeType,
+		FileSize:        record.FileSize,
+	}
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", err
+	}
+
+	presignURL := fmt.Sprintf("http://%s/v1/internal/artifacts/presign-upload", serverAddr)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, presignURL, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return "", err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return "", fmt.Errorf("request presign upload: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return "", fmt.Errorf("presign upload returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var respWrap struct {
+		Code int                                   `json:"code"`
+		Data contract.PresignArtifactUploadResponse `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&respWrap); err != nil {
+		return "", fmt.Errorf("decode presign response: %w", err)
+	}
+	if respWrap.Code != 0 {
+		return "", fmt.Errorf("presign upload failed: code=%d", respWrap.Code)
+	}
+
+	putReq, err := http.NewRequestWithContext(ctx, http.MethodPut, respWrap.Data.UploadURL, bytes.NewReader(data))
+	if err != nil {
+		return "", err
+	}
+	putReq.Header.Set("Content-Type", record.MimeType)
+	putReq.ContentLength = record.FileSize
+
+	putResp, err := http.DefaultClient.Do(putReq)
+	if err != nil {
+		return "", fmt.Errorf("upload artifact file: %w", err)
+	}
+	defer putResp.Body.Close()
+
+	if putResp.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(putResp.Body, 4096))
+		return "", fmt.Errorf("upload artifact file returned %d: %s", putResp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	return respWrap.Data.StorageURI, nil
 }
 
 func artifactPayloadFromRecord(record agentworkspace.ArtifactRecord) events.ArtifactPayload {
@@ -92,11 +189,11 @@ func artifactPayloadFromRecord(record agentworkspace.ArtifactRecord) events.Arti
 		FileSize:     record.FileSize,
 		RelativePath: strings.TrimSpace(record.RelativePath),
 		StorageKey:   strings.TrimSpace(record.StorageKey),
+		StorageURI:   strings.TrimSpace(record.StorageURI),
 		Sha256:       record.Sha256,
 		Source:       artifactSource(record.Source),
 		Status:       artifactStatus(record.Status),
-		// 中文注释：产物在运行期声明时就附带时间，供历史消息直接展示，无需再依赖任务接口二次补齐。
-		CreatedAt: time.Now().UTC(),
+		CreatedAt:    time.Now().UTC(),
 	}
 }
 

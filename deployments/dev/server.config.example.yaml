@@ -31,6 +31,7 @@ llm:
   base_url: "https://api.yygu.cn/v3/llm.chat/"
 
 gitea:
+  enabled: false
   endpoint: "<your_gitea_endpoint>"
   access_token: "<your_access_token>"
   owner: "admin"

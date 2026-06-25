@@ -126,7 +126,7 @@ func (p *MessagePoster) RunNewMessage(
 		return nil, err
 	}
 	// 无项目预上传的附件，需要在项目创建完成后回填项目归属，确保后续文件树可见。
-	p.attachFilesToProject(ctx, caller.OrgID, o.project.PublicID, req.Attachments)
+	p.attachFilesToProject(ctx, caller.OrgID, o.project, req.Attachments)
 	if err := o.ensureProjectSession(); err != nil {
 		logs.ErrorContextf(ctx, "NewMessage ensureProjectSession failed: %v", err)
 		return nil, err
@@ -223,25 +223,30 @@ func (o *newMessageOrchestrator) resolveOrCreateProject() error {
 	}
 
 	repoName := o.poster.buildRepoName(o.caller.OrgID, projectID)
-	repoInfo, _, err := o.poster.giteaClient.CreateRepo(gitea.CreateRepoOption{
-		Name:        repoName,
-		Description: "",
-		Private:     true,
-		AutoInit:    false,
-	})
-	if err != nil {
-		return fmt.Errorf("create gitea repo: %w", err)
+	if o.poster.giteaClient != nil && o.poster.giteaCfg != nil && o.poster.giteaCfg.Enabled {
+		repoInfo, _, err := o.poster.giteaClient.CreateRepo(gitea.CreateRepoOption{
+			Name:        repoName,
+			Description: "",
+			Private:     true,
+			AutoInit:    false,
+		})
+		if err != nil {
+			return fmt.Errorf("create gitea repo: %w", err)
+		}
+		o.project.GiteaRepoFullName = repoInfo.FullName
+		o.project.GiteaRepoID = repoInfo.ID
 	}
-	o.project.GiteaRepoFullName = repoInfo.FullName
-	o.project.GiteaRepoID = repoInfo.ID
 
 	if err := db.CreateProject(o.ctx, o.poster.db, o.project); err != nil {
 		return fmt.Errorf("create project: %w", err)
 	}
 
-	o.poster.initRepoStructure(o.ctx, repoInfo.FullName)
-
-	logs.InfoContextf(o.ctx, "created project=%s org=%d user=%d repo=%s", projectID, o.caller.OrgID, o.caller.Uin, repoInfo.FullName)
+	if o.project.GiteaRepoFullName != "" {
+		o.poster.initRepoStructure(o.ctx, o.project.GiteaRepoFullName)
+		logs.InfoContextf(o.ctx, "created project=%s org=%d user=%d repo=%s", projectID, o.caller.OrgID, o.caller.Uin, o.project.GiteaRepoFullName)
+	} else {
+		logs.InfoContextf(o.ctx, "created project=%s org=%d user=%d (no gitea)", projectID, o.caller.OrgID, o.caller.Uin)
+	}
 
 	if err := db.CreateProjectMember(o.ctx, o.poster.db, &types.ProjectMember{
 		ProjectID:  o.project.ID,
@@ -529,12 +534,13 @@ func (p *MessagePoster) resolveAttachmentURLs(
 func (p *MessagePoster) attachFilesToProject(
 	ctx context.Context,
 	orgID uint,
-	projectPublicID string,
+	project *types.Project,
 	attachments []types.MessageAttachment,
 ) {
-	if strings.TrimSpace(projectPublicID) == "" || len(attachments) == 0 {
+	if project == nil || project.ID == 0 || len(attachments) == 0 {
 		return
 	}
+	projectPublicID := project.PublicID
 	for i := range attachments {
 		if attachments[i].FileUploadID == "" {
 			continue
@@ -553,6 +559,26 @@ func (p *MessagePoster) attachFilesToProject(
 		fileUpload.Metadata.Extra["project_public_id"] = projectPublicID
 		if err := db.UpdateFileUpload(ctx, p.db, fileUpload); err != nil {
 			logs.WarnContextf(ctx, "persist file %s project_public_id failed: %v", attachments[i].FileUploadID, err)
+		}
+
+		exists, _ := db.GetProjectFileByPublicID(ctx, p.db, orgID, fileUpload.PublicID)
+		if exists == nil {
+			pf := &types.ProjectFile{
+				PublicID:        fileUpload.PublicID,
+				OrgID:           orgID,
+				ProjectID:       project.ID,
+				ProjectPublicID: projectPublicID,
+				Filename:        fileUpload.Filename,
+				OriginalName:    attachments[i].Name,
+				MimeType:        fileUpload.MimeType,
+				FileSize:        fileUpload.FileSize,
+				StoragePath:     fileUpload.StoragePath,
+				Sha256:          fileUpload.Sha256,
+				Source:          "user_upload",
+			}
+			if err := db.CreateProjectFile(ctx, p.db, pf); err != nil {
+				logs.WarnContextf(ctx, "create project_file record for attachment %s: %v", attachments[i].FileUploadID, err)
+			}
 		}
 	}
 }

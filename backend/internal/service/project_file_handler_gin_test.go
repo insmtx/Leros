@@ -18,17 +18,18 @@ import (
 )
 
 type mockProjectServiceForAddFile struct {
-	addFileFn             func(ctx context.Context, publicID string, filePublicID string) error
-	createProjectFn       func(ctx context.Context, req *contract.CreateProjectRequest) (*contract.Project, error)
-	getProjectFn          func(ctx context.Context, publicID string) (*contract.Project, error)
-	updateProjectFn       func(ctx context.Context, publicID string, req *contract.UpdateProjectRequest) (*contract.Project, error)
-	deleteProjectFn       func(ctx context.Context, publicID string) error
-	listProjectsFn        func(ctx context.Context, req *contract.ListProjectsRequest) (*contract.ProjectList, error)
-	detailProjectFn       func(ctx context.Context, publicID string) (*contract.ProjectDetail, error)
-	getProjectMemoryFn    func(ctx context.Context, publicID string) (*contract.ProjectMemory, error)
-	getProjectFileTreeFn  func(ctx context.Context, publicID string, parentPath string, depth int) ([]*contract.FileTreeNode, error)
-	downloadProjectFileFn func(ctx context.Context, publicID string, filePath string) (io.ReadCloser, string, int64, error)
+	addFileFn               func(ctx context.Context, publicID string, filePublicID string) error
+	createProjectFn         func(ctx context.Context, req *contract.CreateProjectRequest) (*contract.Project, error)
+	getProjectFn            func(ctx context.Context, publicID string) (*contract.Project, error)
+	updateProjectFn         func(ctx context.Context, publicID string, req *contract.UpdateProjectRequest) (*contract.Project, error)
+	deleteProjectFn         func(ctx context.Context, publicID string) error
+	listProjectsFn          func(ctx context.Context, req *contract.ListProjectsRequest) (*contract.ProjectList, error)
+	detailProjectFn         func(ctx context.Context, publicID string) (*contract.ProjectDetail, error)
+	getProjectMemoryFn      func(ctx context.Context, publicID string) (*contract.ProjectMemory, error)
+	getProjectFileTreeFn    func(ctx context.Context, publicID string, parentPath string, depth int) ([]*contract.FileTreeNode, error)
+	downloadProjectFileFn   func(ctx context.Context, publicID string, filePath string) (io.ReadCloser, string, int64, error)
 	uploadProjectFileFn     func(ctx context.Context, publicID string, reader io.Reader, filename string) (*contract.FileUploadResult, error)
+	presignArtifactUploadFn func(ctx context.Context, req *contract.PresignArtifactUploadRequest) (*contract.PresignArtifactUploadResponse, error)
 }
 
 func (m *mockProjectServiceForAddFile) AddFile(ctx context.Context, publicID string, filePublicID string) error {
@@ -92,6 +93,12 @@ func (m *mockProjectServiceForAddFile) DownloadProjectFile(ctx context.Context, 
 func (m *mockProjectServiceForAddFile) UploadProjectFile(ctx context.Context, publicID string, reader io.Reader, filename string) (*contract.FileUploadResult, error) {
 	if m.uploadProjectFileFn != nil {
 		return m.uploadProjectFileFn(ctx, publicID, reader, filename)
+	}
+	return nil, nil
+}
+func (m *mockProjectServiceForAddFile) PresignArtifactUpload(ctx context.Context, req *contract.PresignArtifactUploadRequest) (*contract.PresignArtifactUploadResponse, error) {
+	if m.presignArtifactUploadFn != nil {
+		return m.presignArtifactUploadFn(ctx, req)
 	}
 	return nil, nil
 }

@@ -398,7 +398,7 @@ func (c *Consumer) prepareWorkspace(ctx context.Context, taskMsg protocol.Worker
 	}
 
 	cloneURL := ""
-	if c.giteaCfg != nil {
+	if c.giteaCfg != nil && c.giteaCfg.Enabled {
 		orgID := taskMsg.Route.OrgID
 		repoName := fmt.Sprintf("%s-%d-%s", c.cfg.Env, orgID, projectID)
 		endpoint := strings.TrimPrefix(strings.TrimPrefix(c.giteaCfg.Endpoint, "https://"), "http://")
@@ -501,7 +501,7 @@ func downloadFile(ctx context.Context, url string, destPath string) error {
 	return nil
 }
 
-// commitAttachments stages, commits and pushes attachment files in the workspace repo.
+// commitAttachments stages and commits attachment files in the workspace repo.
 func commitAttachments(ctx context.Context, repoDir string, count int) {
 	addCmd := exec.CommandContext(ctx, "git", "add", "uploads/")
 	addCmd.Dir = repoDir
@@ -517,13 +517,7 @@ func commitAttachments(ctx context.Context, repoDir string, count int) {
 		logs.ErrorContextf(ctx, "git commit attachments: %v: %s", err, strings.TrimSpace(string(output)))
 		return
 	}
-	pushCmd := exec.CommandContext(ctx, "git", "push", "origin", "main")
-	pushCmd.Dir = repoDir
-	if output, err := pushCmd.CombinedOutput(); err != nil {
-		logs.ErrorContextf(ctx, "git push uploads/: %v: %s", err, strings.TrimSpace(string(output)))
-		return
-	}
-	logs.InfoContextf(ctx, "git push uploads/ completed: count=%d", count)
+	logs.InfoContextf(ctx, "git commit attachments completed: count=%d", count)
 }
 
 // Close shuts down the consumer gracefully, waiting for all in-flight tasks.

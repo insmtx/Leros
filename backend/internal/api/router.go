@@ -44,7 +44,7 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 	r.Use(ygmiddleware.Recovery())
 
 	var giteaClient *gitea.Client
-	if cfg.Gitea != nil {
+	if cfg.Gitea != nil && cfg.Gitea.Enabled {
 		var err error
 		giteaClient, err = gitea.NewClient(cfg.Gitea.Endpoint, gitea.SetToken(cfg.Gitea.AccessToken))
 		if err != nil {
@@ -106,6 +106,7 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 
 		projectFileHandler := handler.NewProjectFileHandler(projectService)
 		projectFileHandler.RegisterRoutes(v1)
+		v1.POST("/internal/artifacts/presign-upload", projectFileHandler.PresignArtifactUpload)
 		logs.Info("Project file routes registered successfully")
 
 		workService := service.NewWorkService(db, eventbus, inferrer, giteaClient, cfg.Gitea, cfg.Env)
@@ -116,7 +117,7 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		handler.RegisterTaskRoutes(v1, taskService)
 		logs.Info("Task routes registered successfully")
 
-		artifactService := service.NewArtifactService(db, giteaClient)
+		artifactService := service.NewArtifactService(db, nil)
 		handler.RegisterArtifactRoutes(v1, artifactService)
 		logs.Info("Artifact routes registered successfully")
 
@@ -143,7 +144,7 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 
 		// Start background consumers
 		if !cfg.Server.DisableEventConsumers {
-			go runnable.StartSessionArtifactDeclared(context.Background(), eventbus, db, giteaClient)
+			go runnable.StartSessionArtifactDeclared(context.Background(), eventbus, db, nil)
 			logs.Info("Session artifact declared runnable started")
 			go runnable.StartSessionRunStarted(context.Background(), sessionService, eventbus)
 			logs.Info("Session run started runnable started")

@@ -98,13 +98,31 @@ type FileTreeNode struct {
 
 // FileUploadResult 文件上传结果
 type FileUploadResult struct {
-	Path     string `json:"path"`          // 相对 repo 根目录的路径
-	Filename string `json:"filename"`      // 文件名
-	Size     int64  `json:"size"`          // 文件大小（字节）
-	URL      string `json:"url,omitempty"` // 文件访问 URL
+	PublicID string `json:"public_id"`        // 文件记录 public_id
+	Path     string `json:"path"`             // 相对 repo 根目录的路径
+	Filename string `json:"filename"`         // 文件名
+	Size     int64  `json:"size"`             // 文件大小（字节）
+	URL      string `json:"url,omitempty"`    // 文件访问 URL
 }
 
 // AddFileRequest 将已上传文件关联到项目的请求
 type AddFileRequest struct {
 	PublicID string `json:"public_id" binding:"required"`
+}
+
+// PresignArtifactUploadRequest Worker 请求产物文件预签名上传 URL 的请求体
+type PresignArtifactUploadRequest struct {
+	OrgID            uint   `json:"org_id" binding:"required"`
+	ProjectPublicID  string `json:"project_public_id" binding:"required"`
+	Filename         string `json:"filename" binding:"required"`
+	Sha256           string `json:"sha256"`
+	MimeType         string `json:"mime_type"`
+	FileSize         int64  `json:"file_size"`
+}
+
+// PresignArtifactUploadResponse Worker 请求产物文件预签名上传 URL 的响应体
+type PresignArtifactUploadResponse struct {
+	UploadURL  string `json:"upload_url"`
+	StorageURI string `json:"storage_uri"`
+	ExpiresAt  string `json:"expires_at"`
 }

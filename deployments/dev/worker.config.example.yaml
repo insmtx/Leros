@@ -16,6 +16,7 @@ cli:
   default: "leros"
 
 gitea:
+  enabled: false
   endpoint: "<your_gitea_endpoint>"
   access_token: "<your_access_token>"
   owner: "admin"

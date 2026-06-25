@@ -93,6 +93,7 @@ func runMigrations(db *gorm.DB) error {
 		&types.Task{},
 		&types.Artifact{},
 		&types.FileUpload{},
+		&types.ProjectFile{},
 		&types.BuiltinSkillMarketplaceItem{},
 		&types.SkillMarketplaceItem{},
 		&types.MessageResource{},

@@ -352,7 +352,17 @@ func ensureGitRepo(ctx context.Context, plan *TaskWorkspace) error {
 	}
 
 	if strings.TrimSpace(plan.CloneURL) == "" {
-		return fmt.Errorf("no clone URL for project repo, ensure gitea is configured")
+		cmd := exec.CommandContext(ctx, "git", "init", plan.RepoDir)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git init: %w: %s", err, strings.TrimSpace(string(output)))
+		}
+		if err := os.MkdirAll(filepath.Join(plan.RepoDir, "artifacts"), 0o755); err != nil {
+			return fmt.Errorf("create artifacts dir: %w", err)
+		}
+		if err := os.MkdirAll(filepath.Join(plan.RepoDir, "assets"), 0o755); err != nil {
+			return fmt.Errorf("create assets dir: %w", err)
+		}
+		return nil
 	}
 
 	parent := filepath.Dir(plan.RepoDir)
