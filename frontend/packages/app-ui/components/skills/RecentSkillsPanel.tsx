@@ -1,30 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { RecentSkillItem, SkillMarketplaceItem } from "@leros/store";
-import { skillMarketplaceApi } from "@leros/store";
+import type { SkillInstalledItem, SkillMarketplaceItem } from "@leros/store";
+import { installedToCardItem, skillMarketplaceApi } from "@leros/store";
 
 interface RecentSkillsPanelProps {
   onCardClick?: (skill: SkillMarketplaceItem) => void;
 }
 
-function recentToCardItem(item: RecentSkillItem): SkillMarketplaceItem {
-  return {
-    source_type: item.author ?? "",
-    skill_id: item.code,
-    name: item.name,
-    description: item.description,
-    version: item.version ?? "",
-    author: item.author ?? "",
-    category: item.category ?? "",
-    tags: item.tags ?? [],
-    icon: item.icon ?? "",
-    installs: 0,
-  };
-}
-
 export function RecentSkillsPanel({ onCardClick }: RecentSkillsPanelProps) {
-  const [recent, setRecent] = useState<RecentSkillItem[]>([]);
+  const [recent, setRecent] = useState<SkillInstalledItem[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const fetchRecent = useCallback(async () => {
@@ -51,22 +36,14 @@ export function RecentSkillsPanel({ onCardClick }: RecentSkillsPanelProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {recent.map((item) => (
             <button
-              key={item.code}
+              key={item.name}
               type="button"
-              onClick={() => onCardClick?.(recentToCardItem(item))}
+              onClick={() => onCardClick?.(installedToCardItem(item))}
               className="group flex items-center gap-3 rounded-lg border border-[var(--leros-control-border)] bg-white p-3 text-left transition-all hover:-translate-y-0.5 hover:border-[var(--leros-primary)] hover:shadow-sm"
             >
-              {item.icon ? (
-                <img
-                  src={item.icon}
-                  alt={item.name}
-                  className="h-8 w-8 shrink-0 rounded-lg object-cover"
-                />
-              ) : (
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--leros-primary-soft)] text-[var(--leros-primary)] text-sm font-bold group-hover:bg-[var(--leros-primary)] group-hover:text-white transition-colors">
-                  {item.name.charAt(0).toUpperCase()}
-                </div>
-              )}
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--leros-primary-soft)] text-[var(--leros-primary)] text-sm font-bold group-hover:bg-[var(--leros-primary)] group-hover:text-white transition-colors">
+                {item.name.charAt(0).toUpperCase()}
+              </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-[var(--leros-text-strong)]">
                   {item.name}

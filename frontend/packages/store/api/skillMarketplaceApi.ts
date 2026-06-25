@@ -105,19 +105,6 @@ export interface ToggleSkillStatusResponse {
   status: string;
 }
 
-export interface RecentSkillItem {
-  code: string;
-  name: string;
-  description: string;
-  icon: string;
-  version: string;
-  category: string;
-  skill_type: string;
-  author: string;
-  tags: string[];
-  status: string;
-}
-
 /**
  * 将后端 SkillInstalledItem 映射为兼容 SkillCard 组件的 SkillMarketplaceItem。
  * 用 name 作为 skill_id（卸载接口使用 name 作为标识符）。
@@ -199,7 +186,7 @@ export const skillMarketplaceApi = {
     ),
 
   listRecentUsed: (limit?: number) =>
-    apiClient.get<BackendDataResponse<RecentSkillItem[]>>(
+    apiClient.get<BackendDataResponse<SkillInstalledItem[]>>(
       "/skills/recent",
       { params: limit ? { limit } : undefined } as any,
     ),

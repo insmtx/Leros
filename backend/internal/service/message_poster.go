@@ -671,6 +671,8 @@ func (p *MessagePoster) writeSkillInvokeResources(ctx context.Context, session *
 			ResourceKey:  source + ":" + skillID,
 			MessageID:    message.ID,
 			SessionID:    session.ID,
+			OrgID:        session.OrgID,
+			Uin:          session.Uin,
 			ResourceType: "skill",
 			ResourceName: name,
 			InvokeType:   "slash_command",

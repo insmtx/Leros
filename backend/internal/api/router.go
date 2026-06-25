@@ -137,7 +137,7 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		handler.RegisterSkillMarketplaceRoutes(v1, skillMarketplaceService)
 		logs.Info("Skill marketplace routes registered successfully")
 
-		skillService := service.NewSkillService(db)
+		skillService := service.NewSkillService(db, eventbus, inferrer)
 		handler.RegisterSkillRoutes(v1, skillService)
 		logs.Info("Skill management routes registered successfully")
 

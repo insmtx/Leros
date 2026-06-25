@@ -27,7 +27,6 @@ export type {
 	ImportSkillParams,
 	ImportSkillResponse,
 	InstalledSkillsResponse,
-	RecentSkillItem,
 	SearchSkillMarketplaceParams,
 	SearchSkillMarketplaceResponse,
 	SkillDetailData,
