@@ -3,7 +3,6 @@ package steps
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/worker/client"
 	"github.com/insmtx/Leros/backend/internal/worker/identity"
 	agentworkspace "github.com/insmtx/Leros/backend/internal/workspace"
 	"github.com/insmtx/Leros/backend/types"
@@ -92,8 +92,9 @@ func (r *WorkspaceArtifactRecorder) Record(ctx context.Context, req *agent.Reque
 	serverOrgID := identity.OrgID()
 	projectPublicID := strings.TrimSpace(req.Workspace.ProjectID)
 	if serverAddr != "" && serverOrgID > 0 && projectPublicID != "" {
+		srv := client.NewServerClient(serverAddr)
 		for i, record := range records {
-			storageURI, err := uploadArtifactToServer(ctx, serverAddr, projectPublicID, record)
+			storageURI, err := uploadArtifactToServer(ctx, srv, projectPublicID, record)
 			if err != nil {
 				logs.WarnContextf(ctx, "upload artifact %s to server: %v", record.RelativePath, err)
 				continue
@@ -105,7 +106,7 @@ func (r *WorkspaceArtifactRecorder) Record(ctx context.Context, req *agent.Reque
 	return payloads, nil
 }
 
-func uploadArtifactToServer(ctx context.Context, serverAddr string, projectPublicID string, record agentworkspace.ArtifactRecord) (string, error) {
+func uploadArtifactToServer(ctx context.Context, srv *client.ServerClient, projectPublicID string, record agentworkspace.ArtifactRecord) (string, error) {
 	absolute, err := agentworkspace.SafeJoin("", record.RelativePath)
 	if err != nil {
 		return "", err
@@ -123,41 +124,13 @@ func uploadArtifactToServer(ctx context.Context, serverAddr string, projectPubli
 		MimeType:        record.MimeType,
 		FileSize:        record.FileSize,
 	}
-	bodyBytes, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", err
-	}
 
-	presignURL := fmt.Sprintf("http://%s/v1/internal/artifacts/presign-upload", serverAddr)
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, presignURL, bytes.NewReader(bodyBytes))
-	if err != nil {
-		return "", err
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(httpReq)
+	respData, err := srv.PresignArtifactUpload(ctx, &reqBody)
 	if err != nil {
 		return "", fmt.Errorf("request presign upload: %w", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return "", fmt.Errorf("presign upload returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	var respWrap struct {
-		Code int                                   `json:"code"`
-		Data contract.PresignArtifactUploadResponse `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&respWrap); err != nil {
-		return "", fmt.Errorf("decode presign response: %w", err)
-	}
-	if respWrap.Code != 0 {
-		return "", fmt.Errorf("presign upload failed: code=%d", respWrap.Code)
-	}
-
-	putReq, err := http.NewRequestWithContext(ctx, http.MethodPut, respWrap.Data.UploadURL, bytes.NewReader(data))
+	putReq, err := http.NewRequestWithContext(ctx, http.MethodPut, respData.UploadURL, bytes.NewReader(data))
 	if err != nil {
 		return "", err
 	}
@@ -175,7 +148,7 @@ func uploadArtifactToServer(ctx context.Context, serverAddr string, projectPubli
 		return "", fmt.Errorf("upload artifact file returned %d: %s", putResp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
-	return respWrap.Data.StorageURI, nil
+	return respData.StorageURI, nil
 }
 
 func artifactPayloadFromRecord(record agentworkspace.ArtifactRecord) events.ArtifactPayload {

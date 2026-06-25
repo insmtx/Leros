@@ -263,8 +263,6 @@ github.com/gopherjs/gopherjs v1.17.2/go.mod h1:pRRIvn/QzFLrKfvEz3qUuEhtE/zLCWfre
 github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/h2non/parth v0.0.0-20190131123155-b4df798d6542/go.mod h1:Ow0tF8D4Kplbc8s8sSb3V2oUCygFHVp8gC3Dn6U4MNI=
-github.com/hashicorp/go-version v1.6.0 h1:feTTfFNnjP967rlCxM/I9g701jU+RN74YKx2mOkIeek=
-github.com/hashicorp/go-version v1.6.0/go.mod h1:fltr4n8CU8Ke44wwGCBoEymUuxUHl09ZGVZPK5anwXA=
 github.com/hashicorp/go-version v1.7.0 h1:5tqGy27NaOTB8yJKUZELlFAS/LTKJkrmONwQKeRZfjY=
 github.com/hashicorp/go-version v1.7.0/go.mod h1:fltr4n8CU8Ke44wwGCBoEymUuxUHl09ZGVZPK5anwXA=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
@@ -487,8 +485,8 @@ github.com/xyproto/randomstring v1.0.5 h1:YtlWPoRdgMu3NZtP45drfy1GKoojuR7hmRcnhZ
 github.com/xyproto/randomstring v1.0.5/go.mod h1:rgmS5DeNXLivK7YprL0pY+lTuhNQW3iGxZ18UQApw/E=
 github.com/yargevad/filepathx v1.0.0 h1:SYcT+N3tYGi+NvazubCNlvgIPbzAk7i7y2dwg3I5FYc=
 github.com/yargevad/filepathx v1.0.0/go.mod h1:BprfX/gpYNJHJfc35GjRRpVcwWXS89gGulUIU5tK3tA=
-github.com/ygpkg/storage-go v0.0.5 h1:AnaaaQwYesMoclY5nLGk9u9Uv+a17d1LiLdsiUhredk=
-github.com/ygpkg/storage-go v0.0.5/go.mod h1:sfq8wVZNOUPUbLBrNCu8xAqxBwjWaQgk9TGrSpTSy+A=
+github.com/ygpkg/storage-go v0.0.6 h1:biSB5pd9PdDHp8PFUC6jveuSIfmDWfFzvbPVO3vjWq4=
+github.com/ygpkg/storage-go v0.0.6/go.mod h1:sfq8wVZNOUPUbLBrNCu8xAqxBwjWaQgk9TGrSpTSy+A=
 github.com/ygpkg/yg-go v1.23.66 h1:ueP8/wIjx1jOIl7vVHJnAPf4ETikw6zN8gPl/KXlv+c=
 github.com/ygpkg/yg-go v1.23.66/go.mod h1:7K8Z6e6Kkhl+xlRgT3+N7x39Tj+/QlJduDcCINUInrU=
 github.com/yosida95/uritemplate/v3 v3.0.2 h1:Ed3Oyj9yrmi9087+NczuL5BwkIc4wvTb5zIM+UJPGz4=

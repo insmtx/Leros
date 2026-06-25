@@ -172,3 +172,76 @@ func ParseStorageURI(uri string) (string, string, error) {
 	}
 	return bucket, key, nil
 }
+
+// RecordUploadParams 记录已上传文件的元数据参数（不上传文件本身）
+type RecordUploadParams struct {
+	StorageURI   string
+	Filename     string
+	OriginalName string
+	MimeType     string
+	OrgID        uint
+	OwnerID      uint
+	FileSize     int64
+	Sha256       string
+	Purpose      string
+	Metadata     map[string]interface{}
+}
+
+// RecordUpload 仅创建 FileUpload 记录，不上传文件。
+// 用于 Worker 已通过预签名 URL 完成上传后的元数据记录。
+func RecordUpload(ctx context.Context, db *gorm.DB, params RecordUploadParams) (*types.FileUpload, error) {
+	if params.StorageURI == "" {
+		return nil, fmt.Errorf("storage uri is required")
+	}
+	if params.Filename == "" {
+		return nil, fmt.Errorf("filename is required")
+	}
+	if params.OrgID == 0 || params.OwnerID == 0 {
+		return nil, fmt.Errorf("org and owner are required")
+	}
+
+	st := GetStorage()
+	pb := st.PathBuilder()
+	storagePath := pb.Build(DefaultBucket(), storageKeyFromStorageURI(params.StorageURI))
+	normalizedURI := storagePath.URI()
+
+	publicID := fmt.Sprintf("file_%s", snowflake.GenerateIDBase58())
+	originalName := params.OriginalName
+	if originalName == "" {
+		originalName = params.Filename
+	}
+	fileSize := params.FileSize
+	if fileSize <= 0 {
+		fileSize = 0
+	}
+
+	fileUpload := &types.FileUpload{
+		PublicID:     publicID,
+		OrgID:        params.OrgID,
+		OwnerID:      params.OwnerID,
+		Filename:     params.Filename,
+		OriginalName: originalName,
+		MimeType:     params.MimeType,
+		FileSize:     fileSize,
+		StoragePath:  normalizedURI,
+		Sha256:       params.Sha256,
+		Purpose:      params.Purpose,
+		Status:       "active",
+		Metadata: types.ObjectMetadata{
+			Extra: params.Metadata,
+		},
+	}
+
+	if err := infradb.CreateFileUpload(ctx, db, fileUpload); err != nil {
+		return nil, fmt.Errorf("create file upload record: %w", err)
+	}
+	return fileUpload, nil
+}
+
+func storageKeyFromStorageURI(uri string) string {
+	_, _, key, err := storage.ParseURI(uri)
+	if err != nil {
+		return ""
+	}
+	return key
+}

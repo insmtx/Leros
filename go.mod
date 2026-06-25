@@ -3,6 +3,7 @@ module github.com/insmtx/Leros
 go 1.25.0
 
 require (
+	code.gitea.io/sdk/gitea v0.23.2
 	github.com/bytedance/sonic v1.15.0
 	github.com/cloudwego/eino v0.8.9
 	github.com/cloudwego/eino-ext/components/model/claude v0.1.18
@@ -22,7 +23,7 @@ require (
 	github.com/swaggo/gin-swagger v1.6.1
 	github.com/swaggo/swag v1.16.6
 	github.com/valyala/fasttemplate v1.2.2
-	github.com/ygpkg/storage-go v0.0.5
+	github.com/ygpkg/storage-go v0.0.6
 	github.com/ygpkg/yg-go v1.23.66
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.41.0
@@ -40,7 +41,6 @@ require (
 	cloud.google.com/go/auth v0.9.3 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.4 // indirect
 	cloud.google.com/go/compute/metadata v0.5.0 // indirect
-	code.gitea.io/sdk/gitea v0.23.2 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/42wim/httpsig v1.2.3 // indirect
 	github.com/ClickHouse/ch-go v0.61.5 // indirect

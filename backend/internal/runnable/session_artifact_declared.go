@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
+	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/worker/protocol"
@@ -178,6 +179,11 @@ func (p *declaredArtifactPersister) PersistDeclaredArtifact(ctx context.Context,
 	}
 
 	if strings.TrimSpace(item.StorageURI) != "" {
+		storageURI := strings.TrimSpace(item.StorageURI)
+		if err := p.recordArtifactUpload(ctx, storageURI, filename, item, route, *session, projectPublicID); err != nil {
+			logs.WarnContextf(ctx, "persist declared artifact: record upload failed: %v", err)
+		}
+
 		pf := &types.ProjectFile{
 			PublicID:        fmt.Sprintf("file_%s", snowflake.GenerateIDBase58()),
 			OrgID:           session.OrgID,
@@ -187,7 +193,7 @@ func (p *declaredArtifactPersister) PersistDeclaredArtifact(ctx context.Context,
 			OriginalName:    filename,
 			MimeType:        strings.TrimSpace(item.MimeType),
 			FileSize:        item.FileSize,
-			StoragePath:     strings.TrimSpace(item.StorageURI),
+			StoragePath:     storageURI,
 			Sha256:          item.Sha256,
 			Source:          "worker_artifact",
 			ArtifactID:      &artifact.ID,
@@ -198,4 +204,24 @@ func (p *declaredArtifactPersister) PersistDeclaredArtifact(ctx context.Context,
 	}
 
 	return nil
+}
+
+func (p *declaredArtifactPersister) recordArtifactUpload(ctx context.Context, storageURI, filename string, item events.ArtifactPayload, route protocol.RouteContext, session types.Session, projectPublicID string) error {
+	mimeType := strings.TrimSpace(item.MimeType)
+	_, err := filestore.RecordUpload(ctx, p.db, filestore.RecordUploadParams{
+		StorageURI:   storageURI,
+		Filename:     filename,
+		OriginalName: filename,
+		MimeType:     mimeType,
+		OrgID:        session.OrgID,
+		OwnerID:      session.Uin,
+		FileSize:     item.FileSize,
+		Sha256:       item.Sha256,
+		Purpose:      filestore.PurposeArtifact,
+		Metadata: map[string]interface{}{
+			"worker_id":         route.WorkerID,
+			"project_public_id": projectPublicID,
+		},
+	})
+	return err
 }

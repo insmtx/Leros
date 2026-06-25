@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +23,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/skill/catalog"
 	"github.com/insmtx/Leros/backend/internal/skill/fetch"
 	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
+	"github.com/insmtx/Leros/backend/internal/worker/client"
 	"github.com/insmtx/Leros/backend/internal/worker/identity"
 	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	"github.com/insmtx/Leros/backend/pkg/dm"
@@ -33,7 +33,6 @@ import (
 
 const consumerName = "worker-skill-mgmt"
 
-// httpClient is a shared HTTP client with a reasonable timeout for skill file downloads.
 var httpClient = &http.Client{Timeout: 5 * time.Minute}
 
 // Config holds the configuration for a skill management consumer.
@@ -179,30 +178,10 @@ func (c *Consumer) tryDownloadFromServer(ctx context.Context, skillID, source, v
 		return nil, fmt.Errorf("server addr not configured")
 	}
 
-	baseURL := fmt.Sprintf("http://%s/v1/skill-marketplace/skills/%s/download", serverAddr, skillID)
-	reqURL := fmt.Sprintf("%s?source=%s&version=%s", baseURL, url.QueryEscape(source), url.QueryEscape(version))
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	srv := client.NewServerClient(serverAddr)
+	data, err := srv.DownloadSkillCache(ctx, skillID, source, version)
 	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("http get: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("not found (404)")
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("server returned status %d", resp.StatusCode)
-	}
-
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 100_000_000))
-	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
+		return nil, err
 	}
 	return data, nil
 }
