@@ -184,7 +184,15 @@ function ProcessTimelineBlock({
 				continue;
 			}
 			const toolCall = toolCallMap.get(step.toolCallId);
-			if (toolCall?.name?.trim()) return `工具调用：${toolCall.name}`;
+			if (!toolCall?.name?.trim()) continue;
+			const args = toolCall.arguments ?? {};
+			if (typeof args.intent === "string" && args.intent.trim())
+				return args.intent.trim();
+			if (typeof args.description === "string" && args.description.trim())
+				return args.description.trim();
+			if (toolCall.name === "write") return "写入文件";
+			if (toolCall.name === "read") return "读取文件";
+			return `调用：${toolCall.name}`;
 		}
 		return "";
 	}, [steps, toolCallMap]);
