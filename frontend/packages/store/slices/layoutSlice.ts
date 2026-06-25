@@ -40,6 +40,7 @@ export type ProjectTask = {
 	title: string;
 	meta: string;
 	status: ProjectTaskStatus;
+	updatedAt?: number;
 	sessionId?: string;
 	taskType?: string;
 	deadline?: string;
@@ -206,6 +207,8 @@ function mapBackendTask(bt: BackendTask): ProjectTask {
 		title: bt.title,
 		meta: bt.description ?? bt.task_type ?? "",
 		status: (bt.status as ProjectTaskStatus) ?? "todo",
+		// 中文注释：保留任务更新时间，供左侧最近项目列表展示相对时间。
+		updatedAt: parseOptionalTimestamp(bt.updated_at),
 		sessionId: taskWithSession.session?.session_id,
 		taskType: bt.task_type,
 		deadline: bt.deadline,
