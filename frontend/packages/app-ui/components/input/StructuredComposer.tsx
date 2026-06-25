@@ -9,7 +9,7 @@ import {
 	CommandList,
 } from "@leros/ui/components/ui/command";
 import { cn } from "@leros/ui/lib/utils";
-import { Bot, Sparkles, TerminalSquare } from "lucide-react";
+import { Bot, Sparkles, TerminalSquare, X } from "lucide-react";
 import {
 	forwardRef,
 	type MouseEvent,
@@ -46,7 +46,7 @@ type AssistantOption = {
 	description: string;
 };
 
-type SkillOption = {
+export type ComposerSkillOption = {
 	code: string;
 	label: string;
 	description: string;
@@ -56,7 +56,7 @@ type SkillOption = {
 type CommandOption =
 	| {
 			kind: "skill";
-			item: SkillOption;
+			item: ComposerSkillOption;
 	  }
 	| {
 			kind: "command";
@@ -73,6 +73,7 @@ export type StructuredComposerHandle = {
 	openCommandPicker: () => void;
 	insertAssistant: (assistantName: string) => void;
 	insertSkill: (skillLabel: string) => void;
+	removeSkill: (skillLabel: string) => void;
 };
 
 type StructuredComposerProps = {
@@ -84,6 +85,7 @@ type StructuredComposerProps = {
 	onBlur: () => void;
 	placeholder: string;
 	isProjectVariant: boolean;
+	projectSkillOptions?: ComposerSkillOption[];
 };
 
 function findTrigger(value: string, cursor: number): ActiveTrigger | null {
@@ -126,7 +128,7 @@ function isEmptyEditorValue(value: string): boolean {
 	return value.trim() === "";
 }
 
-function installedSkillToOption(skill: SkillInstalledItem): SkillOption {
+function installedSkillToOption(skill: SkillInstalledItem): ComposerSkillOption {
 	return {
 		code: skill.name,
 		label: skill.name,
@@ -138,7 +140,7 @@ function installedSkillToOption(skill: SkillInstalledItem): SkillOption {
 }
 
 function matchesCommandQuery(
-	option: Pick<SkillOption, "label" | "code" | "description" | "keywords">,
+	option: Pick<ComposerSkillOption, "label" | "code" | "description" | "keywords">,
 	query: string,
 ): boolean {
 	if (!query) return true;
@@ -265,6 +267,10 @@ function resolveDisplayTokens(value: string, tokens: InsertedToken[]): InsertedT
 	}
 
 	return sortTokens(merged);
+}
+
+function isCursorInsideToken(cursor: number, tokens: InsertedToken[]): boolean {
+	return tokens.some((token) => cursor > token.start && cursor <= token.end);
 }
 
 function sortTokens(tokens: InsertedToken[]): InsertedToken[] {
@@ -589,7 +595,17 @@ function shiftTokensForTextEdit(
 
 export const StructuredComposer = forwardRef<StructuredComposerHandle, StructuredComposerProps>(
 	function StructuredComposer(
-		{ value, onChange, onSubmit, onPasteFiles, onFocus, onBlur, placeholder, isProjectVariant },
+		{
+			value,
+			onChange,
+			onSubmit,
+			onPasteFiles,
+			onFocus,
+			onBlur,
+			placeholder,
+			isProjectVariant,
+			projectSkillOptions,
+		},
 		ref,
 	) {
 		const editorRef = useRef<HTMLDivElement>(null);
@@ -597,7 +613,7 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 		const [trigger, setTrigger] = useState<ActiveTrigger | null>(null);
 		const [activeIndex, setActiveIndex] = useState(0);
 		const [tokens, setTokens] = useState<InsertedToken[]>([]);
-		const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
+		const [skillOptions, setSkillOptions] = useState<ComposerSkillOption[]>([]);
 		const [skillsLoading, setSkillsLoading] = useState(false);
 		const [skillsLoaded, setSkillsLoaded] = useState(false);
 		const [skillsError, setSkillsError] = useState<string | null>(null);
@@ -715,6 +731,13 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 		}, [value]);
 
 		useEffect(() => {
+			if (projectSkillOptions) {
+				setSkillOptions(projectSkillOptions);
+				setSkillsLoaded(true);
+				setSkillsError(null);
+				setSkillsLoading(false);
+				return;
+			}
 			if (trigger?.kind !== "command" || skillsLoaded) return;
 
 			setSkillsLoading(true);
@@ -734,7 +757,7 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 				.finally(() => {
 					setSkillsLoading(false);
 				});
-		}, [skillsLoaded, trigger?.kind]);
+		}, [projectSkillOptions, skillsLoaded, trigger?.kind]);
 
 		const focusAt = useCallback((cursor: number) => {
 			requestAnimationFrame(() => {
@@ -756,7 +779,9 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 			onChange(text);
 
 			if (!composingRef.current) {
-				setTrigger(findTrigger(text, getCaretOffset(editor)));
+				const caret = getCaretOffset(editor);
+				const nextTokens = resolveDisplayTokens(text, snapshot.tokens);
+				setTrigger(isCursorInsideToken(caret, nextTokens) ? null : findTrigger(text, caret));
 			}
 		}, [onChange]);
 
@@ -847,6 +872,33 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 			[focusAt, onChange, value],
 		);
 
+		const removeSkillToken = useCallback(
+			(skillLabel: string) => {
+				const normalizedLabel = skillLabel.startsWith("/") ? skillLabel : `/${skillLabel}`;
+				const currentTokens = resolveDisplayTokens(value, tokens);
+				const target = currentTokens.find(
+					(token) => token.kind === "skill" && token.label === normalizedLabel,
+				);
+				if (!target) return;
+
+				let start = target.start;
+				let end = target.end;
+				if (value[end] === " ") {
+					end += 1;
+				} else if (start > 0 && value[start - 1] === " ") {
+					start -= 1;
+				}
+				const nextValue = `${value.slice(0, start)}${value.slice(end)}`;
+				// 中文注释：从已选技能区域移除时，同步删除输入框里的技能 token 和对应纯文本。
+				setTokens((current) => shiftTokensForTextEdit(current, value, nextValue));
+				onChange(nextValue);
+				setTrigger(null);
+				pendingCaretRef.current = start;
+				focusAt(start);
+			},
+			[focusAt, onChange, tokens, value],
+		);
+
 		useImperativeHandle(
 			ref,
 			() => ({
@@ -855,19 +907,20 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 				insertAssistant: (assistantName: string) =>
 					insertToolbarToken("assistant", `@${assistantName}`),
 				insertSkill: (skillLabel: string) => insertToolbarToken("skill", `/${skillLabel}`),
+				removeSkill: removeSkillToken,
 			}),
-			[insertToolbarToken, insertTrigger],
+			[insertToolbarToken, insertTrigger, removeSkillToken],
 		);
 
 		const selectToken = useCallback(
 			(
 				kind: SelectionKind,
-				option: AssistantOption | ChatCommand | SkillOption,
+				option: AssistantOption | ChatCommand | ComposerSkillOption,
 				activeTrigger: ActiveTrigger,
 			) => {
 				const isAssistant = kind === "assistant";
 				const assistantName = isAssistant ? (option as AssistantOption).name : "";
-				const skillLabel = kind === "skill" ? (option as SkillOption).label : "";
+				const skillLabel = kind === "skill" ? (option as ComposerSkillOption).label : "";
 				if (isAssistant && selectedAssistantNames.includes(assistantName)) {
 					setTrigger(null);
 					return;
@@ -878,7 +931,7 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 				}
 				const label = isAssistant
 					? `@${(option as AssistantOption).name}`
-					: `/${(option as ChatCommand | SkillOption).label}`;
+					: `/${(option as ChatCommand | ComposerSkillOption).label}`;
 				const followingText = value.slice(activeTrigger.end);
 				const trailingSpace = followingText.startsWith(" ") ? "" : " ";
 				const nextValue = `${value.slice(
@@ -1012,7 +1065,8 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 				{trigger && (
 					<div
 						ref={pickerRef}
-						className="absolute bottom-full left-0 z-30 mb-2 w-full max-w-[360px] overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 p-1.5 shadow-[0_12px_36px_rgba(15,23,42,0.12)] backdrop-blur"
+						// 圆角容器需留足内边距，避免 overflow-hidden 裁切顶部标题文字
+						className="absolute bottom-full left-0 z-30 mb-2 w-full max-w-[360px] overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-[0_12px_36px_rgba(15,23,42,0.12)] backdrop-blur"
 					>
 						<Command
 							shouldFilter={false}
@@ -1020,7 +1074,7 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 							onValueChange={handlePickerValueChange}
 							className="rounded-xl! bg-transparent p-0"
 						>
-							<div className="flex items-center gap-2 p-0 text-xs font-medium text-slate-400">
+							<div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-slate-400">
 								{trigger.kind === "assistant" ? <>AI 队友</> : <>命令和 Skills</>}
 								{trigger.query && <span className="truncate text-slate-400">{trigger.query}</span>}
 							</div>
@@ -1080,12 +1134,15 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 												<div className="mb-1 text-[11px] font-medium text-slate-400">已选技能</div>
 												<div className="flex flex-wrap gap-1.5">
 													{selectedSkillLabels.map((label) => (
-														<span
+														<button
 															key={label}
-															className="inline-flex items-center rounded-full bg-violet-50 px-2 py-1 text-[11px] text-violet-700"
+															type="button"
+															onClick={() => removeSkillToken(label)}
+															className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-[11px] text-violet-700 transition-colors hover:bg-violet-100"
 														>
 															/{label}
-														</span>
+															<X className="size-3" />
+														</button>
 													))}
 												</div>
 											</div>
