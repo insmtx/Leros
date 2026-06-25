@@ -16,3 +16,28 @@ func BatchCreateMessageResources(ctx context.Context, db *gorm.DB, records []*ty
 
 	return db.WithContext(ctx).Create(records).Error
 }
+
+// GetDistinctSkillCodes returns distinct skill codes from message_resource records
+// ordered by most recently used first.
+func GetDistinctSkillCodes(ctx context.Context, db *gorm.DB, limit int) ([]string, error) {
+	var results []struct {
+		ResourceKey string
+	}
+	err := db.WithContext(ctx).
+		Model(&types.MessageResource{}).
+		Select("resource_key, MAX(created_at) AS max_created_at").
+		Where("resource_type = ?", "skill").
+		Group("resource_key").
+		Order("max_created_at DESC").
+		Limit(limit).
+		Find(&results).Error
+	if err != nil {
+		return nil, err
+	}
+
+	codes := make([]string, len(results))
+	for i, r := range results {
+		codes[i] = r.ResourceKey
+	}
+	return codes, nil
+}

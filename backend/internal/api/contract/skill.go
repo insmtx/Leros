@@ -1,6 +1,10 @@
 package contract
 
-import "context"
+import (
+	"context"
+
+	"github.com/insmtx/Leros/backend/types"
+)
 
 // ToggleSkillStatusRequest switches a skill between active/inactive.
 type ToggleSkillStatusRequest struct {
@@ -16,4 +20,6 @@ type ToggleSkillStatusResponse struct {
 // SkillService defines the skill management contract.
 type SkillService interface {
 	ToggleSkillStatus(ctx context.Context, code string, req *ToggleSkillStatusRequest) (*ToggleSkillStatusResponse, error)
+	ListRecentUsedSkills(ctx context.Context, limit int) ([]types.Skill, error)
+	GetSkillStatuses(ctx context.Context, codes []string) (map[string]string, error)
 }

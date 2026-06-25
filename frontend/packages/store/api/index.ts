@@ -38,6 +38,7 @@ export type {
 export { sessionApi } from "./sessionApi";
 export type {
 	InstalledSkillsResponse,
+	RecentSkillItem,
 	SearchSkillMarketplaceParams,
 	SearchSkillMarketplaceResponse,
 	SkillInstalledItem,

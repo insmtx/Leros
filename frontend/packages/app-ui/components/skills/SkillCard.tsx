@@ -10,9 +10,13 @@ interface SkillCardProps {
 	variant?: "marketplace" | "mine";
 	/** Called when the card body is clicked (for navigation to detail page) */
 	onClick?: (skill: SkillMarketplaceItem) => void;
+	/** Whether the skill is currently active (only used in "mine" variant) */
+	active?: boolean;
+	/** Called when the enable/disable toggle is clicked */
+	onToggle?: (skill: SkillMarketplaceItem) => void;
 }
 
-export function SkillCard({ skill, variant = "marketplace", onClick }: SkillCardProps) {
+export function SkillCard({ skill, variant = "marketplace", onClick, active, onToggle }: SkillCardProps) {
 	const isLerosAI = skill.author === "Lework";
 	const isMine = variant === "mine";
 
@@ -108,6 +112,32 @@ export function SkillCard({ skill, variant = "marketplace", onClick }: SkillCard
 					</span>
 				)}
 			</div>
+
+			{/* Enable/Disable toggle (mine variant only) */}
+			{isMine && (
+				<div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+					<span className="text-[10px] text-[var(--leros-text-subtle)]">
+						{active ? "已启用" : "已禁用"}
+					</span>
+					<button
+						type="button"
+						onClick={() => onToggle?.(skill)}
+						className={cn(
+							"relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
+							active
+								? "bg-[var(--leros-primary)]"
+								: "bg-[var(--leros-control-border)]",
+						)}
+					>
+						<span
+							className={cn(
+								"inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform",
+								active ? "translate-x-[18px]" : "translate-x-[2px]",
+							)}
+						/>
+					</button>
+				</div>
+			)}
 		</button>
 	);
 }
