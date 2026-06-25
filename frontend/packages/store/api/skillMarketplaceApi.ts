@@ -98,16 +98,6 @@ export interface ImportSkillResponse {
   message: string;
 }
 
-export interface ToggleSkillStatusParams {
-  code: string;
-  status: "active" | "inactive";
-}
-
-export interface ToggleSkillStatusResponse {
-  code: string;
-  status: string;
-}
-
 /**
  * 将后端 SkillInstalledItem 映射为兼容 SkillCard 组件的 SkillMarketplaceItem。
  * 用 name 作为 skill_id（卸载接口使用 name 作为标识符）。
@@ -183,21 +173,9 @@ export const skillMarketplaceApi = {
             params,
         ),
 
-  toggleStatus: (params: ToggleSkillStatusParams) =>
-    apiClient.patch<BackendDataResponse<ToggleSkillStatusResponse>>(
-      `/skills/${encodeURIComponent(params.code)}/status`,
-      { status: params.status },
-    ),
-
   listRecentUsed: (limit?: number) =>
     apiClient.get<BackendDataResponse<SkillInstalledItem[]>>(
       "/skills/recent",
       { params: limit ? { limit } : undefined } as any,
-    ),
-
-  getSkillStatuses: (codes: string[]) =>
-    apiClient.get<BackendDataResponse<Record<string, string>>>(
-      "/skills/statuses",
-      { params: codes.length ? { codes: codes.join(",") } as any : undefined },
     ),
 };

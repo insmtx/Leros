@@ -33,8 +33,6 @@ export type {
 	SkillDetailParams,
 	SkillInstalledItem,
 	SkillMarketplaceItem,
-	ToggleSkillStatusParams,
-	ToggleSkillStatusResponse,
 	UninstallSkillParams,
 	UninstallSkillResponse,
 } from "./api/skillMarketplaceApi";

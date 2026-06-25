@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,12 +18,8 @@ import (
 	"github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
-	skilltoken "github.com/insmtx/Leros/backend/internal/skill"
-	skillcatalog "github.com/insmtx/Leros/backend/internal/skill/catalog"
-	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
 	"github.com/insmtx/Leros/backend/internal/worker/protocol"
 	"github.com/insmtx/Leros/backend/pkg/dm"
-	"github.com/insmtx/Leros/backend/pkg/leros"
 	"github.com/insmtx/Leros/backend/types"
 	"github.com/ygpkg/yg-go/encryptor/snowflake"
 	"github.com/ygpkg/yg-go/logs"
@@ -96,8 +91,6 @@ func (p *MessagePoster) PostMessage(
 	}
 
 	logs.DebugContextf(ctx, "published message events for session=%s", session.PublicID)
-
-	p.writeSkillInvokeResources(ctx, session, message)
 
 	if err := p.publishWorkerTask(ctx, session, message); err != nil {
 		return nil, err
@@ -646,109 +639,4 @@ Thumbs.db
 			logs.WarnContextf(ctx, "[message_poster] init gitea file %s failed: %v", f.path, err)
 		}
 	}
-}
-
-// writeSkillInvokeResources parses /skill tokens from message content and writes
-// message_resource records so that skill invocations are tracked at the service layer
-// before the worker task is published.
-func (p *MessagePoster) writeSkillInvokeResources(ctx context.Context, session *types.Session, message *types.SessionMessage) {
-	if p.db == nil || message == nil || session == nil {
-		return
-	}
-	tokens := skilltoken.ParseTokensOnly(message.Content)
-	if len(tokens) == 0 {
-		return
-	}
-	entries := resolveSkillEntries(tokens)
-	if len(entries) == 0 {
-		return
-	}
-	records := make([]*types.MessageResource, 0, len(entries))
-	for seq, name := range entries {
-		source, skillID, resourceID := p.resolveSkillMarketplace(ctx, name)
-		records = append(records, &types.MessageResource{
-			ResourceID:   resourceID,
-			ResourceKey:  source + ":" + skillID,
-			MessageID:    message.ID,
-			SessionID:    session.ID,
-			OrgID:        session.OrgID,
-			Uin:          session.Uin,
-			ResourceType: "skill",
-			ResourceName: name,
-			InvokeType:   "slash_command",
-			Seq:          seq,
-		})
-	}
-	if err := db.BatchCreateMessageResources(ctx, p.db, records); err != nil {
-		logs.WarnContextf(ctx, "write skill invoke message_resource failed: count=%d error=%v", len(records), err)
-	} else {
-		logs.InfoContextf(ctx, "Skill invoke message_resource written: count=%d", len(records))
-	}
-}
-
-// resolveSkillMarketplace looks up the marketplace record for a local skill
-// name. Returns (source, skill_id, db_primary_key_as_string). When no record is
-// found, source and skillID fall back to the name itself and resourceID is empty.
-func (p *MessagePoster) resolveSkillMarketplace(ctx context.Context, name string) (source, skillID, resourceID string) {
-	if item, err := db.GetBuiltinSkillByID(ctx, p.db, name); err == nil && item != nil {
-		return "Leros", item.SkillID, fmt.Sprintf("%d", item.ID)
-	}
-	query := p.db.WithContext(ctx).Model(&types.SkillMarketplaceItem{}).
-		Where("name = ?", name).
-		Select("id, source, skill_id")
-	type row struct {
-		ID      uint   `gorm:"column:id"`
-		Source  string `gorm:"column:source"`
-		SkillID string `gorm:"column:skill_id"`
-	}
-	var r row
-	if err := query.First(&r).Error; err == nil && r.Source != "" {
-		return r.Source, r.SkillID, fmt.Sprintf("%d", r.ID)
-	}
-	// Fall back to local .skill-metadata file
-	if meta := p.readLocalSkillMetadata(ctx, name); meta != nil {
-		return meta.Source, meta.SkillID, ""
-	}
-	// Fall back to catalog Manifest.Metadata.Source
-	if entry, err := skillcatalog.Get(name); err == nil && entry != nil {
-		src := entry.Manifest.Metadata.Source
-		if src != "" {
-			return src, entry.Manifest.Name, ""
-		}
-	}
-	return name, name, ""
-}
-
-func (p *MessagePoster) readLocalSkillMetadata(ctx context.Context, name string) *skillstore.SkillMetadata {
-	skillsDir, err := leros.SkillsDir()
-	if err != nil {
-		return nil
-	}
-	m, err := skillstore.ReadSkillMetadata(filepath.Join(skillsDir, name))
-	if err != nil {
-		return nil
-	}
-	return m
-}
-
-// resolveSkillEntries resolves skill tokens to manifest names, deduplicating
-// case-insensitively and keeping only valid skill names in the catalog.
-func resolveSkillEntries(tokens []string) []string {
-	if len(tokens) == 0 {
-		return nil
-	}
-	seen := make(map[string]bool, len(tokens))
-	result := make([]string, 0, len(tokens))
-	for _, name := range tokens {
-		key := strings.ToLower(name)
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		if _, err := skillcatalog.Get(name); err != nil {
-			continue
-		}
-		result = append(result, name)
-	}
-	return result
 }
