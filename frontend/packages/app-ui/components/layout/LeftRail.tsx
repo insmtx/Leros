@@ -56,7 +56,7 @@ import {
 	Zap,
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, PointerEvent as ReactPointerEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { APP_LOGO_SRC } from "../../assets";
 import { useAuth } from "../auth";
@@ -971,14 +971,14 @@ function ProfileAvatar({ user }: { user: AuthUser | null }) {
 	const fallbackLabel = getAvatarInitial(user?.name ?? displayPhone ?? "Lework");
 	const setAuthUser = useAuthStore((s) => s.setAuthUser);
 
-	const handleProtectedAvatarNotFound = () => {
+	const handleProtectedAvatarNotFound = useCallback(() => {
 		if (!user?.avatarUrl) return;
 		// 中文注释：头像文件如果已经失效，就把本地登录态里的旧下载地址清掉，避免每次刷新都重复命中 404。
 		setAuthUser({
 			...user,
 			avatarUrl: undefined,
 		});
-	};
+	}, [setAuthUser, user]);
 
 	return (
 		<span
@@ -1050,6 +1050,8 @@ function ImageWithFallback({
 		const cachedAvatarURL = getCachedAvatarDataURL(src);
 		if (cachedAvatarURL) {
 			setImageURL(cachedAvatarURL);
+			// 中文注释：头像缓存命中后直接复用，避免输入框等无关重渲染时重复下载同一文件。
+			return;
 		}
 
 		let cancelled = false;
