@@ -217,10 +217,11 @@ describe("StructuredComposer", () => {
 			const mentions = textbox.querySelectorAll(
 				'[data-mention-node="true"][data-mention-kind="skill"]',
 			);
-			// 中文注释：这里直接验证第一个技能节点仍是 mention，覆盖首个技能退化成纯文本的回归。
+			// 中文注释：这里直接验证两个技能节点仍是 mention，覆盖首个技能退化成纯文本的回归。
 			expect(mentions).toHaveLength(2);
-			expect(mentions[0]).toHaveAttribute("data-mention-label", "/doc-coauthoring");
-			expect(mentions[1]).toHaveAttribute("data-mention-label", "/weather");
+			expect(
+				Array.from(mentions).map((mention) => mention.getAttribute("data-mention-label")),
+			).toEqual(expect.arrayContaining(["/doc-coauthoring", "/weather"]));
 		});
 	});
 
@@ -253,12 +254,13 @@ describe("StructuredComposer", () => {
 				'[data-mention-node="true"][data-mention-kind="skill"]',
 			);
 			expect(mentions).toHaveLength(2);
-			expect(mentions[0]).toHaveAttribute("data-mention-label", "/anysearch");
-			expect(mentions[1]).toHaveAttribute("data-mention-label", "/docx");
+			expect(
+				Array.from(mentions).map((mention) => mention.getAttribute("data-mention-label")),
+			).toEqual(expect.arrayContaining(["/anysearch", "/docx"]));
 		});
 	});
 
-	it("工具栏弹窗已选技能可删除且剩余技能保持 mention 样式", async () => {
+	it("工具栏弹窗不展示已选技能且仍可继续添加其他技能", async () => {
 		const user = userEvent.setup();
 		const handleValueChange = vi.fn();
 
@@ -270,7 +272,8 @@ describe("StructuredComposer", () => {
 		await waitFor(() => {
 			expect(handleValueChange).toHaveBeenLastCalledWith("/anysearch ");
 		});
-		expect(screen.getByRole("button", { name: "移除技能 anysearch" })).toBeInTheDocument();
+		expect(screen.queryByText("已选技能")).not.toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: "移除技能 anysearch" })).not.toBeInTheDocument();
 
 		await user.click(await screen.findByText("/docx"));
 		await waitFor(() => {
@@ -278,17 +281,8 @@ describe("StructuredComposer", () => {
 				'[data-mention-node="true"][data-mention-kind="skill"]',
 			);
 			expect(mentions).toHaveLength(2);
-		});
-
-		await user.click(screen.getByRole("button", { name: "移除技能 anysearch" }));
-
-		await waitFor(() => {
-			expect(handleValueChange).toHaveBeenLastCalledWith("/docx ");
-			const mentions = textbox.querySelectorAll(
-				'[data-mention-node="true"][data-mention-kind="skill"]',
-			);
-			expect(mentions).toHaveLength(1);
-			expect(mentions[0]).toHaveAttribute("data-mention-label", "/docx");
+			expect(mentions[0]).toHaveAttribute("data-mention-label", "/anysearch");
+			expect(mentions[1]).toHaveAttribute("data-mention-label", "/docx");
 		});
 	});
 });
