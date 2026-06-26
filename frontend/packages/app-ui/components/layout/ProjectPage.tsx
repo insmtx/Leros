@@ -49,12 +49,6 @@ import {
 	X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from "react";
 import { toast } from "sonner";
 import { notifyFeatureUnavailable } from "../ai-teammates/feature-unavailable";
 import { MessageTimeline } from "../chat/MessageTimeline";
@@ -686,7 +680,9 @@ function ProjectConfigSidebar({
 									maxLength={500}
 									className="min-h-28 w-full resize-none rounded-lg border border-[var(--leros-control-border)] bg-white px-3 py-2 pb-7 pr-16 text-sm leading-6 text-[var(--leros-text)] placeholder:text-[var(--leros-text-subtle)] transition-colors focus:border-[var(--leros-primary)] focus:outline-none"
 								/>
-								<span className="pointer-events-none absolute bottom-2 right-3 text-xs text-[var(--leros-text-subtle)]">{descriptionDraft.length}/500</span>
+								<span className="pointer-events-none absolute bottom-2 right-3 text-xs text-[var(--leros-text-subtle)]">
+									{descriptionDraft.length}/500
+								</span>
 							</div>
 							<div className="flex justify-end gap-2">
 								<button

@@ -128,17 +128,20 @@ function isEmptyEditorValue(value: string): boolean {
 	return value.trim() === "";
 }
 
-<<<<<<< HEAD
-function installedSkillToOption(skill: SkillInstalledItem): SkillOption {
-	const label = skill.display_name || skill.name;
-=======
 function installedSkillToOption(skill: SkillInstalledItem): ComposerSkillOption {
->>>>>>> d50107a (feat(frontend): 完善项目页与任务页协作体验)
+	const label = skill.display_name || skill.name;
 	return {
 		code: skill.name,
 		label,
 		description: skill.description || skill.category || "已安装技能",
-		keywords: [label, skill.name, skill.description, skill.category, skill.source, skill.trust].filter(Boolean),
+		keywords: [
+			label,
+			skill.name,
+			skill.description,
+			skill.category,
+			skill.source,
+			skill.trust,
+		].filter(Boolean),
 	};
 }
 

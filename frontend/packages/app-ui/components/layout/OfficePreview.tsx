@@ -11,6 +11,11 @@ type NavigationState = {
 	total: number;
 };
 
+const PPTX_DEFAULT_ASPECT_RATIO = 16 / 9;
+const PPTX_DESKTOP_MAX_WIDTH = 1180;
+const PPTX_TABLET_MAX_WIDTH = 960;
+const PPTX_MIN_WIDTH = 320;
+
 export function OfficePreview({
 	buffer,
 	fileName,
@@ -48,7 +53,10 @@ function PagedOfficePreview({
 		const hostElement = canvasHost;
 		const canvasElement = document.createElement("canvas");
 		canvasElement.setAttribute("aria-label", `${fileName} 预览`);
-		canvasElement.className = "max-w-full bg-white shadow-lg";
+		canvasElement.className =
+			format === "pptx"
+				? "max-w-full rounded-sm bg-white shadow-[0_22px_70px_rgba(15,23,42,0.22)] ring-1 ring-black/10"
+				: "max-w-full bg-white shadow-lg";
 		canvasElement.style.visibility = "hidden";
 		hostElement.replaceChildren(canvasElement);
 
@@ -66,9 +74,13 @@ function PagedOfficePreview({
 						? await createDocxViewer(canvasElement, (state) => {
 								if (!cancelled) setNavigation(state);
 							})
-						: await createPptxViewer(canvasElement, (state) => {
-								if (!cancelled) setNavigation(state);
-							});
+						: await createPptxViewer(
+								canvasElement,
+								(state) => {
+									if (!cancelled) setNavigation(state);
+								},
+								getPptxRenderWidth(hostElement, canvasElement),
+							);
 				if (cancelled) {
 					viewer.destroy();
 					return;
@@ -78,15 +90,30 @@ function PagedOfficePreview({
 				await viewer.load(buffer);
 				if (cancelled) return;
 
+				if (format === "pptx") {
+					const renderWidth = getPptxRenderWidth(hostElement, canvasElement);
+					viewer.setViewportWidth?.(renderWidth);
+					if (Math.abs(renderWidth - canvasElement.offsetWidth) > 2) {
+						await viewer.renderCurrent();
+					}
+					if (cancelled) return;
+				}
+
 				canvasElement.style.visibility = "visible";
 				setStatus("ready");
 				resizeObserver = new ResizeObserver(() => {
 					cancelAnimationFrame(resizeFrame);
 					resizeFrame = requestAnimationFrame(() => {
+						if (format === "pptx") {
+							viewer.setViewportWidth?.(getPptxRenderWidth(hostElement, canvasElement));
+						}
 						void viewer.renderCurrent().catch(handleRenderError);
 					});
 				});
 				resizeObserver.observe(hostElement);
+				if (hostElement.parentElement) {
+					resizeObserver.observe(hostElement.parentElement);
+				}
 			} catch (err) {
 				handleRenderError(err);
 			}
@@ -122,15 +149,34 @@ function PagedOfficePreview({
 	};
 
 	return (
-		<div className="flex h-full min-h-[320px] flex-col overflow-hidden bg-[#eef1f6]">
+		<div
+			className={`relative flex h-full min-h-[320px] flex-col overflow-hidden ${
+				format === "pptx"
+					? "bg-[radial-gradient(circle_at_top,#f8fafc_0%,#eef1f6_42%,#e4e9f1_100%)]"
+					: "bg-[#eef1f6]"
+			}`}
+		>
 			<div className="relative min-h-0 flex-1 overflow-auto p-4">
-				<div ref={canvasHostRef} className="flex min-h-full items-start justify-center" />
+				<div
+					ref={canvasHostRef}
+					className={
+						format === "pptx"
+							? "flex min-h-full items-center justify-center py-8"
+							: "flex min-h-full items-start justify-center"
+					}
+				/>
 				{status === "loading" && <PreviewStatus label={`正在渲染 ${format.toUpperCase()}`} />}
 				{status === "error" && <PreviewError format={format} message={error} />}
 			</div>
 
 			{status === "ready" && navigation.total > 0 && (
-				<div className="flex shrink-0 items-center justify-center gap-3 border-t border-[var(--leros-control-border)] bg-white px-4 py-2">
+				<div
+					className={
+						format === "pptx"
+							? "absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center justify-center gap-3 rounded-full border border-[var(--leros-control-border)] bg-white/90 px-3 py-1.5 shadow-lg backdrop-blur"
+							: "flex shrink-0 items-center justify-center gap-3 border-t border-[var(--leros-control-border)] bg-white px-4 py-2"
+					}
+				>
 					<Button
 						type="button"
 						variant="ghost"
@@ -219,6 +265,7 @@ type PagedViewer = {
 	previous(): Promise<void>;
 	next(): Promise<void>;
 	renderCurrent(): Promise<void>;
+	setViewportWidth?(width: number): void;
 	destroy(): void;
 };
 
@@ -244,20 +291,51 @@ async function createDocxViewer(
 async function createPptxViewer(
 	canvas: HTMLCanvasElement,
 	onChange: (state: NavigationState) => void,
+	initialWidth: number,
 ): Promise<PagedViewer> {
 	const { PptxViewer } = await import("@silurus/ooxml/pptx");
-	const viewer = new PptxViewer(canvas, {
+	const viewerOptions = {
 		enableTextSelection: true,
-		onSlideChange: (current, total) => onChange({ current, total }),
-	});
+		onSlideChange: (current: number, total: number) => onChange({ current, total }),
+		width: initialWidth,
+	};
+	const viewer = new PptxViewer(canvas, viewerOptions);
 
 	return {
 		load: (source) => viewer.load(source),
 		previous: () => viewer.prevSlide(),
 		next: () => viewer.nextSlide(),
 		renderCurrent: () => viewer.goToSlide(viewer.slideIndex),
+		setViewportWidth: (width) => {
+			viewerOptions.width = width;
+		},
 		destroy: () => viewer.destroy(),
 	};
+}
+
+function getPptxRenderWidth(hostElement: HTMLElement, canvasElement: HTMLCanvasElement): number {
+	const viewportElement = hostElement.parentElement ?? hostElement;
+	const availableWidth = Math.max(hostElement.clientWidth, viewportElement.clientWidth);
+	const availableHeight = Math.max(hostElement.clientHeight, viewportElement.clientHeight);
+	const aspectRatio = getCanvasAspectRatio(canvasElement);
+	const horizontalInset = availableWidth >= 768 ? 64 : 24;
+	const verticalInset = availableHeight >= 560 ? 96 : 40;
+	const widthCap = availableWidth >= 1120 ? PPTX_DESKTOP_MAX_WIDTH : PPTX_TABLET_MAX_WIDTH;
+	const widthFromContainer = Math.max(PPTX_MIN_WIDTH, availableWidth - horizontalInset);
+	const widthFromHeight = Math.max(PPTX_MIN_WIDTH, (availableHeight - verticalInset) * aspectRatio);
+
+	return Math.round(Math.min(widthCap, widthFromContainer, widthFromHeight));
+}
+
+function getCanvasAspectRatio(canvasElement: HTMLCanvasElement): number {
+	const width = canvasElement.offsetWidth;
+	const height = canvasElement.offsetHeight;
+
+	if (width > 0 && height > 0) {
+		return width / height;
+	}
+
+	return PPTX_DEFAULT_ASPECT_RATIO;
 }
 
 function PreviewStatus({ label }: { label: string }) {
