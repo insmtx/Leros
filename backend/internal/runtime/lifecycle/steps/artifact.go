@@ -81,8 +81,10 @@ func (r *WorkspaceArtifactRecorder) Record(ctx context.Context, req *agent.Reque
 		return nil, err
 	}
 	if len(records) == 0 {
+		logs.DebugContextf(ctx, "artifact: no final artifacts declared in manifest")
 		return nil, nil
 	}
+	logs.DebugContextf(ctx, "artifact: collected %d final artifact(s) from manifest", len(records))
 	payloads := make([]events.ArtifactPayload, 0, len(records))
 	for _, record := range records {
 		payload := artifactPayloadFromRecord(record)
@@ -92,6 +94,7 @@ func (r *WorkspaceArtifactRecorder) Record(ctx context.Context, req *agent.Reque
 	serverAddr := identity.ServerAddr()
 	serverOrgID := identity.OrgID()
 	projectPublicID := strings.TrimSpace(req.Workspace.ProjectID)
+	logs.DebugContextf(ctx, "artifact: upload check, serverAddr=%q orgID=%d projectPublicID=%q", serverAddr, serverOrgID, projectPublicID)
 	if serverAddr != "" && serverOrgID > 0 && projectPublicID != "" {
 		srv := client.NewServerClient(serverAddr, identity.AppKey())
 
@@ -99,30 +102,37 @@ func (r *WorkspaceArtifactRecorder) Record(ctx context.Context, req *agent.Reque
 		if cfgErr != nil {
 			logs.WarnContextf(ctx, "get storage config from server: %v", cfgErr)
 			storageCfg = nil
+		} else {
+			logs.DebugContextf(ctx, "artifact: storage config scheme=%q bucket=%q", storageCfg.Scheme, storageCfg.Bucket)
 		}
 
 		for i, record := range records {
-			storageURI, err := uploadArtifactToServer(ctx, srv, projectPublicID, record, storageCfg)
+			logs.DebugContextf(ctx, "artifact: uploading record[%d] relativePath=%q filename=%q fileSize=%d", i, record.RelativePath, record.Filename, record.FileSize)
+			storageURI, err := uploadArtifactToServer(ctx, srv, projectPublicID, record, storageCfg, plan.RepoDir)
 			if err != nil {
 				logs.WarnContextf(ctx, "upload artifact %s to server: %v", record.RelativePath, err)
 				continue
 			}
-			payloads[i].StorageURI = storageURI
+			payloads[i].StoragePathURI = storageURI
 		}
+	} else {
+		logs.DebugContextf(ctx, "artifact: skip upload, conditions not met")
 	}
 
 	return payloads, nil
 }
 
-func uploadArtifactToServer(ctx context.Context, srv *client.ServerClient, projectPublicID string, record agentworkspace.ArtifactRecord, storageCfg *client.StorageConfig) (string, error) {
-	absolute, err := agentworkspace.SafeJoin("", record.RelativePath)
+func uploadArtifactToServer(ctx context.Context, srv *client.ServerClient, projectPublicID string, record agentworkspace.ArtifactRecord, storageCfg *client.StorageConfig, repoDir string) (string, error) {
+	absolute, err := agentworkspace.SafeJoin(repoDir, record.RelativePath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("safe join %q: %w", record.RelativePath, err)
 	}
+	logs.DebugContextf(ctx, "artifact: resolved absolute path %q for relative path %q", absolute, record.RelativePath)
 	data, err := os.ReadFile(absolute)
 	if err != nil {
 		return "", fmt.Errorf("read artifact file: %w", err)
 	}
+	logs.DebugContextf(ctx, "artifact: read file %q, %d bytes", absolute, len(data))
 
 	randomID := snowflake.GenerateIDBase58()
 	orgID := identity.OrgID()
@@ -144,10 +154,12 @@ func uploadArtifactToServer(ctx context.Context, srv *client.ServerClient, proje
 		storageURI = uri
 	}
 
+	logs.DebugContextf(ctx, "artifact: requesting presign upload URL, bucket=%q key=%q", bucket, key)
 	uploadURL, err := srv.GetPresignUploadURL(ctx, bucket, key)
 	if err != nil {
 		return "", fmt.Errorf("get presign upload url: %w", err)
 	}
+	logs.DebugContextf(ctx, "artifact: got presign upload URL for key=%q", key)
 
 	putReq, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewReader(data))
 	if err != nil {
@@ -167,6 +179,7 @@ func uploadArtifactToServer(ctx context.Context, srv *client.ServerClient, proje
 		return "", fmt.Errorf("upload artifact file returned %d: %s", putResp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
+	logs.DebugContextf(ctx, "artifact: uploaded %q to storageURI=%q, status=%d", record.Filename, storageURI, putResp.StatusCode)
 	return storageURI, nil
 }
 
@@ -181,7 +194,7 @@ func artifactPayloadFromRecord(record agentworkspace.ArtifactRecord) events.Arti
 		FileSize:     record.FileSize,
 		RelativePath: strings.TrimSpace(record.RelativePath),
 		StorageKey:   strings.TrimSpace(record.StorageKey),
-		StorageURI:   strings.TrimSpace(record.StorageURI),
+		StoragePathURI:   strings.TrimSpace(record.StoragePathURI),
 		Sha256:       record.Sha256,
 		Source:       artifactSource(record.Source),
 		Status:       artifactStatus(record.Status),

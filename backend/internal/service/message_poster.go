@@ -16,7 +16,7 @@ import (
 	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/api/auth"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
-	"github.com/insmtx/Leros/backend/internal/infra/db"
+	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	skilltoken "github.com/insmtx/Leros/backend/internal/skill"
@@ -59,7 +59,7 @@ func (p *MessagePoster) PostMessage(
 	session *types.Session,
 	buildMessage func(sequence int64) *types.SessionMessage,
 ) (*types.SessionMessage, error) {
-	sequence, err := db.GetNextSequence(ctx, p.db, session.ID)
+	sequence, err := infradb.GetNextSequence(ctx, p.db, session.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -70,17 +70,17 @@ func (p *MessagePoster) PostMessage(
 		message.MessageType = string(types.MessageTypeText)
 	}
 
-	if err := db.CreateMessage(ctx, p.db, message); err != nil {
+	if err := infradb.CreateMessage(ctx, p.db, message); err != nil {
 		return nil, fmt.Errorf("create message: %w", err)
 	}
 
 	logs.DebugContextf(ctx, "created message seq=%d in session=%s", sequence, session.PublicID)
 
 	now := time.Now()
-	if err := db.IncrementMessageCount(ctx, p.db, session.ID); err != nil {
+	if err := infradb.IncrementMessageCount(ctx, p.db, session.ID); err != nil {
 		return nil, err
 	}
-	if err := db.UpdateLastMessageAt(ctx, p.db, session.ID, now); err != nil {
+	if err := infradb.UpdateLastMessageAt(ctx, p.db, session.ID, now); err != nil {
 		return nil, err
 	}
 
@@ -126,7 +126,7 @@ func (p *MessagePoster) RunNewMessage(
 		return nil, err
 	}
 	// 无项目预上传的附件，需要在项目创建完成后回填项目归属，确保后续文件树可见。
-	p.attachFilesToProject(ctx, caller.OrgID, o.project, req.Attachments)
+	attachFilesToProject(ctx, p.db, caller.OrgID, o.project, req.Attachments)
 	if err := o.ensureProjectSession(); err != nil {
 		logs.ErrorContextf(ctx, "NewMessage ensureProjectSession failed: %v", err)
 		return nil, err
@@ -141,7 +141,7 @@ func (p *MessagePoster) RunNewMessage(
 	}
 
 	// 先补齐附件的可访问 URL，再把附件写入用户消息，避免前端回显和后续上下文拿不到附件信息。
-	p.resolveAttachmentURLs(ctx, caller.OrgID, req.Attachments)
+	resolveAttachmentURLs(ctx, p.db, caller.OrgID, req.Attachments)
 
 	message, err := p.PostMessage(ctx, o.taskSession, func(sequence int64) *types.SessionMessage {
 		msgType := req.MessageType
@@ -190,7 +190,7 @@ type newMessageOrchestrator struct {
 
 func (o *newMessageOrchestrator) resolveOrCreateProject() error {
 	if o.req.ProjectID != "" {
-		proj, err := db.GetProjectByPublicID(o.ctx, o.poster.db, o.caller.OrgID, o.req.ProjectID)
+		proj, err := infradb.GetProjectByPublicID(o.ctx, o.poster.db, o.caller.OrgID, o.req.ProjectID)
 		if err != nil {
 			return err
 		}
@@ -237,7 +237,7 @@ func (o *newMessageOrchestrator) resolveOrCreateProject() error {
 		o.project.GiteaRepoID = repoInfo.ID
 	}
 
-	if err := db.CreateProject(o.ctx, o.poster.db, o.project); err != nil {
+	if err := infradb.CreateProject(o.ctx, o.poster.db, o.project); err != nil {
 		return fmt.Errorf("create project: %w", err)
 	}
 
@@ -248,7 +248,7 @@ func (o *newMessageOrchestrator) resolveOrCreateProject() error {
 		logs.InfoContextf(o.ctx, "created project=%s org=%d user=%d (no gitea)", projectID, o.caller.OrgID, o.caller.Uin)
 	}
 
-	if err := db.CreateProjectMember(o.ctx, o.poster.db, &types.ProjectMember{
+	if err := infradb.CreateProjectMember(o.ctx, o.poster.db, &types.ProjectMember{
 		ProjectID:  o.project.ID,
 		MemberID:   o.caller.Uin,
 		MemberType: types.MemberTypeUser,
@@ -261,7 +261,7 @@ func (o *newMessageOrchestrator) resolveOrCreateProject() error {
 }
 
 func (o *newMessageOrchestrator) ensureProjectSession() error {
-	projectSession, err := db.GetProjectSession(o.ctx, o.poster.db, o.project.ID)
+	projectSession, err := infradb.GetProjectSession(o.ctx, o.poster.db, o.project.ID)
 	if err != nil {
 		return fmt.Errorf("get project session: %w", err)
 	}
@@ -285,7 +285,7 @@ func (o *newMessageOrchestrator) ensureProjectSession() error {
 		Status:               string(types.SessionStatusActive),
 		Title:                "项目协作",
 	}
-	if err := db.CreateSession(o.ctx, o.poster.db, projectSession); err != nil {
+	if err := infradb.CreateSession(o.ctx, o.poster.db, projectSession); err != nil {
 		return fmt.Errorf("create project session: %w", err)
 	}
 
@@ -295,7 +295,7 @@ func (o *newMessageOrchestrator) ensureProjectSession() error {
 
 func (o *newMessageOrchestrator) resolveOrCreateTask() error {
 	if o.req.TaskID != "" {
-		t, err := db.GetTaskByPublicID(o.ctx, o.poster.db, o.caller.OrgID, o.req.TaskID)
+		t, err := infradb.GetTaskByPublicID(o.ctx, o.poster.db, o.caller.OrgID, o.req.TaskID)
 		if err != nil {
 			return err
 		}
@@ -326,7 +326,7 @@ func (o *newMessageOrchestrator) resolveOrCreateTask() error {
 		Description: o.req.Content,
 		Status:      string(types.TaskStatusCreated),
 	}
-	if err := db.CreateTask(o.ctx, o.poster.db, o.task); err != nil {
+	if err := infradb.CreateTask(o.ctx, o.poster.db, o.task); err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
 
@@ -352,7 +352,7 @@ func (o *newMessageOrchestrator) createTaskSession() error {
 		Status:               string(types.SessionStatusActive),
 		Title:                o.task.Title,
 	}
-	if err := db.CreateSession(o.ctx, o.poster.db, o.taskSession); err != nil {
+	if err := infradb.CreateSession(o.ctx, o.poster.db, o.taskSession); err != nil {
 		return fmt.Errorf("create task session: %w", err)
 	}
 
@@ -383,7 +383,7 @@ func (p *MessagePoster) publishWorkerTask(ctx context.Context, session *types.Se
 		assignedAssistantID := p.inferrer.InferAssignedAssistantID(ctx, orgID, string(session.Type))
 		if assignedAssistantID > 0 {
 			session.AllocatedAssistantID = assignedAssistantID
-			if err := db.UpdateAllocatedAssistantID(ctx, p.db, session.ID, assignedAssistantID); err != nil {
+			if err := infradb.UpdateAllocatedAssistantID(ctx, p.db, session.ID, assignedAssistantID); err != nil {
 				return fmt.Errorf("failed to update allocated_assistant_id: %w", err)
 			}
 		}
@@ -466,7 +466,7 @@ func (p *MessagePoster) resolveWorkerTaskModel(ctx context.Context, orgID uint) 
 	if p == nil || p.db == nil {
 		return protocol.ModelOptions{}, errors.New("database is required to resolve worker task llm model")
 	}
-	model, err := db.GetDefaultLLMModel(ctx, p.db, orgID)
+	model, err := infradb.GetDefaultLLMModel(ctx, p.db, orgID)
 	if err != nil {
 		return protocol.ModelOptions{}, fmt.Errorf("get default llm model: %w", err)
 	}
@@ -501,8 +501,9 @@ func convertMessageToProtocolAttachments(attachments types.MessageAttachmentSlic
 	return result
 }
 
-func (p *MessagePoster) resolveAttachmentURLs(
+func resolveAttachmentURLs(
 	ctx context.Context,
+	db *gorm.DB,
 	orgID uint,
 	attachments []types.MessageAttachment,
 ) {
@@ -513,7 +514,7 @@ func (p *MessagePoster) resolveAttachmentURLs(
 		if attachments[i].FileUploadID == "" {
 			continue
 		}
-		fileUpload, err := db.GetFileUploadByPublicID(ctx, p.db, orgID, attachments[i].FileUploadID)
+		fileUpload, err := infradb.GetFileUploadByPublicID(ctx, db, orgID, attachments[i].FileUploadID)
 		if err != nil {
 			logs.WarnContextf(ctx, "resolve attachment file %s: %v", attachments[i].FileUploadID, err)
 			continue
@@ -531,8 +532,9 @@ func (p *MessagePoster) resolveAttachmentURLs(
 	}
 }
 
-func (p *MessagePoster) attachFilesToProject(
+func attachFilesToProject(
 	ctx context.Context,
+	db *gorm.DB,
 	orgID uint,
 	project *types.Project,
 	attachments []types.MessageAttachment,
@@ -545,7 +547,7 @@ func (p *MessagePoster) attachFilesToProject(
 		if attachments[i].FileUploadID == "" {
 			continue
 		}
-		fileUpload, err := db.GetFileUploadByPublicID(ctx, p.db, orgID, attachments[i].FileUploadID)
+		fileUpload, err := infradb.GetFileUploadByPublicID(ctx, db, orgID, attachments[i].FileUploadID)
 		if err != nil {
 			logs.WarnContextf(ctx, "attach file %s to project %s failed: %v", attachments[i].FileUploadID, projectPublicID, err)
 			continue
@@ -557,11 +559,11 @@ func (p *MessagePoster) attachFilesToProject(
 			fileUpload.Metadata.Extra = make(map[string]interface{})
 		}
 		fileUpload.Metadata.Extra["project_public_id"] = projectPublicID
-		if err := db.UpdateFileUpload(ctx, p.db, fileUpload); err != nil {
+		if err := infradb.UpdateFileUpload(ctx, db, fileUpload); err != nil {
 			logs.WarnContextf(ctx, "persist file %s project_public_id failed: %v", attachments[i].FileUploadID, err)
 		}
 
-		exists, _ := db.GetProjectFileByPublicID(ctx, p.db, orgID, fileUpload.PublicID)
+		exists, _ := infradb.GetProjectFileByPublicID(ctx, db, orgID, fileUpload.PublicID)
 		if exists == nil {
 			pf := &types.ProjectFile{
 				PublicID:        fileUpload.PublicID,
@@ -576,7 +578,7 @@ func (p *MessagePoster) attachFilesToProject(
 				Sha256:          fileUpload.Sha256,
 				Source:          "user_upload",
 			}
-			if err := db.CreateProjectFile(ctx, p.db, pf); err != nil {
+			if err := infradb.CreateProjectFile(ctx, db, pf); err != nil {
 				logs.WarnContextf(ctx, "create project_file record for attachment %s: %v", attachments[i].FileUploadID, err)
 			}
 		}
@@ -705,7 +707,7 @@ func (p *MessagePoster) writeSkillInvokeResources(ctx context.Context, session *
 			Seq:          seq,
 		})
 	}
-	if err := db.BatchCreateMessageResources(ctx, p.db, records); err != nil {
+	if err := infradb.BatchCreateMessageResources(ctx, p.db, records); err != nil {
 		logs.WarnContextf(ctx, "write skill invoke message_resource failed: count=%d error=%v", len(records), err)
 	} else {
 		logs.InfoContextf(ctx, "Skill invoke message_resource written: count=%d", len(records))
@@ -716,7 +718,7 @@ func (p *MessagePoster) writeSkillInvokeResources(ctx context.Context, session *
 // name. Returns (source, skill_id, db_primary_key_as_string). When no record is
 // found, source and skillID fall back to the name itself and resourceID is empty.
 func (p *MessagePoster) resolveSkillMarketplace(ctx context.Context, name string) (source, skillID, resourceID string) {
-	if item, err := db.GetBuiltinSkillByID(ctx, p.db, name); err == nil && item != nil {
+	if item, err := infradb.GetBuiltinSkillByID(ctx, p.db, name); err == nil && item != nil {
 		return "Leros", item.SkillID, fmt.Sprintf("%d", item.ID)
 	}
 	query := p.db.WithContext(ctx).Model(&types.SkillMarketplaceItem{}).
