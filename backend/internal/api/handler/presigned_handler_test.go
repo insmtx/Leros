@@ -40,7 +40,7 @@ func TestPresignedPutAndGetRoundTrip(t *testing.T) {
 
 	// Step 1: get presign upload URL
 	w1 := httptest.NewRecorder()
-	req1, _ := http.NewRequest("PUT", "/static/test-bucket/hello.txt?presign=1", nil)
+	req1, _ := http.NewRequest("GET", "/static/test-bucket/hello.txt?operation=upload", nil)
 	r.ServeHTTP(w1, req1)
 	if w1.Code != http.StatusOK {
 		t.Fatalf("step1: presign upload URL generation failed: %d %s", w1.Code, w1.Body.String())
@@ -64,7 +64,7 @@ func TestPresignedPutAndGetRoundTrip(t *testing.T) {
 
 	// Step 3: get presign download URL
 	w3 := httptest.NewRecorder()
-	req3, _ := http.NewRequest("GET", "/static/test-bucket/hello.txt?presign=1", nil)
+	req3, _ := http.NewRequest("GET", "/static/test-bucket/hello.txt?operation=download", nil)
 	r.ServeHTTP(w3, req3)
 	if w3.Code != http.StatusOK {
 		t.Fatalf("step3: presign download URL generation failed: %d %s", w3.Code, w3.Body.String())
@@ -130,7 +130,7 @@ func TestPresignedGetWithoutToken_Success(t *testing.T) {
 	// Upload a file first
 	body := strings.NewReader("public content")
 	w1 := httptest.NewRecorder()
-	req1, _ := http.NewRequest("PUT", "/static/test-bucket/public.txt?presign=1", nil)
+	req1, _ := http.NewRequest("GET", "/static/test-bucket/public.txt?operation=upload", nil)
 	r.ServeHTTP(w1, req1)
 	if w1.Code != http.StatusOK {
 		t.Fatalf("presign upload URL generation failed: %d", w1.Code)
@@ -165,7 +165,7 @@ func TestPresignedGetObjectNotFound(t *testing.T) {
 
 	// Generate a valid download token for a non-existent file
 	w1 := httptest.NewRecorder()
-	req1, _ := http.NewRequest("GET", "/static/test-bucket/nonexistent.txt?presign=1", nil)
+	req1, _ := http.NewRequest("GET", "/static/test-bucket/nonexistent.txt?operation=download", nil)
 	r.ServeHTTP(w1, req1)
 	if w1.Code != http.StatusOK {
 		t.Fatalf("presign URL generation failed: %d", w1.Code)
@@ -189,7 +189,7 @@ func TestPresignedPutOpMismatch(t *testing.T) {
 
 	// Get a download token, then try to use it for put
 	w1 := httptest.NewRecorder()
-	req1, _ := http.NewRequest("GET", "/static/test-bucket/hello.txt?presign=1", nil)
+	req1, _ := http.NewRequest("GET", "/static/test-bucket/hello.txt?operation=download", nil)
 	r.ServeHTTP(w1, req1)
 	if w1.Code != http.StatusOK {
 		t.Fatalf("presign URL generation failed: %d", w1.Code)
