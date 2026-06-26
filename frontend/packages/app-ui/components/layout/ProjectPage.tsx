@@ -4,6 +4,7 @@ import {
 	type Project,
 	type ProjectSkill,
 	type ProjectTask,
+	API_BASE_URL,
 	projectFileApi,
 	type SkillInstalledItem,
 	skillMarketplaceApi,
@@ -1226,9 +1227,14 @@ function ProjectFiles({
 		async function loadPreview() {
 			setPreviewState({ status: "loading" });
 			try {
-				const response = await projectFileApi.fetchDownload(projectId, currentFile.path, {
-					signal: controller.signal,
-				});
+				const response = currentFile.storageUri
+					? await fetch(
+							`${API_BASE_URL}/files/preview?storage_uri=${encodeURIComponent(currentFile.storageUri)}`,
+							{ signal: controller.signal },
+						)
+					: await projectFileApi.fetchDownload(projectId, currentFile.path, {
+							signal: controller.signal,
+						});
 				const mimeType =
 					response.headers.get("content-type") ??
 					currentFile.mimeType ??
@@ -1321,7 +1327,11 @@ function ProjectFiles({
 
 	const handleDownload = async (file: ProjectFileNode) => {
 		try {
-			const response = await projectFileApi.fetchDownload(projectId, file.path);
+			const response = file.storageUri
+				? await fetch(
+						`${API_BASE_URL}/files/preview?storage_uri=${encodeURIComponent(file.storageUri)}`,
+					)
+				: await projectFileApi.fetchDownload(projectId, file.path);
 			const blob = await response.blob();
 			const objectUrl = URL.createObjectURL(blob);
 			const link = document.createElement("a");

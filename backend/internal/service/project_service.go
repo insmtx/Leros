@@ -717,13 +717,14 @@ func buildFileTreeFromProjectFiles(ctx context.Context, dbParam *gorm.DB, files 
 		fullPath := sourcePrefix + fileName
 
 		node := &contract.FileTreeNode{
-			Name:      fileName,
-			Path:      fullPath,
-			Type:      "file",
-			Size:      fileUpload.FileSize,
-			MimeType:  fileUpload.MimeType,
-			CreatedAt: pf.CreatedAt.Unix(),
-			PublicID:  pf.FilePublicID,
+			Name:       fileName,
+			Path:       fullPath,
+			Type:       "file",
+			Size:       fileUpload.FileSize,
+			MimeType:   fileUpload.MimeType,
+			CreatedAt:  pf.CreatedAt.Unix(),
+			PublicID:   pf.FilePublicID,
+			StorageURI: fileUpload.StorageURI,
 		}
 		roots = append(roots, node)
 	}

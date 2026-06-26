@@ -196,8 +196,12 @@ func publicArtifactPayload(artifact events.ArtifactPayload) events.ArtifactPaylo
 		ArtifactID:   strings.TrimSpace(artifact.ArtifactID),
 		Title:        strings.TrimSpace(artifact.Title),
 		Filename:     artifactFilename(artifact),
+		Description:  strings.TrimSpace(artifact.Description),
 		MimeType:     strings.TrimSpace(artifact.MimeType),
 		ArtifactType: artifactType(artifact.ArtifactType),
+		FileSize:     artifact.FileSize,
+		StorageURI:   strings.TrimSpace(artifact.StorageURI),
+		Sha256:       strings.TrimSpace(artifact.Sha256),
 		CreatedAt:    artifact.CreatedAt,
 	}
 }
@@ -285,8 +289,12 @@ func messageArtifactsFromRunCompleted(artifacts []events.ArtifactPayload) []type
 			ArtifactID:   artifact.ArtifactID,
 			Title:        artifact.Title,
 			Filename:     artifact.Filename,
+			Description:  artifact.Description,
 			MimeType:     artifact.MimeType,
 			ArtifactType: artifact.ArtifactType,
+			FileSize:     artifact.FileSize,
+			StorageURI:   artifact.StorageURI,
+			Sha256:       artifact.Sha256,
 			CreatedAt:    artifact.CreatedAt,
 		})
 	}

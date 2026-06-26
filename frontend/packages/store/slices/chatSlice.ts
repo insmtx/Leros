@@ -518,6 +518,7 @@ function mapArtifactPayload(payload: BackendSessionArtifactPayload): MessageArti
 		size: formatFileSize(payload.file_size ?? 0),
 		updatedAt: parseOptionalTimestamp(payload.created_at),
 		downloadUrl: "",
+		storageUri: payload.storage_uri?.trim() || undefined,
 		sha256: payload.sha256,
 	};
 }

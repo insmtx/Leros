@@ -122,6 +122,7 @@ export type BackendSessionArtifactPayload = {
 	mime_type?: string;
 	file_size?: number;
 	sha256?: string;
+	storage_uri?: string;
 	created_at?: string;
 };
 
