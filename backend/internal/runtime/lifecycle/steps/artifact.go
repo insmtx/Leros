@@ -94,7 +94,7 @@ func (r *WorkspaceArtifactRecorder) Record(ctx context.Context, req *agent.Reque
 	serverOrgID := identity.OrgID()
 	projectPublicID := strings.TrimSpace(req.Workspace.ProjectID)
 	if serverAddr != "" && serverOrgID > 0 && projectPublicID != "" {
-		srv := client.NewServerClient(serverAddr)
+		srv := client.NewServerClient(serverAddr, identity.AppKey())
 
 		storageCfg, cfgErr := srv.GetStorageConfig(ctx)
 		if cfgErr != nil {

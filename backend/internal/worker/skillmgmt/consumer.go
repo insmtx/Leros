@@ -178,7 +178,7 @@ func (c *Consumer) tryDownloadFromServer(ctx context.Context, skillID, source, v
 		return nil, fmt.Errorf("server addr not configured")
 	}
 
-	srv := client.NewServerClient(serverAddr)
+	srv := client.NewServerClient(serverAddr, identity.AppKey())
 	data, err := srv.DownloadSkillCache(ctx, skillID, source, version)
 	if err != nil {
 		return nil, err

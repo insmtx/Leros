@@ -19,12 +19,14 @@ const defaultHTTPTimeout = 30 * time.Second
 type ServerClient struct {
 	baseURL    string
 	httpClient *http.Client
+	appKey     string
 }
 
-func NewServerClient(serverAddr string) *ServerClient {
+func NewServerClient(serverAddr, appKey string) *ServerClient {
 	return &ServerClient{
 		baseURL:    fmt.Sprintf("http://%s", serverAddr),
 		httpClient: &http.Client{Timeout: defaultHTTPTimeout},
+		appKey:     appKey,
 	}
 }
 
@@ -46,6 +48,7 @@ func (c *ServerClient) doPost(ctx context.Context, endpoint string, reqBody inte
 		return fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	c.setAppKey(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -86,6 +89,7 @@ func (c *ServerClient) doGet(ctx context.Context, path string, target interface{
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
+	c.setAppKey(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -129,6 +133,7 @@ func (c *ServerClient) doGetRaw(ctx context.Context, path string) ([]byte, error
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
+	c.setAppKey(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -167,4 +172,10 @@ func (c *ServerClient) DownloadSkillCache(ctx context.Context, skillID, source, 
 	baseURL := c.baseURL + "/v1/skill-marketplace/skills/" + url.PathEscape(skillID) + "/download"
 	reqURL := fmt.Sprintf("%s?source=%s&version=%s", baseURL, url.QueryEscape(source), url.QueryEscape(version))
 	return c.doGetRaw(ctx, reqURL)
+}
+
+func (c *ServerClient) setAppKey(req *http.Request) {
+	if c.appKey != "" {
+		req.Header.Set("X-App-Key", c.appKey)
+	}
 }
