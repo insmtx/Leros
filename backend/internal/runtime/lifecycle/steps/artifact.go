@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ygpkg/yg-go/encryptor/snowflake"
 	"github.com/ygpkg/yg-go/logs"
+	"github.com/ygpkg/storage-go"
 
 	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
@@ -93,8 +95,15 @@ func (r *WorkspaceArtifactRecorder) Record(ctx context.Context, req *agent.Reque
 	projectPublicID := strings.TrimSpace(req.Workspace.ProjectID)
 	if serverAddr != "" && serverOrgID > 0 && projectPublicID != "" {
 		srv := client.NewServerClient(serverAddr)
+
+		storageCfg, cfgErr := srv.GetStorageConfig(ctx)
+		if cfgErr != nil {
+			logs.WarnContextf(ctx, "get storage config from server: %v", cfgErr)
+			storageCfg = nil
+		}
+
 		for i, record := range records {
-			storageURI, err := uploadArtifactToServer(ctx, srv, projectPublicID, record)
+			storageURI, err := uploadArtifactToServer(ctx, srv, projectPublicID, record, storageCfg)
 			if err != nil {
 				logs.WarnContextf(ctx, "upload artifact %s to server: %v", record.RelativePath, err)
 				continue
@@ -106,7 +115,7 @@ func (r *WorkspaceArtifactRecorder) Record(ctx context.Context, req *agent.Reque
 	return payloads, nil
 }
 
-func uploadArtifactToServer(ctx context.Context, srv *client.ServerClient, projectPublicID string, record agentworkspace.ArtifactRecord) (string, error) {
+func uploadArtifactToServer(ctx context.Context, srv *client.ServerClient, projectPublicID string, record agentworkspace.ArtifactRecord, storageCfg *contract.StorageConfigResponse) (string, error) {
 	absolute, err := agentworkspace.SafeJoin("", record.RelativePath)
 	if err != nil {
 		return "", err
@@ -116,13 +125,33 @@ func uploadArtifactToServer(ctx context.Context, srv *client.ServerClient, proje
 		return "", fmt.Errorf("read artifact file: %w", err)
 	}
 
+	randomID := snowflake.GenerateIDBase58()
+	orgID := identity.OrgID()
+	key := fmt.Sprintf("artifacts/%d/%s/%s/%s", orgID, projectPublicID, randomID, record.Filename)
+
+	bucket := ""
+	scheme := "s3"
+	if storageCfg != nil {
+		bucket = storageCfg.Bucket
+		scheme = storageCfg.Scheme
+	}
+
+	storageURI := ""
+	if bucket != "" {
+		uri, err := storage.BuildURI(scheme, bucket, key)
+		if err != nil {
+			return "", fmt.Errorf("build storage uri: %w", err)
+		}
+		storageURI = uri
+	}
+
 	reqBody := contract.PresignArtifactUploadRequest{
-		OrgID:           identity.OrgID(),
-		ProjectPublicID: projectPublicID,
-		Filename:        record.Filename,
-		Sha256:          record.Sha256,
-		MimeType:        record.MimeType,
-		FileSize:        record.FileSize,
+		Bucket:   bucket,
+		Key:      key,
+		Filename: record.Filename,
+		Sha256:   record.Sha256,
+		MimeType: record.MimeType,
+		FileSize: record.FileSize,
 	}
 
 	respData, err := srv.PresignArtifactUpload(ctx, &reqBody)
@@ -148,7 +177,7 @@ func uploadArtifactToServer(ctx context.Context, srv *client.ServerClient, proje
 		return "", fmt.Errorf("upload artifact file returned %d: %s", putResp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
-	return respData.StorageURI, nil
+	return storageURI, nil
 }
 
 func artifactPayloadFromRecord(record agentworkspace.ArtifactRecord) events.ArtifactPayload {
