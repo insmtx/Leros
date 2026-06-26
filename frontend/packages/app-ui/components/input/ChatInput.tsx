@@ -451,7 +451,6 @@ function findPendingQuestion(
 	return null;
 }
 
-<<<<<<< HEAD
 function buildComposerMetadata(
 	content: string,
 	tokens: ComposerToken[],
@@ -469,8 +468,6 @@ function buildComposerMetadata(
 	return composerTokens.length > 0 ? { composerTokens } : undefined;
 }
 
-=======
->>>>>>> d50107a (feat(frontend): 完善项目页与任务页协作体验)
 function projectSkillToComposerOption(skill: ProjectSkill): ComposerSkillOption {
 	return {
 		code: skill.code,
