@@ -510,8 +510,8 @@ export function LeftRail({
 											"normal-case leading-snug tracking-normal font-normal",
 										)}
 									>
-										<span className="text-xs">最近项目</span>
-										<span className="text-[11px]">（仅展示5个）</span>
+										<span className="text-sm">最近项目</span>
+										<span className="text-xs">（仅展示5个）</span>
 									</div>
 								) : group.label ? (
 									<div className="leros-nav-section-label">{group.label}</div>
