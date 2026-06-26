@@ -10,6 +10,7 @@ import {
 	useChatStore,
 	useLayoutStore,
 } from "@leros/store";
+import { Button } from "@leros/ui/components/ui/button";
 import {
 	Command,
 	CommandEmpty,
@@ -18,6 +19,14 @@ import {
 	CommandItem,
 	CommandList,
 } from "@leros/ui/components/ui/command";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@leros/ui/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@leros/ui/components/ui/popover";
 import { cn } from "@leros/ui/lib/utils";
 import {
@@ -398,18 +407,18 @@ export function ProjectPage({
 
 	return (
 		<div data-slot="project-page" className="flex h-full flex-1 flex-col bg-[var(--leros-surface)]">
-			<header className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-10">
+			<header className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-10">
 				<div className="flex items-center gap-3 text-[var(--leros-text-muted)]">
 					{/* 中文注释：项目详情页顶部保留面包屑，方便从具体项目快速回到项目列表页。 */}
 					<button
 						type="button"
 						onClick={handleBackToProjects}
-						className="text-base font-bold text-[var(--leros-text-muted)] transition-colors hover:text-[var(--leros-primary)]"
+						className="text-sm font-normal text-[var(--leros-text-muted)] transition-colors hover:text-[var(--leros-primary)]"
 					>
 						项目
 					</button>
 					<ChevronRight className="size-4 text-[var(--leros-text-subtle)]" />
-					<h1 className="max-w-[360px] truncate text-base font-bold text-[var(--leros-text-strong)]">
+					<h1 className="max-w-[360px] truncate text-sm font-bold text-[var(--leros-text-strong)]">
 						{project.name}
 					</h1>
 				</div>
@@ -700,12 +709,16 @@ function ProjectConfigSidebar({
 				>
 					{editingDescription ? (
 						<div className="space-y-3">
-							<textarea
-								value={descriptionDraft}
-								onChange={(event) => setDescriptionDraft(event.target.value)}
-								placeholder="补充项目目标、背景或协作范围"
-								className="min-h-28 w-full resize-none rounded-lg border border-[var(--leros-control-border)] bg-white px-3 py-2 text-sm leading-6 text-[var(--leros-text)] placeholder:text-[var(--leros-text-subtle)] transition-colors focus:border-[var(--leros-primary)] focus:outline-none"
-							/>
+							<div className="relative">
+								<textarea
+									value={descriptionDraft}
+									onChange={(event) => setDescriptionDraft(event.target.value)}
+									placeholder="补充项目目标、背景或协作范围"
+									maxLength={500}
+									className="min-h-28 w-full resize-none rounded-lg border border-[var(--leros-control-border)] bg-white px-3 py-2 pb-7 pr-16 text-sm leading-6 text-[var(--leros-text)] placeholder:text-[var(--leros-text-subtle)] transition-colors focus:border-[var(--leros-primary)] focus:outline-none"
+								/>
+								<span className="pointer-events-none absolute bottom-2 right-3 text-xs text-[var(--leros-text-subtle)]">{descriptionDraft.length}/500</span>
+							</div>
 							<div className="flex justify-end gap-2">
 								<button
 									type="button"
@@ -780,6 +793,7 @@ function ProjectConfigSidebar({
 						>
 							<Plus className="size-4" />
 						</PopoverTrigger>
+						{/* 固定在按钮上方，和输入框工具栏的技能选择弹窗保持一致。 */}
 						<PopoverContent
 							align="end"
 							side="top"
@@ -794,24 +808,6 @@ function ProjectConfigSidebar({
 									onValueChange={setSkillSearch}
 									placeholder="搜索技能"
 								/>
-								{project.skills.length > 0 && (
-									<div className="px-2 pb-2 pt-1">
-										<div className="mb-1 text-[11px] font-medium text-slate-400">已选技能</div>
-										<div className="flex flex-wrap gap-1.5">
-											{project.skills.map((skill) => (
-												<button
-													key={skill.code}
-													type="button"
-													onClick={() => removeProjectSkill(skill.code)}
-													className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-[11px] text-violet-700 transition-colors hover:bg-violet-100"
-												>
-													/{skill.name}
-													<X className="size-3" />
-												</button>
-											))}
-										</div>
-									</div>
-								)}
 								<CommandList className="max-h-64">
 									<CommandEmpty className="py-6 text-slate-400">没有可继续添加的技能</CommandEmpty>
 									<CommandGroup className="p-0">
@@ -990,15 +986,68 @@ function ProjectTasks({
 	tasks: ProjectTask[];
 	onOpenTask?: (task: ProjectTask) => void;
 }) {
+	const { updateTask } = useLayoutStore((s) => s);
+	const [renameTarget, setRenameTarget] = useState<ProjectTask | null>(null);
+	const [renameValue, setRenameValue] = useState("");
 	const [deleteTarget, setDeleteTarget] = useState<ProjectTask | null>(null);
+
+	const handleConfirmRename = async () => {
+		const title = renameValue.trim();
+		if (!renameTarget || !title) return;
+
+		const updatedTask = await updateTask({ public_id: renameTarget.id, title });
+		if (updatedTask) {
+			setRenameTarget(null);
+			setRenameValue("");
+		}
+	};
 
 	return (
 		// 中文注释：任务 tab 需要占用更宽的主内容区域，避免大屏下卡片挤在中间留下过多留白。
 		<div className="mx-auto w-full max-w-[1100px]">
 			<h2 className="text-lg font-semibold text-[var(--leros-text-strong)]">任务</h2>
 			<div className="mt-4">
-				<ProjectTaskList tasks={tasks} onDelete={setDeleteTarget} onOpen={onOpenTask} />
+				<ProjectTaskList
+					tasks={tasks}
+					onRename={(task) => {
+						setRenameTarget(task);
+						setRenameValue(task.title);
+					}}
+					onDelete={setDeleteTarget}
+					onOpen={onOpenTask}
+				/>
 			</div>
+			<Dialog open={renameTarget !== null} onOpenChange={(open) => !open && setRenameTarget(null)}>
+				<DialogContent className="sm:max-w-md" showCloseButton={false}>
+					<DialogHeader>
+						<DialogTitle>重命名任务</DialogTitle>
+						<DialogDescription>请输入新的任务名称</DialogDescription>
+					</DialogHeader>
+					<div className="mt-4">
+						<input
+							type="text"
+							value={renameValue}
+							onChange={(event) => setRenameValue(event.target.value)}
+							onKeyDown={(event) => {
+								if (event.key === "Enter") {
+									handleConfirmRename();
+								}
+							}}
+							placeholder="任务名称"
+							autoFocus
+							className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 transition-colors focus:border-blue-300 focus:outline-none"
+						/>
+					</div>
+					<DialogFooter className="mt-4">
+						<Button variant="outline" onClick={() => setRenameTarget(null)}>
+							取消
+						</Button>
+						<Button onClick={handleConfirmRename} disabled={!renameValue.trim()}>
+							确认
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 			{deleteTarget && (
 				<TaskDeleteDialog
 					task={deleteTarget}
@@ -1015,11 +1064,13 @@ function ProjectTasks({
 function ProjectTaskList({
 	tasks,
 	compact = false,
+	onRename,
 	onDelete,
 	onOpen,
 }: {
 	tasks: ProjectTask[];
 	compact?: boolean;
+	onRename?: (task: ProjectTask) => void;
 	onDelete?: (task: ProjectTask) => void;
 	onOpen?: (task: ProjectTask) => void;
 }) {
@@ -1083,7 +1134,7 @@ function ProjectTaskList({
 						<div key={task.id} className={cardClassName}>
 							<button
 								type="button"
-								className={cn(contentClassName, "pr-11")}
+								className={cn(contentClassName, "pr-24")}
 								onClick={() => onOpen?.(task)}
 								disabled={!onOpen}
 								title={onOpen ? "打开任务会话" : undefined}
@@ -1091,17 +1142,30 @@ function ProjectTaskList({
 								{content}
 							</button>
 							{!compact && (
-								<button
-									type="button"
-									className="pointer-events-none absolute right-4 top-4 rounded p-0.5 text-[var(--leros-text-muted)] opacity-0 transition-opacity hover:bg-[var(--leros-danger-softer)] hover:text-[var(--leros-danger)] group-hover:pointer-events-auto group-hover:opacity-100"
-									onClick={(event) => {
-										event.stopPropagation();
-										onDelete(task);
-									}}
-									title="删除任务"
-								>
-									<Trash2 className="size-4" />
-								</button>
+								<div className="pointer-events-none absolute right-4 top-4 flex items-center gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+									<button
+										type="button"
+										className="rounded p-0.5 text-[var(--leros-text-muted)] transition-colors hover:bg-[var(--leros-primary-softer)] hover:text-[var(--leros-primary)]"
+										onClick={(event) => {
+											event.stopPropagation();
+											onRename?.(task);
+										}}
+										title="重命名任务"
+									>
+										<Pencil className="size-4" />
+									</button>
+									<button
+										type="button"
+										className="rounded p-0.5 text-[var(--leros-text-muted)] transition-colors hover:bg-[var(--leros-danger-softer)] hover:text-[var(--leros-danger)]"
+										onClick={(event) => {
+											event.stopPropagation();
+											onDelete(task);
+										}}
+										title="删除任务"
+									>
+										<Trash2 className="size-4" />
+									</button>
+								</div>
 							)}
 						</div>
 					);
@@ -1297,32 +1361,33 @@ function ProjectFiles({
 	};
 
 	return (
-		<div className="h-full overflow-y-auto px-10 py-8">
+		<div className="h-full overflow-y-auto px-10 py-7">
 			<div className="mx-auto w-full max-w-[1200px]">
-				<div className="mb-8 flex items-center justify-between gap-6">
+				<div className="mb-7 flex items-center justify-between gap-5">
 					<div>
-						<h2 className="text-2xl font-semibold tracking-tight text-[var(--leros-text-strong)]">
+						<h2 className="text-[2rem] font-semibold tracking-tight text-[var(--leros-text-strong)]">
 							项目文件
 						</h2>
-						<p className="mt-1 text-sm text-[var(--leros-text-muted)]">
+						<p className="mt-0.5 text-[13px] text-[var(--leros-text-muted)]">
 							管理当前项目的所有文件资源
 						</p>
 					</div>
-					<div className="flex items-center gap-3">
+					{/* 中文注释：项目文件页顶部筛选条整体收一档，保持结构不变，只降低高度和横向占比，让桌面端视觉更紧凑。 */}
+					<div className="flex items-center gap-2.5">
 						<div className="relative">
 							<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--leros-text-muted)]" />
 							<input
 								value={searchKeyword}
 								onChange={(event) => setSearchKeyword(event.target.value)}
 								placeholder="搜索文件..."
-								className="h-10 w-64 rounded-xl border border-[var(--leros-control-border)] bg-white pl-9 pr-4 text-sm outline-none transition-colors focus:border-[var(--leros-primary)]"
+								className="h-9 w-60 rounded-xl border border-[var(--leros-control-border)] bg-white pl-9 pr-3.5 text-[13px] outline-none transition-colors focus:border-[var(--leros-primary)]"
 							/>
 						</div>
 						<div className="relative">
 							<select
 								value={fileSourceFilter}
 								onChange={(event) => setFileSourceFilter(event.target.value as "all" | FileSource)}
-								className="h-10 cursor-pointer appearance-none rounded-xl border border-[var(--leros-control-border)] bg-white py-0 pl-3.5 pr-9 text-sm outline-none transition-colors focus:border-[var(--leros-primary)]"
+								className="h-9 min-w-[132px] cursor-pointer appearance-none rounded-xl border border-[var(--leros-control-border)] bg-white py-0 pl-3.5 pr-9 text-[13px] outline-none transition-colors focus:border-[var(--leros-primary)]"
 							>
 								<option value="all">全部</option>
 								<option value="task">任务文件</option>
@@ -1362,7 +1427,7 @@ function ProjectFiles({
 					</div>
 				) : (
 					<div className="overflow-hidden rounded-2xl border border-[var(--leros-control-border)] bg-white">
-						<div className="grid grid-cols-[minmax(0,1fr)_90px_120px_180px_180px] border-b border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--leros-text-muted)]">
+						<div className="grid grid-cols-[minmax(0,1fr)_90px_120px_180px_180px] border-b border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--leros-text-muted)]">
 							<div>名称</div>
 							<div>类型</div>
 							<div>大小</div>
@@ -1373,20 +1438,20 @@ function ProjectFiles({
 							{allFlatFiles.map((file) => (
 								<div
 									key={file.path}
-									className="grid grid-cols-[minmax(0,1fr)_90px_120px_180px_180px] items-center px-6 py-5 transition-colors hover:bg-[var(--leros-primary-softer)]/25"
+									className="grid grid-cols-[minmax(0,1fr)_90px_120px_180px_180px] items-center px-5 py-4 transition-colors hover:bg-[var(--leros-primary-softer)]/25"
 								>
 									<button
 										type="button"
 										data-file-preview-trigger
 										onClick={() => setPreviewFile(file)}
-										className="flex min-w-0 cursor-pointer items-center gap-3 rounded-lg px-2 py-1 text-left transition-colors hover:bg-[var(--leros-primary-softer)]/50"
+										className="flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors hover:bg-[var(--leros-primary-softer)]/50"
 										title="查看"
 									>
-										<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--leros-primary-softer)] text-[var(--leros-primary)]">
+										<div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--leros-primary-softer)] text-[var(--leros-primary)]">
 											<ProjectFileTypeIcon fileName={file.name} />
 										</div>
 										<div className="min-w-0">
-											<p className="truncate text-sm font-semibold text-[var(--leros-text-strong)]">
+											<p className="truncate text-[15px] font-semibold text-[var(--leros-text-strong)]">
 												{file.name}
 											</p>
 											<p className="truncate text-xs text-[var(--leros-text-muted)]">
@@ -1394,22 +1459,22 @@ function ProjectFiles({
 											</p>
 										</div>
 									</button>
-									<div className="text-sm">
-										<span className="inline-block rounded-md bg-[var(--leros-surface-soft)] px-2.5 py-1 text-xs font-medium text-[var(--leros-text-muted)]">
+									<div className="text-[13px]">
+										<span className="inline-block rounded-md bg-[var(--leros-surface-soft)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--leros-text-muted)]">
 											{getFileSource(file.path) === "task" ? "任务文件" : "上传文件"}
 										</span>
 									</div>
-									<div className="text-sm text-[var(--leros-text-muted)]">
+									<div className="text-[13px] text-[var(--leros-text-muted)]">
 										{formatBytes(file.size)}
 									</div>
-									<div className="text-sm text-[var(--leros-text-muted)]">
+									<div className="text-[13px] text-[var(--leros-text-muted)]">
 										{formatTime(file.createdAt)}
 									</div>
-									<div className="flex items-center justify-end gap-2">
+									<div className="flex items-center justify-end gap-1.5">
 										<button
 											type="button"
 											onClick={() => setPreviewFile(file)}
-											className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-[var(--leros-text-muted)] transition-colors hover:bg-[var(--leros-primary-softer)] hover:text-[var(--leros-primary)]"
+											className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[13px] text-[var(--leros-text-muted)] transition-colors hover:bg-[var(--leros-primary-softer)] hover:text-[var(--leros-primary)]"
 											title="查看"
 										>
 											<Eye className="size-4" />
@@ -1418,7 +1483,7 @@ function ProjectFiles({
 										<button
 											type="button"
 											onClick={() => handleDownload(file)}
-											className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-[var(--leros-text-muted)] transition-colors hover:bg-[var(--leros-primary-softer)] hover:text-[var(--leros-primary)]"
+											className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[13px] text-[var(--leros-text-muted)] transition-colors hover:bg-[var(--leros-primary-softer)] hover:text-[var(--leros-primary)]"
 											title="下载"
 										>
 											<Download className="size-4" />

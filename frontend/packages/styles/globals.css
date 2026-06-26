@@ -85,7 +85,7 @@
     border-right: 1px solid var(--leros-sidebar-border);
     background: var(--leros-sidebar-bg);
     color: var(--leros-text);
-    padding: 24px 0;
+    padding: 12px 0;
     transition: width 180ms ease;
   }
 
@@ -267,7 +267,8 @@
   .leros-sidebar-footer {
     border-top: 1px solid
       color-mix(in srgb, var(--leros-sidebar-border) 55%, transparent);
-    padding: 16px 8px 0;
+    padding: 6px 0;
+    padding-bottom: 0;
     margin-top: auto;
   }
 
