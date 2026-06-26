@@ -789,6 +789,7 @@ function ProjectConfigSidebar({
 						>
 							<Plus className="size-4" />
 						</PopoverTrigger>
+						{/* 固定在按钮上方，和输入框工具栏的技能选择弹窗保持一致。 */}
 						<PopoverContent
 							align="end"
 							side="top"
@@ -803,24 +804,6 @@ function ProjectConfigSidebar({
 									onValueChange={setSkillSearch}
 									placeholder="搜索技能"
 								/>
-								{project.skills.length > 0 && (
-									<div className="px-2 pb-2 pt-1">
-										<div className="mb-1 text-[11px] font-medium text-slate-400">已选技能</div>
-										<div className="flex flex-wrap gap-1.5">
-											{project.skills.map((skill) => (
-												<button
-													key={skill.code}
-													type="button"
-													onClick={() => removeProjectSkill(skill.code)}
-													className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-[11px] text-violet-700 transition-colors hover:bg-violet-100"
-												>
-													/{skill.name}
-													<X className="size-3" />
-												</button>
-											))}
-										</div>
-									</div>
-								)}
 								<CommandList className="max-h-64">
 									<CommandEmpty className="py-6 text-slate-400">没有可继续添加的技能</CommandEmpty>
 									<CommandGroup className="p-0">
@@ -1374,32 +1357,33 @@ function ProjectFiles({
 	};
 
 	return (
-		<div className="h-full overflow-y-auto px-10 py-8">
+		<div className="h-full overflow-y-auto px-10 py-7">
 			<div className="mx-auto w-full max-w-[1200px]">
-				<div className="mb-8 flex items-center justify-between gap-6">
+				<div className="mb-7 flex items-center justify-between gap-5">
 					<div>
-						<h2 className="text-2xl font-semibold tracking-tight text-[var(--leros-text-strong)]">
+						<h2 className="text-[2rem] font-semibold tracking-tight text-[var(--leros-text-strong)]">
 							项目文件
 						</h2>
-						<p className="mt-1 text-sm text-[var(--leros-text-muted)]">
+						<p className="mt-0.5 text-[13px] text-[var(--leros-text-muted)]">
 							管理当前项目的所有文件资源
 						</p>
 					</div>
-					<div className="flex items-center gap-3">
+					{/* 中文注释：项目文件页顶部筛选条整体收一档，保持结构不变，只降低高度和横向占比，让桌面端视觉更紧凑。 */}
+					<div className="flex items-center gap-2.5">
 						<div className="relative">
 							<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--leros-text-muted)]" />
 							<input
 								value={searchKeyword}
 								onChange={(event) => setSearchKeyword(event.target.value)}
 								placeholder="搜索文件..."
-								className="h-10 w-64 rounded-xl border border-[var(--leros-control-border)] bg-white pl-9 pr-4 text-sm outline-none transition-colors focus:border-[var(--leros-primary)]"
+								className="h-9 w-60 rounded-xl border border-[var(--leros-control-border)] bg-white pl-9 pr-3.5 text-[13px] outline-none transition-colors focus:border-[var(--leros-primary)]"
 							/>
 						</div>
 						<div className="relative">
 							<select
 								value={fileSourceFilter}
 								onChange={(event) => setFileSourceFilter(event.target.value as "all" | FileSource)}
-								className="h-10 cursor-pointer appearance-none rounded-xl border border-[var(--leros-control-border)] bg-white py-0 pl-3.5 pr-9 text-sm outline-none transition-colors focus:border-[var(--leros-primary)]"
+								className="h-9 min-w-[132px] cursor-pointer appearance-none rounded-xl border border-[var(--leros-control-border)] bg-white py-0 pl-3.5 pr-9 text-[13px] outline-none transition-colors focus:border-[var(--leros-primary)]"
 							>
 								<option value="all">全部</option>
 								<option value="task">任务文件</option>
@@ -1439,7 +1423,7 @@ function ProjectFiles({
 					</div>
 				) : (
 					<div className="overflow-hidden rounded-2xl border border-[var(--leros-control-border)] bg-white">
-						<div className="grid grid-cols-[minmax(0,1fr)_90px_120px_180px_180px] border-b border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-6 py-4 text-xs font-semibold uppercase tracking-wider text-[var(--leros-text-muted)]">
+						<div className="grid grid-cols-[minmax(0,1fr)_90px_120px_180px_180px] border-b border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-5 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--leros-text-muted)]">
 							<div>名称</div>
 							<div>类型</div>
 							<div>大小</div>
@@ -1450,20 +1434,20 @@ function ProjectFiles({
 							{allFlatFiles.map((file) => (
 								<div
 									key={file.path}
-									className="grid grid-cols-[minmax(0,1fr)_90px_120px_180px_180px] items-center px-6 py-5 transition-colors hover:bg-[var(--leros-primary-softer)]/25"
+									className="grid grid-cols-[minmax(0,1fr)_90px_120px_180px_180px] items-center px-5 py-4 transition-colors hover:bg-[var(--leros-primary-softer)]/25"
 								>
 									<button
 										type="button"
 										data-file-preview-trigger
 										onClick={() => setPreviewFile(file)}
-										className="flex min-w-0 cursor-pointer items-center gap-3 rounded-lg px-2 py-1 text-left transition-colors hover:bg-[var(--leros-primary-softer)]/50"
+										className="flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors hover:bg-[var(--leros-primary-softer)]/50"
 										title="查看"
 									>
-										<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--leros-primary-softer)] text-[var(--leros-primary)]">
+										<div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--leros-primary-softer)] text-[var(--leros-primary)]">
 											<ProjectFileTypeIcon fileName={file.name} />
 										</div>
 										<div className="min-w-0">
-											<p className="truncate text-sm font-semibold text-[var(--leros-text-strong)]">
+											<p className="truncate text-[15px] font-semibold text-[var(--leros-text-strong)]">
 												{file.name}
 											</p>
 											<p className="truncate text-xs text-[var(--leros-text-muted)]">
@@ -1471,22 +1455,22 @@ function ProjectFiles({
 											</p>
 										</div>
 									</button>
-									<div className="text-sm">
-										<span className="inline-block rounded-md bg-[var(--leros-surface-soft)] px-2.5 py-1 text-xs font-medium text-[var(--leros-text-muted)]">
+									<div className="text-[13px]">
+										<span className="inline-block rounded-md bg-[var(--leros-surface-soft)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--leros-text-muted)]">
 											{getFileSource(file.path) === "task" ? "任务文件" : "上传文件"}
 										</span>
 									</div>
-									<div className="text-sm text-[var(--leros-text-muted)]">
+									<div className="text-[13px] text-[var(--leros-text-muted)]">
 										{formatBytes(file.size)}
 									</div>
-									<div className="text-sm text-[var(--leros-text-muted)]">
+									<div className="text-[13px] text-[var(--leros-text-muted)]">
 										{formatTime(file.createdAt)}
 									</div>
-									<div className="flex items-center justify-end gap-2">
+									<div className="flex items-center justify-end gap-1.5">
 										<button
 											type="button"
 											onClick={() => setPreviewFile(file)}
-											className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-[var(--leros-text-muted)] transition-colors hover:bg-[var(--leros-primary-softer)] hover:text-[var(--leros-primary)]"
+											className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[13px] text-[var(--leros-text-muted)] transition-colors hover:bg-[var(--leros-primary-softer)] hover:text-[var(--leros-primary)]"
 											title="查看"
 										>
 											<Eye className="size-4" />
@@ -1495,7 +1479,7 @@ function ProjectFiles({
 										<button
 											type="button"
 											onClick={() => handleDownload(file)}
-											className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-[var(--leros-text-muted)] transition-colors hover:bg-[var(--leros-primary-softer)] hover:text-[var(--leros-primary)]"
+											className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[13px] text-[var(--leros-text-muted)] transition-colors hover:bg-[var(--leros-primary-softer)] hover:text-[var(--leros-primary)]"
 											title="下载"
 										>
 											<Download className="size-4" />

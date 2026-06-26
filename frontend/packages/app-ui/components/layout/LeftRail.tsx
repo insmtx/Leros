@@ -501,19 +501,20 @@ export function LeftRail({
 			<ScrollArea hideScrollbar className="min-h-0 flex-1 overflow-hidden">
 				<nav className="leros-nav" aria-label="主导航">
 					{navGroups.map((group) => {
-						const sectionLabel =
-							group.id === "projects" ? "最近项目（默认展示最近5个项目）" : group.label;
 						return (
 							<div key={group.id} className="leros-nav-section">
-								{sectionLabel ? (
+								{group.id === "projects" ? (
 									<div
 										className={cn(
 											"leros-nav-section-label",
-											group.id === "projects" && "normal-case leading-snug tracking-normal",
+											"normal-case leading-snug tracking-normal font-normal",
 										)}
 									>
-										{sectionLabel}
+										<span className="text-sm">最近项目</span>
+										<span className="text-xs">（仅展示5个）</span>
 									</div>
+								) : group.label ? (
+									<div className="leros-nav-section-label">{group.label}</div>
 								) : null}
 								{group.id === "projects" ? (
 									<ProjectList
