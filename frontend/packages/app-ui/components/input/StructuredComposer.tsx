@@ -565,6 +565,7 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 		const composingRef = useRef(false);
 		const pendingCaretRef = useRef<number | null>(null);
 		const dismissedTriggerStartRef = useRef<number | null>(null);
+		const shouldAutoScrollPickerRef = useRef(false);
 
 		const assistantOptions = useMemo<AssistantOption[]>(() => mockAssistants, []);
 		const displayTokens = useMemo(() => resolveDisplayTokens(value, tokens), [tokens, value]);
@@ -669,6 +670,7 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 
 		useEffect(() => {
 			if (!activePickerValue) return;
+			if (!shouldAutoScrollPickerRef.current) return;
 
 			requestAnimationFrame(() => {
 				const picker = pickerRef.current;
@@ -679,6 +681,7 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 				).find((item) => item.dataset.pickerItemValue === activePickerValue);
 
 				activeItem?.scrollIntoView({ block: "nearest" });
+				shouldAutoScrollPickerRef.current = false;
 			});
 		}, [activePickerValue]);
 
@@ -1023,6 +1026,8 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 				if (trigger) {
 					if (event.key === "ArrowDown" || event.key === "ArrowUp") {
 						event.preventDefault();
+						// 中文注释：只在键盘切换高亮项时自动滚动列表，避免鼠标移入触发 cmdk 高亮时出现列表跳动。
+						shouldAutoScrollPickerRef.current = true;
 						const direction = event.key === "ArrowDown" ? 1 : -1;
 						setActiveIndex((current) => {
 							if (pickerItemCount === 0) return 0;
