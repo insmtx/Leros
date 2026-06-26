@@ -31,7 +31,11 @@ import {
 	useMemo,
 	useState,
 } from "react";
-import { APP_LOGO_SRC } from "../../assets";
+import { 
+	APP_LOGO_SRC,
+	APP_PRIVACY_POLICY_PDF_SRC,
+	APP_TERMS_OF_SERVICE_PDF_SRC,
+} from "../../assets";
 
 type AuthMode = "login";
 
@@ -326,8 +330,23 @@ function AuthDialog({
 							/>
 							<span>
 								我已阅读并同意
-								<span className="mx-1 text-[#64748b]">《服务条款》</span>和
-								<span className="mx-1 text-[#64748b]">《隐私政策》</span>
+								<a
+									href={APP_TERMS_OF_SERVICE_PDF_SRC}
+									target="_blank"
+									rel="noreferrer"
+									className="mx-1 text-[#64748b] transition-colors hover:text-[#4d5cff]"
+								>
+									《服务条款》
+								</a>
+								和
+								<a
+									href={APP_PRIVACY_POLICY_PDF_SRC}
+									target="_blank"
+									rel="noreferrer"
+									className="mx-1 text-[#64748b] transition-colors hover:text-[#4d5cff]"
+								>
+									《隐私政策》
+								</a>
 							</span>
 						</div>
 

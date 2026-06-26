@@ -278,7 +278,7 @@ export function ProjectsHubView({ navigation }: ProjectsHubViewProps) {
 						<DialogTitle>重命名项目</DialogTitle>
 						<DialogDescription>请输入新的项目名称</DialogDescription>
 					</DialogHeader>
-					<div className="mt-4">
+					<div className="mt-4 relative">
 						<input
 							type="text"
 							value={renameValue}
@@ -289,9 +289,11 @@ export function ProjectsHubView({ navigation }: ProjectsHubViewProps) {
 								}
 							}}
 							placeholder="项目名称"
+							maxLength={30}
 							autoFocus
-							className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 transition-colors focus:border-blue-300 focus:outline-none"
+							className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 pr-14 text-sm text-slate-800 placeholder:text-slate-400 transition-colors focus:border-blue-300 focus:outline-none"
 						/>
+						<span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">{renameValue.length}/30</span>
 					</div>
 					<DialogFooter className="mt-4">
 						<Button variant="outline" onClick={() => setRenameProject(null)}>
@@ -546,25 +548,33 @@ function CreateProjectDialog({
 						<span className="mb-2 block text-sm font-semibold text-[var(--leros-text-strong)]">
 							项目名称
 						</span>
-						<input
-							value={name}
-							onChange={(event) => setName(event.target.value)}
-							placeholder="请输入项目名称"
-							autoFocus
-							className="h-10 w-full rounded-lg border border-[var(--leros-control-border)] bg-white px-3 text-sm text-[var(--leros-text)] placeholder:text-[var(--leros-text-subtle)] transition-colors focus:border-[var(--leros-primary)] focus:outline-none"
-						/>
+						<div className="relative">
+							<input
+								value={name}
+								onChange={(event) => setName(event.target.value)}
+								placeholder="请输入项目名称"
+								maxLength={30}
+								autoFocus
+								className="h-10 w-full rounded-lg border border-[var(--leros-control-border)] bg-white px-3 pr-14 text-sm text-[var(--leros-text)] placeholder:text-[var(--leros-text-subtle)] transition-colors focus:border-[var(--leros-primary)] focus:outline-none"
+							/>
+							<span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--leros-text-subtle)]">{name.length}/30</span>
+						</div>
 					</label>
 
 					<label className="block">
 						<span className="mb-2 block text-sm font-semibold text-[var(--leros-text-strong)]">
 							项目描述
 						</span>
-						<textarea
-							value={description}
-							onChange={(event) => setDescription(event.target.value)}
-							placeholder="简单描述这个项目的目标、背景或协作范围"
-							className="min-h-28 w-full resize-none rounded-lg border border-[var(--leros-control-border)] bg-white px-3 py-2 text-sm leading-6 text-[var(--leros-text)] placeholder:text-[var(--leros-text-subtle)] transition-colors focus:border-[var(--leros-primary)] focus:outline-none"
-						/>
+						<div className="relative">
+							<textarea
+								value={description}
+								onChange={(event) => setDescription(event.target.value)}
+								placeholder="简单描述这个项目的目标、背景或协作范围"
+								maxLength={500}
+								className="min-h-28 w-full resize-none rounded-lg border border-[var(--leros-control-border)] bg-white px-3 py-2 pb-7 pr-16 text-sm leading-6 text-[var(--leros-text)] placeholder:text-[var(--leros-text-subtle)] transition-colors focus:border-[var(--leros-primary)] focus:outline-none"
+							/>
+							<span className="pointer-events-none absolute bottom-2 right-3 text-xs text-[var(--leros-text-subtle)]">{description.length}/500</span>
+						</div>
 					</label>
 
 					<div className="space-y-3">
@@ -599,7 +609,14 @@ function CreateProjectDialog({
 									>
 										+ 添加
 									</PopoverTrigger>
-									<PopoverContent align="end" sideOffset={10} className="w-[340px] p-1.5">
+									{/* 固定在按钮上方，避免创建项目弹窗内的技能选择层随空间动态换位。 */}
+									<PopoverContent
+										align="end"
+										side="top"
+										sideOffset={10}
+										collisionAvoidance={{ side: "none", align: "shift", fallbackAxisSide: "none" }}
+										className="w-[340px] p-1.5"
+									>
 										<Command shouldFilter={false} className="rounded-xl! bg-transparent p-0">
 											<div className="px-2 py-1 text-xs font-medium text-slate-400">选择技能</div>
 											<CommandInput
@@ -607,26 +624,6 @@ function CreateProjectDialog({
 												onValueChange={setSkillSearch}
 												placeholder="搜索技能"
 											/>
-											{selectedSkills.length > 0 && (
-												<div className="px-2 pb-2 pt-1">
-													<div className="mb-1 text-[11px] font-medium text-slate-400">
-														已选技能
-													</div>
-													<div className="flex flex-wrap gap-1.5">
-														{selectedSkills.map((skill) => (
-															<button
-																key={skill.code}
-																type="button"
-																onClick={() => removeSkill(skill.code)}
-																className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-[11px] text-violet-700 transition-colors hover:bg-violet-100"
-															>
-																/{skill.label}
-																<X className="size-3" />
-															</button>
-														))}
-													</div>
-												</div>
-											)}
 											<CommandList className="max-h-64">
 												<CommandEmpty className="py-6 text-slate-400">
 													没有可继续添加的技能

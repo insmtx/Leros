@@ -4,6 +4,15 @@ import type { ProjectArtifact, ProjectTask } from "@leros/store";
 import { formatTokenCount, projectFileApi, useChatStore, useLayoutStore } from "@leros/store";
 import { artifactApi } from "@leros/store/api/artifactApi";
 import { taskApi } from "@leros/store/api/taskApi";
+import { Button } from "@leros/ui/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@leros/ui/components/ui/dialog";
 import type { ApiError } from "@leros/ui/lib/request";
 import { cn } from "@leros/ui/lib/utils";
 import {
@@ -15,6 +24,7 @@ import {
 	ChevronRight,
 	ChevronsLeft,
 	ChevronsRight,
+	Pencil,
 	Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -73,6 +83,7 @@ export function TaskDetailPage({
 		fetchProjects,
 		setTaskDetailRoute,
 		switchProject,
+		updateTask,
 	} = useLayoutStore((s) => s);
 
 	const {
@@ -87,6 +98,8 @@ export function TaskDetailPage({
 	} = useChatStore((s) => s);
 
 	const [task, setTask] = useState<ProjectTask | null>(null);
+	const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+	const [renameValue, setRenameValue] = useState("");
 	const [taskFiles, setTaskFiles] = useState<ProjectFileNode[]>([]);
 	const [previewArtifact, setPreviewArtifact] = useState<ProjectArtifact | null>(null);
 	const [rightSidebarWidth, setRightSidebarWidth] = useState(
@@ -99,6 +112,10 @@ export function TaskDetailPage({
 	const resolvedTaskId = taskId ?? activeTaskDetailTaskId;
 	const resolvedSessionId = sessionId ?? activeTaskDetailSessionId;
 	const project = projects.find((p) => p.id === resolvedProjectId);
+	const storeTask = useMemo(
+		() => project?.tasks.find((item) => item.id === resolvedTaskId) ?? null,
+		[project, resolvedTaskId],
+	);
 	// 面包屑只做展示截断，完整名称通过 title 保留，避免超长文本撑开头部布局。
 	const breadcrumbProjectName = truncateBreadcrumbText(project?.name);
 	const breadcrumbTaskTitle = truncateBreadcrumbText(task?.title ?? "任务");
@@ -232,6 +249,26 @@ export function TaskDetailPage({
 	}, [resolvedTaskId, fetchTaskFiles]);
 
 	useEffect(() => {
+		if (!storeTask) return;
+		setTask((current) => {
+			if (!current || current.id !== storeTask.id) return storeTask;
+			if (
+				current.title === storeTask.title &&
+				current.meta === storeTask.meta &&
+				current.status === storeTask.status &&
+				current.updatedAt === storeTask.updatedAt &&
+				current.sessionId === storeTask.sessionId &&
+				current.taskType === storeTask.taskType &&
+				current.deadline === storeTask.deadline &&
+				current.description === storeTask.description
+			) {
+				return current;
+			}
+			return { ...current, ...storeTask };
+		});
+	}, [storeTask]);
+
+	useEffect(() => {
 		if (!resolvedTaskId || isGenerating) return;
 		fetchTaskFiles();
 	}, [resolvedTaskId, fetchTaskFiles, isGenerating]);
@@ -259,6 +296,23 @@ export function TaskDetailPage({
 		// 中文注释：任务详情右侧栏的展开态只属于当前查看上下文，切换任务或会话后应恢复默认展开。
 		setRightSidebarCollapsed(false);
 	}, [resolvedProjectId, resolvedTaskId, resolvedSessionId]);
+
+	const handleOpenRenameDialog = () => {
+		if (!task?.title) return;
+		setRenameValue(task.title);
+		setRenameDialogOpen(true);
+	};
+
+	const handleConfirmRename = async () => {
+		const title = renameValue.trim();
+		if (!task || !title) return;
+
+		const updatedTask = await updateTask({ public_id: task.id, title });
+		if (!updatedTask) return;
+
+		setTask(updatedTask);
+		setRenameDialogOpen(false);
+	};
 
 	const handleRightSidebarResizeStart = (event: React.PointerEvent<HTMLHRElement>) => {
 		if (rightSidebarCollapsed) return;
@@ -304,13 +358,13 @@ export function TaskDetailPage({
 			data-slot="task-detail-page"
 			className="flex h-full min-w-0 flex-1 flex-col bg-[var(--leros-surface)]"
 		>
-			<header className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-10">
+			<header className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--leros-control-border)] bg-[var(--leros-surface-soft)] px-5">
 				<div className="flex min-w-0 items-center gap-3 text-[var(--leros-text-muted)]">
 					{/* 中文注释：任务详情页面包屑与项目页保持一致，三级结构为 项目 > 项目名 > 任务名。 */}
 					<button
 						type="button"
 						onClick={() => navigation?.goToRoute("projectsHub")}
-						className="text-base font-bold text-[var(--leros-text-muted)] transition-colors hover:text-[var(--leros-primary)]"
+						className="text-sm font-normal text-[var(--leros-text-muted)] transition-colors hover:text-[var(--leros-primary)]"
 					>
 						项目
 					</button>
@@ -326,7 +380,7 @@ export function TaskDetailPage({
 									}
 									resolvedProjectId && switchProject(resolvedProjectId);
 								}}
-								className="max-w-[360px] truncate text-base font-bold text-[var(--leros-text-muted)] transition-colors hover:text-[var(--leros-primary)]"
+								className="max-w-[360px] truncate text-sm font-normal text-[var(--leros-text-muted)] transition-colors hover:text-[var(--leros-primary)]"
 								title={project.name}
 							>
 								{breadcrumbProjectName}
@@ -335,7 +389,7 @@ export function TaskDetailPage({
 						</>
 					)}
 					<h1
-						className="max-w-[360px] truncate text-base font-bold text-[var(--leros-text-strong)]"
+						className="max-w-[360px] truncate text-sm font-bold text-[var(--leros-text-strong)]"
 						title={task?.title}
 					>
 						{breadcrumbTaskTitle}
@@ -351,7 +405,7 @@ export function TaskDetailPage({
 							}
 							resolvedProjectId && switchProject(resolvedProjectId);
 						}}
-						className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-[var(--leros-text-muted)] transition-colors hover:bg-[var(--leros-primary-softer)] hover:text-[var(--leros-primary)]"
+						className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-[var(--leros-text-muted)] transition-colors hover:bg-[var(--leros-primary-softer)] hover:text-[var(--leros-primary)]"
 					>
 						<ArrowLeft className="size-3.5" />
 						返回新建任务
@@ -416,31 +470,24 @@ export function TaskDetailPage({
 									/>
 								</section>
 							)}
-							{task?.description && (
+							{task?.title && (
 								<section>
-									<h3 className="mb-3 text-xs font-semibold text-[var(--leros-text-muted)]">
-										任务描述
-									</h3>
-									<p className="text-sm leading-relaxed text-[var(--leros-text)]">
-										{task.description}
-									</p>
-								</section>
-							)}
-							{project && (
-								<section>
-									<h3 className="mb-3 text-xs font-semibold text-[var(--leros-text-muted)]">
-										所属项目
-									</h3>
-									<div className="rounded-lg border border-[var(--leros-control-border)] bg-[var(--leros-surface)] p-3.5">
-										<p className="text-sm font-semibold text-[var(--leros-text-strong)]">
-											{project.name}
-										</p>
-										{project.description && (
-											<p className="mt-1 text-xs text-[var(--leros-text-muted)]">
-												{project.description}
-											</p>
-										)}
+									<div className="mb-3 flex items-center justify-between gap-3">
+										<h3 className="text-xs font-semibold text-[var(--leros-text-muted)]">
+											任务名称
+										</h3>
+										<button
+											type="button"
+											onClick={handleOpenRenameDialog}
+											className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-[var(--leros-text-muted)] transition-colors hover:bg-[var(--leros-primary-softer)] hover:text-[var(--leros-text-strong)]"
+											title="重命名任务"
+										>
+											<Pencil className="size-3.5" />
+										</button>
 									</div>
+									<p className="text-sm leading-relaxed text-[var(--leros-text)]">
+										{task.title}
+									</p>
 								</section>
 							)}
 							{latestTodos && latestTodos.length > 0 && (
@@ -496,6 +543,41 @@ export function TaskDetailPage({
 					</aside>
 				)}
 			</div>
+			<Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+				<DialogContent className="sm:max-w-md" showCloseButton={false}>
+					<DialogHeader>
+						<DialogTitle>重命名任务</DialogTitle>
+						<DialogDescription>请输入新的任务名称</DialogDescription>
+					</DialogHeader>
+					<div className="mt-4 relative">
+						<input
+							type="text"
+							value={renameValue}
+							onChange={(event) => setRenameValue(event.target.value)}
+							onKeyDown={(event) => {
+								if (event.key === "Enter") {
+									void handleConfirmRename();
+								}
+							}}
+							placeholder="任务名称"
+							maxLength={30}
+							autoFocus
+							className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 pr-14 text-sm text-slate-800 placeholder:text-slate-400 transition-colors focus:border-blue-300 focus:outline-none"
+						/>
+						<span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+							{renameValue.length}/30
+						</span>
+					</div>
+					<DialogFooter className="mt-4">
+						<Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+							取消
+						</Button>
+						<Button onClick={() => void handleConfirmRename()} disabled={!renameValue.trim()}>
+							确认
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 			<ArtifactPreviewDialog
 				artifact={previewArtifact}
 				open={previewArtifact !== null}
