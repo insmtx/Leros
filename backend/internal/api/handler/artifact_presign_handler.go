@@ -26,3 +26,14 @@ func (h *ProjectFileHandler) PresignArtifactUpload(ctx *gin.Context) {
 	}
 	ctx.JSON(http.StatusOK, dto.Success(resp))
 }
+
+// GetStorageConfig returns the storage configuration (scheme and bucket) for Worker.
+func (h *ProjectFileHandler) GetStorageConfig(ctx *gin.Context) {
+	resp, err := h.service.GetStorageConfig(ctx.Request.Context())
+	if err != nil {
+		logs.ErrorContextf(ctx, "get storage config failed: %v", err)
+		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, err.Error()))
+		return
+	}
+	ctx.JSON(http.StatusOK, dto.Success(resp))
+}
