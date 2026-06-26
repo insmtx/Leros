@@ -250,6 +250,7 @@ type SkillListItem struct {
 
 // SkillDetailData 表示已安装 skill 的完整详情，包括 SKILL.md 内容。
 type SkillDetailData struct {
+	SkillID     string   `json:"skill_id,omitempty"`
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
 	Category    string   `json:"category"`
