@@ -282,10 +282,12 @@ func (h *Handler) handleList(ctx context.Context, wcmd messaging.WorkerCommand, 
 		Success: true,
 		Action:  "list",
 	}
+	// Use json.RawMessage so that the items serialize as raw JSON
+	// rather than being base64-encoded (which happens with []byte -> any).
 	if data, err := json.Marshal(items); err != nil {
 		return h.replyError(wcmd.Body.ReplyTo, "marshal list data", err)
 	} else {
-		resp.Data = data
+		resp.Data = json.RawMessage(data)
 	}
 	return h.publishReply(wcmd.Body.ReplyTo, resp)
 }
@@ -350,10 +352,12 @@ func (h *Handler) handleDetail(ctx context.Context, wcmd messaging.WorkerCommand
 		Success: true,
 		Action:  "detail",
 	}
+	// Use json.RawMessage so that the detail data serializes as raw JSON
+	// rather than being base64-encoded.
 	if data, err := json.Marshal(data); err != nil {
 		return h.replyError(wcmd.Body.ReplyTo, "marshal detail data", err)
 	} else {
-		resp.Data = data
+		resp.Data = json.RawMessage(data)
 	}
 	return h.publishReply(wcmd.Body.ReplyTo, resp)
 }
