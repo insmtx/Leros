@@ -9,7 +9,7 @@ type WorkerConfig struct {
 	BootstrapToken string `yaml:"bootstrap_token,omitempty" json:"bootstrap_token,omitempty"`
 	WorkspaceRoot  string `yaml:"workspace_root,omitempty" json:"workspace_root,omitempty"`
 
-	Env   string       `yaml:"env,omitempty" json:"env,omitempty"`
+	Env   string            `yaml:"env,omitempty" json:"env,omitempty"`
 	NATS  *NATSConfig       `yaml:"nats,omitempty"`
 	CLI   *CLIEnginesConfig `yaml:"cli,omitempty"`
 	Gitea *GiteaConfig      `yaml:"gitea,omitempty"`
