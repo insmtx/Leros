@@ -2,291 +2,260 @@ package run
 
 import (
 	"context"
-	"errors"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/insmtx/Leros/backend/internal/agent"
-	runtimeevents "github.com/insmtx/Leros/backend/internal/runtime/events"
-	"github.com/insmtx/Leros/backend/pkg/leros"
-	"github.com/insmtx/Leros/backend/pkg/messaging"
 	"github.com/nats-io/nats.go"
+
+	"github.com/insmtx/Leros/backend/agent"
+	"github.com/insmtx/Leros/backend/internal/assistant"
+	assistantdomain "github.com/insmtx/Leros/backend/internal/assistant/domain"
+	"github.com/insmtx/Leros/backend/pkg/messaging"
+	"github.com/insmtx/Leros/backend/pkg/seqtracker"
 )
 
-type fakeSeqTracker struct {
-	lastTerminal uint64
-	terminal     map[uint64]bool
-	received     []uint64
-	processing   []uint64
-	completed    []uint64
-	failed       map[uint64]string
+type handlerPublisher struct {
+	mu     sync.Mutex
+	events []messaging.RunEvent
 }
 
-func (f *fakeSeqTracker) TrackReceived(_ context.Context, _ string, seq uint64, _, _, _, _ string) error {
-	f.received = append(f.received, seq)
-	return nil
-}
-
-func (f *fakeSeqTracker) MarkProcessing(_ context.Context, _ string, seq uint64) error {
-	f.processing = append(f.processing, seq)
-	return nil
-}
-
-func (f *fakeSeqTracker) MarkCompleted(_ context.Context, _ string, seq uint64) error {
-	f.completed = append(f.completed, seq)
-	return nil
-}
-
-func (f *fakeSeqTracker) MarkFailed(_ context.Context, _ string, seq uint64, errMsg string) error {
-	if f.failed == nil {
-		f.failed = make(map[uint64]string)
+func (p *handlerPublisher) Publish(_ context.Context, _ string, value any) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if event, ok := value.(messaging.RunEvent); ok {
+		p.events = append(p.events, event)
 	}
-	f.failed[seq] = errMsg
 	return nil
 }
 
-func (f *fakeSeqTracker) GetLastCompletedSeq(context.Context, string) (uint64, error) {
-	return 0, nil
-}
-
-func (f *fakeSeqTracker) GetLastTerminalSeq(context.Context, string) (uint64, error) {
-	return f.lastTerminal, nil
-}
-
-func (f *fakeSeqTracker) IsDuplicate(context.Context, string, uint64) (bool, error) {
-	return false, nil
-}
-
-func (f *fakeSeqTracker) IsTerminal(_ context.Context, _ string, seq uint64) (bool, error) {
-	return f.terminal[seq], nil
-}
-
-func (f *fakeSeqTracker) Close() error {
-	return nil
-}
-
-type fakeSubscriber struct {
-	subscribeCalled     bool
-	subscribeFromCalled bool
-	startSeq            int64
-}
-
-func (f *fakeSubscriber) Subscribe(context.Context, string, string, func(*nats.Msg)) error {
-	f.subscribeCalled = true
-	return nil
-}
-
-func (f *fakeSubscriber) SubscribeFrom(_ context.Context, _ string, startSeq int64, _ func(*nats.Msg)) error {
-	f.subscribeFromCalled = true
-	f.startSeq = startSeq
-	return nil
-}
-
-type fakePublisher struct {
-	calls []publishedEvent
-}
-
-type publishedEvent struct {
-	topic string
-	event any
-}
-
-func (f *fakePublisher) Publish(_ context.Context, topic string, event any) error {
-	f.calls = append(f.calls, publishedEvent{topic: topic, event: event})
-	return nil
-}
-
-func (f *fakePublisher) Request(context.Context, string, any) (*nats.Msg, error) {
+func (*handlerPublisher) Request(context.Context, string, any) (*nats.Msg, error) {
 	return nil, nil
 }
 
-type fakeRunner struct {
-	err    error
-	result *agent.RunResult
-	emit   *runtimeevents.Event
-	calls  int
-}
+type handlerPreparer struct{}
 
-func (f *fakeRunner) Run(ctx context.Context, req *agent.RequestContext) (*agent.RunResult, error) {
-	f.calls++
-	if f.emit != nil && req.EventSink != nil {
-		_ = req.EventSink.Emit(ctx, f.emit)
-	}
-	if f.err != nil {
-		return f.result, f.err
-	}
-	if f.result != nil {
-		return f.result, nil
-	}
-	return &agent.RunResult{RunID: req.RunID, Status: agent.RunStatusCompleted}, nil
-}
-
-func TestConsumerExecuteWithTrackerMarksAllSeqsFailed(t *testing.T) {
-	t.Setenv(leros.EnvWorkspaceRoot, t.TempDir())
-
-	runErr := errors.New("skill not found")
-	tracker := &fakeSeqTracker{}
-	publisher := &fakePublisher{}
-	h := &Handler{
-		cfg:        Config{OrgID: 1, WorkerID: 2},
-		publisher:  publisher,
-		runner:     &fakeRunner{err: runErr},
-		seqTracker: tracker,
-	}
-	task := testRunTask()
-	task.Route.SessionID = "session_1"
-	setSeqs(&task, []uint64{7, 8})
-
-	err := h.executeWithTracker(context.Background(), task)
-	if !errors.Is(err, runErr) {
-		t.Fatalf("executeWithTracker error = %v, want %v", err, runErr)
-	}
-
-	if !sameSeqs(tracker.processing, []uint64{7, 8}) {
-		t.Fatalf("processing seqs = %v, want [7 8]", tracker.processing)
-	}
-	for _, seq := range []uint64{7, 8} {
-		if tracker.failed[seq] != runErr.Error() {
-			t.Fatalf("failed[%d] = %q, want %q", seq, tracker.failed[seq], runErr.Error())
-		}
-	}
-	if len(tracker.completed) != 0 {
-		t.Fatalf("completed seqs = %v, want none", tracker.completed)
-	}
-	if len(publisher.calls) != 1 {
-		t.Fatalf("published events = %d, want one state lane publish", len(publisher.calls))
-	}
-	if evt, ok := publisher.calls[0].event.(messaging.RunEvent); !ok ||
-		evt.Body.Event != messaging.RunEventRunFailed {
-		t.Fatalf("first published event = %#v, want run.failed event", publisher.calls[0].event)
-	}
-}
-
-func TestConsumerExecuteWithTrackerDoesNotEmitRunFailedForCancelledRun(t *testing.T) {
-	t.Setenv(leros.EnvWorkspaceRoot, t.TempDir())
-
-	tracker := &fakeSeqTracker{}
-	publisher := &fakePublisher{}
-	cancelledEvent := runtimeevents.NewRunCompleted(runtimeevents.RunCompletedPayload{
-		Status: string(agent.RunStatusCancelled),
-		Result: runtimeevents.RunResultPayload{
-			Message: "已取消",
+func (handlerPreparer) Prepare(
+	_ context.Context,
+	req *assistantdomain.RunRequest,
+) (*assistant.PreparedRun, error) {
+	return &assistant.PreparedRun{
+		Request: req,
+		Execution: agent.ExecutionRequest{
+			ExecutionID: req.RunID,
+			TraceID:     req.TraceID,
+			Runtime:     "test",
 		},
-	}, "已取消")
-	cancelledEvent.Type = runtimeevents.EventCancelled
-	h := &Handler{
-		cfg:       Config{OrgID: 1, WorkerID: 2},
-		publisher: publisher,
-		runner: &fakeRunner{
-			err: context.Canceled,
-			result: &agent.RunResult{
-				RunID:  "run_1",
-				Status: agent.RunStatusCancelled,
-				Error:  context.Canceled.Error(),
+	}, nil
+}
+
+type handlerFinalizer struct{}
+
+func (handlerFinalizer) FinalizeRequired(
+	_ context.Context,
+	run *assistant.PreparedRun,
+	runtimeResult *agent.ExecutionResult,
+	_ assistant.JournalSnapshot,
+) (*assistant.Finalization, error) {
+	return &assistant.Finalization{Result: &assistantdomain.RunResult{
+		RunID:   run.Request.RunID,
+		TraceID: run.Request.TraceID,
+		Status:  assistantdomain.RunStatusCompleted,
+		Message: runtimeResult.Message,
+	}}, nil
+}
+
+func (handlerFinalizer) PostRunBestEffort(
+	context.Context,
+	*assistant.PreparedRun,
+	*assistantdomain.RunResult,
+	assistant.JournalSnapshot,
+) {
+}
+
+type handlerRuntime struct {
+	started chan struct{}
+	release chan struct{}
+}
+
+type trackerCall struct {
+	seq    uint64
+	status seqtracker.Status
+}
+
+type trackerRecorder struct {
+	mu    sync.Mutex
+	calls []trackerCall
+}
+
+func (t *trackerRecorder) TrackReceived(
+	context.Context,
+	string,
+	uint64,
+	string,
+	string,
+	string,
+	string,
+) error {
+	return nil
+}
+
+func (t *trackerRecorder) MarkProcessing(_ context.Context, _ string, seq uint64) error {
+	t.record(seq, seqtracker.StatusProcessing)
+	return nil
+}
+
+func (t *trackerRecorder) MarkCompleted(_ context.Context, _ string, seq uint64) error {
+	t.record(seq, seqtracker.StatusCompleted)
+	return nil
+}
+
+func (t *trackerRecorder) MarkFailed(_ context.Context, _ string, seq uint64, _ string) error {
+	t.record(seq, seqtracker.StatusFailed)
+	return nil
+}
+
+func (*trackerRecorder) GetLastCompletedSeq(context.Context, string) (uint64, error) {
+	return 0, nil
+}
+
+func (*trackerRecorder) GetLastTerminalSeq(context.Context, string) (uint64, error) {
+	return 0, nil
+}
+
+func (*trackerRecorder) IsDuplicate(context.Context, string, uint64) (bool, error) {
+	return false, nil
+}
+
+func (*trackerRecorder) IsTerminal(context.Context, string, uint64) (bool, error) {
+	return false, nil
+}
+
+func (*trackerRecorder) Close() error { return nil }
+
+func (t *trackerRecorder) record(seq uint64, status seqtracker.Status) {
+	t.mu.Lock()
+	t.calls = append(t.calls, trackerCall{seq: seq, status: status})
+	t.mu.Unlock()
+}
+
+func (t *trackerRecorder) statuses() []trackerCall {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return append([]trackerCall(nil), t.calls...)
+}
+
+func (*handlerRuntime) Name() string { return "test" }
+
+func (r *handlerRuntime) Execute(
+	context.Context,
+	agent.ExecutionRequest,
+	agent.Observer,
+) (agent.ExecutionResult, error) {
+	close(r.started)
+	<-r.release
+	return agent.ExecutionResult{Message: "done"}, nil
+}
+
+func TestHandlerWaitsForExecutionAndPublishesReplyMessageIDs(t *testing.T) {
+	runtime := &handlerRuntime{started: make(chan struct{}), release: make(chan struct{})}
+	registry := agent.NewRegistry()
+	registry.Register("test", runtime)
+	registry.SetDefault("test")
+	service := assistant.NewService(
+		handlerPreparer{},
+		agent.NewExecutor(registry),
+		handlerFinalizer{},
+		assistant.NewJournalFactory(),
+	)
+	publisher := &handlerPublisher{}
+	handler, err := New(Config{
+		OrgID:          1,
+		WorkerID:       2,
+		MaxConcurrency: 1,
+		DebounceWindow: 5 * time.Millisecond,
+	}, publisher, service)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	tracker := &trackerRecorder{}
+	handler.seqTracker = tracker
+	defer handler.Close()
+
+	command := messaging.NewRunCommand(
+		"message-1",
+		messaging.RouteContext{OrgID: 1, WorkerID: 2, SessionID: "session-1"},
+		messaging.TraceContext{
+			TraceID:   "trace-1",
+			RequestID: "request-1",
+			TaskID:    "task-1",
+			RunID:     "run-1",
+		},
+		messaging.RunCommandPayload{
+			TaskType: messaging.TaskTypeAgentRun,
+			Execution: messaging.ExecutionTarget{
+				AssistantID: "assistant-1",
 			},
-			emit: cancelledEvent,
-		},
-		seqTracker: tracker,
-	}
-	task := testRunTask()
-	task.Route.SessionID = "session_1"
-	setSeqs(&task, []uint64{7})
-
-	if err := h.executeWithTracker(context.Background(), task); err != nil {
-		t.Fatalf("executeWithTracker error = %v, want nil for cancellation", err)
-	}
-
-	if !sameSeqs(tracker.completed, []uint64{7}) {
-		t.Fatalf("completed seqs = %v, want [7]", tracker.completed)
-	}
-	if len(tracker.failed) != 0 {
-		t.Fatalf("failed seqs = %#v, want none", tracker.failed)
-	}
-	if len(publisher.calls) != 1 {
-		t.Fatalf("published events = %d, want one state lane publish", len(publisher.calls))
-	}
-	for _, call := range publisher.calls {
-		evt, ok := call.event.(messaging.RunEvent)
-		if !ok {
-			t.Fatalf("published event = %#v, want RunEvent", call.event)
-		}
-		if evt.Body.Event == messaging.RunEventRunFailed {
-			t.Fatalf("published run.failed for cancellation: %#v", evt)
-		}
-	}
-}
-
-func TestConsumerExecuteWithTrackerEmitsRunFailedWhenPrepareWorkspaceFails(t *testing.T) {
-	t.Setenv(leros.EnvWorkspaceRoot, t.TempDir())
-
-	tracker := &fakeSeqTracker{}
-	publisher := &fakePublisher{}
-	h := &Handler{
-		cfg:        Config{OrgID: 1, WorkerID: 2},
-		publisher:  publisher,
-		runner:     &fakeRunner{},
-		seqTracker: tracker,
-	}
-	task := testRunTask()
-	task.Route.SessionID = "session_1"
-	task.Workspace.ProjectID = "project_1"
-	// Use invalid work_dir to trigger workspace prepare failure, verifying run.failed is emitted.
-	task.Runtime.WorkDir = "../escape"
-	setSeqs(&task, []uint64{9})
-
-	err := h.executeWithTracker(context.Background(), task)
-	if err == nil {
-		t.Fatal("executeWithTracker error = nil, want workspace prepare error")
-	}
-
-	if tracker.failed[9] == "" {
-		t.Fatalf("failed seq 9 should be recorded, got %q", tracker.failed[9])
-	}
-	if len(publisher.calls) != 1 {
-		t.Fatalf("published events = %d, want one state lane publish", len(publisher.calls))
-	}
-	if evt, ok := publisher.calls[0].event.(messaging.RunEvent); !ok ||
-		evt.Body.Event != messaging.RunEventRunFailed {
-		t.Fatalf("first published event = %#v, want run.failed event", publisher.calls[0].event)
-	}
-}
-
-func testRunTask() runTask {
-	return runTask{
-		ID:        "msg_1",
-		CreatedAt: time.Now().UTC(),
-		Trace: messaging.TraceContext{
-			TraceID: "trace_1",
-			TaskID:  "task_1",
-			RunID:   "run_1",
-		},
-		Route: messaging.RouteContext{
-			OrgID:    1,
-			WorkerID: 2,
-		},
-		TaskType: messaging.TaskTypeAgentRun,
-		Input: messaging.TaskInput{
-			Type: messaging.InputTypeMessage,
-			Messages: []messaging.ChatMessage{
-				{Role: messaging.MessageRoleUser, Content: "hello"},
+			Input: messaging.TaskInput{
+				Type: messaging.InputTypeMessage,
+				Messages: []messaging.ChatMessage{
+					{ID: "user-message-1", Role: messaging.MessageRoleUser, Content: "first"},
+					{ID: "user-message-1", Role: messaging.MessageRoleUser, Content: "duplicate"},
+					{ID: "user-message-2", Role: messaging.MessageRoleUser, Content: "second"},
+				},
 			},
+			Model: messaging.ModelOptions{
+				Provider: "openai",
+				Model:    "test-model",
+				APIKey:   "test-key",
+			},
+			Runtime: messaging.RuntimeOptions{Kind: "test"},
 		},
-		Model: messaging.ModelOptions{
-			Provider: "openai",
-			Model:    "gpt-4.1",
-			APIKey:   "test-key",
-		},
-	}
-}
+		nil,
+	)
 
-func sameSeqs(got []uint64, want []uint64) bool {
-	if len(got) != len(want) {
-		return false
+	completed := make(chan error, 1)
+	go func() {
+		completed <- handler.HandleRunCommand(context.Background(), command, &nats.Msg{
+			Reply: "$JS.ACK.stream.consumer.1.42.1.123456789.0",
+			Sub:   &nats.Subscription{},
+		})
+	}()
+	<-runtime.started
+	if calls := tracker.statuses(); len(calls) != 1 ||
+		calls[0].seq != 42 ||
+		calls[0].status != seqtracker.StatusProcessing {
+		t.Fatalf("statuses before completion = %#v", calls)
 	}
-	for i := range got {
-		if got[i] != want[i] {
-			return false
+	select {
+	case err := <-completed:
+		t.Fatalf("handler returned before runtime completed: %v", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(runtime.release)
+	if err := <-completed; err != nil {
+		t.Fatalf("HandleRunCommand() error = %v", err)
+	}
+	if calls := tracker.statuses(); len(calls) != 2 ||
+		calls[1].seq != 42 ||
+		calls[1].status != seqtracker.StatusCompleted {
+		t.Fatalf("statuses after completion = %#v", calls)
+	}
+
+	publisher.mu.Lock()
+	defer publisher.mu.Unlock()
+	var terminal *messaging.RunEvent
+	for i := range publisher.events {
+		if publisher.events[i].Body.Event == messaging.RunEventRunCompleted {
+			terminal = &publisher.events[i]
+			break
 		}
 	}
-	return true
+	if terminal == nil {
+		t.Fatalf("published events = %#v", publisher.events)
+	}
+	replyIDs := terminal.Body.ReplyToMessageIDs
+	if len(replyIDs) != 2 || replyIDs[0] != "user-message-1" || replyIDs[1] != "user-message-2" {
+		t.Fatalf("reply ids = %v", replyIDs)
+	}
 }

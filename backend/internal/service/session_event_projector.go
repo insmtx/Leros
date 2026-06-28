@@ -3,9 +3,11 @@ package service
 import (
 	"encoding/json"
 
+	"github.com/insmtx/Leros/backend/agent"
+	"github.com/insmtx/Leros/backend/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/api/dto"
-	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	assistantdomain "github.com/insmtx/Leros/backend/internal/assistant/domain"
 	"github.com/insmtx/Leros/backend/pkg/messaging"
 	"github.com/insmtx/Leros/backend/types"
 )
@@ -42,7 +44,7 @@ func ProjectRunEvent(runEvent messaging.RunEvent) (*dto.SessionEvent, bool) {
 		event.Payload = dto.ToolCallDeltaPayload{
 			ToolCallID: runEvent.Body.Payload.ToolCall.ToolCallID,
 			Name:       runEvent.Body.Payload.ToolCall.Name,
-			Arguments:  runEvent.Body.Payload.ToolCall.Arguments,
+			Arguments:  events.MarshalRaw(runEvent.Body.Payload.ToolCall.Arguments),
 		}
 	case messaging.RunEventToolCallFinished:
 		if runEvent.Body.Payload.ToolResult == nil {
@@ -52,7 +54,7 @@ func ProjectRunEvent(runEvent messaging.RunEvent) (*dto.SessionEvent, bool) {
 		event.Payload = toolCallResultPayload(&events.ToolCallResultPayload{
 			ToolCallID: runEvent.Body.Payload.ToolResult.ToolCallID,
 			Name:       runEvent.Body.Payload.ToolResult.Name,
-			Result:     runEvent.Body.Payload.ToolResult.Result,
+			Result:     events.MarshalRaw(runEvent.Body.Payload.ToolResult.Result),
 			Error:      runEvent.Body.Payload.ToolResult.Error,
 			IsError:    runEvent.Body.Payload.ToolResult.IsError,
 			ElapsedMS:  runEvent.Body.Payload.ToolResult.ElapsedMS,
@@ -69,23 +71,19 @@ func ProjectRunEvent(runEvent messaging.RunEvent) (*dto.SessionEvent, bool) {
 		}
 		event.Type = events.EventArtifactDeclared
 		event.Payload = events.ArtifactPayload{
-			ArtifactID:  runEvent.Body.Payload.Artifact.ArtifactID,
-			Title:       runEvent.Body.Payload.Artifact.Title,
-			Filename:    runEvent.Body.Payload.Artifact.Filename,
-			MimeType:    runEvent.Body.Payload.Artifact.MimeType,
+			ArtifactID:   runEvent.Body.Payload.Artifact.ArtifactID,
+			Title:        runEvent.Body.Payload.Artifact.Title,
+			Filename:     runEvent.Body.Payload.Artifact.Filename,
+			MimeType:     runEvent.Body.Payload.Artifact.MimeType,
 			ArtifactType: runEvent.Body.Payload.Artifact.ArtifactType,
-			CreatedAt:   runEvent.CreatedAt,
+			CreatedAt:    runEvent.CreatedAt,
 		}
 	case messaging.RunEventRunStarted:
 		event.Type = events.EventStarted
 	case messaging.RunEventRunCompleted:
 		event.Type = events.EventCompleted
 		if runEvent.Body.RunCompleted != nil {
-			msg := runEvent.Body.RunCompleted.Result.Message
-			event.Payload = &events.RunCompletedPayload{
-				Status: runEvent.Body.RunCompleted.Status,
-				Result: events.RunResultPayload{Message: msg},
-			}
+			event.Payload = terminalPayloadFromMessaging(runEvent.Body.RunCompleted, runEvent.Body.Error)
 		}
 	case messaging.RunEventApprovalRequested:
 		event.Type = events.EventApprovalRequested
@@ -113,10 +111,14 @@ func ProjectRunEvent(runEvent messaging.RunEvent) (*dto.SessionEvent, bool) {
 		if runEvent.Body.Error != nil {
 			message = runEvent.Body.Error.Message
 		}
-		event.Payload = dto.RunStatusPayload{
-			Status:  "failed",
-			RunID:   runEvent.Trace.RunID,
-			Message: message,
+		if runEvent.Body.RunCompleted != nil {
+			event.Payload = terminalPayloadFromMessaging(runEvent.Body.RunCompleted, runEvent.Body.Error)
+		} else {
+			event.Payload = dto.RunStatusPayload{
+				Status:  "failed",
+				RunID:   runEvent.Trace.RunID,
+				Message: message,
+			}
 		}
 	case messaging.RunEventRunCancelled:
 		event.Type = events.EventCancelled
@@ -124,10 +126,14 @@ func ProjectRunEvent(runEvent messaging.RunEvent) (*dto.SessionEvent, bool) {
 		if runEvent.Body.RunCompleted != nil && runEvent.Body.RunCompleted.Result.Message != "" {
 			message = runEvent.Body.RunCompleted.Result.Message
 		}
-		event.Payload = dto.RunStatusPayload{
-			Status:  "cancelled",
-			RunID:   runEvent.Trace.RunID,
-			Message: message,
+		if runEvent.Body.RunCompleted != nil {
+			event.Payload = terminalPayloadFromMessaging(runEvent.Body.RunCompleted, runEvent.Body.Error)
+		} else {
+			event.Payload = dto.RunStatusPayload{
+				Status:  "cancelled",
+				RunID:   runEvent.Trace.RunID,
+				Message: message,
+			}
 		}
 	default:
 		return nil, false
@@ -160,17 +166,22 @@ func ProjectRunEventRecord(sessionID string, chunk types.MessageChunk) (*contrac
 		Timestamp: chunk.Timestamp,
 	}
 
-	switch events.EventType(chunk.Type) {
+	switch agent.EventType(chunk.Type) {
 	case events.EventStarted:
 		event.Type = string(events.EventStarted)
 	case events.EventCompleted:
 		event.Type = string(events.EventCompleted)
-		if payload, ok := decodeChunkPayload[events.RunCompletedPayload](chunk); ok {
+		if payload, ok := decodeTerminalChunk(chunk); ok {
 			event.Payload = payload
 		}
-	case events.EventFailed, events.EventCancelled:
+	case events.EventFailed:
 		event.Type = string(events.EventFailed)
-		if payload, ok := decodeChunkPayload[events.RunCompletedPayload](chunk); ok {
+		if payload, ok := decodeTerminalChunk(chunk); ok {
+			event.Payload = payload
+		}
+	case events.EventCancelled:
+		event.Type = string(events.EventCancelled)
+		if payload, ok := decodeTerminalChunk(chunk); ok {
 			event.Payload = payload
 		}
 	case events.EventMessageDelta:
@@ -269,31 +280,6 @@ func ProjectRunEventRecord(sessionID string, chunk types.MessageChunk) (*contrac
 	return event, true
 }
 
-func publicStreamArtifactPayload(payload events.ArtifactPayload) events.ArtifactPayload {
-	return events.ArtifactPayload{
-		ArtifactID:   payload.ArtifactID,
-		Title:        payload.Title,
-		Filename:     payload.Filename,
-		MimeType:     payload.MimeType,
-		ArtifactType: payload.ArtifactType,
-		CreatedAt:    payload.CreatedAt,
-	}
-}
-
-func publicRunCompletedPayload(payload *events.RunCompletedPayload) *events.RunCompletedPayload {
-	if payload == nil {
-		return nil
-	}
-	result := *payload
-	if len(payload.Artifacts) > 0 {
-		result.Artifacts = make([]events.ArtifactPayload, 0, len(payload.Artifacts))
-		for _, artifact := range payload.Artifacts {
-			result.Artifacts = append(result.Artifacts, publicStreamArtifactPayload(artifact))
-		}
-	}
-	return &result
-}
-
 func decodeChunkPayload[T any](chunk types.MessageChunk) (T, bool) {
 	var value T
 	if len(chunk.Payload) == 0 {
@@ -305,9 +291,97 @@ func decodeChunkPayload[T any](chunk types.MessageChunk) (T, bool) {
 	return value, true
 }
 
+func decodeTerminalChunk(chunk types.MessageChunk) (dto.RunTerminalPayload, bool) {
+	payload, ok := decodeChunkPayload[assistantdomain.TerminalPayload](chunk)
+	if !ok {
+		return dto.RunTerminalPayload{}, false
+	}
+	return terminalPayloadFromDomain(payload), true
+}
+
+func terminalPayloadFromDomain(payload assistantdomain.TerminalPayload) dto.RunTerminalPayload {
+	return dto.RunTerminalPayload{
+		Status:      payload.Status,
+		Result:      messaging.RunResultPayload{Message: payload.Message},
+		Error:       payload.Error,
+		Artifacts:   append([]assistantdomain.ArtifactRecord(nil), payload.Artifacts...),
+		Usage:       payload.Usage,
+		Events:      append([]assistantdomain.TerminalEventRecord(nil), payload.Events...),
+		StartedAt:   payload.StartedAt,
+		CompletedAt: payload.CompletedAt,
+		Metadata:    payload.Metadata,
+	}
+}
+
+func terminalPayloadFromMessaging(
+	payload *messaging.RunCompletedPayload,
+	runError *messaging.RunEventError,
+) dto.RunTerminalPayload {
+	if payload == nil {
+		return dto.RunTerminalPayload{}
+	}
+	result := dto.RunTerminalPayload{
+		Status:      payload.Status,
+		Result:      payload.Result,
+		StartedAt:   payload.StartedAt,
+		CompletedAt: payload.CompletedAt,
+	}
+	if runError != nil {
+		result.Error = runError.Message
+	}
+	if payload.Usage != nil {
+		result.Usage = &agent.Usage{
+			InputTokens:  payload.Usage.InputTokens,
+			OutputTokens: payload.Usage.OutputTokens,
+			TotalTokens:  payload.Usage.TotalTokens,
+		}
+	}
+	for _, artifact := range payload.Artifacts {
+		result.Artifacts = append(result.Artifacts, assistantdomain.ArtifactRecord{
+			ArtifactID:   artifact.ArtifactID,
+			Title:        artifact.Title,
+			Filename:     artifact.Filename,
+			Description:  artifact.Description,
+			MimeType:     artifact.MimeType,
+			ArtifactType: artifact.ArtifactType,
+			FileSize:     artifact.FileSize,
+			RelativePath: artifact.RelativePath,
+			StorageKey:   artifact.StorageKey,
+			Sha256:       artifact.Sha256,
+			Source:       artifact.Source,
+			Status:       artifact.Status,
+		})
+	}
+	for _, record := range payload.Events {
+		result.Events = append(result.Events, assistantdomain.TerminalEventRecord{
+			Seq:       record.Seq,
+			LastSeq:   record.LastSeq,
+			Type:      record.Type,
+			Timestamp: record.Timestamp,
+			Payload:   append(json.RawMessage(nil), record.Payload...),
+		})
+	}
+	if payload.Metadata != nil {
+		result.Metadata = &assistantdomain.RunMetadata{
+			Runtime:    payload.Metadata.Runtime,
+			WorkDir:    payload.Metadata.WorkDir,
+			ProviderID: payload.Metadata.ProviderID,
+			SessionID:  payload.Metadata.SessionID,
+			Phase:      payload.Metadata.Phase,
+			Resume:     payload.Metadata.Resume,
+		}
+	}
+	return result
+}
+
 func toolCallResultPayload(result *events.ToolCallResultPayload) dto.ToolCallResultPayload {
 	status := "success"
-	value := result.Result
+	var value any
+	if len(result.Result) > 0 {
+		if err := json.Unmarshal(result.Result, &value); err != nil {
+			value = string(result.Result)
+		}
+	}
 	if result.IsError {
 		status = "error"
 		if value == nil {

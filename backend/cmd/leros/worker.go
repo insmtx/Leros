@@ -13,12 +13,14 @@ import (
 	"strings"
 	"time"
 
+	engines "github.com/insmtx/Leros/backend/agent/runtime/provider"
 	"github.com/insmtx/Leros/backend/config"
-	"github.com/insmtx/Leros/backend/engines"
-	"github.com/insmtx/Leros/backend/engines/builtin"
+	agentruntime "github.com/insmtx/Leros/backend/internal/assistant/bootstrap"
+	builtin "github.com/insmtx/Leros/backend/internal/assistant/bootstrap/builtin"
+	skilllinks "github.com/insmtx/Leros/backend/internal/assistant/bootstrap/skilllinks"
 	"github.com/insmtx/Leros/backend/internal/infra/mq"
-	agentruntime "github.com/insmtx/Leros/backend/internal/runtime"
-	runtimemcp "github.com/insmtx/Leros/backend/internal/runtime/mcp"
+	localmemory "github.com/insmtx/Leros/backend/internal/memory/local"
+	modelrouter "github.com/insmtx/Leros/backend/internal/modelrouter"
 	"github.com/insmtx/Leros/backend/internal/worker/command"
 	"github.com/insmtx/Leros/backend/internal/worker/command/interaction"
 	"github.com/insmtx/Leros/backend/internal/worker/command/run"
@@ -191,7 +193,7 @@ func runTaskWorker(defaultRuntime string) {
 		logs.Fatalf("Failed to ensure state dir: %v", err)
 		return
 	}
-	if err := engines.SyncToLerosDir(""); err != nil {
+	if err := skilllinks.SyncToLerosDir(""); err != nil {
 		logs.Warnf("Sync worker built-in skills failed: %v", err)
 	}
 	identity.Set(identity.Profile{
@@ -202,11 +204,12 @@ func runTaskWorker(defaultRuntime string) {
 		// WorkerAddr is the worker HTTP service address, for example ":8081" or "127.0.0.1:8081".
 		WorkerAddr: workerListenAddr,
 	})
-	// Setup MCP auth token before starting HTTP server so /v1/mcp uses the configured value.
+	var mcpToken string
 	if cfg.CLI != nil && cfg.CLI.MCP != nil {
-		runtimemcp.SetAuthToken(cfg.CLI.MCP.BearerToken)
+		mcpToken = cfg.CLI.MCP.BearerToken
 	}
-	httpServer, err := startWorkerHTTPServer(workerListenAddr)
+	modelStore := modelrouter.NewModelStore()
+	httpServer, err := startWorkerHTTPServer(workerListenAddr, modelStore, mcpToken)
 	if err != nil {
 		logs.Fatalf("Failed to start worker HTTP server: %v", err)
 		return
@@ -246,10 +249,23 @@ func runTaskWorker(defaultRuntime string) {
 		}
 		cliSkillDirs = bootstrapSvc.GetSkillDirs()
 	}
+	interactionRouter := engines.NewInteractionRouter()
+	memoryStore, err := localmemory.NewStore(localmemory.Options{})
+	if err != nil {
+		cancel()
+		_ = bus.Close()
+		logs.Fatalf("Failed to create memory store: %v", err)
+		return
+	}
 	runtimeService, err := agentruntime.NewService(ctx, agentruntime.Options{
-		CLIConfig:      cfg.CLI,
-		DefaultRuntime: defaultRuntime,
-		CLISkillDirs:   cliSkillDirs,
+		CLIConfig:         cfg.CLI,
+		DefaultRuntime:    defaultRuntime,
+		CLISkillDirs:      cliSkillDirs,
+		GiteaCfg:          cfg.Gitea,
+		Env:               cfg.Env,
+		InteractionRouter: interactionRouter,
+		ModelStore:        modelStore,
+		MemoryStore:       memoryStore,
 	})
 	if err != nil {
 		cancel()
@@ -271,7 +287,7 @@ func runTaskWorker(defaultRuntime string) {
 		WorkerID:       cfg.WorkerID,
 		Env:            cfg.Env,
 		SeqTrackerPath: seqTrackerPath,
-	}, bus, runtimeService, cfg.Gitea)
+	}, bus, runtimeService.AssistantService())
 	if err != nil {
 		cancel()
 		_ = bus.Close()
@@ -279,7 +295,7 @@ func runTaskWorker(defaultRuntime string) {
 		return
 	}
 
-	interactionHandler := interaction.New(engines.DefaultInteractionRouter)
+	interactionHandler := interaction.New(interactionRouter)
 
 	skillHandler, err := skill.New(bus.Conn())
 	if err != nil {
@@ -440,7 +456,11 @@ func workerTokenEndpoint(serverAddr string) string {
 	return fmt.Sprintf("http://%s/v1/workers/token", serverAddr)
 }
 
-func startWorkerHTTPServer(addr string) (*http.Server, error) {
+func startWorkerHTTPServer(
+	addr string,
+	modelStore *modelrouter.ModelStore,
+	mcpToken string,
+) (*http.Server, error) {
 	if strings.TrimSpace(addr) == "" {
 		addr = ":8081"
 	}
@@ -448,7 +468,7 @@ func startWorkerHTTPServer(addr string) (*http.Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("listen on %s: %w", addr, err)
 	}
-	r := router.SetupRouter()
+	r := router.SetupRouter(modelStore, mcpToken)
 	server := &http.Server{
 		Addr:    addr,
 		Handler: r,

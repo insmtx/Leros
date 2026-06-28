@@ -89,10 +89,10 @@ type RunEvent = Envelope[RunEventBody]
 
 // RunEventBody 是单个运行事件的 payload。
 type RunEventBody struct {
-	Seq               int64         `json:"seq"`
-	Event             RunEventType  `json:"event"`
+	Seq               int64           `json:"seq"`
+	Event             RunEventType    `json:"event"`
 	Payload           RunEventPayload `json:"payload"`
-	ReplyToMessageIDs []string      `json:"reply_to_message_ids,omitempty"`
+	ReplyToMessageIDs []string        `json:"reply_to_message_ids,omitempty"`
 
 	// RunCompleted 仅在终端事件（run.completed/failed/cancelled）时填充。
 	RunCompleted *RunCompletedPayload `json:"run_completed,omitempty"`
@@ -102,14 +102,14 @@ type RunEventBody struct {
 
 // RunEventPayload 携带流事件的特定内容。
 type RunEventPayload struct {
-	MessageID        string              `json:"message_id,omitempty"`
-	Role             MessageRole         `json:"role,omitempty"`
-	Content          string              `json:"content,omitempty"`
-	Usage            *UsagePayload       `json:"usage,omitempty"`
-	ToolCall         *ToolCallPayload    `json:"tool_call,omitempty"`
-	ToolResult       *ToolCallResultPayload `json:"tool_result,omitempty"`
-	Todos            []RuntimeTodoItem   `json:"todos,omitempty"`
-	Artifact         *ArtifactPayload    `json:"artifact,omitempty"`
+	MessageID        string                   `json:"message_id,omitempty"`
+	Role             MessageRole              `json:"role,omitempty"`
+	Content          string                   `json:"content,omitempty"`
+	Usage            *UsagePayload            `json:"usage,omitempty"`
+	ToolCall         *ToolCallPayload         `json:"tool_call,omitempty"`
+	ToolResult       *ToolCallResultPayload   `json:"tool_result,omitempty"`
+	Todos            []RuntimeTodoItem        `json:"todos,omitempty"`
+	Artifact         *ArtifactPayload         `json:"artifact,omitempty"`
 	ApprovalRequest  *ApprovalRequestPayload  `json:"approval_request,omitempty"`
 	ApprovalDecision *ApprovalDecisionPayload `json:"approval_decision,omitempty"`
 	QuestionRequest  *QuestionRequestPayload  `json:"question_request,omitempty"`
@@ -133,19 +133,19 @@ type UsagePayload struct {
 
 // ToolCallPayload 是工具调用开始和参数事件的标准负载。
 type ToolCallPayload struct {
-	ToolCallID string         `json:"tool_call_id"`
-	Name       string         `json:"name"`
-	Arguments  map[string]any `json:"arguments,omitempty"`
+	ToolCallID string          `json:"tool_call_id"`
+	Name       string          `json:"name"`
+	Arguments  json.RawMessage `json:"arguments,omitempty"`
 }
 
 // ToolCallResultPayload 是工具调用终止事件的标准负载。
 type ToolCallResultPayload struct {
-	ToolCallID string `json:"tool_call_id"`
-	Name       string `json:"name,omitempty"`
-	Result     any    `json:"result,omitempty"`
-	Error      string `json:"error,omitempty"`
-	IsError    bool   `json:"is_error"`
-	ElapsedMS  int64  `json:"elapsed_ms,omitempty"`
+	ToolCallID string          `json:"tool_call_id"`
+	Name       string          `json:"name,omitempty"`
+	Result     json.RawMessage `json:"result,omitempty"`
+	Error      string          `json:"error,omitempty"`
+	IsError    bool            `json:"is_error"`
+	ElapsedMS  int64           `json:"elapsed_ms,omitempty"`
 }
 
 // RuntimeTodoItem 描述一个运行时本地规划步骤。
@@ -174,12 +174,12 @@ type ArtifactPayload struct {
 
 // ApprovalRequestPayload 描述需要用户审批的工具调用。
 type ApprovalRequestPayload struct {
-	RequestID   string         `json:"request_id"`
-	ToolName    string         `json:"tool_name"`
-	ToolCallID  string         `json:"tool_call_id,omitempty"`
-	Description string         `json:"description"`
-	Arguments   map[string]any `json:"arguments,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
+	RequestID   string            `json:"request_id"`
+	ToolName    string            `json:"tool_name"`
+	ToolCallID  string            `json:"tool_call_id,omitempty"`
+	Description string            `json:"description"`
+	Arguments   json.RawMessage   `json:"arguments,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
 // ApprovalDecisionPayload 描述审批结果。
@@ -191,12 +191,12 @@ type ApprovalDecisionPayload struct {
 
 // QuestionRequestPayload 描述引擎向用户提出的澄清问题。
 type QuestionRequestPayload struct {
-	RequestID  string         `json:"request_id"`
-	SessionID  string         `json:"session_id,omitempty"`
-	Questions  []QuestionItem `json:"questions"`
-	ToolCallID string         `json:"tool_call_id,omitempty"`
-	MessageID  string         `json:"message_id,omitempty"`
-	Metadata   map[string]any `json:"metadata,omitempty"`
+	RequestID  string            `json:"request_id"`
+	SessionID  string            `json:"session_id,omitempty"`
+	Questions  []QuestionItem    `json:"questions"`
+	ToolCallID string            `json:"tool_call_id,omitempty"`
+	MessageID  string            `json:"message_id,omitempty"`
+	Metadata   map[string]string `json:"metadata,omitempty"`
 }
 
 // QuestionItem 是问题请求中的单个问题。
@@ -224,14 +224,24 @@ type QuestionAnswerPayload struct {
 
 // RunCompletedPayload 归档完整的成功运行。
 type RunCompletedPayload struct {
-	Status      string            `json:"status"`
-	Result      RunResultPayload  `json:"result"`
-	Artifacts   []ArtifactPayload `json:"artifacts,omitempty"`
-	Usage       *UsagePayload     `json:"usage,omitempty"`
-	Events      []RunEventRecord  `json:"events,omitempty"`
-	StartedAt   string            `json:"started_at,omitempty"`
-	CompletedAt string            `json:"completed_at,omitempty"`
-	Metadata    map[string]any    `json:"metadata,omitempty"`
+	Status      string              `json:"status"`
+	Result      RunResultPayload    `json:"result"`
+	Artifacts   []ArtifactPayload   `json:"artifacts,omitempty"`
+	Usage       *UsagePayload       `json:"usage,omitempty"`
+	Events      []RunEventRecord    `json:"events,omitempty"`
+	StartedAt   string              `json:"started_at,omitempty"`
+	CompletedAt string              `json:"completed_at,omitempty"`
+	Metadata    *RunMetadataPayload `json:"metadata,omitempty"`
+}
+
+// RunMetadataPayload contains typed run metadata while preserving the wire JSON object.
+type RunMetadataPayload struct {
+	Runtime    string `json:"runtime,omitempty"`
+	WorkDir    string `json:"work_dir,omitempty"`
+	ProviderID string `json:"provider_id,omitempty"`
+	SessionID  string `json:"session_id,omitempty"`
+	Phase      string `json:"phase,omitempty"`
+	Resume     bool   `json:"resume,omitempty"`
 }
 
 // RunResultPayload 描述 run.completed 中归档的最终助手结果。

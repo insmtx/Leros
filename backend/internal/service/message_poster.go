@@ -44,12 +44,12 @@ type MessagePoster struct {
 // NewMessagePoster 创建 MessagePoster 实例。
 func NewMessagePoster(db *gorm.DB, eb eventbus.EventBus, inferrer AssistantInferrer, giteaClient *gitea.Client, giteaCfg *config.GiteaConfig, env string, titleUpdater TitleUpdater) *MessagePoster {
 	return &MessagePoster{
-		db:          db,
-		eventbus:    eb,
-		inferrer:    inferrer,
-		giteaClient: giteaClient,
-		giteaCfg:    giteaCfg,
-		env:         env,
+		db:           db,
+		eventbus:     eb,
+		inferrer:     inferrer,
+		giteaClient:  giteaClient,
+		giteaCfg:     giteaCfg,
+		env:          env,
 		titleUpdater: titleUpdater,
 	}
 }
@@ -439,10 +439,10 @@ func (p *MessagePoster) publishWorkerTask(ctx context.Context, session *types.Se
 			},
 			Model: modelOptions,
 		},
-		map[string]any{
-			"session_id":   session.PublicID,
-			"message_type": message.MessageType,
-			"sequence":     message.Sequence,
+		&messaging.RunCommandMetadata{
+			SessionID:   session.PublicID,
+			MessageType: message.MessageType,
+			Sequence:    message.Sequence,
 		},
 	)
 

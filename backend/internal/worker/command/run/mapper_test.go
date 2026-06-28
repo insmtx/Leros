@@ -35,9 +35,6 @@ func TestRequestFromWorkerTaskMapsWorkspaceContext(t *testing.T) {
 				{Role: messaging.MessageRoleUser, Content: "hello"},
 			},
 		},
-		Metadata: map[string]any{
-			"source": "test",
-		},
 	}
 
 	req := RequestFromWorkerTask(task)
@@ -58,9 +55,16 @@ func TestRequestFromWorkerTaskMapsWorkspaceContext(t *testing.T) {
 		t.Fatalf("workspace request id = %q, want req_1", req.Workspace.RequestID)
 	}
 
-	for _, key := range []string{"org_id", "worker_id", "session_id", "task_id", "request_id", "agent_id", "project_id"} {
-		if _, ok := req.Metadata[key]; ok {
-			t.Fatalf("metadata should not carry %q: %#v", key, req.Metadata)
-		}
+}
+
+func TestReplyToMessageIDsDeduplicatesInputMessageIDs(t *testing.T) {
+	got := replyToMessageIDs([]messaging.ChatMessage{
+		{ID: " 1 "},
+		{ID: ""},
+		{ID: "2"},
+		{ID: "1"},
+	})
+	if len(got) != 2 || got[0] != "1" || got[1] != "2" {
+		t.Fatalf("replyToMessageIDs() = %v, want [1 2]", got)
 	}
 }

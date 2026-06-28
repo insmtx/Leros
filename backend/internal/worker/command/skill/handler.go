@@ -20,7 +20,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/insmtx/Leros/backend/engines"
+	skilllinks "github.com/insmtx/Leros/backend/internal/assistant/bootstrap/skilllinks"
 	"github.com/insmtx/Leros/backend/internal/skill/catalog"
 	"github.com/insmtx/Leros/backend/internal/skill/fetch"
 	skillstore "github.com/insmtx/Leros/backend/internal/skill/store"
@@ -231,7 +231,7 @@ func (h *Handler) installSkillContent(ctx context.Context, skillContent []byte, 
 		"~/.claude/skills",
 		"~/.agents/skills",
 	}
-	if err := engines.EnsureExternalSkillLink(name, knownCLISkillDirs); err != nil {
+	if err := skilllinks.EnsureExternalSkillLink(name, knownCLISkillDirs); err != nil {
 		logs.WarnContextf(ctx, "sync external links for %q: %v", name, err)
 	}
 

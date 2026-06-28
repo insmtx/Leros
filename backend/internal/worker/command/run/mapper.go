@@ -3,72 +3,71 @@ package run
 import (
 	"strings"
 
-	"github.com/insmtx/Leros/backend/internal/agent"
+	assistantdomain "github.com/insmtx/Leros/backend/internal/assistant/domain"
 	"github.com/insmtx/Leros/backend/pkg/messaging"
 )
 
 // RequestFromWorkerTask converts the internal runTask into the agent runtime boundary.
-func RequestFromWorkerTask(task runTask) *agent.RequestContext {
-	return &agent.RequestContext{
+func RequestFromWorkerTask(task runTask) *assistantdomain.RunRequest {
+	return &assistantdomain.RunRequest{
 		RunID:   firstNonEmpty(task.Trace.RunID, task.Trace.TaskID, task.ID),
 		TraceID: task.Trace.TraceID,
 		TaskID:  task.Trace.TaskID,
-		Assistant: agent.AssistantContext{
+		Assistant: assistantdomain.AssistantContext{
 			ID:     task.Execution.AssistantID,
 			Skills: append([]string(nil), task.Execution.Skills...),
 			Tools:  append([]string(nil), task.Execution.Tools...),
 		},
-		Actor: agent.ActorContext{
+		Actor: assistantdomain.ActorContext{
 			UserID:      task.Actor.UserID,
 			DisplayName: task.Actor.DisplayName,
 			Channel:     task.Actor.Channel,
 			ExternalID:  task.Actor.ExternalID,
 			AccountID:   task.Actor.AccountID,
 		},
-		Conversation: agent.ConversationContext{
+		Conversation: assistantdomain.ConversationContext{
 			ID: task.Route.SessionID,
 		},
-		Workspace: agent.WorkspaceContext{
+		Workspace: assistantdomain.WorkspaceContext{
 			OrgID:     task.Route.OrgID,
 			ProjectID: task.Workspace.ProjectID,
 			TaskID:    task.Trace.TaskID,
-			RequestID: task.Trace.RequestID,
+			RequestID: firstNonEmpty(task.Trace.RequestID, task.ID),
 		},
-		Input: agent.InputContext{
-			Type:        agent.InputType(task.Input.Type),
+		Input: assistantdomain.InputContext{
+			Type:        assistantdomain.InputType(task.Input.Type),
 			Messages:    inputMessagesFromTask(task.Input.Messages),
 			Attachments: attachmentsFromTask(task.Input.Attachments),
 		},
-		Runtime: agent.RuntimeOptions{
+		Runtime: assistantdomain.RuntimeOptions{
 			Kind:    task.Runtime.Kind,
 			WorkDir: task.Runtime.WorkDir,
 			MaxStep: task.Runtime.MaxStep,
 		},
-		Model: agent.ModelOptions{
+		Model: assistantdomain.ModelOptions{
 			Provider:     task.Model.Provider,
 			Model:        task.Model.Model,
 			APIKey:       task.Model.APIKey,
 			BaseURL:      task.Model.BaseURL,
 			BaseURLHasV1: task.Model.BaseURLHasV1,
 		},
-		Capability: agent.CapabilityContext{
+		Capability: assistantdomain.CapabilityContext{
 			AllowedTools: append([]string(nil), task.Execution.Tools...),
 		},
-		Policy: agent.PolicyContext{
+		Policy: assistantdomain.PolicyContext{
 			RequireApproval: task.Policy.RequireApproval,
 			PermissionMode:  task.Policy.PermissionMode,
 		},
-		Metadata: mergedMetadata(task),
 	}
 }
 
-func inputMessagesFromTask(messages []messaging.ChatMessage) []agent.InputMessage {
+func inputMessagesFromTask(messages []messaging.ChatMessage) []assistantdomain.InputMessage {
 	if len(messages) == 0 {
 		return nil
 	}
-	result := make([]agent.InputMessage, 0, len(messages))
+	result := make([]assistantdomain.InputMessage, 0, len(messages))
 	for _, message := range messages {
-		result = append(result, agent.InputMessage{
+		result = append(result, assistantdomain.InputMessage{
 			Role:    string(message.Role),
 			Content: message.Content,
 		})
@@ -76,13 +75,13 @@ func inputMessagesFromTask(messages []messaging.ChatMessage) []agent.InputMessag
 	return result
 }
 
-func attachmentsFromTask(attachments []messaging.Attachment) []agent.Attachment {
+func attachmentsFromTask(attachments []messaging.Attachment) []assistantdomain.Attachment {
 	if len(attachments) == 0 {
 		return nil
 	}
-	result := make([]agent.Attachment, 0, len(attachments))
+	result := make([]assistantdomain.Attachment, 0, len(attachments))
 	for _, attachment := range attachments {
-		result = append(result, agent.Attachment{
+		result = append(result, assistantdomain.Attachment{
 			ID:       attachment.ID,
 			Name:     attachment.Name,
 			MimeType: attachment.MimeType,
@@ -90,17 +89,6 @@ func attachmentsFromTask(attachments []messaging.Attachment) []agent.Attachment 
 		})
 	}
 	return result
-}
-
-func mergedMetadata(task runTask) map[string]any {
-	metadata := make(map[string]any, len(task.Metadata)+1)
-	for k, v := range task.Metadata {
-		metadata[k] = v
-	}
-	if task.ID != "" {
-		metadata["message_id"] = task.ID
-	}
-	return metadata
 }
 
 func firstNonEmpty(values ...string) string {

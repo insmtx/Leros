@@ -7,10 +7,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ygpkg/yg-go/logs"
 
+	"github.com/insmtx/Leros/backend/agent"
+	"github.com/insmtx/Leros/backend/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/api/auth"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/api/dto"
-	"github.com/insmtx/Leros/backend/internal/runtime/events"
 )
 
 type SessionHandler struct {
@@ -224,7 +225,7 @@ func (h *SessionHandler) SessionEvents(ctx *gin.Context) {
 	ctx.Header("Connection", "keep-alive")
 	ctx.Header("Access-Control-Allow-Origin", "*")
 
-	eventChan := make(chan *events.Event, 16)
+	eventChan := make(chan *agent.Event, 16)
 	sink := events.ChannelSink{C: eventChan}
 
 	go func() {

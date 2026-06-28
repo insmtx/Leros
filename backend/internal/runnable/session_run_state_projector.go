@@ -11,10 +11,10 @@ import (
 	"github.com/nats-io/nats.go"
 	"gorm.io/gorm"
 
+	"github.com/insmtx/Leros/backend/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
-	"github.com/insmtx/Leros/backend/internal/runtime/events"
 	"github.com/insmtx/Leros/backend/pkg/messaging"
 	"github.com/insmtx/Leros/backend/types"
 	"github.com/ygpkg/yg-go/logs"
@@ -204,7 +204,7 @@ func handleRunCancelledEvent(ctx context.Context, service contract.SessionServic
 		SessionID:         runEvent.Route.SessionID,
 		Content:           content,
 		ReplyToMessageIDs: runEvent.Body.ReplyToMessageIDs,
-		ErrorMsg:          "run cancelled",
+		ErrorMsg:          cancellationError(runEvent),
 		Status:            string(types.MessageStatusCancelled),
 		Chunks:            messagingEventsToChunks(messagingCompletedEvents(completed)),
 		Artifacts:         messagingArtifactsToMessageArtifacts(messagingCompletedArtifacts(completed)),
@@ -216,6 +216,13 @@ func handleRunCancelledEvent(ctx context.Context, service contract.SessionServic
 	if err := service.FailedSessionMessage(ctx, req); err != nil {
 		logs.WarnContextf(ctx, "cancelled session message: %v", err)
 	}
+}
+
+func cancellationError(runEvent messaging.RunEvent) string {
+	if runEvent.Body.Error != nil && strings.TrimSpace(runEvent.Body.Error.Message) != "" {
+		return runEvent.Body.Error.Message
+	}
+	return "run cancelled"
 }
 
 // ---- type conversion helpers ----
@@ -270,26 +277,32 @@ func completedMetadataToObject(completed *messaging.RunCompletedPayload) *types.
 	if completed == nil || completed.Metadata == nil {
 		return nil
 	}
-	data, err := json.Marshal(completed.Metadata)
-	if err != nil {
-		return nil
-	}
-	var meta types.ObjectMetadata
-	if err := json.Unmarshal(data, &meta); err != nil {
-		return nil
-	}
-
 	extra := map[string]any{}
-	for k, v := range completed.Metadata {
-		extra[k] = v
+	if completed.Metadata.Runtime != "" {
+		extra["runtime"] = completed.Metadata.Runtime
+	}
+	if completed.Metadata.WorkDir != "" {
+		extra["work_dir"] = completed.Metadata.WorkDir
+	}
+	if completed.Metadata.ProviderID != "" {
+		extra["provider_id"] = completed.Metadata.ProviderID
+	}
+	if completed.Metadata.SessionID != "" {
+		extra["session_id"] = completed.Metadata.SessionID
+	}
+	if completed.Metadata.Phase != "" {
+		extra["phase"] = completed.Metadata.Phase
+	}
+	if completed.Metadata.Resume {
+		extra["resume"] = true
 	}
 	if completed.Usage != nil && completed.Usage.TotalTokens > 0 {
 		extra["tokens"] = completed.Usage.TotalTokens
 	}
-	if len(extra) > 0 {
-		meta.Extra = extra
+	if len(extra) == 0 {
+		return nil
 	}
-	return &meta
+	return &types.ObjectMetadata{Extra: extra}
 }
 
 func messagingCompletedEvents(completed *messaging.RunCompletedPayload) []messaging.RunEventRecord {
@@ -513,21 +526,21 @@ func artifactStatus(value string) string {
 	return "pending"
 }
 
-func extractSkillName(toolName string, arguments map[string]any) string {
+func extractSkillName(toolName string, arguments json.RawMessage) string {
 	if toolName == "" {
 		return ""
 	}
 	name := strings.ToLower(strings.TrimSpace(toolName))
 	if name == "use_skill" || name == "invoke_skill" || name == "run_skill" {
-		if skillArg, ok := arguments["skill"]; ok {
-			if s, ok := skillArg.(string); ok && strings.TrimSpace(s) != "" {
-				return strings.TrimSpace(s)
-			}
+		var input struct {
+			Skill     string `json:"skill"`
+			SkillName string `json:"skill_name"`
 		}
-		if skillArg, ok := arguments["skill_name"]; ok {
-			if s, ok := skillArg.(string); ok && strings.TrimSpace(s) != "" {
-				return strings.TrimSpace(s)
+		if json.Unmarshal(arguments, &input) == nil {
+			if value := strings.TrimSpace(input.Skill); value != "" {
+				return value
 			}
+			return strings.TrimSpace(input.SkillName)
 		}
 	}
 	return ""

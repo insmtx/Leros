@@ -3,7 +3,7 @@ package contract
 import (
 	"context"
 
-	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	"github.com/insmtx/Leros/backend/agent/runtime/events"
 )
 
 // SessionService defines the session service contract.

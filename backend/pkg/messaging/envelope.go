@@ -17,6 +17,7 @@
 package messaging
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -55,6 +56,6 @@ type Envelope[T any] struct {
 	Trace TraceContext `json:"trace"`
 	Route RouteContext `json:"route"`
 
-	Body     T              `json:"body"`
-	Metadata map[string]any `json:"metadata,omitempty"`
+	Body     T               `json:"body"`
+	Metadata json.RawMessage `json:"metadata,omitempty"`
 }

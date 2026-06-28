@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/insmtx/Leros/backend/agent"
+	"github.com/insmtx/Leros/backend/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/api/dto"
-	"github.com/insmtx/Leros/backend/internal/runtime/events"
 	"github.com/insmtx/Leros/backend/pkg/messaging"
 	"github.com/nats-io/nats.go"
 	"gorm.io/driver/sqlite"
@@ -24,10 +25,20 @@ import (
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dsn := fmt.Sprintf(
+		"file:%s-%d?mode=memory&cache=shared",
+		strings.ReplaceAll(t.Name(), "/", "-"),
+		time.Now().UnixNano(),
+	)
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to open test database: %v", err)
 	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("get test database handle: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
 
 	if err := db.AutoMigrate(
 		&types.Project{},
@@ -38,6 +49,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		&types.Artifact{},
 		&types.LLMModel{},
 		&types.FileUpload{},
+		&types.WorkerDeployment{},
 	); err != nil {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}
@@ -96,6 +108,10 @@ func (m *replayEventBus) Request(_ context.Context, _ string, _ any) (*nats.Msg,
 }
 
 func (m *replayEventBus) SubscribeFrom(ctx context.Context, topic string, startSeq int64, handler func(msg *nats.Msg)) error {
+	if !strings.Contains(topic, ".run.stream") {
+		<-ctx.Done()
+		return ctx.Err()
+	}
 	m.startSeq = startSeq
 	for _, msg := range m.messages {
 		handler(msg)
@@ -349,6 +365,7 @@ func TestHandleSessionRunStartedMarksReplyMessagesProcessing(t *testing.T) {
 		SessionID:         session.PublicID,
 		ReplyToMessageIDs: []string{fmt.Sprintf("%d", first.ID), fmt.Sprintf("%d", second.ID)},
 		StreamStartSeq:    123,
+		StateStartSeq:     321,
 	})
 	if err != nil {
 		t.Fatalf("HandleSessionRunStarted failed: %v", err)
@@ -796,7 +813,7 @@ func TestHandleSessionTitleRequest_XinSessionTitle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSession failed: %v", err)
 	}
-	if retrieved.Title != "Manual title" {
+	if retrieved.Title != "hello" {
 		t.Errorf("expected title %q, got %q", "hello", retrieved.Title)
 	}
 }
@@ -826,7 +843,7 @@ func TestHandleSessionTitleRequest_Truncated(t *testing.T) {
 		t.Fatalf("GetSession failed: %v", err)
 	}
 	if len([]rune(retrieved.Title)) != 100 {
-		t.Errorf("expected title %q, got %q", "hello", retrieved.Title)
+		t.Errorf("expected title length 100, got %d", len([]rune(retrieved.Title)))
 	}
 }
 
@@ -836,7 +853,7 @@ func TestHandleSessionTitleRequest_CustomTitleUnchanged(t *testing.T) {
 
 	session, err := service.CreateSession(ctx, &contract.CreateSessionRequest{
 		Type:  string(types.SessionTypeUserChat),
-		Title: "New Session",
+		Title: "Manual title",
 	})
 	if err != nil {
 		t.Fatalf("CreateSession failed: %v", err)
@@ -853,7 +870,7 @@ func TestHandleSessionTitleRequest_CustomTitleUnchanged(t *testing.T) {
 		t.Fatalf("GetSession failed: %v", err)
 	}
 	if retrieved.Title != "Manual title" {
-		t.Errorf("expected title %q, got %q", "hello", retrieved.Title)
+		t.Errorf("expected title %q, got %q", "Manual title", retrieved.Title)
 	}
 }
 
@@ -1460,8 +1477,13 @@ func TestStreamSessionEventsReplayUsesProcessingMessageStartSeqAndFiltersReplies
 	}}
 	service := NewSessionService(database, bus, &mockInferrer{assistantID: 1}, nil, nil, "test")
 	var emitted []string
-	err := service.StreamSessionEvents(ctx, session.PublicID, true, events.SinkFunc(func(ctx context.Context, event *events.Event) error {
+	streamCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	err := service.StreamSessionEvents(streamCtx, session.PublicID, true, events.SinkFunc(func(ctx context.Context, event *agent.Event) error {
 		emitted = append(emitted, event.Content)
+		if strings.Contains(event.Content, "match") {
+			cancel()
+		}
 		return nil
 	}))
 	if err != nil {

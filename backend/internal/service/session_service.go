@@ -17,13 +17,14 @@ import (
 	"gorm.io/gorm"
 
 	"code.gitea.io/sdk/gitea"
+	"github.com/insmtx/Leros/backend/agent"
+	"github.com/insmtx/Leros/backend/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/config"
 	"github.com/insmtx/Leros/backend/internal/api/auth"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	"github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
-	"github.com/insmtx/Leros/backend/internal/runtime/events"
 	"github.com/insmtx/Leros/backend/pkg/messaging"
 	"github.com/insmtx/Leros/backend/prompts"
 	"github.com/insmtx/Leros/backend/types"
@@ -823,7 +824,7 @@ func (s *sessionService) StreamSessionEvents(ctx context.Context, sessionPID str
 			logs.WarnContextf(ctx, "unknown run event type: %v", runEvent.Body.Event)
 			return
 		}
-		if err := sink.Emit(ctx, &events.Event{
+		if err := sink.Emit(ctx, &agent.Event{
 			Type:    se.Type,
 			Content: toJSONString(se),
 		}); err != nil {
@@ -1020,9 +1021,9 @@ func convertToContractSessionMessage(message *types.SessionMessage, publicID str
 }
 
 func isHiddenSessionHistoryChunk(eventType string) bool {
-	switch events.EventType(eventType) {
-	// case events.EventTodoSnapshot, events.EventTodoUpdated:
-	// 	return true
+	switch agent.EventType(eventType) {
+	case events.EventTodoSnapshot, events.EventTodoUpdated:
+		return true
 	default:
 		return false
 	}

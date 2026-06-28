@@ -139,7 +139,7 @@ func TestCurlStylePresignRoundTrip(t *testing.T) {
 	st := filestore.GetStorage()
 	bucket := filestore.DefaultBucket()
 	_, err := st.PutObject(context.Background(), bucket, "hello-world.txt",
-		strings.NewReader("hello from curl test"), nil)
+		strings.NewReader("hello from curl test"))
 	if err != nil {
 		t.Fatalf("step3: put object: %v", err)
 	}

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Leros Server / Worker 架构设计说明</title>
+<title>Leros Server / Worker 与 Agent 执行架构设计说明</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0d1117; color: #c9d1d9; line-height: 1.7; padding: 20px; }
@@ -39,69 +39,43 @@
 </head>
 <body>
 <div class="container">
-<h1>Leros Server / Worker 架构设计说明</h1>
-<p>本文档基于当前代码库（<code>backend/</code>）实际实现，阐述 Server 端（控制面）与 Worker 端（执行面）的完整架构分层、各层职责、以及一条 Agent Run 任务的完整调用链路。</p>
+<h1>Leros Server / Worker 与 Agent 执行架构设计说明</h1>
+<p>本文档描述 Server（控制面）、Worker（执行面）以及独立 Agent 执行层的当前职责边界。2026-06-28 的架构迁移已经落地，主链、目录和契约均以当前代码为准。</p>
+<div class="warn"><strong>文档状态：</strong>当前实施架构。实施结果、测试证据和维护项见 <a href="./AGENT_EXECUTION_ARCHITECTURE_PROGRESS_2026-06-28.md">Agent 执行架构实施进度</a>；原始决策依据见 <a href="./AGENT_EXECUTION_ARCHITECTURE_REFACTOR_PLAN.md">架构重整方案</a>。</div>
 
 <h2>一、整体架构概览</h2>
 
 <div class="arch-diagram">
 <pre style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; line-height: 1.5; text-align: left; color: #0d1117;">
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                       Leros Platform Architecture                                 │
-│                                                                                  │
-│  ┌─────────────────────────────────────────┐   ┌───────────────────────────────┐ │
-│  │         Server (Control Plane)           │   │     Worker (Execution Plane)  │ │
-│  │  cmd/leros/server.go: Gin HTTP Server    │   │  cmd/leros/worker.go         │ │
-│  │──────────────────────────────────────────│   │───────────────────────────────│ │
-│  │  internal/api/                           │   │                               │ │
-│  │  ├─ handler/    REST API Handlers        │   │  ┌─────────────────────────┐  │ │
-│  │  ├─ middleware/ Auth, CORS               │   │  │   command/             │  │ │
-│  │  └─ dto/        Request/Response types   │   │  │   Dispatcher (4 lanes)  │  │ │
-│  │──────────────────────────────────────────│   │  │   ├─ cmd.run            │  │ │
-│  │  internal/service/ Business logic        │   │  │   ├─ cmd.control        │  │ │
-│  │  ┌────────────────────────────────┐       │   │  │   ├─ cmd.interaction   │  │ │
-│  │  │  infra/mq/ EventBus (NATS)     │       │   │  │   └─ cmd.skill         │  │ │
-│  │  │  Publish WorkerCommand ──&gt;     │       │   │  └─────────────────────────┘  │ │
-│  │  └───────────────┬────────────────┘       │   │              │                │ │
-│  └──────────────────│────────────────────────┘   │  ┌───────────┴─────────────┐  │ │
-│                     │                            │  │   command/run Handler   │  │ │
-│                     │  NATS JetStream             │  │   Handler.pool          │  │ │
-│                     │  (cmd.run / cmd.control    │  │   ├─ debounce            │  │ │
-│                     │   cmd.interaction          │  │   ├─ workspace prepare   │  │ │
-│                     │   cmd.skill)               │  │   ├─ runner.Run()        │  │ │
-│                     │                            │  │   └─ stream sink (NATS)  │  │ │
-│                     ▼                            │  └──────────────────────────┘  │ │
-│                     │                            │              │                │ │
-│                     │                            │  ┌───────────┴─────────────┐  │ │
-│                     │                            │  │   agent/                │  │ │
-│                     │                            │  │   RuntimeRouter         │  │ │
-│                     │                            │  │   ├─ native (leros)     │  │ │
-│                     │                            │  │   ├─ codex / claude     │  │ │
-│                     │                            │  │   └─ opencode           │  │ │
-│                     │                            │  └──────────────────────────┘  │ │
-│                     │                            │              │                │ │
-│                     │                            │  ┌───────────┴─────────────┐  │ │
-│                     │                            │  │   runtime/              │  │ │
-│                     │                            │  │   lifecycle/            │  │ │
-│                     │                            │  │   Runner (wrapper)      │  │ │
-│                     │                            │  │   ├─ todo               │  │ │
-│                     │                            │  │   ├─ approval/ask       │  │ │
-│                     │                            │  │   └─ artifact record    │  │ │
-│                     │                            │  └──────────────────────────┘  │ │
-│                     │                            │              │                │ │
-│                     │                            │  ┌───────────┴─────────────┐  │ │
-│                     │                            │  │   router.SetupRouter()  │  │ │
-│                     │                            │  │   ├─ /health            │  │ │
-│                     │                            │  │   ├─ /v1/mcp            │  │ │
-│                     │                            │  │   ├─ /v1/chat/comple... │  │ │
-│                     │                            │  │   └─ /v1/messages       │  │ │
-│                     │                            │  └──────────────────────────┘  │ │
-│                     │                            └───────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────────┐
+│                              Leros Current Architecture                                    │
+│                                                                                            │
+│  ┌──────────────────────────────┐       NATS       ┌─────────────────────────────────────┐ │
+│  │ Server / Control Plane       │  WorkerCommand   │ Worker / Execution Plane            │ │
+│  │ API → Service → EventBus     │ ───────────────→ │ command.Dispatcher (4 lanes)        │ │
+│  │                              │                  │          │                          │ │
+│  │ State/Stream Projectors      │  run.stream      │ Command Adapter                    │ │
+│  │ Session persistence + SSE    │ ←─────────────── │          ↓                          │ │
+│  └──────────────────────────────┘  run.state       │ RunCoordinator                     │ │
+│                                                    │ debounce / concurrency / cancel     │ │
+│                                                    │          ↓                          │ │
+│                                                    │ internal/assistant.Service          │ │
+│                                                    │ prepare business context            │ │
+│                                                    │          ↓                          │ │
+│                                                    │ backend/agent.Executor              │ │
+│                                                    │ Runtime Registry                    │ │
+│                                                    │   ├─ native (Eino)                  │ │
+│                                                    │   ├─ claude                         │ │
+│                                                    │   ├─ codex                          │ │
+│                                                    │   └─ opencode                       │ │
+│                                                    │          ↓                          │ │
+│                                                    │ assistant.Finalizer + EventMapper   │ │
+│                                                    └─────────────────────────────────────┘ │
+└────────────────────────────────────────────────────────────────────────────────────────────┘
 </pre>
 </div>
 
-<p>Leros 采用 <strong>Server（控制面）- Worker（执行面）</strong> 分离架构，通过 <strong>NATS JetStream</strong> 作为消息中间件解耦通信。</p>
+<p>Leros 采用 <strong>Server（控制面）- Worker（执行面）</strong> 分离架构，通过 <strong>NATS JetStream</strong> 解耦通信。Worker 内部进一步分为通信调度、SingerOS 业务包装和独立 Agent 执行三层。</p>
 
 <h2>二、架构层级详解</h2>
 
@@ -161,7 +135,7 @@ type WorkerCommand struct {
     Trace     TraceContext        // {RequestID, TaskID, RunID}
     Route     RouteContext        // {OrgID, WorkerID, SessionID}
     Body      WorkerCommandBody   // 根据 CommandType 携带不同 Payload
-    Metadata  map[string]any
+    Metadata  json.RawMessage     // 强类型命令元数据的 JSON
 }
 
 type WorkerCommandBody struct {
@@ -220,7 +194,7 @@ type WorkerCommandBody struct {
     <td><code>cmd.interaction</code></td>
     <td><code>InteractionHandler</code></td>
     <td><code>command/interaction.Handler</code></td>
-    <td>审批决策 / 问题答案 → 调用 <code>engines.InteractionRouter</code> 唤起阻塞的 Agent</td>
+    <td>审批决策 / 问题答案 → 调用注入 Runtime 的 <code>agent.InteractionHandler</code> 唤起阻塞执行</td>
   </tr>
   <tr>
     <td><code>cmd.skill</code></td>
@@ -232,80 +206,78 @@ type WorkerCommandBody struct {
 <p>Dispatcher 接收原始 <code>*nats.Msg</code>，使 handler 能获取 stream seq 用于 crash recovery（seq tracking）和 背压控制（NATS ACK）。</p>
 </div>
 
-<h3>2.6 Run 命令处理与执行层（command/run）</h3>
+<h3>2.6 Worker Run 适配与调度层</h3>
 <div class="layer-card">
-<h3><span class="badge badge-green">command/run</span> Run Handler</h3>
-<p class="file-ref">对应文件: backend/internal/worker/command/run/handler.go, mapper.go, stream_sink.go</p>
-<p><code>run.Handler</code> 同时实现 <code>RunHandler</code> 和 <code>ControlHandler</code>。它处理 <code>cmd.run</code> 与 <code>cmd.control</code>，当前仍承载命令适配、调度和执行准备等多类职责：</p>
+<h3><span class="badge badge-green">worker</span> Command Adapter + RunCoordinator</h3>
+<p class="file-ref">对应目录: backend/internal/worker/command/run/, backend/internal/worker/run/</p>
+<p>Worker Run 层只处理通信与进程内调度，不生成 prompt，也不理解 Model、Skill、Memory、Workspace 或 Runtime 协议。</p>
 
-<p><strong>执行管道：</strong></p>
-<div class="flow-step"><span class="step-num">Step 1</span> — <strong>Semaphore 获取</strong>：背压控制，超过 capacity 时阻塞</div>
-<div class="flow-step"><span class="step-num">Step 2</span> — <strong>Route 校验</strong>：验证命令的 <code>OrgID</code> / <code>WorkerID</code> 与本 Worker 匹配</div>
-<div class="flow-step"><span class="step-num">Step 3</span> — <strong>Seq Tracking</strong>：通过 SQLite 持久化 NATS stream sequence，实现 crash recovery。Worker 重启后回放时自动跳过已处理的消息。</div>
-<div class="flow-step"><span class="step-num">Step 4</span> — <strong>防抖合并（Debounce）</strong>：同一 Session 的快速连续消息（如用户连续打字）在 1500ms 窗口内合并为一次 Agent Run，减少 LLM 调用次数。</div>
-<div class="flow-step"><span class="step-num">Step 5</span> — <strong>Worker Pool 调度</strong>：合并后的任务通过 WorkerPool（默认 20 并发）提交执行，先到先得。</div>
-<div class="flow-step"><span class="step-num">Step 6</span> — <strong>Workspace 准备</strong>：从 Gitea clone 项目仓库到临时 Workspace，注入上传附件。</div>
-<div class="flow-step"><span class="step-num">Step 7</span> — <strong>Agent Run</strong>：调用 <code>agent.Runner.Run()</code></div>
-<div class="flow-step"><span class="step-num">Step 8</span> — <strong>结果流式回传</strong>：通过 <code>MQStreamSink</code> 将 Agent 执行的 runtime events 实时发布到 NATS（SSE 推送给前端）</div>
+<p><strong>Command Adapter 职责：</strong></p>
+<ul>
+  <li>解码并校验 <code>WorkerCommand</code>、route 与 payload。</li>
+  <li>读取 JetStream delivery sequence 并映射为 <code>RunSubmission</code>。</li>
+  <li>调用 Coordinator；在批次执行完成后更新 delivery 状态。</li>
+</ul>
 
-<p><strong>任务取消机制（cmd.control）：</strong></p>
-<p>Handler 维护 <code>activeRuns map</code>，记录每个 Session 当前运行的 <code>context.CancelFunc</code>。收到 <code>run.cancel</code> 命令时直接触发 cancel，Agent Run 的 context 即时终止。终端事件使用脱离原取消信号且带超时的发布 context，保证取消后仍能发布 <code>run.cancelled</code>。</p>
+<p><strong>RunCoordinator 职责：</strong></p>
+<ul>
+  <li>Session 级 1500ms debounce 与消息合并。</li>
+  <li>并发限制、pending waiter、active run 与 graceful close。</li>
+  <li>通过 <code>context.CancelFunc</code> 处理 <code>cmd.control</code>。</li>
+  <li>聚合 delivery sequence，但不依赖 NATS subject 或 payload 类型。</li>
+</ul>
+
+<div class="warn"><strong>当前状态：</strong>Coordinator 已接入主链。每个 debounce waiter 等待真实批次结果；同 Session 串行、不同 Session 并行；Handler 只在批次完成后更新 delivery sequence。</div>
 </div>
 
-<h3>2.7 Agent 抽象层（agent/）</h3>
+<h3>2.7 SingerOS Agent 业务包装层</h3>
 <div class="layer-card">
-<h3><span class="badge badge-yellow">agent</span> Agent 抽象与路由</h3>
-<p class="file-ref">对应文件: backend/internal/agent/runner.go, backend/internal/agent/router.go</p>
-<p>定义了核心抽象 <code>Runner</code> 接口：</p>
+<h3><span class="badge badge-yellow">assistant</span> 业务 Run 编排</h3>
+<p class="file-ref">对应目录: backend/internal/assistant/</p>
+<p><code>assistant.Service</code> 是一次 SingerOS 业务 Agent Run 的唯一编排入口，包裹独立执行层：</p>
+<ul>
+  <li><strong>Preparer</strong>：读取 Session history、Memory 和 Skill，解析模型、Tool、Workspace 与附件，构造纯执行层 <code>ExecutionRequest</code>。</li>
+  <li><strong>Service</strong>：发布 <code>run.started</code>，调用 <code>agent.Executor</code>，分类 completed/failed/cancelled，并保证每次 Run 只有一个终端事件。</li>
+  <li><strong>Finalizer</strong>：执行 Workspace reconciliation、Artifact 收集和 Git stage/commit/push。</li>
+  <li><strong>Journal</strong>：归档完整 activity event、usage、tool call 和统计信息，供终端事件持久化。</li>
+</ul>
+<p>Assistant、Actor、Org、Project、Skill、Memory、Artifact 和 Git 都只能存在于本层及其业务依赖中，不得进入独立 Agent Runtime。</p>
+</div>
+
+<h3>2.8 独立 Agent 执行层</h3>
+<div class="layer-card">
+<h3><span class="badge badge-red">backend/agent</span> Executor + Runtime</h3>
+<p class="file-ref">对应目录: backend/agent/, backend/agent/runtime/</p>
+<p><code>backend/agent</code> 是顶层可复用执行包，不依赖 SingerOS 的 <code>internal/*</code>、config、messaging、NATS、Session、Memory、Skill 或 Workspace。</p>
 <div class="code-block"><code>
-type Runner interface {
-    Run(ctx context.Context, req *RequestContext) (*RunResult, error)
+type Runtime interface {
+    Name() string
+    Execute(
+        ctx context.Context,
+        request ExecutionRequest,
+        observer Observer,
+    ) (ExecutionResult, error)
 }
 </code></div>
-<p><code>RequestContext</code> 是归一化的执行快照，包含 Assistant、Actor、Input、Runtime、Model、Policy 等上下文。使得不同 Runtime（Leros native / Claude / Codex / OpenCode）都能消费相同格式的请求。</p>
-
-<p><strong>RuntimeRouter</strong> 实现多 Runtime 路由：</p>
+<p><strong>Executor：</strong></p>
 <ul>
-  <li>注册多个 Runner（按 kind 标识：<code>leros</code>、<code>codex</code>、<code>claude</code>、<code>opencode</code>）</li>
-  <li>根据请求中 <code>Runtime.Kind</code> 选择对应 Runner</li>
-  <li>未指定时使用配置的默认 Runtime</li>
+  <li>校验已经准备完成的 <code>ExecutionRequest</code>。</li>
+  <li>通过 Registry 按 name 解析 Runtime。</li>
+  <li>统一执行生命周期、取消与 Observer 错误处理。</li>
+  <li>返回不包含业务 RunStatus 的 <code>ExecutionResult</code>。</li>
 </ul>
-
-<p><strong>RunResult</strong> 包含执行结果：RunID、Status（completed/failed/cancelled）、Message、Error、Usage（token 统计）、ToolCalls 记录。</p>
-</div>
-
-<h3>2.8 Runtime 引擎层（runtime/ + engines/）</h3>
-<div class="layer-card">
-<h3><span class="badge badge-red">runtime</span> Runtime 执行引擎</h3>
-<p class="file-ref">对应文件: backend/internal/runtime/, backend/engines/</p>
-
-<p><strong>Runtime Service（runtime/service.go）：</strong></p>
+<p><strong>四个同级 Runtime：</strong></p>
 <ul>
-  <li>创建 <code>tools.Registry</code> 注册所有可用工具（Skill Use / Skill Manage / Memory / Todo / Node）</li>
-  <li>通过 <code>engines/builtin</code> 构建引擎注册表（native + CLI 引擎）</li>
-  <li>为每个引擎创建 <code>externalcli.Runner</code>，注入审批/提问处理器和 MCP 配置</li>
-  <li>返回包装了 <code>lifecycle.Runner</code> 的最终 Runner</li>
+  <li><code>native</code>：内部使用 Eino，但只消费 ExecutionRequest。</li>
+  <li><code>claude</code>、<code>codex</code>、<code>opencode</code>：负责各自 CLI 或服务协议。</li>
+  <li>所有 Runtime 使用同一个接口、事件模型、取消语义和 contract test。</li>
 </ul>
-
-<p><strong>lifecycle.Runner 包装层：</strong></p>
+<p><strong>执行边界：</strong></p>
 <ul>
-  <li>在原始 Runner 外层注入执行生命周期步骤：Todo 初始化、审批拦截、Workspace artifact 记录</li>
-  <li>确保每个 Agent Run 都有完整的生命周期管理（启动 → 执行 → 收尾）</li>
-</ul>
-
-<p><strong>externalcli.Runner：</strong></p>
-<ul>
-  <li>将 <code>RequestContext</code> 转换为对应 CLI 引擎的命令参数</li>
-  <li>启动外部 CLI 进程（如 <code>claude</code>、<code>codex</code>）执行 Agent 任务</li>
-  <li>注入 MCP 服务配置、审批/提问处理器</li>
-  <li>捕获 CLI 的输出和事件，转换为标准 <code>RunResult</code></li>
-</ul>
-
-<p><strong>engines/ 层：</strong></p>
-<ul>
-  <li><code>engines/builtin/</code> — native 引擎与 CLI 引擎的统一注册</li>
-  <li><code>engines/native/</code>、<code>engines/claude/</code>、<code>engines/codex/</code>、<code>engines/opencode/</code> — 具体引擎适配器</li>
-  <li><code>InteractionRouter</code> — 审批决议路由（Agent 等待审批时，前端回传决议后通过此路由唤醒阻塞的 Agent）</li>
+  <li>Runtime 只能产生 message、reasoning、tool、approval、question 和 provider-session 活动。</li>
+  <li>Runtime 不访问 NATS、数据库，不生成业务 <code>run.*</code> 终态，不执行 Git。</li>
+  <li>Tool 使用具名类型或 <code>json.RawMessage</code>，公共签名禁止 <code>map[string]interface{}</code>。</li>
+  <li>Approval/Question 通过构造时注入的强类型 InteractionHandler 处理。</li>
 </ul>
 </div>
 
@@ -313,7 +285,7 @@ type Runner interface {
 <div class="layer-card">
 <h3><span class="badge badge-blue">projector</span> Server 端状态与流投影</h3>
 <p class="file-ref">对应文件: backend/internal/runnable/session_run_state_projector.go, session_run_stream_projector.go</p>
-<p>Worker 通过 <code>MQStreamSink</code> 将标准 runtime event 转为 <code>messaging.RunEvent</code>，再按事件语义发布到两条 lane：</p>
+<p>Worker 通过 <code>assistant.EventMapper</code> 将 core execution event 转为 <code>messaging.RunEvent</code>，再由 event publisher 按事件语义发布到两条 lane：</p>
 <ul>
   <li><code>run.stream</code>：message、reasoning、tool、todo 等高频增量事件，供 SSE 实时推送和回放。</li>
   <li><code>run.state</code>：run started/terminal、artifact、approval、question 等低频关键状态。</li>
@@ -351,55 +323,28 @@ type WorkerScheduler interface {
 <h3>3.1 链路总览</h3>
 <div class="arch-diagram">
 <pre style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; line-height: 1.6; text-align: left; color: #0d1117;">
-  Frontend                Server (Control)              NATS                  Worker (Execute)
-  ────────                ────────────────              ────                  ────────────────
-     │                         │                          │                         │
-     │  POST /v1/sessions/     │                          │                         │
-     │  /:id/messages          │                          │                         │
-     │ ───────────────────────→│                          │                         │
-     │                         │                          │                         │
-     │                         │  1. handler 解析请求     │                         │
-     │                         │  2. service 构建         │                         │
-     │                         │     WorkerCommand        │                         │
-     │                         │     (agent.run)          │                         │
-     │                         │                          │                         │
-     │                         │  3. bus.Publish() ──────→│                         │
-     │                         │     subject:             │                         │
-     │                         │     org.X.worker.Y       │                         │
-     │                         │     .cmd.run             │                         │
-     │                         │                          │                         │
-     │          返回 SSE 流    │                          │  JetStream              │
-     │  ←──────────────────────│                          │  persistent             │
-     │                         │                          │                         │
-     │                         │                          │  consumer pull ────────→│
-     │                         │                          │                         │
-     │                         │                          │                         4. Dispatcher
-     │                         │                          │                            cmd.run lane
-     │                         │                          │                            ↓
-     │                         │                          │                         5. Run Handler
-     │                         │                          │                            HandleRunCommand()
-     │                         │                          │                            ├─ sem acquire
-     │                         │                          │                            ├─ route validate
-     │                         │                          │                            ├─ seq track
-     │                         │                          │                            ├─ debounce merge
-     │                         │                          │                            ├─ WorkerPool submit
-     │                         │                          │                            │
-     │                         │                          │                            ├─ prepareWorkspace
-     │                         │                          │                            │   (clone repo)
-     │                         │                          │                            │
-     │                         │                          │                            ├─ runner.Run(ctx, req)
-     │                         │                          │                            │   ├─ RuntimeRouter
-     │                         │                          │                            │   ├─ lifecycle.Runner
-     │                         │                          │                            │   └─ externalcli.Runner
-     │                         │                          │                            │
-     │                         │                          │         runtime events     │
-     │                         │  ←─── SSE 推送 ──────────│ ←─── MQStreamSink ────────│
-     │                         │                          │    (event stream)         │
-     │                         │                          │                         │
-     │                         │                          │                         │  6. 执行完成
-     │                         │                          │                         │     ├─ emit Completed
-     │                         │                          │                         │     └─ seq completed
-     │                         │                          │                         │
+ Frontend       Server           NATS              Worker
+    │              │               │                  │
+    │ message      │               │                  │
+    │─────────────→│ WorkerCommand │                  │
+    │              │──────────────→│ cmd.run          │
+    │              │               │─────────────────→│ Command Adapter
+    │              │               │                  │       ↓
+    │              │               │                  │ RunCoordinator
+    │              │               │                  │ debounce / pool / cancel
+    │              │               │                  │       ↓
+    │              │               │                  │ assistant.Service
+    │              │               │                  │       ├─ Preparer
+    │              │               │                  │       ↓
+    │              │               │                  │ agent.Executor
+    │              │               │                  │       ↓
+    │              │               │                  │ native | claude
+    │              │               │                  │ codex  | opencode
+    │              │               │                  │       ↓
+    │              │               │                  │ Finalizer + EventMapper
+    │              │  run.stream   │                  │
+    │ SSE          │←──────────────│←─────────────────│ execution events
+    │←─────────────│  run.state    │                  │
 </pre>
 </div>
 
@@ -426,13 +371,18 @@ type WorkerScheduler interface {
 </div>
 
 <div class="flow-step">
-  <span class="step-num">Step 5</span> — <strong>Run Handler 执行管道</strong><br>
-  <p><code>run.Handler.HandleRunCommand()</code> 执行完整管道：Semaphore 获取 → Payload/Route/Model 校验 → Seq 去重 → 防抖合并 → WorkerPool 调度 → Workspace 准备（Clone Git repo、下载附件并 commit） → 调用 <code>agent.Runner.Run()</code>。</p>
+  <span class="step-num">Step 5</span> — <strong>Worker 适配与调度</strong><br>
+  <p>Command Adapter 完成 wire 校验和 <code>RunSubmission</code> 映射；<code>RunCoordinator</code> 负责 seq 聚合、Session debounce、并发、等待和取消，然后调用 <code>assistant.Service</code>。</p>
 </div>
 
 <div class="flow-step">
-  <span class="step-num">Step 6</span> — <strong>Agent 执行与结果回传</strong><br>
-  <p><code>lifecycle.Runner</code> 先创建 <code>RunJournal</code> 并执行生命周期 pipeline，再由 <code>RuntimeRouter</code> 根据 kind 选择 <code>externalcli.Runner</code>。引擎事件经 RunJournal 统一编号和归档后，由 <code>MQStreamSink</code> 转为 <code>messaging.RunEvent</code>，分别发布到 <code>run.stream</code> 或 <code>run.state</code>。Server projector 持久化关键状态，并向前端提供 SSE 实时流与回放。</p>
+  <span class="step-num">Step 6</span> — <strong>业务准备与独立执行</strong><br>
+  <p><code>assistant.Preparer</code> 读取 Session、Memory、Skill、Model 和 Workspace，生成纯 <code>agent.ExecutionRequest</code>。<code>agent.Executor</code> 选择 native、Claude、Codex 或 OpenCode Runtime。Runtime 只返回 execution event 和 result。</p>
+</div>
+
+<div class="flow-step">
+  <span class="step-num">Step 7</span> — <strong>业务收尾与结果回传</strong><br>
+  <p><code>assistant.Finalizer</code> 处理 Artifact 和 Git，Service 决定唯一业务终态。<code>worker/eventpub.NATSEventSink</code> 将 core event 转为兼容的 <code>messaging.RunEvent</code>，分别发布到 <code>run.stream</code> 或 <code>run.state</code>。Server projector 持久化关键状态并提供 SSE 实时流与回放。</p>
 </div>
 
 <h3>3.3 交互式流程（审批/提问）</h3>
@@ -461,15 +411,15 @@ type WorkerScheduler interface {
      │                         │                          │                         InteractionHandler
      │                         │                          │                         .HandleApproval()
      │                         │                          │                          ↓
-     │                         │                          │                         InteractionRouter
-     │                         │                          │                         .ResolveApproval()
+     │                         │                          │                         InteractionHandler
+     │                         │                          │                         .Resolve()
      │                         │                          │                          ↓
      │                         │                          │                         解除 Runner 阻塞
      │                         │                          │                         Agent 继续执行
      │                         │                          │                         │
 </pre>
 </div>
-<p>交互式流程的核心机制：Agent 执行到需要审批/提问的步骤时，通过 <code>InteractionRouter</code> 创建一个 channel 并阻塞等待。前端回传决议后，Server 通过 <code>cmd.interaction</code> lane 下发到 Worker，Worker 的 <code>InteractionHandler</code> 调用 <code>InteractionRouter.ResolveApproval()</code> 关闭 channel，Agent 继续执行。</p>
+<p>交互式流程保持现有 wire 协议：Runtime 通过构造时注入的 <code>agent.InteractionHandler</code> 请求审批或提问；前端决议经 <code>cmd.interaction</code> lane 返回 Worker，InteractionHandler 解析命令并唤醒对应请求。独立 Agent 层不依赖 NATS 或全局 router。</p>
 
 <h2>四、关键设计决策</h2>
 
@@ -497,18 +447,28 @@ type WorkerScheduler interface {
   </tr>
   <tr>
     <td>结果回传</td>
-    <td>RunJournal → MQStreamSink → 双 lane NATS</td>
-    <td>RunJournal 统一编号和归档；stream/state 分流兼顾实时推送、关键状态持久化和独立 replay sequence</td>
+    <td>Core Event → EventMapper → 双 lane NATS</td>
+    <td>Core 与 wire event 明确分离；stream/state 分流继续兼顾实时推送、状态持久化和独立 replay sequence</td>
   </tr>
   <tr>
     <td>多 Runtime</td>
-    <td>RuntimeRouter + externalcli.Runner</td>
-    <td>支持 Leros native / Claude / Codex / OpenCode 多种 Agent 引擎，通过 CLI 子进程调用，易于扩展新引擎</td>
+    <td>统一 <code>agent.Runtime</code> + Registry</td>
+    <td>native / Claude / Codex / OpenCode 完全同级，使用同一请求、事件、结果和取消契约</td>
   </tr>
   <tr>
     <td>审批/提问</td>
-    <td>InteractionRouter + channel 阻塞</td>
-    <td>Agent 遇到审批时阻塞等待 channel；用户操作通过 NATS 回传后关闭 channel 继续执行</td>
+    <td>注入强类型 <code>InteractionHandler</code></td>
+    <td>保留交互能力，但 Runtime 不依赖 NATS 或 package-level 全局 router</td>
+  </tr>
+  <tr>
+    <td>执行与业务</td>
+    <td><code>backend/agent</code> + <code>internal/assistant</code></td>
+    <td>执行层不包含 SingerOS 业务；业务层负责 Session、Memory、Skill、Workspace、Artifact 和 Git</td>
+  </tr>
+  <tr>
+    <td>Runtime 输入</td>
+    <td>准备完成的 <code>ExecutionRequest</code></td>
+    <td>Runtime 不再接收同时承担原始输入和跨阶段可变状态的 RequestContext</td>
   </tr>
   <tr>
     <td>Worker 调度</td>
@@ -529,12 +489,15 @@ type WorkerScheduler interface {
   <tr><td><code>backend/pkg/messaging/command.go</code></td><td>共享类型</td><td>WorkerCommand 协议定义</td></tr>
   <tr><td><code>backend/pkg/messaging/event.go</code></td><td>共享类型</td><td>RunEvent 协议与 stream/state lane 分类</td></tr>
   <tr><td><code>backend/internal/worker/command/</code></td><td>Worker 核心</td><td>四 Lane 统一命令分发</td></tr>
-  <tr><td><code>backend/internal/worker/command/run/</code></td><td>Worker 核心</td><td>Agent Run 命令处理、调度和事件发布</td></tr>
-  <tr><td><code>backend/internal/agent/</code></td><td>抽象</td><td>Runner 接口 + RuntimeRouter</td></tr>
-  <tr><td><code>backend/internal/runtime/</code></td><td>Runtime</td><td>生命周期注入 + 工具注册</td></tr>
-  <tr><td><code>backend/internal/runtime/drivers/externalcli/</code></td><td>Runtime</td><td>外部 CLI 引擎驱动</td></tr>
-  <tr><td><code>backend/internal/runtime/lifecycle/journal/</code></td><td>Runtime</td><td>Run 事件编号、归档和终端事件组装</td></tr>
-  <tr><td><code>backend/engines/</code></td><td>引擎</td><td>引擎适配器 + InteractionRouter</td></tr>
+  <tr><td><code>backend/internal/worker/command/run/</code></td><td>Worker 适配</td><td>Run/Control wire 解码、校验与 RunSubmission 映射</td></tr>
+  <tr><td><code>backend/internal/worker/run/</code></td><td>Worker 调度</td><td>Debounce、并发、等待、取消与 delivery sequence 聚合</td></tr>
+  <tr><td><code>backend/internal/assistant/</code></td><td>业务包装</td><td>Preparer、Service、Journal、Finalizer 与业务终态</td></tr>
+  <tr><td><code>backend/internal/worker/eventpub/</code></td><td>Wire 映射</td><td>core Event 到双 lane messaging.RunEvent 的映射与发布</td></tr>
+  <tr><td><code>backend/agent/</code></td><td>独立执行</td><td>Executor、Runtime、ExecutionRequest/Result、Event、Tool、Interaction</td></tr>
+  <tr><td><code>backend/agent/runtime/</code></td><td>Runtime 实现</td><td>native、Claude、Codex、OpenCode 和 external CLI 公共设施</td></tr>
+  <tr><td><code>backend/internal/memory/</code></td><td>业务资源</td><td>实例化 Memory Store</td></tr>
+  <tr><td><code>backend/internal/skill/</code></td><td>业务资源</td><td>Skill Service 与远端 source adapter</td></tr>
+  <tr><td><code>backend/internal/workspace/</code></td><td>业务资源</td><td>Workspace、附件和 Artifact 实现</td></tr>
   <tr><td><code>backend/internal/worker/scheduler/</code></td><td>Worker 管理</td><td>Worker 实例生命周期管理</td></tr>
   <tr><td><code>backend/internal/worker/server/</code></td><td>Worker 管理</td><td>WebSocket Worker 连接管理</td></tr>
   <tr><td><code>backend/internal/worker/command/interaction/</code></td><td>Worker 交互</td><td>审批/提问命令处理</td></tr>
@@ -543,53 +506,50 @@ type WorkerScheduler interface {
   <tr><td><code>backend/internal/runnable/session_run_stream_projector.go</code></td><td>Server 投影</td><td>记录 stream lane 首序号，支持 SSE replay</td></tr>
 </table>
 
-<h2>六、架构优化项</h2>
+<h2>六、实施状态与维护约束</h2>
 
-<p>当前消息协议和双 lane 投影已经完成统一，但 Agent Run 的 Worker 内部边界仍存在以下问题。详细目标架构与迁移步骤见 <a href="./AGENT_RUNTIME_ARCHITECTURE_PLAN.md">AGENT_RUNTIME_ARCHITECTURE_PLAN.md</a>。</p>
+<p>原计划中的 P0、P1、P2 架构项已经实施。完整代码证据和验证结果见 <a href="./AGENT_EXECUTION_ARCHITECTURE_PROGRESS_2026-06-28.md">AGENT_EXECUTION_ARCHITECTURE_PROGRESS_2026-06-28.md</a>。</p>
 
 <div class="layer-card">
-<h3><span class="badge badge-yellow">P1</span> Runner 接口跨越三层语义</h3>
-<p><code>agent.Runner</code> 同时被 <code>RuntimeRouter</code>、<code>lifecycle.Runner</code> 和 <code>externalcli.Runner</code> 实现。调用签名相同，但分别代表 Runtime 选择、Run 生命周期编排和 Engine 驱动适配，导致调用链难以判断真正的职责所有者。</p>
-<p><strong>调整方向：</strong>顶层使用 <code>RunService</code> 表达一次 Run 的编排；下层使用 <code>Runtime</code> 表达具体执行能力，不再复用同一个泛化 Runner 接口。</p>
+<h3><span class="badge badge-green">完成</span> 主链与调度语义</h3>
+<p>唯一主链为 <code>command/run.Handler → RunCoordinator → assistant.Service → agent.Executor → Runtime</code>。Coordinator 已实现 debounce 全 waiter、并发上限、Session 串行、取消、Close 和 delivery sequence 完成/失败语义。</p>
 </div>
 
 <div class="layer-card">
-<h3><span class="badge badge-yellow">P1</span> run.Handler 职责过多</h3>
-<p><code>command/run.Handler</code> 当前同时负责 wire 解码、路由校验、seq tracking、debounce、并发控制、Workspace/附件准备、活动 Run 管理、取消、Agent 调用和失败事件补发。</p>
-<p><strong>调整方向：</strong>Handler 保留 NATS 入站适配；调度、合并和取消收敛到 <code>RunCoordinator</code>；Workspace 与生命周期收敛到 Agent Run 编排器。</p>
+<h3><span class="badge badge-green">完成</span> 独立执行边界</h3>
+<p><code>backend/agent</code> 递归禁止依赖 <code>internal/*</code>、config、messaging 和业务 Tool 包。PreparedRun、Workspace、Session、Memory、Skill、Artifact、Git 与业务 RunStatus 均由 <code>internal/assistant</code> 持有。</p>
 </div>
 
 <div class="layer-card">
-<h3><span class="badge badge-yellow">P1</span> 终端事件存在多个潜在生产者</h3>
-<p>Engine event、<code>externalcli.Runner</code>、lifecycle journal 和 run Handler 都会参与 completed/failed/cancelled 的识别或补发。虽然当前 RunJournal 已统一编号与归档，但终端事件所有权仍不够单一。</p>
-<p><strong>调整方向：</strong>Runtime 只输出活动事件和执行结果；RunService 是 started 与 terminal event 的唯一生产者；NATS Publisher 只负责 wire 映射和 lane 路由。</p>
+<h3><span class="badge badge-green">完成</span> Runtime 与事件收敛</h3>
+<p>native、Claude、Codex、OpenCode 作为具体 Runtime 注册；native 直接执行 Eino，三个 CLI Runtime 复用 externalcli Driver。主路径只有一套 <code>ExecutionRequest</code>、<code>ExecutionResult</code> 和 <code>agent.Event</code>；provider、events、eventpub 和 todo 的迁移期 type alias 已删除。</p>
 </div>
 
 <div class="layer-card">
-<h3><span class="badge badge-yellow">P2</span> wire、domain 与 delivery metadata 混在 runTask</h3>
-<p><code>messaging.RunCommandPayload</code> 是跨进程协议，<code>agent.RequestContext</code> 是内部执行快照，二者应保持独立。当前额外的扁平 <code>runTask</code> 又混入了 NATS sequence 等 delivery metadata，形成三套相近结构。</p>
-<p><strong>调整方向：</strong>保留 wire/domain 分离和显式 mapper；删除中间 <code>runTask</code>，由 <code>RunSubmission</code> 组合 Agent Request、reply message IDs 与 delivery sequences。禁止让 <code>pkg/messaging</code> 依赖 <code>internal/agent</code>。</p>
+<h3><span class="badge badge-green">完成</span> 旧层和全局状态清理</h3>
+<p><code>backend/engines</code>、<code>internal/runtime</code>、<code>internal/agent</code>、eventengine 和 simplechat 已退出代码树。Memory、Model、Skill mutation、Interaction、provider session 与 MCP token 均由 composition root 构造并注入。</p>
 </div>
 
 <div class="layer-card">
-<h3><span class="badge badge-yellow">P2</span> 并发和等待状态分散</h3>
-<p>Semaphore、WorkerPool、debouncer、pending waiters 和 activeRuns 分别维护部分调度状态，增加取消、关闭和 ACK 时序的推理成本。</p>
-<p><strong>调整方向：</strong>统一由 RunCoordinator 管理并发、debounce、批次完成通知和活动 Run；NATS Handler 只在 Coordinator 返回后完成 delivery 状态更新。</p>
+<h3><span class="badge badge-blue">维护约束</span> 防止边界回退</h3>
+<p>新增 Runtime 必须实现同一 contract suite；新增 Tool 的公共输入必须为 <code>json.RawMessage</code> 或具名结构；Runtime 不得发布业务 <code>run.*</code> 终态；外部事件必须转换为 WorkerCommand 后进入唯一主链。</p>
 </div>
 
-<h2>七、当前结论</h2>
+<h2>七、实施结论</h2>
 
 <table>
-  <tr><th>范围</th><th>当前状态</th><th>后续原则</th></tr>
-  <tr><td>Server / Worker 通信</td><td><code>pkg/messaging</code> 统一 envelope 与 subject</td><td>保持现有 wire schema，不重新设计消息总线</td></tr>
-  <tr><td>Worker 命令入口</td><td><code>command.Dispatcher</code> 统一四条 lane</td><td>保持 Dispatcher，继续压薄具体 Handler</td></tr>
-  <tr><td>Run Event</td><td><code>run.stream</code> / <code>run.state</code> 双 lane</td><td>保持分流与独立 replay sequence</td></tr>
-  <tr><td>Agent Run</td><td>Runner、Handler、lifecycle 职责交叠</td><td>收敛为 Command Adapter → Coordinator → RunService → Runtime → Engine</td></tr>
-  <tr><td>重构尺度</td><td>内部结构调整</td><td>不增加服务、lane、数据库状态机或通用插件框架</td></tr>
+  <tr><th>范围</th><th>最终决策</th></tr>
+  <tr><td>Server / Worker 通信</td><td>保持 <code>pkg/messaging</code>、四条 command lane 和现有 wire schema</td></tr>
+  <tr><td>Run Event</td><td>保持 <code>run.stream</code> / <code>run.state</code> 与独立 replay sequence</td></tr>
+  <tr><td>Agent core</td><td>顶层可复用 <code>backend/agent</code>，不依赖 SingerOS 业务</td></tr>
+  <tr><td>业务包装</td><td><code>internal/assistant</code> 负责 prepare、finalize 和业务终态</td></tr>
+  <tr><td>Runtime</td><td>native、Claude、Codex、OpenCode 完全同级，直接实现一个 Runtime 接口</td></tr>
+  <tr><td>Worker</td><td>Command Adapter → RunCoordinator → assistant.Service</td></tr>
+  <tr><td>实施状态</td><td>主链迁移、边界收敛、旧包清理与核心回归测试已完成</td></tr>
 </table>
 
 <hr style="border-color: #30363d; margin: 30px 0;">
-<p style="color: #8b949e; font-size: 13px;">更新时间: 2026-06-27 | 基于 SingerOS/backend 当前工作区实现 | 架构版本: command.Dispatcher + messaging 双 lane + Run Projectors</p>
+<p style="color: #8b949e; font-size: 13px;">更新时间: 2026-06-28 | 架构版本: messaging 双 lane + RunCoordinator + assistant 业务包装 + 独立 agent.Runtime（当前实施）</p>
 </div>
 </body>
 </html>

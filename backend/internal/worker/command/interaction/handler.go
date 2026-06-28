@@ -11,7 +11,7 @@ import (
 )
 
 // Resolver 是 approval/question 的解析接口。
-// 生产环境由 engines.DefaultInteractionRouter 实现。
+// 生产环境由进程装配时创建的 InteractionRouter 实现。
 type Resolver interface {
 	ResolveApproval(requestID, action, reason string) error
 	ResolveQuestion(requestID string, answers [][]string) error

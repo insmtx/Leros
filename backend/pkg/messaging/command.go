@@ -113,11 +113,11 @@ type QuestionAnswerCommandPayload struct {
 
 // SkillCommandPayload 是 skill.manage 命令的 payload。
 type SkillCommandPayload struct {
-	Action  string `json:"action"`              // "install" | "list" | "uninstall" | "detail" | "import"
-	Source  string `json:"source,omitempty"`    // "Leros" | "github" | "skills-sh" | "url"
-	SkillID string `json:"skill_id,omitempty"`  // install identifier
-	Version string `json:"version,omitempty"`   // optional version for install
-	Name    string `json:"name,omitempty"`      // for uninstall / detail: the skill name
+	Action  string `json:"action"`             // "install" | "list" | "uninstall" | "detail" | "import"
+	Source  string `json:"source,omitempty"`   // "Leros" | "github" | "skills-sh" | "url"
+	SkillID string `json:"skill_id,omitempty"` // install identifier
+	Version string `json:"version,omitempty"`  // optional version for install
+	Name    string `json:"name,omitempty"`     // for uninstall / detail: the skill name
 	// DownloadURL is the URL from which the worker downloads the skill file during "import".
 	DownloadURL string `json:"download_url,omitempty"`
 }
@@ -125,8 +125,18 @@ type SkillCommandPayload struct {
 // ---- Command Builders ----
 
 // NewRunCommand 构造一个 agent.run WorkerCommand。
-func NewRunCommand(envID string, route RouteContext, trace TraceContext, payload RunCommandPayload, metadata map[string]any) WorkerCommand {
+func NewRunCommand(
+	envID string,
+	route RouteContext,
+	trace TraceContext,
+	payload RunCommandPayload,
+	metadata *RunCommandMetadata,
+) WorkerCommand {
 	raw, _ := json.Marshal(payload)
+	metadataRaw, _ := json.Marshal(metadata)
+	if metadata == nil {
+		metadataRaw = nil
+	}
 	return WorkerCommand{
 		ID:        envID,
 		Type:      MessageTypeWorkerCommand,
@@ -137,8 +147,15 @@ func NewRunCommand(envID string, route RouteContext, trace TraceContext, payload
 			CommandType: CommandTypeRun,
 			Payload:     raw,
 		},
-		Metadata: metadata,
+		Metadata: metadataRaw,
 	}
+}
+
+// RunCommandMetadata contains typed optional metadata for agent.run commands.
+type RunCommandMetadata struct {
+	SessionID   string `json:"session_id,omitempty"`
+	MessageType string `json:"message_type,omitempty"`
+	Sequence    int64  `json:"sequence,omitempty"`
 }
 
 // NewCancelRunCommand 构造一个 run.cancel WorkerCommand。
@@ -288,10 +305,9 @@ type WorkspaceOptions struct {
 }
 
 type TaskInput struct {
-	Type        InputType      `json:"type"`
-	Messages    []ChatMessage  `json:"messages,omitempty"`
-	Attachments []Attachment   `json:"attachments,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
+	Type        InputType     `json:"type"`
+	Messages    []ChatMessage `json:"messages,omitempty"`
+	Attachments []Attachment  `json:"attachments,omitempty"`
 }
 
 type ChatMessage struct {

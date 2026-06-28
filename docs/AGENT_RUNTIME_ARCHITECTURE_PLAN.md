@@ -1,298 +1,837 @@
-# Agent Runtime 架构调整计划
+# Agent Runtime 架构最终调整方案
 
-> 状态：设计方案
+> 状态：最终设计方案
 >
-> 更新时间：2026-06-27
+> 更新时间：2026-06-28
 >
 > 当前架构参考：[leros-architecture.html](./leros-architecture.html)
 
-## 1. 背景与结论
+## 1. 最终结论
 
 当前 Server/Worker 分离、`WorkerCommand` 统一协议、四条 command lane，以及
-`run.stream` / `run.state` 双 lane 已经形成清晰的跨进程通信边界。这些部分不需要重新设计。
+`run.stream` / `run.state` 双 lane 已经形成稳定的跨进程边界。本次不重新设计这些部分。
 
-当前复杂度主要集中在 Worker 内部：
-
-1. `agent.Runner` 被 Runtime 路由、生命周期包装器和 Engine 适配器共同实现，同一接口承载三种语义。
-2. `command/run.Handler` 同时负责传输适配、调度、Workspace 准备、取消、Agent 调用和失败补偿。
-3. Engine、Runtime、lifecycle journal 和 Handler 都参与终端状态处理，事件所有权不够单一。
-4. `runTask` 同时承载 wire payload、领域请求和 NATS delivery metadata。
-5. Semaphore、WorkerPool、debouncer、pending waiters 和 active runs 分散维护 Run 调度状态。
-
-本次调整的核心不是增加更多抽象，而是将当前混在一起的职责收敛为一条可直接追踪的链路：
+调整范围限定在 Worker 内部的 Agent Run：
 
 ```text
 NATS Command
     → Command Adapter
     → Run Coordinator
     → Agent RunService
-    → Runtime
+    → RunPreparer
+    → PreparedRun
+    → Runtime Registry
+    → Runtime Adapter
     → Engine
+    → RunFinalizer
 ```
 
-事件反向链路：
+事件链路：
 
 ```text
-Engine 原始事件
-    → Runtime 标准事件
+EngineEvent
+    → Runtime Adapter
+    → agent.Event
     → RunJournal
-    → RunEvent Publisher
+    → NATSEventSink
     → NATS run.stream / run.state
     → Server Projector
 ```
 
-## 2. 设计原则与尺度
+最终设计采用以下关键决策：
 
-### 2.1 设计原则
+1. 原始 `agent.Request` 与准备后的 `agent.PreparedRun` 完全分离。
+2. RunService 是流程 Orchestrator，不直接实现所有准备和收尾逻辑。
+3. 上层只保留一个 `agent.EventSink` 接口；不再定义重复的 EventPublisher 接口。
+4. RunJournal 只编号、记录、聚合和转发，不判断 Run 终态。
+5. Required Finalize 与 best-effort post-run 明确分开。
+6. RunCoordinator 只管理 Worker 本地调度，不理解 Workspace、Model、Engine 或 Event 类型。
+7. Runtime Registry 与 Runtime Adapter 分离。
+8. Engine 只能输出 `EngineEvent` 和 `EngineResult`，不能引用 Agent、Messaging 或 Session 领域类型。
 
-- **单一 Run 入口**：业务代码只通过 `RunService.Run` 启动 Agent Run。
-- **单一终端事件所有者**：只有 RunService 产生 started/completed/failed/cancelled。
-- **传输与领域分离**：`pkg/messaging` 保持 wire contract，不依赖 `internal/agent`。
-- **依赖方向单向**：Agent 和 Runtime 不知道 NATS、JetStream、Worker lane 或 SSE。
-- **显式映射**：wire request 只在 Command Adapter 映射一次；Agent event 只在 Publisher 映射一次。
-- **渐进迁移**：保持现有消息 schema、数据库 schema 和部署方式，每个阶段可独立验证。
+## 2. 当前代码证据
 
-### 2.2 明确不做
+### 2.1 Request 当前确实被当作可变状态
 
-- 不增加新的服务进程。
-- 不增加新的 NATS stream 或 lane。
-- 不引入事件溯源框架、工作流引擎或持久化状态机。
-- 不设计通用插件系统或通用 middleware 框架。
-- 不把 Server/Worker wire DTO 与内部 Agent 类型合并。
-- 不在本次调整中重做 Worker Scheduler、WebSocket 管理或 Skill 系统。
+当前 lifecycle pipeline 中：
 
-## 3. 参考项目取舍
+- `NormalizeStep` 调用 `NormalizeRequest(state.OriginalRequest)`，直接修改原始请求。
+- `ModelStep` 将原始模型配置写入 model router 后，再修改 `req.Model.BaseURL`。
+- `ContextStep` 之后才通过 `ContextBuilder.Prepare` 克隆请求并写入 System Prompt。
+- Handler 在 lifecycle 前直接修改 `req.Runtime.WorkDir` 和 `req.Workspace.RepoDir`。
+- `JournalStep` 和 `ContextStep` 会修改 `Request.EventSink`。
 
-### 3.1 Pi
+因此当前 `RequestContext` 同时表达：
 
-吸收：
+- Server 传入的原始意图。
+- Worker 补充的 Workspace 状态。
+- Prepare 后的模型和 Prompt。
+- 事件输出通道。
 
-- Agent 对一次运行的状态、事件和停止条件具有明确所有权。
-- 模型/Provider 调用位于 Agent loop 的执行边界。
-- 事件流是 Agent 的输出，不与消息总线绑定。
+这正是调用链难以追踪的重要原因。
 
-不照搬：
+### 2.2 RunService 不能只是替代旧 lifecycle.Runner
 
-- SingerOS 同时支持 native 与外部完整 Agent CLI，不适合强制所有 Engine 进入同一种模型工具循环。
+当前 pipeline 包含十余个 Step。简单将它们搬进新的 RunService，只会把复杂度从
+Handler/lifecycle 包移动到一个新的大型类型。
 
-### 3.2 Multica
+RunService 应只持有四个依赖：
 
-吸收：
+```go
+type Service struct {
+    preparer        RunPreparer
+    runtimeResolver RuntimeResolver
+    finalizer       RunFinalizer
+    journalFactory  JournalFactory
+}
+```
 
-- Backend 执行过程事件与最终 Result 分离。
-- 每个 CLI Backend 只处理自身进程协议和事件解析。
-- 调度层消费统一事件，不读取 Provider 私有输出。
+其职责仅是控制顺序、错误分类和终端事件。
 
-不照搬：
+### 2.3 Engine 当前穿透了 Runtime 边界
 
-- 不构建大型 Daemon 对象，不把仓库、调度、网络、执行和上报重新集中到一个类型。
+当前 `engines.Engine` 直接使用 `internal/runtime/events.Event`，native Engine 也直接产生：
 
-### 3.3 Hermes Agent
+- `run.started`
+- `message.result`
+- `run.completed`
+- `run.failed`
 
-吸收：
+随后 `externalcli.Runner` 再过滤这些事件并组装 `agent.RunResult`。这使 Engine 与
+Agent lifecycle 使用同一事件语言，Runtime Adapter 很容易被绕过。
 
-- Provider transport 只负责请求格式转换和响应标准化。
-- Provider 私有字段保留在适配层，不污染通用事件字段。
+此外 native Engine 当前根据 `SessionID` 自行加载 Session 历史；该职责应属于
+Preparer，Engine 只应接收准备完成的 messages。
 
-不照搬：
+最终设计将 Engine 事件与 Agent 事件拆开。
 
-- 不复制大型 conversation loop 和大量运行时全局状态。
-- 不把重试、缓存、Provider 路由、工具执行和持久化集中在单个 Agent 类型。
+### 2.4 Session complete 属于 Server projector
 
-## 4. 目标架构层级
+Worker 使用的 `PassthroughSessionMessageProvider.CompleteClaimed` 是 no-op。真正的 Session
+消息完成、失败、取消和 artifact 持久化由 Server 的 state projector 处理。
+
+因此目标架构中删除 Worker 侧 `SessionCompleteStep`。Worker 只发布 terminal event，
+不表达“数据库 Session 已完成”。
+
+### 2.5 Learning 已是 best effort，但执行顺序不正确
+
+当前 `LearningStep` 会吞掉错误，不改变主 Run 状态，这是正确语义；但它位于 terminal
+event 之前。目标顺序调整为：
+
+```text
+Required Finalize
+→ Emit Terminal
+→ Post-run Best Effort
+```
+
+Learning、metrics 和 diagnostics 无论成功失败，都不能修改已经确定的 RunResult。
+
+## 3. 设计尺度
+
+### 3.1 保留
+
+- Server / Worker 两进程模型。
+- `pkg/messaging` wire contract。
+- 四条 Worker command lane。
+- `run.stream` / `run.state` 双 lane。
+- JetStream sequence tracking。
+- Session 级 debounce。
+- Provider session resume。
+- InteractionRouter 审批/提问机制。
+- Server state/stream projectors。
+
+### 3.2 不做
+
+- 不增加服务进程、NATS stream 或 lane。
+- 不引入工作流引擎、事件溯源框架或持久化状态机。
+- 不重做 Worker Scheduler、WebSocket 管理或 Skill 系统。
+- 不把每个 Prepare/Finalize 步骤做成独立 package 或 Step 对象。
+- 不让 `pkg/messaging` 依赖 `internal/agent`。
+- 不让 RunService、Runtime 或 Engine 访问 NATS。
+
+### 3.3 参考项目取舍
+
+- **Pi**：吸收 Agent 对运行状态和标准事件流的清晰所有权；不要求外部完整 Agent CLI
+  进入统一的模型工具循环。
+- **Multica**：吸收执行过程 Events 与最终 Result 分离，以及 CLI Backend 只处理自身
+  协议的边界；不复制大型 Daemon 对象。
+- **Hermes Agent**：吸收 Provider transport 只负责格式转换和响应标准化的窄接口；
+  不复制大型 conversation loop 或全局运行时状态。
+
+## 4. 目标分层与依赖方向
 
 ```mermaid
 flowchart TD
     Entry["cmd/leros<br/>进程装配"]
     Command["worker/command<br/>NATS 入站适配"]
-    Coordinator["worker/run<br/>Run 调度与取消"]
-    Agent["agent<br/>RunService 生命周期编排"]
-    Runtime["runtime<br/>Runtime 选择与执行端口"]
-    Engine["engines<br/>具体协议与进程驱动"]
-    Publisher["worker/eventpub<br/>NATS 出站适配"]
-    Messaging["pkg/messaging<br/>共享 wire contract"]
-    NATS["infra/mq<br/>NATS JetStream"]
-    Projector["runnable<br/>Server Projectors"]
+    Coordinator["worker/run<br/>并发、合并、取消"]
+    Service["agent/run.Service<br/>Run Orchestrator"]
+    Preparer["agent/run.Preparer<br/>生成 PreparedRun"]
+    Resolver["runtime.Registry<br/>按 kind 解析"]
+    Adapter["runtime.Adapter<br/>Engine → Agent"]
+    Engine["engines<br/>具体协议与进程"]
+    Finalizer["agent/run.Finalizer<br/>Required + Post-run"]
+    Journal["agent/run.Journal<br/>编号、归档、转发"]
+    Sink["worker/eventpub.NATSEventSink"]
+    NATS["NATS JetStream"]
+    Projector["Server Projectors"]
 
     Entry --> Command
     Command --> Coordinator
-    Coordinator --> Agent
-    Agent --> Runtime
-    Runtime --> Engine
-
-    Agent --> Publisher
-    Publisher --> Messaging
-    Publisher --> NATS
-    Command --> Messaging
-    Command --> NATS
+    Coordinator --> Service
+    Service --> Journal
+    Service --> Preparer
+    Service --> Resolver
+    Resolver --> Adapter
+    Adapter --> Engine
+    Service --> Finalizer
+    Adapter --> Journal
+    Journal --> Sink
+    Sink --> NATS
     NATS --> Projector
 ```
 
-### 4.1 进程装配层
+依赖约束：
 
-路径：`backend/cmd/leros/`
+```text
+cmd
+  → worker adapters
+  → worker/run
+  → agent/run
+  → agent ports
 
-职责：
+runtime implementation
+  → agent ports
+  → engines
 
-- 加载配置。
-- 创建 NATS、Runtime Registry、RunService、RunCoordinator 和 handlers。
-- 启动 HTTP Server 与 Dispatcher。
-- 注册进程关闭函数。
+engines
+  → 不依赖 agent/runtime/messaging/NATS
+```
 
-禁止：
+`Runtime` 与 `RuntimeResolver` 端口定义在 `internal/agent`，由 `internal/runtime`
+实现。这样 Agent RunService 不需要 import Runtime 实现包，避免 Go import cycle。
 
-- Run 调度或业务逻辑。
-- Workspace 准备。
-- 事件映射。
+## 5. 核心数据模型
 
-### 4.2 Command Adapter
+### 5.1 Request：原始不可变输入
 
-目标路径：`backend/internal/worker/command/`
+`agent.Request` 表达调用方意图：
 
-职责：
+- Run/Trace/Task 标识。
+- Assistant 与 Actor 快照。
+- Conversation 和原始输入。
+- 请求的 Project/Workspace 标识。
+- 请求的 Runtime kind。
+- 原始 Model 配置。
+- Capability 与 Policy。
 
-- 订阅 command lanes。
-- 解析并校验 `messaging.WorkerCommand` envelope。
-- 将 `RunCommandPayload` 映射为内部 `agent.Request`。
-- 从 `*nats.Msg` 提取 stream sequence。
-- 将请求、事件路由上下文和 delivery sequences 组装为 `RunSubmission`。
-- 等待 Coordinator 返回后更新 delivery terminal state。
+Request 不包含：
 
-禁止：
+- 最终 WorkDir、RepoDir、TaskDir。
+- 构建后的 System Prompt。
+- 解析后的 tools/skills。
+- Artifact baseline。
+- EventSink。
+- NATS route、subject 或 delivery sequence。
 
-- Workspace clone 或附件下载。
-- Runtime 选择。
-- Run 生命周期事件生产。
-- 直接调用 Engine。
+Go 无法对普通 struct 强制不可变，因此采用以下约束：
 
-### 4.3 Run Coordinator
+- Command Mapper 创建 Request 后不再修改。
+- RunService 入口先执行 deep clone 和最小规范化。
+- Preparer 只读 normalized Request。
+- PreparedRun 拥有独立的 slice/map 副本。
+- 使用测试对比 Run 前后的 Request，防止回归。
 
-目标路径：`backend/internal/worker/run/`
+### 5.2 PreparedRun：准备完成的执行上下文
 
-职责：
+```go
+type PreparedRun struct {
+    // Request is the normalized immutable input retained for audit/finalization.
+    Request *Request
 
-- 按 Session key 进行 debounce 合并。
-- 管理 Worker 级别并发上限。
-- 串行化同一 Session 的 Run。
-- 维护 active run 和 `context.CancelFunc`。
-- 处理 `Submit`、`Cancel` 和优雅关闭。
-- 将合并后的 `RunSubmission` 交给 RunService。
+    RuntimeKind string
+    Spec        ExecutionSpec
+    Workspace   PreparedWorkspace
+    Baseline    ArtifactBaseline
+}
 
-Coordinator 不解析 NATS 消息，也不生产业务事件。
+type ExecutionSpec struct {
+    SystemPrompt   string
+    Prompt         string
+    Messages       []InputMessage
+    Model          PreparedModel
+    AllowedTools   []string
+    PermissionMode string
+    MaxSteps       int
+}
 
-### 4.4 Agent RunService
+type PreparedWorkspace struct {
+    WorkDir string
+    RepoDir string
+    TaskDir string
+}
 
-目标路径：`backend/internal/agent/`
+type ArtifactBaseline struct {
+    Ref string
+}
+```
 
-RunService 是一次 Agent Run 的应用层所有者，内部只保留三个阶段：
+约束：
 
-1. **Prepare**
-   - 请求标准化与校验。
-   - Model、System Prompt、Session Context 构建。
-   - Workspace 和附件准备。
-   - 权限检查与 artifact baseline。
-   - 创建 RunJournal 并发布 `run.started`。
+- Runtime 只消费 `PreparedRun.Spec` 与 `PreparedRun.Workspace`。
+- Runtime 不回写 PreparedRun。
+- `PreparedRun.Request` 只用于关联、审计、finalize 和 post-run。
+- Baseline 可以引用磁盘快照，不要求把完整文件树加载到内存。
 
-2. **Execute**
-   - 根据 `Runtime.Kind` 解析 Runtime。
-   - 调用 Runtime。
-   - Runtime 活动事件全部写入 RunJournal。
+### 5.3 RuntimeResult：执行结果，不是 Run 终态
 
-3. **Finalize**
-   - Workspace push 和 artifact reconcile。
-   - 生成最终 Result。
-   - learning 与 session complete。
-   - 恰好发布一个 completed、failed 或 cancelled。
+```go
+type RuntimeResult struct {
+    Message                string
+    Usage                  *Usage
+    ToolCalls              []ToolCallRecord
+    ProviderConversationID string
+    Metadata               map[string]string
+}
+```
 
-RunService 不知道事件最终会写入 NATS、日志还是测试内存。
+RuntimeResult 不包含：
 
-### 4.5 Runtime
+- `RunStatus`。
+- completed/failed/cancelled。
+- Session 数据库状态。
+- NATS payload。
 
-端口定义：`backend/internal/agent/runtime.go`
+Runtime 执行失败通过返回 `error` 表达；RunService 根据 error/context 决定最终 RunStatus。
 
-实现路径：`backend/internal/runtime/`
+### 5.4 RunResult：Required Finalize 后的最终结果
 
-职责：
+RunResult 是 Agent Run 的最终业务结果，包含：
 
-- 根据 kind 选择 native、Claude、Codex 或 OpenCode Runtime。
-- 将 Agent Request 转为 Engine Request。
-- 消费 Engine 原始事件并标准化为 Agent Event。
-- 管理 Provider session resume。
-- 协调审批/提问 responder 与现有 `InteractionRouter`。
-- 返回 Runtime Result。
+- RunID、TraceID。
+- completed/failed/cancelled。
+- 用户可见 Message。
+- 独立 Error。
+- Usage、ToolCalls、Artifacts。
+- StartedAt、CompletedAt。
+- Run metadata。
 
-Runtime 不生产 Run started/terminal event，也不依赖 NATS。
+`content` 与技术错误继续分离：Message 不回退到 Error。
 
-### 4.6 Engine
+## 6. 核心接口
 
-路径：`backend/engines/`
+### 6.1 EventSink：唯一上层事件接口
 
-职责：
+```go
+type EventSink interface {
+    Emit(ctx context.Context, event *Event) error
+}
+```
 
-- 具体 CLI 或 native Engine 的准备和启动。
-- 进程生命周期与 Provider 协议。
-- 原始输出解析。
-- Provider 特有 responder。
+不再增加公开的 `EventPublisher` 接口。
 
-Engine 不负责：
+Worker 侧提供具体实现：
 
-- Agent Run 生命周期。
-- Workspace 业务准备。
-- NATS subject 或 wire envelope。
-- Session message 持久化。
+```go
+type RunEventContext struct {
+    OrgID             uint
+    WorkerID          uint
+    SessionID         string
+    TraceID           string
+    RequestID         string
+    TaskID            string
+    RunID             string
+    ParentID          string
+    ReplyToMessageIDs []string
+}
 
-### 4.7 RunEvent Publisher
+type NATSEventSink struct {
+    context RunEventContext
+    bus     EventBus
+}
+```
 
-目标路径：`backend/internal/worker/eventpub/`
+以及供 Coordinator 使用的最小工厂：
 
-职责：
+```go
+type EventSinkFactory interface {
+    NewEventSink(eventContext RunEventContext) agent.EventSink
+}
+```
 
-- 实现 RunCoordinator 使用的 `EventSinkFactory`，按 `RunEventContext` 创建 run-scoped sink。
-- 将 `agent.Event` 映射为 `messaging.RunEvent`。
-- 根据事件类型选择 `run.stream` 或 `run.state`。
-- 填充 route、trace、reply message IDs。
-- 对 terminal event 使用 detached timeout context。
-- 调用 EventBus 发布。
+`NATSEventSink` 可以在实现内部使用 publisher 命名，但不形成第二套抽象。
 
-未知事件类型必须返回错误，不能默认归入 stream lane。
+### 6.2 Journal
 
-### 4.8 Server Projector
+```go
+type Journal interface {
+    Record(ctx context.Context, event *agent.Event) error
+    Snapshot() JournalSnapshot
+}
 
-保留当前路径：
+type JournalFactory interface {
+    New(req *agent.Request, sink agent.EventSink) Journal
+}
+```
 
-- `session_run_state_projector.go`
-- `session_run_stream_projector.go`
+Journal 负责：
 
-职责：
+- 填充 RunID、TraceID。
+- 分配单调递增的 event sequence。
+- 填充 timestamp 和 event ID。
+- 归档 activity events。
+- 聚合 Message、Usage、ToolCalls 和 artifact facts。
+- 将事件转发到 EventSink。
 
-- state projector：处理 started、terminal、artifact 等关键状态。
-- stream projector：记录 stream lane 首序号。
-- SSE：消费 stream lane 并根据 `StreamStartSeq` 回放。
+Journal 不负责：
 
-`StreamStartSeq` 和 `StateStartSeq` 始终来自各自 lane，禁止相互替代。
+- 判断成功、失败或取消。
+- 将 Engine completed 转成 Run completed。
+- 在 `Close` 时隐式补发 terminal。
+- 选择 NATS lane 或 subject。
+- 持久化 Session。
 
-## 5. 目标目录
+RunService 必须显式记录终端事件：
+
+```go
+if err := journal.Record(ctx, runCompletedEvent(result)); err != nil {
+    // Handle according to existing delivery policy.
+}
+```
+
+`JournalSnapshot` 归档非终端 activity facts；terminal event 可以被记录和转发，
+但不再次嵌入自身的 archived events。
+
+### 6.3 RunPreparer
+
+```go
+type RunPreparer interface {
+    Prepare(ctx context.Context, req *agent.Request) (*agent.PreparedRun, error)
+}
+```
+
+Preparer 内部以具体方法组织，不恢复通用 Step pipeline：
+
+```text
+validate input
+→ resolve model
+→ build session context
+→ resolve skills/tools
+→ build system prompt
+→ prepare workspace
+→ ingest attachments
+→ authorize
+→ capture baseline
+→ build ExecutionSpec
+```
+
+Preparer 可以由一个具体 struct 实现，内部复用现有 ContextBuilder、Workspace helpers
+和 model router，不为每一步创建接口。
+
+### 6.4 Runtime 与 RuntimeResolver
+
+```go
+type Runtime interface {
+    Kind() string
+    Execute(
+        ctx context.Context,
+        run *PreparedRun,
+        sink EventSink,
+    ) (*RuntimeResult, error)
+}
+
+type RuntimeResolver interface {
+    Resolve(kind string) (Runtime, error)
+}
+```
+
+约束：
+
+- Runtime 接收 PreparedRun，不接收原始 Request。
+- Runtime 只输出 activity events 和 RuntimeResult。
+- Runtime 不输出 run.started 或 terminal events。
+- Registry 只注册和解析 Runtime，不执行适配逻辑。
+- Adapter 只负责 Engine request/result/event 转换和 provider session resume。
+
+### 6.5 RunFinalizer
+
+```go
+type RunFinalizer interface {
+    FinalizeRequired(
+        ctx context.Context,
+        run *agent.PreparedRun,
+        runtimeResult *agent.RuntimeResult,
+        snapshot JournalSnapshot,
+    ) (*Finalization, error)
+
+    PostRunBestEffort(
+        ctx context.Context,
+        run *agent.PreparedRun,
+        result *agent.RunResult,
+        snapshot JournalSnapshot,
+    )
+}
+
+type Finalization struct {
+    Result *agent.RunResult
+    Events []*agent.Event
+}
+```
+
+Required Finalize 顺序固定：
+
+```text
+reconcile workspace
+→ collect artifact facts
+→ stage/commit/push workspace
+→ build final RunResult
+```
+
+要求：
+
+- reconcile 必须先于 push。
+- clean working tree 不是错误。
+- required finalize 失败会使 Run 进入 failed。
+- Finalizer 返回 artifact facts/events，由 RunService 在 terminal event 之前显式写入 Journal。
+
+Post-run Best Effort 在 terminal event 之后执行：
+
+- learning。
+- metrics。
+- diagnostics。
+- 经验提取。
+
+Post-run 错误只记录日志/指标，不修改 RunResult，也不再发布第二个 terminal event。
+
+Worker 不执行 Session complete。Server projector 根据 terminal event 完成真正的
+Session message 状态提交。
+
+### 6.6 RunService
+
+```go
+type Service struct {
+    preparer        RunPreparer
+    runtimeResolver agent.RuntimeResolver
+    finalizer       RunFinalizer
+    journalFactory  JournalFactory
+}
+```
+
+RunService 主体保持显式顺序：
+
+```go
+func (s *Service) Run(
+    ctx context.Context,
+    input *agent.Request,
+    sink agent.EventSink,
+) (*agent.RunResult, error) {
+    req, err := agent.CloneAndNormalizeRequest(input)
+    if err != nil {
+        return nil, err // rejected before a Run is accepted
+    }
+
+    journal := s.journalFactory.New(req, sink)
+    if err := journal.Record(ctx, agent.NewRunStarted(req)); err != nil {
+        return nil, err
+    }
+
+    prepared, err := s.preparer.Prepare(ctx, req)
+    if err != nil {
+        return s.finishError(ctx, req, nil, journal, "prepare", err)
+    }
+
+    runtime, err := s.runtimeResolver.Resolve(prepared.RuntimeKind)
+    if err != nil {
+        return s.finishError(ctx, req, prepared, journal, "runtime_resolve", err)
+    }
+
+    runtimeResult, err := runtime.Execute(ctx, prepared, journalSink(journal))
+    if err != nil {
+        return s.finishError(ctx, req, prepared, journal, "execute", err)
+    }
+
+    finalized, err := s.finalizer.FinalizeRequired(
+        ctx,
+        prepared,
+        runtimeResult,
+        journal.Snapshot(),
+    )
+    if err != nil {
+        return s.finishError(ctx, req, prepared, journal, "finalize", err)
+    }
+
+    for _, event := range finalized.Events {
+        if err := journal.Record(ctx, event); err != nil {
+            return finalized.Result, err
+        }
+    }
+
+    if err := journal.Record(ctx, agent.NewRunCompleted(finalized.Result)); err != nil {
+        return finalized.Result, err
+    }
+
+    s.finalizer.PostRunBestEffort(
+        ctx,
+        prepared,
+        finalized.Result,
+        journal.Snapshot(),
+    )
+    return finalized.Result, nil
+}
+```
+
+示例省略日志和少量辅助函数，但固定以下语义：
+
+- RunService 只编排，不实现 Prepare/Runtime/Finalize 细节。
+- accepted Run 恰好产生一个 started 和一个 terminal event。
+- prepare/resolve/execute/finalize 任一失败都显式生成 failed/cancelled。
+- post-run 在 terminal 后执行，不能改变终态。
+- 原始 Request 和 PreparedRun 均不被 Runtime 修改。
+
+### 6.7 RunCoordinator
+
+```go
+type RunSubmission struct {
+    Request      *agent.Request
+    EventContext RunEventContext
+    DeliverySeqs []uint64
+}
+
+type ExecuteFunc func(
+    ctx context.Context,
+    submission RunSubmission,
+    sink agent.EventSink,
+) (*agent.RunResult, error)
+
+type RunOutcome struct {
+    Result       *agent.RunResult
+    DeliverySeqs []uint64
+}
+
+type RunCoordinator interface {
+    Submit(ctx context.Context, submission RunSubmission) (RunOutcome, error)
+    Cancel(ctx context.Context, sessionID, runID string) error
+    Close() error
+}
+```
+
+Coordinator 只理解：
+
+- RunID。
+- SessionID。
+- RunSubmission。
+- debounce key。
+- concurrency slot。
+- active cancellation。
+- ExecuteFunc。
+- execution outcome。
+
+Coordinator 明确禁止依赖：
+
+- Workspace。
+- Model。
+- Engine。
+- Artifact。
+- 具体 EventType。
+- NATS subject。
+- Server Session 持久化。
+
+Submission 合并由 `RunSubmission.Merge` 或注入的 merge function 完成。Coordinator
+不读取 Model/Input 的业务字段。合并操作必须创建新的 Request 和输入切片，不能修改
+任一原始 Submission 中的 Request。
+
+Command Adapter 仍负责 NATS stream sequence tracking。Coordinator 返回后，Adapter
+根据合并批次中的全部 DeliverySeqs 更新 terminal delivery state。
+
+## 7. Engine 边界
+
+### 7.1 Engine 不能使用 Agent Event
+
+目标 `engines` 包不允许 import：
+
+- `internal/agent`。
+- `internal/runtime/events`。
+- `pkg/messaging`。
+- NATS。
+
+Engine 定义自己的最小协议：
+
+```go
+type EngineEventType string
+
+type EngineEvent struct {
+    Type       EngineEventType
+    OccurredAt time.Time
+    Content    string
+    Payload    json.RawMessage
+}
+
+type EngineResult struct {
+    Message                string
+    Usage                  *EngineUsage
+    ProviderConversationID string
+    Err                    error
+}
+
+type Execution struct {
+    Process   Process
+    Events    <-chan EngineEvent
+    Result    <-chan EngineResult
+    Approvals ApprovalResponder
+    Questions QuestionResponder
+}
+
+type Engine interface {
+    Prepare(ctx context.Context, req PrepareRequest) error
+    Run(ctx context.Context, req RunRequest) (*Execution, error)
+}
+```
+
+约束：
+
+- Run 启动失败通过返回 error 表达。
+- 启动成功后，Result channel 恰好产生一个 EngineResult。
+- EngineEvent 只描述 provider activity，不包含 RunStatus。
+- Engine 不产生 run.started/completed/failed/cancelled。
+- Engine RunRequest 使用 ProviderConversationID/ResumeRef，不引用 SingerOS Session 类型。
+- native Engine 不再调用 Session API 或自行加载历史；Preparer 将已准备的 messages
+  写入 ExecutionSpec，Runtime 再映射到 Engine RunRequest。
+- Provider 私有 payload 使用具名结构或 `json.RawMessage`，不使用
+  `map[string]interface{}` 传递业务数据。
+- `ProviderConversationID` 是 Provider resume 标识，不是 SingerOS Session。
+
+### 7.2 Runtime Adapter 是唯一翻译层
+
+Runtime Adapter 负责：
+
+```text
+PreparedRun
+→ engines.RunRequest
+
+EngineEvent
+→ agent.Event
+
+EngineResult
+→ agent.RuntimeResult / error
+```
+
+Provider session store 和 InteractionRouter 保留在 Runtime Adapter，因为它们需要同时
+理解 Provider responder 与 Agent activity event。
+
+### 7.3 Registry 与 Adapter 分离
+
+`runtime.Registry`：
+
+- 按 kind 注册 Runtime。
+- 处理默认 kind。
+- 返回不可用错误。
+
+`runtime.Adapter`：
+
+- 包装一个 Engine。
+- 管理 Provider resume。
+- 消费 Engine Events/Result。
+- 转换为 Agent Runtime 契约。
+
+Registry 不解析 Engine event；Adapter 不管理全局 Runtime 注册。
+
+## 8. Event 与终态所有权
+
+| 事件/结果 | 唯一所有者 | 说明 |
+|---|---|---|
+| EngineEvent | Engine | Provider activity |
+| agent activity event | Runtime Adapter | 标准 message/tool/todo/interaction |
+| run.started | RunService | accepted Run 开始 |
+| artifact.declared | RunService | 记录 Finalizer 返回的 artifact event |
+| run.completed | RunService | Required Finalize 成功 |
+| run.failed | RunService | prepare/execute/finalize 失败 |
+| run.cancelled | RunService | context cancel/deadline |
+| event sequence/timestamp | RunJournal | 不决定事件类型 |
+| stream/state lane | NATSEventSink | 不决定 Run 状态 |
+| Session message 状态 | Server state projector | Worker 无 DB 所有权 |
+
+禁止的隐式行为：
+
+- Journal `Close()` 自动生成 terminal。
+- Runtime 将 Engine completed 直接透传为 run.completed。
+- Handler 在 RunService 已形成终态后再次补发失败事件。
+- Publisher 根据 error 猜测 RunStatus。
+
+## 9. 完整执行顺序
+
+```mermaid
+sequenceDiagram
+    participant C as Command Adapter
+    participant Q as Run Coordinator
+    participant S as RunService
+    participant J as RunJournal
+    participant P as RunPreparer
+    participant R as Runtime Adapter
+    participant E as Engine
+    participant F as RunFinalizer
+    participant N as NATSEventSink
+
+    C->>Q: Submit(RunSubmission)
+    Q->>Q: debounce + session serial + concurrency
+    Q->>S: Run(Request, Sink)
+    S->>S: CloneAndNormalizeRequest
+    S->>J: Record(run.started)
+    J->>N: run.started
+    S->>P: Prepare(Request)
+    P-->>S: PreparedRun
+    S->>R: Execute(PreparedRun, Journal)
+    R->>E: Run(EngineRequest)
+    E-->>R: EngineEvent stream
+    R->>J: Record(agent activity)
+    J->>N: activity
+    E-->>R: EngineResult
+    R-->>S: RuntimeResult
+    S->>F: FinalizeRequired
+    F->>F: reconcile → artifacts → commit/push → result
+    F-->>S: Finalization(Result + artifact events)
+    S->>J: Record(artifact events)
+    S->>J: Record(run.completed)
+    J->>N: run.completed
+    S->>F: PostRunBestEffort
+    S-->>Q: RunResult
+    Q-->>C: Outcome + DeliverySeqs
+```
+
+失败路径：
+
+```text
+prepare error
+runtime resolve error
+runtime execute error
+required finalize error
+        ↓
+RunService classify failed/cancelled
+        ↓
+build RunResult
+        ↓
+journal.Record(explicit terminal)
+        ↓
+post-run diagnostics only
+```
+
+## 10. 目标目录
 
 ```text
 backend/
 ├── cmd/leros/
-│   ├── server.go
-│   └── worker.go
+│   └── worker.go                     # composition root
 │
-├── pkg/messaging/
+├── pkg/messaging/                    # wire contract，保持不变
 │   ├── envelope.go
 │   ├── command.go
 │   ├── event.go
 │   └── subject.go
 │
 ├── internal/
-│   ├── infra/mq/
-│   │   └── nats.go
-│   │
 │   ├── worker/
 │   │   ├── command/
 │   │   │   ├── dispatcher.go
-│   │   │   ├── run_handler.go
+│   │   │   ├── run_handler.go        # decode/validate/map/seq
 │   │   │   ├── run_mapper.go
 │   │   │   ├── control_handler.go
 │   │   │   ├── interaction/
@@ -301,413 +840,265 @@ backend/
 │   │   ├── run/
 │   │   │   ├── coordinator.go
 │   │   │   ├── submission.go
-│   │   │   ├── debounce.go
 │   │   │   └── active_runs.go
 │   │   │
 │   │   └── eventpub/
-│   │       ├── publisher.go
+│   │       ├── nats_sink.go
 │   │       └── mapper.go
 │   │
 │   ├── agent/
-│   │   ├── service.go
-│   │   ├── runtime.go
-│   │   ├── request.go
+│   │   ├── request.go                # Request
+│   │   ├── prepared_run.go           # PreparedRun/ExecutionSpec
+│   │   ├── runtime.go                # Runtime/Resolver/RuntimeResult ports
 │   │   ├── result.go
 │   │   ├── event.go
-│   │   ├── journal.go
-│   │   └── lifecycle/
-│   │       ├── prepare.go
-│   │       ├── execute.go
-│   │       └── finalize.go
+│   │   └── run/
+│   │       ├── service.go
+│   │       ├── preparer.go
+│   │       ├── finalizer.go
+│   │       ├── journal.go
+│   │       └── postrun.go
 │   │
 │   ├── runtime/
 │   │   ├── registry.go
-│   │   └── adapter/
-│   │       ├── engine.go
-│   │       └── provider_session.go
+│   │   ├── adapter.go
+│   │   └── provider_session.go
 │   │
 │   └── runnable/
 │       ├── session_run_state_projector.go
 │       └── session_run_stream_projector.go
 │
 └── engines/
-    ├── engine.go
+    ├── engine.go                     # EngineEvent/EngineResult/Execution
     ├── native/
     ├── claude/
     ├── codex/
     └── opencode/
 ```
 
-目录用于表达职责，不要求为每个小类型创建独立 package。迁移时优先保持较少的 package，
-只有在依赖方向需要编译期隔离时才拆包。
+控制目录规模：
 
-## 6. 核心接口
+- `agent/run` 只有一个 package，Preparer/Finalizer 不继续拆子包。
+- `worker/run` 只有一个 package，不引入通用 scheduler framework。
+- Runtime Adapter 可以先用单个 `adapter.go`，没有第二种实现前不创建 adapter 子目录。
 
-### 6.1 RunService
+## 11. 渐进迁移计划
 
-```go
-// RunService owns the complete lifecycle of one agent run.
-type RunService interface {
-    Run(
-        ctx context.Context,
-        req *Request,
-        sink EventSink,
-    ) (*RunResult, error)
-}
-```
+### Phase 0：固化当前行为
 
-约束：
+补充 characterization tests：
 
-- `Run` 返回前必须形成终态。
-- `Run` 最多产生一个 terminal event。
-- `Request` 不包含 EventSink、NATS route 或 delivery sequence。
-
-### 6.2 Runtime
-
-```go
-// Runtime executes a prepared agent request using one runtime kind.
-type Runtime interface {
-    Kind() string
-    Execute(
-        ctx context.Context,
-        req *Request,
-        sink EventSink,
-    ) (*RunResult, error)
-}
-
-// RuntimeResolver resolves the runtime selected by a request.
-type RuntimeResolver interface {
-    Resolve(kind string) (Runtime, error)
-}
-```
-
-`Runtime` 与 `RuntimeResolver` 定义在 `agent` 包，由 `internal/runtime` 的 Registry
-和 adapter 实现。这样 RunService 只依赖同包端口，Runtime 实现可以依赖 Agent
-Request/Event，而不会形成 Go import cycle。
-
-Runtime 可以输出活动事件，但 started 和 terminal event 会被 RunService 统一管理。
-
-### 6.3 RunCoordinator
-
-```go
-// RunEventContext carries the routing data required by an event sink.
-type RunEventContext struct {
-    OrgID             uint
-    WorkerID          uint
-    SessionID         string
-    RequestID         string
-    TaskID            string
-    RunID             string
-    TraceID           string
-    ParentID          string
-    ReplyToMessageIDs []string
-}
-
-// RunSubmission joins a domain request with worker delivery metadata.
-type RunSubmission struct {
-    Request      *agent.Request
-    EventContext RunEventContext
-    DeliverySeqs []uint64
-}
-
-// EventSinkFactory creates a run-scoped sink without exposing NATS to Coordinator.
-type EventSinkFactory interface {
-    NewEventSink(ctx RunEventContext) agent.EventSink
-}
-
-// RunCoordinator schedules and cancels worker-local runs.
-type RunCoordinator interface {
-    Submit(ctx context.Context, submission RunSubmission) error
-    Cancel(ctx context.Context, sessionID, runID string) error
-    Close() error
-}
-```
-
-### 6.4 Event Publisher
-
-```go
-// EventPublisher publishes one normalized agent event.
-type EventPublisher interface {
-    Publish(ctx context.Context, event *agent.Event) error
-}
-```
-
-具体 NATS 实现可以实现 `agent.EventSink`，但 Agent 包只看到最小 Sink 接口。
-
-## 7. 数据与事件边界
-
-### 7.1 请求对象
-
-| 对象 | 所属层 | 内容 |
-|---|---|---|
-| `messaging.WorkerCommand` | Wire | envelope、trace、route、command body |
-| `messaging.RunCommandPayload` | Wire | 跨进程可序列化的 Run 参数 |
-| `RunSubmission` | Worker application | Agent Request + event context + delivery seqs |
-| `agent.Request` | Agent domain | 不可变执行快照 |
-| `engines.RunRequest` | Engine port | Engine 所需的 prompt、model、workdir、session |
-
-允许的映射：
-
-```text
-WorkerCommand → RunSubmission → agent.Request → engines.RunRequest
-```
-
-禁止：
-
-- `pkg/messaging` import `internal/agent`。
-- Agent Request 保存 `*nats.Msg` 或 JetStream sequence。
-- Engine Request 保存 Server API DTO。
-
-### 7.2 事件所有权
-
-| 事件 | 生产者 | 下游 |
-|---|---|---|
-| `run.started` | RunService | RunJournal → Publisher |
-| message/reasoning delta | Runtime | RunJournal → Publisher |
-| tool/todo event | Runtime | RunJournal → Publisher |
-| approval/question | Runtime interaction adapter | RunJournal → Publisher |
-| artifact declared | RunService finalize | RunJournal → Publisher |
-| completed/failed/cancelled | RunService | RunJournal → Publisher |
-
-Engine 产生的 Provider started/completed/error 是 Runtime 内部信号，不直接成为 Run terminal event。
-
-### 7.3 Lane 分类
-
-保持现有分类：
-
-- `run.stream`
-  - `message.delta`
-  - `reasoning.delta`
-  - `message.completed`
-  - `tool_call.started`
-  - `tool_call.finished`
-  - `todo.snapshot`
-  - `todo.updated`
-
-- `run.state`
-  - `run.started`
-  - `run.completed`
-  - `run.failed`
-  - `run.cancelled`
-  - `artifact.declared`
-  - `approval.requested/resolved`
-  - `question.asked/answered`
-
-分类函数对未知事件返回错误。
-
-## 8. 关键流程
-
-### 8.1 正常 Run
-
-```mermaid
-sequenceDiagram
-    participant S as Server
-    participant N as NATS
-    participant C as Command Adapter
-    participant Q as Run Coordinator
-    participant A as Agent RunService
-    participant R as Runtime
-    participant E as Engine
-    participant P as RunEvent Publisher
-
-    S->>N: WorkerCommand(agent.run)
-    N->>C: cmd.run delivery
-    C->>C: validate + map + seq
-    C->>Q: Submit(RunSubmission)
-    Q->>Q: debounce + concurrency
-    Q->>A: Run(Request, Sink)
-    A->>P: run.started
-    A->>R: Execute(Request, Journal)
-    R->>E: Run(EngineRequest)
-    E-->>R: raw events
-    R-->>A: normalized activity events
-    A->>P: activity events
-    R-->>A: Runtime Result
-    A->>P: run.completed
-    A-->>Q: RunResult
-    Q-->>C: completed
-    C->>C: delivery seq completed
-```
-
-### 8.2 取消
-
-1. `cmd.control` 到达 Command Adapter。
-2. Adapter 解码 `run.cancel` 并调用 `Coordinator.Cancel(sessionID, runID)`。
-3. Coordinator 查找 active run 并触发 cancel。
-4. Runtime/Engine 通过 context 停止。
-5. RunService 将 `context.Canceled` 归一化为 cancelled。
-6. RunService 发布唯一的 `run.cancelled`。
-7. Publisher 使用 detached timeout context 将终端事件发布到 state lane。
-
-### 8.3 审批与提问
-
-本次不重做 InteractionRouter：
-
-1. Engine adapter 识别 Provider approval/question。
-2. Runtime 发出标准 approval/question event。
-3. 现有 InteractionRouter 阻塞等待。
-4. `cmd.interaction` handler 写入决议或答案。
-5. Runtime 将决议写回 Engine responder。
-
-审批机制后续如需改为非阻塞状态机，应作为独立设计，不与本次 Run 分层调整混合。
-
-## 9. 渐进迁移计划
-
-### Phase 0：行为基线
-
-- 为当前完整链路补充 characterization tests。
-- 固化 command 和 event JSON shape。
-- 固化 stream/state 分类。
-- 固化取消时的终端事件和 session message 持久化行为。
-- 固化 provider session resume、审批和提问行为。
+- Request 当前字段映射。
+- command/event JSON shape。
+- stream/state 分类。
+- 取消 terminal event。
+- `content` / `error_msg` 分离。
+- Provider session resume。
+- approval/question。
+- artifact reconcile/push 顺序。
+- Server projector 持久化。
 
 完成标准：
 
-- 后续阶段可以区分架构调整与行为回归。
+- 后续能区分架构迁移与行为回归。
 
-### Phase 1：区分 RunService 与 Runtime
+### Phase 1：引入 Request / PreparedRun / RuntimeResult
 
-- 新增 `RunService`、`Runtime`、`RuntimeResolver`。
-- 将当前 `RuntimeRouter` 适配为 RuntimeResolver。
-- 将 `externalcli.Runner` 适配为 Runtime。
-- 由 RunService 包装现有 lifecycle pipeline。
-- Worker composition root 改为注入 RunService。
+- 将 `RequestContext` 收敛为原始 `Request`。
+- 新增 PreparedRun、ExecutionSpec、PreparedWorkspace、ArtifactBaseline。
+- 新增 Runtime、RuntimeResolver、RuntimeResult 端口。
+- 添加兼容 adapter，让旧 `agent.Runner` 暂时仍可调用。
+- 为 Request 增加 deep clone 与 immutability tests。
 
-本阶段不移动 Workspace、debounce 和 NATS Publisher。
-
-完成标准：
-
-- 调用链中不再由三个不同层同时暴露 `agent.Runner`。
-- native、Claude、Codex、OpenCode 行为保持不变。
-
-### Phase 2：提取 RunCoordinator
-
-- 新建 `worker/run`。
-- 将 debounce、WorkerPool、pending waiters、active runs 和取消迁入 Coordinator。
-- 引入 `RunSubmission`。
-- 删除扁平 `runTask`。
-- 移除 Semaphore 与 WorkerPool 的双重并发控制，只保留一个并发门。
-- Command Handler 只负责 wire、delivery seq 和调用 Coordinator。
+本阶段不删除旧 lifecycle。
 
 完成标准：
 
-- Handler 不再持有 pool、debouncer、pending 或 activeRuns。
-- 同 Session 合并、跨 Session 并发和 NATS ACK 时序与当前一致。
+- 新接口可编译。
+- PreparedRun 可完整表达当前 externalcli.Runner 所需输入。
+- Prepare 测试证明不修改 Request。
 
-### Phase 3：收拢 Agent 生命周期
+### Phase 2：收紧 Engine 边界
 
-- 将 Workspace 和附件准备迁入 RunService Prepare。
-- 将现有 lifecycle steps 按 prepare、execute、finalize 收拢。
-- RunJournal 不再通过修改 `Request.EventSink` 注入。
-- 从 Request 删除 EventSink。
-- Handler 删除 `emitRunFailed` / `emitRunCancelled` 补发逻辑。
-
-完成标准：
-
-- 任意 prepare、runtime、finalize 错误都由 RunService 形成终态。
-- 每个 Run 恰好一个 started 和一个 terminal event。
-
-### Phase 4：提取 RunEvent Publisher
-
-- 将 `MQStreamSink` 移到 `worker/eventpub`。
-- 集中 Agent Event → `messaging.RunEvent` 映射。
-- 未知事件改为显式错误。
-- Server projector 直接依赖 wire event，不反向依赖 Worker runtime event。
-- 保留 terminal detached context 和双 lane subject。
+- 在 `engines` 定义 EngineEvent、EngineResult、Execution。
+- native/Claude/Codex/OpenCode 改为输出 Engine 契约。
+- Engine 不再 import `internal/runtime/events`。
+- Runtime Adapter 负责 EngineEvent → agent.Event。
+- Runtime Adapter 负责 EngineResult → RuntimeResult。
+- 保留 Provider responder 和 resume 行为。
 
 完成标准：
 
-- Runtime、Engine 和 Agent 包中不存在 NATS import。
-- Event 类型转换只存在于 Runtime adapter 和 RunEvent Publisher 两处明确边界。
+- `engines` 不依赖 agent、runtime events、messaging 或 NATS。
+- Engine 不产生 Run lifecycle event。
 
-### Phase 5：目录收敛与文档同步
+### Phase 3：实现 Preparer / Finalizer / Journal / RunService
 
-- 删除兼容 alias、旧 Runner 和空转发文件。
-- 更新 `PROJECT_STRUCTURE.md`。
-- 更新 `leros-architecture.html` 为重构后的实际状态。
-- 用 `rg` 验证旧包名和旧接口无引用。
+- 将 ContextBuilder、model routing、Workspace、附件、权限、baseline 收入具体 Preparer。
+- 将 reconcile、artifact collect、commit/push、result build 收入具体 Finalizer。
+- 将 Learning 移到 `PostRunBestEffort`。
+- 删除 Worker `SessionCompleteStep`。
+- Journal 改为 `Record/Snapshot`，移除隐式终态逻辑。
+- RunService 显式编排 started、prepare、execute、required finalize、terminal、post-run。
+- 添加旧 Runner → 新 RunService 的临时兼容层。
 
-## 10. 测试计划
+完成标准：
 
-### 10.1 Command Adapter
+- Request 无 EventSink、SystemPrompt 和 prepared WorkDir。
+- Runtime 只接收 PreparedRun。
+- 每个 accepted Run 恰好一个 started 和 terminal。
+- Learning 失败不改变 completed。
 
-- 非法 envelope、command type、route 和 model 被拒绝。
-- wire 字段完整映射到 Agent Request。
-- reply message IDs 和 delivery sequences 不丢失。
-- Adapter 不修改 wire DTO。
+### Phase 4：提取 NATSEventSink
 
-### 10.2 RunCoordinator
+- 将 `MQStreamSink` 迁移为 `worker/eventpub.NATSEventSink`。
+- 删除独立 EventPublisher 接口。
+- 保留一个 EventSink + 一个 EventSinkFactory。
+- 集中 agent.Event → messaging.RunEvent 映射。
+- 未知 EventType 返回错误，不默认映射为 message delta。
+- 保留 terminal detached timeout context。
 
-- 同 Session 在 debounce window 内合并。
-- 不同 Session 不互相合并。
-- 同 Session 不并发执行。
-- Worker 并发上限生效且无双重 semaphore。
-- Cancel 只取消匹配的 session/run。
-- Close 等待或取消在途任务，不泄漏 waiter。
-- 合并批次内全部 delivery seq 得到一致终态。
+完成标准：
 
-### 10.3 RunService
+- Agent/Runtime/Engine 不依赖 NATS。
+- lane 选择只存在于 NATSEventSink。
 
-- 正常执行：started → activity → completed。
-- Runtime 失败：started → failed。
-- context cancel：started → cancelled。
-- Prepare 失败和 Finalize 失败均形成唯一 terminal event。
-- Event sequence 单调递增。
-- Result、usage、artifact 和 archived events 正确进入 terminal payload。
+### Phase 5：提取 RunCoordinator
 
-### 10.4 Runtime 与 Engine
+- 将 debounce、并发门、pending waiters、active runs、cancel 迁入 `worker/run`。
+- 删除扁平 `runTask`，改用 RunSubmission。
+- 移除 Semaphore + WorkerPool 双重限流，只保留一个并发门。
+- Submission merge 不泄漏 Model/Workspace 逻辑到 Coordinator。
+- Handler 保留 decode、wire validation、mapping 和 seq tracking。
 
-- 默认 Runtime 与显式 Runtime 选择。
-- Runtime 不可用时返回清晰错误。
-- Engine started/completed 不穿透为重复 Run lifecycle event。
-- Provider session resume 保持。
-- approval/question responder 保持。
+完成标准：
 
-### 10.5 Publisher 与 Projector
+- Handler 不持有 pool、debouncer、pending 或 activeRuns。
+- Coordinator 不 import engines、workspace、messaging subject 或 runtime events。
+- 同 Session 串行、跨 Session 并发和 delivery ACK 时序保持。
 
-- 每种 Agent Event 映射到正确 wire payload。
+### Phase 6：切换与清理
+
+- Worker composition root 直接装配新 RunService 与 Coordinator。
+- 删除 `agent.Runner`、RuntimeRouter 和旧 lifecycle pipeline。
+- 删除 compatibility adapter、空 alias 和旧 stream sink。
+- 更新 `PROJECT_STRUCTURE.md` 与当前架构 HTML。
+- 用依赖扫描确认禁用 import。
+
+## 12. 测试计划
+
+### 12.1 Request / PreparedRun
+
+- Prepare 前后原始 Request deep equal。
+- PreparedRun slice/map 与 Request 不共享可变 backing data。
+- WorkDir、SystemPrompt、resolved tools 只存在 PreparedRun。
+- Requested WorkDir 与最终 PreparedWorkspace 明确区分。
+- Prepare 失败不留下半修改 Request。
+
+### 12.2 RunService
+
+- 调用顺序严格为 normalize → started → prepare → resolve → execute →
+  required finalize → terminal → post-run。
+- prepare/resolve/execute/finalize 错误各产生一个 failed。
+- context cancel/deadline 产生 cancelled。
+- post-run 错误不改变 completed。
+- Runtime 不可用产生明确 phase metadata。
+- terminal event 显式 Record，不依赖 Journal Close。
+
+### 12.3 Journal
+
+- Sequence 从 1 单调递增。
+- 缺失 timestamp/ID 被填充。
+- activity events 正确归档和聚合。
+- Snapshot 不嵌套 terminal event。
+- Journal 不自动产生 terminal。
+- Sink 错误按既定 delivery 策略返回。
+
+### 12.4 Finalizer
+
+- reconcile 先于 artifact collection 和 push。
+- artifact events 先于 terminal。
+- clean working tree 成功。
+- reconcile/push 失败导致 failed。
+- learning/metrics/diagnostics 失败不改变结果。
+- Worker 不调用 Session persistence。
+
+### 12.5 Runtime / Engine
+
+- Registry 默认和显式 kind 选择。
+- Registry 与 Adapter 职责隔离。
+- EngineEvent 正确映射为 agent activity event。
+- EngineResult 正确映射为 RuntimeResult。
+- Engine 不输出 RunStatus。
+- Provider resume、approval、question 行为保持。
+- Result channel 恰好一个结果。
+
+### 12.6 RunCoordinator
+
+- 同 Session debounce 合并。
+- 不同 Session 不合并。
+- 同 Session 不并发。
+- Worker 并发上限生效。
+- Cancel 只取消匹配 Run。
+- Close 不泄漏 waiter/goroutine。
+- 合并批次的全部 DeliverySeqs 得到一致 outcome。
+- Coordinator 测试不需要 Model、Workspace 或 Engine fixture。
+
+### 12.7 Publisher / Projector
+
+- 每种 agent.Event 映射到正确 wire payload。
 - 每种事件进入正确 lane。
 - 未知事件返回错误。
-- terminal event 在原 context 已取消时仍可发布。
-- StreamStartSeq 和 StateStartSeq 分别来自对应 lane。
-- completed/failed/cancelled session message 内容、error_msg、chunks 和 artifacts 正确。
+- terminal 在原 context 已取消时仍尝试发布。
+- StreamStartSeq / StateStartSeq 分别来自对应 lane。
+- completed/failed/cancelled session message 正确。
+- `content` 与 `error_msg` 保持分离。
 
-### 10.6 集成验证
+### 12.8 集成链路
 
-使用 fake Runtime 和 fake EventBus 覆盖：
+使用 fake Engine、fake Runtime 或 fake EventBus 分层覆盖：
 
 ```text
 WorkerCommand
-→ Dispatcher
 → Command Adapter
-→ Coordinator
+→ RunCoordinator
 → RunService
-→ Publisher
-→ State/Stream Projector
+→ PreparedRun
+→ Runtime Adapter
+→ NATSEventSink
+→ Server Projector
 → Session Message
 ```
 
-验证命令、事件、持久化和 replay metadata 的完整关联。
+## 13. 验收标准
 
-## 11. 验收标准
+- 原始 Request 在一次 Run 前后保持不变。
+- Runtime 只接收 PreparedRun。
+- RunService 只编排，不实现 Engine 或 Workspace 细节。
+- RunJournal 不判断终态、不选择 lane、不隐式补发事件。
+- 上层只有一个 EventSink 接口。
+- Required Finalize 与 Post-run Best Effort 分离。
+- reconcile 先于 workspace push。
+- Worker 不执行 Session 数据库完成逻辑。
+- Coordinator 不理解 Workspace、Model、Engine、Artifact、EventType 或 NATS subject。
+- Registry 不解析 Engine event；Adapter 不管理全局注册。
+- Engine 不依赖 agent、runtime event、messaging、NATS 或 RunStatus。
+- 每个 accepted Run 恰好一个 started 和一个 terminal。
+- wire schema、数据库 schema 和双 lane replay 语义保持不变。
+- `content` 与 `error_msg` 保持分离。
+- targeted build、vet、unit 和链路集成测试通过。
 
-- 保持现有 NATS subject、stream、consumer 和 JSON wire schema。
-- 保持现有数据库 schema。
-- 每个 Run ID 恰好一个 started 和一个 terminal event。
-- `content` 与 `error_msg` 继续保持分离。
-- Runtime 和 Engine 不依赖 NATS。
-- Command Handler 不承担 Workspace、Agent lifecycle 或终端事件补偿。
-- RunService 不包含 transport route 或 JetStream delivery metadata。
-- 双 lane replay sequence 语义不退化。
-- targeted build、vet 和相关 package tests 通过。
-
-## 12. 风险控制
+## 14. 风险控制
 
 | 风险 | 控制措施 |
 |---|---|
-| 终端事件重复或丢失 | Phase 0 固化事件计数；RunService 单一所有权 |
-| debounce 后 ACK 过早 | RunSubmission 保留全部 delivery seq，Coordinator 完成后统一返回 |
-| 取消后 terminal 发布失败 | Publisher 保留 detached timeout context |
-| wire/domain 字段遗漏 | mapper table tests 和 JSON golden tests |
-| provider session 恢复回归 | Runtime adapter characterization tests |
-| 迁移同时改动过多 | 每个 Phase 独立提交，不跨阶段删除兼容实现 |
+| PreparedRun 字段不足导致 Runtime 回读 Request | 先用现有 externalcli/native 输入反推 ExecutionSpec 完整性 |
+| Request 仍被隐式修改 | deep clone、deep equal 测试、移除 prepared 字段 |
+| RunService 成为上帝对象 | 只持有 Preparer/Resolver/Finalizer/JournalFactory |
+| Journal 再次吸收 lifecycle | 接口只暴露 Record/Snapshot |
+| Engine/Agent 事件继续混用 | 独立 EngineEvent/EngineResult + import guard |
+| terminal 重复或丢失 | RunService 单一所有权 + 事件计数测试 |
+| post-run 反向影响结果 | terminal 后执行且无错误返回到主 Run |
+| debounce 后 ACK 过早 | RunSubmission 保存全部 DeliverySeqs，执行完成后统一更新 |
+| 取消后 terminal 发布失败 | 保留 detached timeout context |
+| 一次迁移范围过大 | 六个阶段独立提交，兼容层最后删除 |

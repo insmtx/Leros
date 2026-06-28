@@ -106,6 +106,11 @@ func expectDefaultWorkerDeployment(mock sqlmock.Sqlmock) {
 		))
 }
 
+func expectNoBuiltinSkillItems(mock sqlmock.Sqlmock) {
+	mock.ExpectQuery(`SELECT .* FROM "leros_builtin_skill_marketplace_item"`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "skill_id", "status"}))
+}
+
 func initSkillImportTestStorage(t *testing.T) {
 	t.Helper()
 	if err := filestore.Init(&config.StorageConfig{
@@ -479,10 +484,10 @@ func TestImportSkillFromGitHubReturnsImportedAfterWorkerSuccess(t *testing.T) {
 	if !ok {
 		t.Fatalf("request type = %T, want WorkerCommand", publisher.requests[0])
 	}
-		payload, err := messaging.DecodeCommandPayload[messaging.SkillCommandPayload](&msg.Body)
-		if err != nil {
-			t.Fatalf("decode skill command payload: %v", err)
-		}
+	payload, err := messaging.DecodeCommandPayload[messaging.SkillCommandPayload](&msg.Body)
+	if err != nil {
+		t.Fatalf("decode skill command payload: %v", err)
+	}
 	if payload.Action != "import" || payload.Source != "github" {
 		t.Fatalf("unexpected GitHub import body: %+v", msg.Body)
 	}
@@ -609,6 +614,7 @@ func TestAnnotateMarketplaceInstalledMatchesNameOrSkillID(t *testing.T) {
 			database, mock, ctx, cleanup := setupSkillMarketplaceInstallServiceDB(t)
 			defer cleanup()
 			expectDefaultWorkerDeployment(mock)
+			expectNoBuiltinSkillItems(mock)
 			publisher := &skillInstallPublisher{
 				response: installedSkillsResponse(t, tt.skills),
 			}
@@ -630,6 +636,7 @@ func TestAnnotateMarketplaceInstalledNoMatch(t *testing.T) {
 	database, mock, ctx, cleanup := setupSkillMarketplaceInstallServiceDB(t)
 	defer cleanup()
 	expectDefaultWorkerDeployment(mock)
+	expectNoBuiltinSkillItems(mock)
 	publisher := &skillInstallPublisher{
 		response: installedSkillsResponse(t, []contract.SkillInstalledItem{{Name: "other-skill"}}),
 	}
