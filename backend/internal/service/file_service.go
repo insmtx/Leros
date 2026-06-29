@@ -7,9 +7,11 @@ import (
 	"mime"
 	"net/http"
 	"strings"
-	"time"
+
+	"github.com/ygpkg/storage-go"
 
 	"github.com/insmtx/Leros/backend/internal/api/contract"
+	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	"github.com/ygpkg/yg-go/encryptor/snowflake"
 	"github.com/ygpkg/yg-go/logs"
@@ -53,7 +55,12 @@ func (s *fileService) UploadFile(ctx context.Context, req *contract.UploadFileRe
 		ext = req.Filename[idx:]
 	}
 	storeFilename := fmt.Sprintf("%s%s", snowflake.GenerateIDBase58(), ext)
-	key := fmt.Sprintf("%s/%d/%s", req.Purpose, caller.OrgID, storeFilename)
+	var key string
+	if req.SourceID != "" {
+		key = fmt.Sprintf("%s/%d/%s/uploads/%s", req.Purpose, caller.OrgID, req.SourceID, storeFilename)
+	} else {
+		key = fmt.Sprintf("%s/%d/uploads/%s", req.Purpose, caller.OrgID, storeFilename)
+	}
 
 	file, err := filestore.Upload(ctx, s.db, filestore.UploadParams{
 		Data:         data,
@@ -72,14 +79,12 @@ func (s *fileService) UploadFile(ctx context.Context, req *contract.UploadFileRe
 
 	return &contract.UploadFileResult{
 		PublicID:     file.PublicID,
-		FileUploadID: file.PublicID,
 		Filename:     file.Filename,
 		OriginalName: file.OriginalName,
 		MimeType:     file.MimeType,
 		FileSize:     file.FileSize,
 		Sha256:       file.Sha256,
-		StoragePath:  file.StoragePath,
-		URL:          file.StoragePath,
+		StorageURI:   file.StorageURI,
 	}, nil
 }
 
@@ -93,9 +98,9 @@ func (s *fileService) DownloadFile(ctx context.Context, orgID uint, fileID strin
 	// TODO: 当存储层支持 HTTP 请求时，直接使用 PublicURL 作为绝对路径或重定向地址，
 	//       当前本地磁盘模式下 PublicURL() 返回的是本地绝对路径，无法通过 HTTP 访问。
 	publicURL := ""
-	fileUpload.StoragePath = strings.TrimSpace(fileUpload.StoragePath)
-	if fileUpload.StoragePath != "" {
-		publicURL = fileUpload.StoragePath
+	fileUpload.StorageURI = strings.TrimSpace(fileUpload.StorageURI)
+	if fileUpload.StorageURI != "" {
+		publicURL = fileUpload.StorageURI
 	}
 
 	return reader, &contract.FileDownloadInfo{
@@ -106,10 +111,36 @@ func (s *fileService) DownloadFile(ctx context.Context, orgID uint, fileID strin
 	}, nil
 }
 
-func (s *fileService) PresignDownloadURL(ctx context.Context, orgID uint, fileID string) (string, error) {
-	url, _, err := filestore.PresignDownloadByPublicID(ctx, s.db, orgID, fileID, time.Hour)
+func (s *fileService) PresignDownloadURL(ctx context.Context, orgID uint, publicID, storageURI string) (string, error) {
+	var targetURI string
+
+	if publicID != "" {
+		fileUpload, err := infradb.GetFileUploadByPublicID(ctx, s.db, orgID, publicID)
+		if err != nil {
+			logs.ErrorContextf(ctx, "get file upload by publicID failed: %v", err)
+			return "", fmt.Errorf("get presign download url failed")
+		}
+		if fileUpload == nil {
+			return "", fmt.Errorf("get presign download url failed")
+		}
+		targetURI = fileUpload.StorageURI
+	} else {
+		targetURI = storageURI
+	}
+
+	if targetURI == "" {
+		return "", fmt.Errorf("publicID or storageURI is required")
+	}
+
+	_, bucket, key, err := storage.ParseURI(targetURI)
 	if err != nil {
-		logs.ErrorContextf(ctx, "presign download url failed: %v", err)
+		logs.ErrorContextf(ctx, "parse storage URI failed: %v", err)
+		return "", fmt.Errorf("get presign download url failed")
+	}
+
+	url, _, err := filestore.PresignDownload(ctx, bucket, key)
+	if err != nil {
+		logs.ErrorContextf(ctx, "presign download failed: %v", err)
 		return "", fmt.Errorf("get presign download url failed")
 	}
 	return url, nil

@@ -518,6 +518,7 @@ function mapArtifactPayload(payload: BackendSessionArtifactPayload): MessageArti
 		size: formatFileSize(payload.file_size ?? 0),
 		updatedAt: parseOptionalTimestamp(payload.created_at),
 		downloadUrl: "",
+		storageUri: payload.storage_uri?.trim() || undefined,
 		sha256: payload.sha256,
 	};
 }
@@ -1667,7 +1668,7 @@ export class ChatActionImpl {
 	};
 
 	addUploadedAttachment = async (projectId: string, file: File) => {
-		const response = await projectFileApi.upload({ projectId, file });
+		const response = await projectFileApi.upload({ projectId, projectPublicId: projectId, file });
 		const payload = response.data;
 		const attachmentId = `att-${Date.now()}`;
 		const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
@@ -1679,8 +1680,8 @@ export class ChatActionImpl {
 			size: payload.file_size ?? payload.size ?? file.size,
 			url: previewUrl,
 			file,
-			path: payload.public_id || payload.storage_path || payload.path,
-			fileUploadId: payload.file_upload_id,
+			path: payload.public_id || payload.storage_uri || payload.path,
+			fileUploadId: payload.public_id,
 			mimeType: payload.mime_type || file.type,
 		};
 

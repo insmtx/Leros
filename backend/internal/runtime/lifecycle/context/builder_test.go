@@ -32,7 +32,7 @@ func TestContextBuilderBuildSystemPromptLayers(t *testing.T) {
 
 	// Layer 1: 角色定义 + Assistant 自定义 SystemPrompt
 	for _, expected := range []string{
-		"你是 Leros 助手",
+		"你的名称是 lework",
 		"Assistant-specific prompt.",
 	} {
 		if !strings.Contains(prompt, expected) {

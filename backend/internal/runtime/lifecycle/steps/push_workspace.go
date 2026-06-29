@@ -51,6 +51,13 @@ func (s PushWorkspaceStep) Run(ctx context.Context, state *State) error {
 		return nil
 	}
 
+	checkCmd := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
+	checkCmd.Dir = repoDir
+	if checkCmd.Run() != nil {
+		logs.InfoContextf(ctx, "push_workspace: no git remote, skip push")
+		return nil
+	}
+
 	pushCmd := exec.CommandContext(ctx, "git", "push", "origin", "main")
 	pushCmd.Dir = repoDir
 	if output, err := pushCmd.CombinedOutput(); err != nil {
