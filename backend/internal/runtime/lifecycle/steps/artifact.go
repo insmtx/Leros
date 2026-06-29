@@ -1,15 +1,25 @@
 package steps
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ygpkg/yg-go/encryptor/snowflake"
+	"github.com/ygpkg/yg-go/logs"
+	"github.com/ygpkg/storage-go"
 
 	"github.com/insmtx/Leros/backend/internal/agent"
 	"github.com/insmtx/Leros/backend/internal/runtime/events"
+	"github.com/insmtx/Leros/backend/internal/worker/client"
+	"github.com/insmtx/Leros/backend/internal/worker/identity"
 	agentworkspace "github.com/insmtx/Leros/backend/internal/workspace"
 	"github.com/insmtx/Leros/backend/types"
 )
@@ -58,7 +68,7 @@ func NewWorkspaceArtifactRecorder() *WorkspaceArtifactRecorder {
 	return &WorkspaceArtifactRecorder{}
 }
 
-// Record 收集单次运行的最终 manifest 产物。
+// Record 收集单次运行的最终 manifest 产物，并上传到 filestore。
 func (r *WorkspaceArtifactRecorder) Record(ctx context.Context, req *agent.RequestContext) ([]events.ArtifactPayload, error) {
 	if r == nil || req == nil {
 		return nil, nil
@@ -72,31 +82,127 @@ func (r *WorkspaceArtifactRecorder) Record(ctx context.Context, req *agent.Reque
 		return nil, err
 	}
 	if len(records) == 0 {
+		logs.DebugContextf(ctx, "artifact: no final artifacts declared in manifest")
 		return nil, nil
 	}
+	logs.DebugContextf(ctx, "artifact: collected %d final artifact(s) from manifest", len(records))
 	payloads := make([]events.ArtifactPayload, 0, len(records))
 	for _, record := range records {
-		payloads = append(payloads, artifactPayloadFromRecord(record))
+		payload := artifactPayloadFromRecord(record)
+		payloads = append(payloads, payload)
 	}
+
+	serverAddr := identity.ServerAddr()
+	serverOrgID := identity.OrgID()
+	projectPublicID := strings.TrimSpace(req.Workspace.ProjectID)
+	logs.DebugContextf(ctx, "artifact: upload check, serverAddr=%q orgID=%d projectPublicID=%q", serverAddr, serverOrgID, projectPublicID)
+	if serverAddr != "" && serverOrgID > 0 && projectPublicID != "" {
+		srv := client.NewServerClient(serverAddr, identity.AppKey())
+
+		storageCfg, cfgErr := srv.GetStorageConfig(ctx)
+		if cfgErr != nil {
+			logs.WarnContextf(ctx, "get storage config from server: %v", cfgErr)
+			storageCfg = nil
+		} else {
+			logs.DebugContextf(ctx, "artifact: storage config scheme=%q bucket=%q", storageCfg.Scheme, storageCfg.Bucket)
+		}
+
+		for i, record := range records {
+			logs.DebugContextf(ctx, "artifact: uploading record[%d] relativePath=%q filename=%q fileSize=%d", i, record.RelativePath, record.Filename, record.FileSize)
+			storageURI, err := uploadArtifactToServer(ctx, srv, projectPublicID, record, storageCfg, plan.RepoDir)
+			if err != nil {
+				logs.WarnContextf(ctx, "upload artifact %s to server: %v", record.RelativePath, err)
+				continue
+			}
+			payloads[i].StorageURI = storageURI
+		}
+	} else {
+		logs.DebugContextf(ctx, "artifact: skip upload, conditions not met")
+	}
+
 	return payloads, nil
+}
+
+func uploadArtifactToServer(ctx context.Context, srv *client.ServerClient, projectPublicID string, record agentworkspace.ArtifactRecord, storageCfg *client.StorageConfig, repoDir string) (string, error) {
+	absolute, err := agentworkspace.SafeJoin(repoDir, record.RelativePath)
+	if err != nil {
+		return "", fmt.Errorf("safe join %q: %w", record.RelativePath, err)
+	}
+	logs.DebugContextf(ctx, "artifact: resolved absolute path %q for relative path %q", absolute, record.RelativePath)
+	data, err := os.ReadFile(absolute)
+	if err != nil {
+		return "", fmt.Errorf("read artifact file: %w", err)
+	}
+	logs.DebugContextf(ctx, "artifact: read file %q, %d bytes", absolute, len(data))
+
+	randomID := snowflake.GenerateIDBase58()
+	orgID := identity.OrgID()
+	ext := filepath.Ext(record.OriginalName)
+	storageFilename := randomID + ext
+	key := fmt.Sprintf("projects/%d/%s/artifacts/%s", orgID, projectPublicID, storageFilename)
+
+	bucket := ""
+	scheme := "s3"
+	if storageCfg != nil {
+		bucket = storageCfg.Bucket
+		scheme = storageCfg.Scheme
+	}
+
+	storageURI := ""
+	if bucket != "" {
+		uri, err := storage.BuildURI(scheme, bucket, key)
+		if err != nil {
+			return "", fmt.Errorf("build storage uri: %w", err)
+		}
+		storageURI = uri
+	}
+
+	logs.DebugContextf(ctx, "artifact: requesting presign upload URL, bucket=%q key=%q", bucket, key)
+	uploadURL, err := srv.GetPresignUploadURL(ctx, bucket, key)
+	if err != nil {
+		return "", fmt.Errorf("get presign upload url: %w", err)
+	}
+	logs.DebugContextf(ctx, "artifact: got presign upload URL for key=%q", key)
+
+	putReq, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewReader(data))
+	if err != nil {
+		return "", err
+	}
+	putReq.Header.Set("Content-Type", record.MimeType)
+	putReq.ContentLength = record.FileSize
+
+	putResp, err := http.DefaultClient.Do(putReq)
+	if err != nil {
+		return "", fmt.Errorf("upload artifact file: %w", err)
+	}
+	defer putResp.Body.Close()
+
+	if putResp.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(putResp.Body, 4096))
+		return "", fmt.Errorf("upload artifact file returned %d: %s", putResp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	logs.DebugContextf(ctx, "artifact: uploaded %q to storageURI=%q, status=%d", record.Filename, storageURI, putResp.StatusCode)
+	return storageURI, nil
 }
 
 func artifactPayloadFromRecord(record agentworkspace.ArtifactRecord) events.ArtifactPayload {
 	return events.ArtifactPayload{
-		ArtifactID:   newArtifactID(),
-		Title:        artifactTitle(record),
-		Filename:     artifactFilename(record),
-		Description:  strings.TrimSpace(record.Description),
+		ArtifactID:    newArtifactID(),
+		Title:         artifactTitle(record),
+		Filename:      artifactFilename(record),
+		OriginalName:  strings.TrimSpace(record.OriginalName),
+		Description:   strings.TrimSpace(record.Description),
 		MimeType:     strings.TrimSpace(record.MimeType),
 		ArtifactType: artifactType(record.ArtifactType),
 		FileSize:     record.FileSize,
 		RelativePath: strings.TrimSpace(record.RelativePath),
 		StorageKey:   strings.TrimSpace(record.StorageKey),
+		StorageURI:   strings.TrimSpace(record.StorageURI),
 		Sha256:       record.Sha256,
 		Source:       artifactSource(record.Source),
 		Status:       artifactStatus(record.Status),
-		// 中文注释：产物在运行期声明时就附带时间，供历史消息直接展示，无需再依赖任务接口二次补齐。
-		CreatedAt: time.Now().UTC(),
+		CreatedAt:    time.Now().UTC(),
 	}
 }
 

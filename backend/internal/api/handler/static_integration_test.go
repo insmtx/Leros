@@ -32,16 +32,15 @@ func TestCurlStylePresignUpload(t *testing.T) {
 	staticGroup := r.Group("/static")
 	RegisterStaticRoutes(staticGroup)
 
-	// 等价于 curl -X PUT "http://localhost:8080/v1/static/test-bucket/path/to/file.txt?presign=1"
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("PUT", "/static/test-bucket/path/to/file.txt?presign=1", nil)
+	req, _ := http.NewRequest("GET", "/static/test-bucket/path/to/file.txt?operation=upload", nil)
 	r.ServeHTTP(w, req)
 
-	fmt.Printf("[PUT presign-upload] status=%d, url=%s, expires=%s\n",
+	fmt.Printf("[GET presign-upload] status=%d, url=%s, expires=%s\n",
 		w.Code, w.Body.String(), w.Header().Get("X-Presign-Expires-At"))
 
-	t.Logf("[PUT presign-upload] status=%d, url=%s", w.Code, w.Body.String())
-	t.Logf("[PUT presign-upload] X-Presign-Expires-At=%s", w.Header().Get("X-Presign-Expires-At"))
+	t.Logf("[GET presign-upload] status=%d, url=%s", w.Code, w.Body.String())
+	t.Logf("[GET presign-upload] X-Presign-Expires-At=%s", w.Header().Get("X-Presign-Expires-At"))
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -72,9 +71,8 @@ func TestCurlStylePresignDownload(t *testing.T) {
 	staticGroup := r.Group("/static")
 	RegisterStaticRoutes(staticGroup)
 
-	// 等价于 curl -X GET "http://localhost:8080/v1/static/test-bucket/path/to/file.txt?presign=1"
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/static/test-bucket/path/to/file.txt?presign=1", nil)
+	req, _ := http.NewRequest("GET", "/static/test-bucket/path/to/file.txt?operation=download", nil)
 	r.ServeHTTP(w, req)
 
 	fmt.Printf("[GET presign-download] status=%d, url=%s, expires=%s\n",
@@ -113,9 +111,9 @@ func TestCurlStylePresignRoundTrip(t *testing.T) {
 	staticGroup := r.Group("/static")
 	RegisterStaticRoutes(staticGroup)
 
-	// 1. 获取预签名上传 URL
+	// 1. get presign upload URL
 	w1 := httptest.NewRecorder()
-	req1, _ := http.NewRequest("PUT", "/static/test-bucket/hello-world.txt?presign=1", nil)
+	req1, _ := http.NewRequest("GET", "/static/test-bucket/hello-world.txt?operation=upload", nil)
 	r.ServeHTTP(w1, req1)
 
 	if w1.Code != http.StatusOK {
@@ -124,9 +122,9 @@ func TestCurlStylePresignRoundTrip(t *testing.T) {
 	uploadURL := w1.Body.String()
 	t.Logf("[step1] presign-upload URL: %s", uploadURL)
 
-	// 2. 获取预签名下载 URL
+	// 2. get presign download URL
 	w2 := httptest.NewRecorder()
-	req2, _ := http.NewRequest("GET", "/static/test-bucket/hello-world.txt?presign=1", nil)
+	req2, _ := http.NewRequest("GET", "/static/test-bucket/hello-world.txt?operation=download", nil)
 	r.ServeHTTP(w2, req2)
 
 	if w2.Code != http.StatusOK {
@@ -135,17 +133,17 @@ func TestCurlStylePresignRoundTrip(t *testing.T) {
 	downloadURL := w2.Body.String()
 	t.Logf("[step2] presign-download URL: %s", downloadURL)
 
-	// 3. 通过 storage 直接写入文件（模拟客户端上传）
+	// 3. write file to storage
 	st := filestore.GetStorage()
 	bucket := filestore.DefaultBucket()
 	_, err := st.PutObject(context.Background(), bucket, "hello-world.txt",
-		strings.NewReader("hello from curl test"), nil)
+		strings.NewReader("hello from curl test"))
 	if err != nil {
 		t.Fatalf("step3: put object: %v", err)
 	}
 	t.Log("[step3] wrote file to storage")
 
-	// 4. 通过 storage 直接读取文件（模拟客户端通过预签名 URL 下载）
+	// 4. read file from storage
 	result, err := st.GetObject(context.Background(), bucket, "hello-world.txt")
 	if err != nil {
 		t.Fatalf("step4: get object: %v", err)

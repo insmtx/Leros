@@ -178,8 +178,12 @@ type MessageArtifact struct {
 	ArtifactID   string    `json:"artifact_id,omitempty"`
 	Title        string    `json:"title,omitempty"`
 	Filename     string    `json:"filename,omitempty"`
+	Description  string    `json:"description,omitempty"`
 	MimeType     string    `json:"mime_type,omitempty"`
 	ArtifactType string    `json:"artifact_type,omitempty"`
+	FileSize     int64     `json:"file_size,omitempty"`
+	StorageURI   string    `json:"storage_uri,omitempty"`
+	Sha256       string    `json:"sha256,omitempty"`
 	CreatedAt    time.Time `json:"created_at,omitempty"`
 }
 

@@ -86,6 +86,7 @@ export type MessageArtifact = {
 	size: string;
 	updatedAt?: number;
 	downloadUrl: string;
+	storageUri?: string;
 	sha256?: string;
 };
 
@@ -93,6 +94,14 @@ export type MessageMetadata = {
 	model?: string;
 	tokens?: number;
 	latency?: number;
+	composerTokens?: ComposerToken[];
+};
+
+export type ComposerToken = {
+	kind: "assistant" | "skill";
+	label: string;
+	start: number;
+	end: number;
 };
 
 export type MessageUsage = {

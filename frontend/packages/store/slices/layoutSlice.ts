@@ -4,7 +4,7 @@ import { taskApi } from "../api/taskApi";
 import type { BackendArtifact, BackendProject, BackendSession, BackendTask } from "../api/types";
 import { workApi } from "../api/workApi";
 import type { SliceCreator } from "../types";
-import type { Attachment } from "../types/chat";
+import type { Attachment, MessageMetadata } from "../types/chat";
 import { flattenActions } from "../utils";
 import { formatFileSize, parseOptionalTimestamp } from "../utils/format";
 
@@ -58,6 +58,7 @@ export type ProjectArtifact = {
 	size: string;
 	updatedAt?: number;
 	downloadUrl: string;
+	storageUri?: string;
 	sha256?: string;
 };
 
@@ -335,6 +336,14 @@ export class LayoutActionImpl {
 		this.#get = get;
 	}
 
+	#clearComposerDraft = () => {
+		const store = this.#get() as LayoutStore & {
+			clearComposerInput?: () => void;
+		};
+		// 中文注释：项目/任务聊天输入框与首页共用同一份草稿状态，离开当前上下文时必须同步清空，避免 token 退化成普通文本残留。
+		store.clearComposerInput?.();
+	};
+
 	toggleLeftRail = () => {
 		this.#set((state) => ({ leftRailCollapsed: !state.leftRailCollapsed }));
 	};
@@ -356,6 +365,10 @@ export class LayoutActionImpl {
 	};
 
 	switchView = (view: ViewMode) => {
+		const state = this.#get();
+		if (state.currentView !== view) {
+			this.#clearComposerDraft();
+		}
 		this.#set({
 			currentView: view,
 			conversationListOpen: view === "chat",
@@ -370,6 +383,10 @@ export class LayoutActionImpl {
 	};
 
 	switchProject = (projectId: string) => {
+		const state = this.#get();
+		if (state.currentView !== "project" || state.activeProjectId !== projectId) {
+			this.#clearComposerDraft();
+		}
 		this.#set({
 			activeProjectId: projectId,
 			activeProjectTab: "chat",
@@ -382,6 +399,10 @@ export class LayoutActionImpl {
 	};
 
 	setProjectRoute = (projectId: string, tab: "chat" | "tasks" | "files" = "chat") => {
+		const state = this.#get();
+		if (state.currentView !== "project" || state.activeProjectId !== projectId) {
+			this.#clearComposerDraft();
+		}
 		this.#set({
 			activeProjectId: projectId,
 			activeProjectTab: tab,
@@ -420,6 +441,7 @@ export class LayoutActionImpl {
 		content: string,
 		projectId?: string | null,
 		attachments?: Attachment[],
+		_metadata?: MessageMetadata,
 	) => {
 		const trimmed = content.trim();
 		if (!trimmed) return;
@@ -560,6 +582,15 @@ export class LayoutActionImpl {
 	};
 
 	openTaskDetail = (projectId: string, taskId: string, sessionId: string | null = null) => {
+		const state = this.#get();
+		if (
+			state.currentView !== "taskDetail" ||
+			state.activeTaskDetailProjectId !== projectId ||
+			state.activeTaskDetailTaskId !== taskId ||
+			state.activeTaskDetailSessionId !== sessionId
+		) {
+			this.#clearComposerDraft();
+		}
 		this.#set({
 			activeTaskDetailProjectId: projectId,
 			activeTaskDetailTaskId: taskId,
@@ -569,6 +600,15 @@ export class LayoutActionImpl {
 	};
 
 	setTaskDetailRoute = (projectId: string, taskId: string, sessionId: string | null = null) => {
+		const state = this.#get();
+		if (
+			state.currentView !== "taskDetail" ||
+			state.activeTaskDetailProjectId !== projectId ||
+			state.activeTaskDetailTaskId !== taskId ||
+			state.activeTaskDetailSessionId !== sessionId
+		) {
+			this.#clearComposerDraft();
+		}
 		this.#set({
 			activeProjectId: projectId,
 			activeTaskDetailProjectId: projectId,
@@ -642,7 +682,18 @@ export class LayoutActionImpl {
 			if (!bp) throw new Error("No data returned");
 			const item = mapBackendProject(bp);
 			this.#set((state) => ({
-				projects: state.projects.map((p) => (p.id === item.id ? { ...p, ...item } : p)),
+				projects: state.projects.map((p) =>
+					p.id === item.id
+						? {
+								...p,
+								...item,
+								tasks: p.tasks,
+								messages: p.messages,
+								artifacts: p.artifacts,
+								files: p.files,
+							}
+						: p,
+				),
 			}));
 			return item;
 		} catch (err) {

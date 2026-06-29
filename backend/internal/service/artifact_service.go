@@ -1,30 +1,25 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"path/filepath"
 	"strings"
 
-	"code.gitea.io/sdk/gitea"
-
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
+	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	"github.com/insmtx/Leros/backend/types"
 	"gorm.io/gorm"
 )
 
 type artifactService struct {
-	db          *gorm.DB
-	giteaClient *gitea.Client
+	db *gorm.DB
 }
 
-// NewArtifactService creates a service for generated artifacts.
-func NewArtifactService(db *gorm.DB, giteaClient *gitea.Client) contract.ArtifactService {
-	return &artifactService{db: db, giteaClient: giteaClient}
+func NewArtifactService(db *gorm.DB, _ interface{}) contract.ArtifactService {
+	return &artifactService{db: db}
 }
 
 func (s *artifactService) ListTaskArtifacts(ctx context.Context, taskPublicID string) ([]contract.Artifact, error) {
@@ -98,35 +93,27 @@ func (s *artifactService) GetArtifactDownload(ctx context.Context, artifactPubli
 		return nil, err
 	}
 
-	if strings.TrimSpace(artifact.RelativePath) == "" {
-		return nil, errors.New("artifact has no relative path")
+	storageURI := strings.TrimSpace(artifact.FileURL)
+	if storageURI == "" {
+		return nil, errors.New("artifact has no file url")
 	}
 
-	project, err := infradb.GetProjectByID(ctx, s.db, artifact.ProjectID)
+	bucket, key, err := filestore.ParseStorageURI(storageURI)
 	if err != nil {
-		return nil, err
-	}
-	if project == nil || strings.TrimSpace(project.GiteaRepoFullName) == "" {
-		return nil, errors.New("project not linked to gitea repo")
+		return nil, fmt.Errorf("parse artifact storage uri: %w", err)
 	}
 
-	parts := strings.SplitN(project.GiteaRepoFullName, "/", 2)
-	if len(parts) != 2 {
-		return nil, errors.New("invalid gitea repo full name")
-	}
-
-	data, _, err := s.giteaClient.GetFile(parts[0], parts[1],
-		project.GiteaDefaultBranch, artifact.RelativePath)
+	st := filestore.GetStorage()
+	obj, err := st.GetObject(ctx, bucket, key)
 	if err != nil {
-		return nil, fmt.Errorf("get gitea file: %w", err)
+		return nil, fmt.Errorf("read artifact from storage: %w", err)
 	}
-	reader := io.NopCloser(bytes.NewReader(data))
 
 	return &contract.ArtifactDownload{
 		FileName: artifactDownloadName(artifact),
 		MimeType: artifact.MimeType,
 		Size:     artifact.FileSize,
-		Reader:   reader,
+		Reader:   obj.Body,
 	}, nil
 }
 

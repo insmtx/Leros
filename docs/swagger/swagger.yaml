@@ -3137,46 +3137,6 @@ paths:
       summary: 下载项目文件
       tags:
       - Project
-  /projects/{project_id}/files/preview:
-    get:
-      description: 代理 Gitea raw 内容，流式透传原始文件内容，浏览器可根据 Content-Type 内嵌预览
-      parameters:
-      - description: 项目 public_id
-        in: path
-        name: project_id
-        required: true
-        type: string
-      - description: 文件相对路径，如 artifacts/example.png
-        in: query
-        name: path
-        required: true
-        type: string
-      produces:
-      - application/octet-stream
-      responses:
-        "200":
-          description: 文件内容
-          schema:
-            type: file
-        "400":
-          description: 请求参数错误
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-        "401":
-          description: 未认证
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-        "404":
-          description: 资源不存在
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-        "500":
-          description: 内部服务器错误
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-      summary: 预览项目文件
-      tags:
-      - Project
   /projects/{project_id}/files/upload:
     post:
       consumes:

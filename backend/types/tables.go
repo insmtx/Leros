@@ -63,6 +63,8 @@ const (
 
 	// TableNameFileUpload 文件上传表名
 	TableNameFileUpload = tablenamePrefix + "file_upload"
+	// TableNameProjectFile 项目文件关联表名
+	TableNameProjectFile = tablenamePrefix + "project_file"
 	// TableNameBuiltinSkillMarketplaceItem 内置 Skill 市场条目表名
 	TableNameBuiltinSkillMarketplaceItem = tablenamePrefix + "builtin_skill_marketplace_item"
 	// TableNameSkillMarketplaceItem Skill 市场记录缓存表名

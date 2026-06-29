@@ -11,7 +11,7 @@ import {
 } from "@leros/ui/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@leros/ui/components/ui/popover";
 import { cn } from "@leros/ui/lib/utils";
-import { Bot, Plus, Sparkles, WandSparkles, X } from "lucide-react";
+import { Bot, Plus, Sparkles, WandSparkles } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useMemo, useState } from "react";
 import { mockAssistants } from "./mockDirectiveData";
 import type { ComposerSkillOption, StructuredComposerHandle } from "./StructuredComposer";
@@ -24,6 +24,7 @@ type ComposerActionBarProps = {
 	children?: ReactNode;
 	className?: string;
 	projectSkillOptions?: ComposerSkillOption[];
+	disableAssistantAndSkill?: boolean;
 };
 
 type SkillOption = {
@@ -109,6 +110,7 @@ export function ComposerActionBar({
 	children,
 	className,
 	projectSkillOptions,
+	disableAssistantAndSkill = false,
 }: ComposerActionBarProps) {
 	const [assistantOpen, setAssistantOpen] = useState(false);
 	const [skillOpen, setSkillOpen] = useState(false);
@@ -139,10 +141,8 @@ export function ComposerActionBar({
 		return skillOptions.filter((skill) => {
 			if (selectedSkillLabels.includes(skill.label)) return false;
 			if (!query) return true;
-			return [skill.label, skill.code, skill.description, ...skill.keywords]
-				.join(" ")
-				.toLowerCase()
-				.includes(query);
+			// 中文注释：技能搜索只按名称/code 匹配，描述和标签不参与搜索，避免弱相关结果排在前面。
+			return [skill.label, skill.code].join(" ").toLowerCase().includes(query);
 		});
 	}, [selectedSkillLabels, skillOptions, skillSearch]);
 
@@ -176,6 +176,11 @@ export function ComposerActionBar({
 	}, [projectSkillOptions, skillOpen, skillsLoaded]);
 
 	const allowAction = () => (onBeforeAction ? onBeforeAction() : true);
+	const assistantSkillButtonClassName = cn(
+		"inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900",
+		disableAssistantAndSkill &&
+			"cursor-not-allowed opacity-45 hover:bg-transparent hover:text-slate-600",
+	);
 
 	return (
 		<div className={cn("flex flex-wrap items-center gap-2", className)}>
@@ -195,38 +200,32 @@ export function ComposerActionBar({
 			<Popover open={assistantOpen} onOpenChange={setAssistantOpen}>
 				<PopoverTrigger
 					type="button"
+					disabled={disableAssistantAndSkill}
 					onClick={(event) => {
+						if (disableAssistantAndSkill) {
+							event.preventDefault();
+							return;
+						}
 						if (assistantOpen) return;
 						if (event.defaultPrevented) return;
 						if (!allowAction()) {
 							event.preventDefault();
 						}
 					}}
-					className="inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+					className={assistantSkillButtonClassName}
 				>
 					<Bot className="size-4" />
 					<span>召唤AI队友</span>
 				</PopoverTrigger>
-				<PopoverContent align="start" side="top" sideOffset={10} className="w-[320px] p-1.5">
+				{/* 固定在按钮上方，避免视口碰撞策略把选择弹窗动态翻到下方。 */}
+				<PopoverContent
+					align="start"
+					side="top"
+					sideOffset={10}
+					collisionAvoidance={{ side: "none", align: "shift", fallbackAxisSide: "none" }}
+					className="w-[320px] p-1.5"
+				>
 					<div className="mb-1 px-2 py-1 text-xs font-medium text-slate-400">选择 AI 队友</div>
-					{selectedAssistantNames.length > 0 && (
-						<div className="px-2 pb-2">
-							<div className="mb-1 text-[11px] font-medium text-slate-400">已选 AI 队友</div>
-							<div className="flex flex-wrap gap-1.5">
-								{selectedAssistantNames.map((name) => (
-									<button
-										key={name}
-										type="button"
-										onClick={() => composerRef.current?.removeAssistant(name)}
-										className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[11px] text-blue-700 transition-colors hover:bg-blue-100"
-									>
-										@{name}
-										<X className="size-3" />
-									</button>
-								))}
-							</div>
-						</div>
-					)}
 					<div className="max-h-64 overflow-y-auto">
 						{filteredAssistants.length === 0 ? (
 							<div className="px-3 py-6 text-center text-sm text-slate-400">
@@ -260,19 +259,31 @@ export function ComposerActionBar({
 			<Popover open={skillOpen} onOpenChange={setSkillOpen}>
 				<PopoverTrigger
 					type="button"
+					disabled={disableAssistantAndSkill}
 					onClick={(event) => {
+						if (disableAssistantAndSkill) {
+							event.preventDefault();
+							return;
+						}
 						if (skillOpen) return;
 						if (event.defaultPrevented) return;
 						if (!allowAction()) {
 							event.preventDefault();
 						}
 					}}
-					className="inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+					className={assistantSkillButtonClassName}
 				>
 					<WandSparkles className="size-4" />
 					<span>添加技能</span>
 				</PopoverTrigger>
-				<PopoverContent align="start" side="top" sideOffset={10} className="w-[340px] p-1.5">
+				{/* 固定在按钮上方，避免视口碰撞策略把选择弹窗动态翻到下方。 */}
+				<PopoverContent
+					align="start"
+					side="top"
+					sideOffset={10}
+					collisionAvoidance={{ side: "none", align: "shift", fallbackAxisSide: "none" }}
+					className="w-[340px] p-1.5"
+				>
 					<Command shouldFilter={false} className="rounded-xl! bg-transparent p-0">
 						<div className="px-2 py-1 text-xs font-medium text-slate-400">选择技能</div>
 						<CommandInput
@@ -280,24 +291,6 @@ export function ComposerActionBar({
 							onValueChange={setSkillSearch}
 							placeholder="搜索技能"
 						/>
-						{selectedSkillLabels.length > 0 && (
-							<div className="px-2 pb-2 pt-1">
-								<div className="mb-1 text-[11px] font-medium text-slate-400">已选技能</div>
-								<div className="flex flex-wrap gap-1.5">
-									{selectedSkillLabels.map((label) => (
-										<button
-											key={label}
-											type="button"
-											onClick={() => composerRef.current?.removeSkill(label)}
-											className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-[11px] text-violet-700 transition-colors hover:bg-violet-100"
-										>
-											/{label}
-											<X className="size-3" />
-										</button>
-									))}
-								</div>
-							</div>
-						)}
 						<CommandList className="max-h-64">
 							<CommandEmpty className="py-6 text-slate-400">没有可继续添加的技能</CommandEmpty>
 							<CommandGroup className="p-0">
