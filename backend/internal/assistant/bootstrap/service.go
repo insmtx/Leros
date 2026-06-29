@@ -113,7 +113,7 @@ func NewService(ctx context.Context, opts Options) (*Service, error) {
 	// Build new architecture pipeline with workspace/attachment ports.
 	var wm assistant.WorkspaceManager
 	var ai assistant.AttachmentIngestor
-	if opts.GiteaCfg != nil {
+	if opts.GiteaCfg != nil && opts.GiteaCfg.Enabled {
 		wm = assistant.NewWorkspaceManager(opts.Env, opts.GiteaCfg.Endpoint, opts.GiteaCfg.Owner, opts.GiteaCfg.AccessToken)
 	}
 	ai = assistant.NewAttachmentIngestor()

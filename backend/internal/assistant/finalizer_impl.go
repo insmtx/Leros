@@ -302,6 +302,13 @@ func pushWorkspace(ctx context.Context, workspace WorkspacePreparation) error {
 		return nil // clean working tree is not an error
 	}
 
+	// 本地 git init 的仓库没有 origin，跳过 push
+	hasRemote := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
+	hasRemote.Dir = repoDir
+	if hasRemote.Run() != nil {
+		logs.InfoContextf(ctx, "push_workspace skipped: no origin remote (local repo)")
+		return nil
+	}
 	pushCmd := exec.CommandContext(ctx, "git", "push", "origin", "main")
 	pushCmd.Dir = repoDir
 	if output, err := pushCmd.CombinedOutput(); err != nil {

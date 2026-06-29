@@ -404,7 +404,24 @@ func (p *preparer) prepareWorkspace(ctx context.Context, req *assistantdomain.Ru
 		return p.workspaceMgr.PrepareWorkspace(ctx, req)
 	}
 	if strings.TrimSpace(req.Workspace.ProjectID) != "" {
-		return WorkspacePreparation{}, fmt.Errorf("workspace manager is required for project workspace")
+		// 没有 WorkspaceManager（如 gitea.enabled=false），使用本地 git init
+		plan, err := agentworkspace.PrepareTaskWorkspace(ctx, agentworkspace.TaskWorkspaceRequest{
+			OrgID:            req.Workspace.OrgID,
+			ProjectID:        strings.TrimSpace(req.Workspace.ProjectID),
+			TaskID:           firstNonEmpty(req.Workspace.TaskID, req.TaskID),
+			RequestID:        req.Workspace.RequestID,
+			RequestedWorkDir: req.Runtime.WorkDir,
+		})
+		if err != nil {
+			return WorkspacePreparation{}, err
+		}
+		return WorkspacePreparation{
+			WorkDir:              plan.EffectiveWorkDir,
+			RepoDir:              plan.RepoDir,
+			TaskDir:              plan.TaskDir,
+			ArtifactManifestPath: plan.ArtifactManifestPath,
+			BaselinePath:         plan.BaselinePath,
+		}, nil
 	}
 	workDir := strings.TrimSpace(req.Runtime.WorkDir)
 	if workDir == "" {
