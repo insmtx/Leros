@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.1.17] - 2026-06-29
+
+### Worker Command 架构、文件预览与技能展示增强
+
+本版本重构 Worker Command 与 Agent Runtime 架构，支持 Session Run 取消，统一文件与产物访问链路，并增强 OOXML 预览、已安装技能汉化展示和输入区交互体验。
+
+- 统一 Worker Command 架构，重构 Agent Runtime、消息命令、运行协调与事件发布链路，支持 Session Run 取消
+- 重构 git storage 与 Worker/Server 文件提交链路，收敛仓库提交排除规则并增强工作区 artifact 处理
+- 加固 Worker 与 Server 鉴权边界，调整静态资源访问方式并补充 `leros static` 相关 CLI 能力
+- 新增 OOXML 文件预览能力，支持 Word、Excel、PPT 等 Office 文件在附件、项目文件与产物预览中统一展示
+- 文件预览统一走 authenticated preview 接口，产物文件列表统一使用 `projectFileApi`，减少前端多套文件来源分歧
+- `artifact_declare` 移除强制 `artifacts/` 路径限制，允许更灵活地声明和展示任务产物
+- 新增根据用户消息生成简洁项目或任务标题的提示词，并完善标题生成、事件投影与前端状态更新
+- 完善已安装技能汉化展示，优化技能 catalog、技能市场服务、最近技能面板与输入区技能名称展示
+- 输入框 mention chip 支持内联删除，统一移除技能与 AI 队友弹窗已选区，并优化问答决策时的文本输入体验
+- 限制项目与任务输入长度，优化任务面包屑、侧栏间距、工作台推荐提示文案和文件卡片元信息展示
+- 桌面端支持打开服务条款与隐私政策 PDF，修复 store 中无效技能状态类型导出
+
 ## [v0.1.16] - 2026-06-26
 
 ### Web Search 工具、桌面托盘与任务协作增强
