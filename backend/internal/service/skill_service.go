@@ -130,5 +130,26 @@ func (s *skillService) fetchInstalledSkills(ctx context.Context, orgID uint) ([]
 		})
 	}
 
+	result = filterUserVisibleInstalledSkills(result)
+	(&skillMarketplaceService{
+		db:         s.db,
+		translator: NewDefaultSkillDescriptionTranslator(s.db),
+	}).enrichInstalledSystemSkills(ctx, result)
+
 	return result, nil
+}
+
+func filterUserVisibleInstalledSkills(skills []contract.SkillInstalledItem) []contract.SkillInstalledItem {
+	if len(skills) == 0 {
+		return skills
+	}
+
+	result := skills[:0]
+	for _, skill := range skills {
+		if strings.EqualFold(strings.TrimSpace(skill.Source), "local") {
+			continue
+		}
+		result = append(result, skill)
+	}
+	return result
 }

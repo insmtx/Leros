@@ -39,15 +39,17 @@ type ManifestMetadata struct {
 
 // Entry 表示一个已发现并解析出元数据和正文的 Skill 文档。
 type Entry struct {
-	Manifest    Manifest
-	Body        string
-	Dir         string
-	Path        string
-	AbsoluteDir string
+	Manifest      Manifest
+	Body          string
+	Dir           string
+	Path          string
+	AbsoluteDir   string
+	StoredSkillID string
 }
 
 // Summary 是注入运行时提示词的紧凑视图。
 type Summary struct {
+	SkillID       string
 	Name          string
 	Description   string
 	Version       string
@@ -70,6 +72,7 @@ func (e *Entry) Summary() Summary {
 		trust = "trusted"
 	}
 	return Summary{
+		SkillID:       e.StoredSkillID,
 		Name:          e.Manifest.Name,
 		Description:   e.Manifest.Description,
 		Version:       e.Manifest.Version,

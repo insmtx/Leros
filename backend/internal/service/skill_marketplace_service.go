@@ -644,6 +644,7 @@ func (s *skillMarketplaceService) listInstalledSkills(ctx context.Context) ([]co
 	if err := json.Unmarshal(rawData, &skills); err != nil {
 		return nil, fmt.Errorf("unmarshal skill list items: %w", err)
 	}
+	skills = filterUserVisibleInstalledSkills(skills)
 	s.enrichInstalledSystemSkills(ctx, skills)
 
 	return skills, nil
@@ -1081,8 +1082,12 @@ func (s *skillMarketplaceService) getInstalledSkillDetail(ctx context.Context, s
 		return nil, fmt.Errorf("unmarshal skill detail items: %w", err)
 	}
 
+	detailSkillID := strings.TrimSpace(detail.SkillID)
+	if detailSkillID == "" {
+		detailSkillID = detail.Name
+	}
 	detailResp := &contract.SkillDetailResponse{
-		SkillID:     detail.Name,
+		SkillID:     detailSkillID,
 		Source:      "installed",
 		Name:        detail.Name,
 		DisplayName: "",
@@ -1120,10 +1125,6 @@ func (s *skillMarketplaceService) enrichInstalledSystemSkills(ctx context.Contex
 	builtinByID, err := s.builtinItemsBySkillID(ctx, names)
 	if err != nil {
 		logs.WarnContextf(ctx, "enrich installed system skills: query builtin skills: %v", err)
-		return
-	}
-	if len(builtinByID) == 0 {
-		return
 	}
 
 	views := make([]contract.SkillMarketplaceItemView, 0, len(builtinByID))
@@ -1138,18 +1139,52 @@ func (s *skillMarketplaceService) enrichInstalledSystemSkills(ctx context.Contex
 	for _, view := range views {
 		viewByID[view.SkillID] = view
 	}
+	cachedByName, err := s.cachedMarketplaceItemsBySkillName(ctx, names)
+	if err != nil {
+		logs.WarnContextf(ctx, "enrich installed marketplace skills: query cached skills: %v", err)
+	}
+	cachedViews := make([]contract.SkillMarketplaceItemView, 0, len(cachedByName))
+	seenCachedSkillIDs := make(map[string]bool, len(cachedByName))
+	for _, item := range cachedByName {
+		key := item.Source + "|" + item.SkillID + "|" + item.Version
+		if seenCachedSkillIDs[key] {
+			continue
+		}
+		seenCachedSkillIDs[key] = true
+		cachedViews = append(cachedViews, cachedItemToView(item))
+	}
+	s.resolveCacheAndTranslation(ctx, cachedViews)
+	cachedViewByName := make(map[string]contract.SkillMarketplaceItemView, len(cachedViews)*2)
+	for _, view := range cachedViews {
+		if strings.TrimSpace(view.SkillID) != "" {
+			cachedViewByName[view.SkillID] = view
+		}
+		if strings.TrimSpace(view.Name) != "" {
+			cachedViewByName[view.Name] = view
+		}
+	}
 
 	for idx := range skills {
 		view, ok := viewByID[skills[idx].Name]
-		if !ok {
+		if ok {
+			skills[idx].DisplayName = view.DisplayName
+			if view.Description != "" {
+				skills[idx].Description = view.Description
+			}
+			if skills[idx].Category == "" {
+				skills[idx].Category = view.Category
+			}
 			continue
 		}
-		skills[idx].DisplayName = view.DisplayName
-		if view.Description != "" {
-			skills[idx].Description = view.Description
-		}
-		if skills[idx].Category == "" {
-			skills[idx].Category = view.Category
+
+		if cachedView, ok := cachedViewByName[skills[idx].Name]; ok {
+			skills[idx].DisplayName = cachedView.DisplayName
+			if cachedView.Description != "" {
+				skills[idx].Description = cachedView.Description
+			}
+			if skills[idx].Category == "" {
+				skills[idx].Category = cachedView.Category
+			}
 		}
 	}
 }
@@ -1159,27 +1194,94 @@ func (s *skillMarketplaceService) enrichInstalledSystemSkillDetail(ctx context.C
 		return
 	}
 
-	builtinByID, err := s.builtinItemsBySkillID(ctx, []string{detail.Name})
+	identifiers := installedSkillDetailLookupKeys(detail)
+	builtinByID, err := s.builtinItemsBySkillID(ctx, identifiers)
 	if err != nil {
 		logs.WarnContextf(ctx, "enrich installed system skill detail: query builtin skill: %v", err)
 		return
 	}
-	item, ok := builtinByID[detail.Name]
-	if !ok {
+	if item, ok := firstBuiltinItemByKey(builtinByID, identifiers); ok {
+		views := []contract.SkillMarketplaceItemView{builtinItemToView(item)}
+		s.resolveCacheAndTranslation(ctx, views)
+		if len(views) == 0 {
+			return
+		}
+		detail.DisplayName = views[0].DisplayName
+		if views[0].Description != "" {
+			detail.Description = views[0].Description
+		}
+		if detail.Category == "" {
+			detail.Category = views[0].Category
+		}
 		return
 	}
 
-	views := []contract.SkillMarketplaceItemView{builtinItemToView(item)}
-	s.resolveCacheAndTranslation(ctx, views)
-	if len(views) == 0 {
+	cachedByName, err := s.cachedMarketplaceItemsBySkillName(ctx, identifiers)
+	if err != nil {
+		logs.WarnContextf(ctx, "enrich installed marketplace skill detail: query cached skill: %v", err)
 		return
 	}
-	detail.DisplayName = views[0].DisplayName
-	if views[0].Description != "" {
-		detail.Description = views[0].Description
+	if cached, ok := firstCachedMarketplaceItemByKey(cachedByName, identifiers); ok {
+		views := []contract.SkillMarketplaceItemView{cachedItemToView(cached)}
+		s.resolveCacheAndTranslation(ctx, views)
+		if len(views) == 0 {
+			return
+		}
+		detail.DisplayName = views[0].DisplayName
+		if views[0].Description != "" {
+			detail.Description = views[0].Description
+		}
+		if detail.Category == "" {
+			detail.Category = views[0].Category
+		}
+		s.localizeInstalledSkillMarkdown(ctx, detail, &cached)
 	}
-	if detail.Category == "" {
-		detail.Category = views[0].Category
+}
+
+func (s *skillMarketplaceService) localizeInstalledSkillMarkdown(ctx context.Context, detail *contract.SkillDetailResponse, item *types.SkillMarketplaceItem) {
+	if detail == nil || item == nil {
+		return
+	}
+	if strings.TrimSpace(detail.SkillMD) == "" || utils.CJKRatioMarkdown(detail.SkillMD) >= cjkTranslationThreshold {
+		return
+	}
+
+	if s.st != nil && item.PackageStoragePath != "" {
+		zhBody, zhDesc, zhErr := skillcache.ReadChineseDocumentFromStorage(ctx, s.st, item.PackageStoragePath)
+		if zhErr == nil && zhBody != "" {
+			detail.SkillMD = zhBody
+			if zhDesc != "" {
+				detail.Description = zhDesc
+			}
+			return
+		}
+		logs.WarnContextf(ctx, "localize installed skill markdown: read SKILL.zh-CN.md for %s/%s@%s: %v", item.Source, item.SkillID, item.Version, zhErr)
+	}
+
+	if s.translator == nil {
+		return
+	}
+	translationMap, err := s.translator.TranslateDocument(ctx, []TranslateDocumentItem{
+		{SkillID: item.SkillID, Content: detail.SkillMD},
+	})
+	if err != nil {
+		logs.WarnContextf(ctx, "localize installed skill markdown: translate %s/%s@%s: %v", item.Source, item.SkillID, item.Version, err)
+		return
+	}
+	translated := strings.TrimSpace(translationMap[item.SkillID])
+	if translated == "" {
+		return
+	}
+	manifest, body, parseErr := catalog.ParseDocument([]byte(translated))
+	if parseErr != nil {
+		logs.WarnContextf(ctx, "localize installed skill markdown: parse translated %s/%s@%s: %v", item.Source, item.SkillID, item.Version, parseErr)
+		return
+	}
+	if strings.TrimSpace(body) != "" {
+		detail.SkillMD = body
+	}
+	if strings.TrimSpace(manifest.Description) != "" {
+		detail.Description = manifest.Description
 	}
 }
 
@@ -1213,6 +1315,102 @@ func (s *skillMarketplaceService) builtinItemsBySkillID(ctx context.Context, ski
 		result[item.SkillID] = item
 	}
 	return result, nil
+}
+
+func (s *skillMarketplaceService) cachedMarketplaceItemsBySkillName(ctx context.Context, names []string) (map[string]types.SkillMarketplaceItem, error) {
+	result := make(map[string]types.SkillMarketplaceItem)
+	if len(names) == 0 || s.db == nil {
+		return result, nil
+	}
+
+	unique := make([]string, 0, len(names))
+	seen := make(map[string]bool, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		unique = append(unique, name)
+	}
+	if len(unique) == 0 {
+		return result, nil
+	}
+
+	var items []types.SkillMarketplaceItem
+	if err := s.db.WithContext(ctx).
+		Where("skill_id IN ? OR name IN ?", unique, unique).
+		Order("updated_at DESC").
+		Find(&items).Error; err != nil {
+		return nil, err
+	}
+
+	for _, item := range items {
+		for _, key := range []string{item.SkillID, item.Name} {
+			key = strings.TrimSpace(key)
+			if key == "" || seenResultKey(result, key) {
+				continue
+			}
+			result[key] = item
+		}
+	}
+	return result, nil
+}
+
+func cachedItemToView(item types.SkillMarketplaceItem) contract.SkillMarketplaceItemView {
+	return skillMarketplaceItemView(
+		item.Source,
+		item.SkillID,
+		item.Name,
+		item.Description,
+		item.Version,
+		item.Author,
+		item.Category,
+		[]string(item.Tags),
+		"",
+		item.Installs,
+	)
+}
+
+func seenResultKey(items map[string]types.SkillMarketplaceItem, key string) bool {
+	_, ok := items[key]
+	return ok
+}
+
+func installedSkillDetailLookupKeys(detail *contract.SkillDetailResponse) []string {
+	if detail == nil {
+		return nil
+	}
+
+	keys := make([]string, 0, 2)
+	seen := make(map[string]bool, 2)
+	for _, key := range []string{detail.SkillID, detail.Name} {
+		key = strings.TrimSpace(key)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func firstBuiltinItemByKey(items map[string]types.BuiltinSkillMarketplaceItem, keys []string) (types.BuiltinSkillMarketplaceItem, bool) {
+	for _, key := range keys {
+		if item, ok := items[key]; ok {
+			return item, true
+		}
+	}
+	return types.BuiltinSkillMarketplaceItem{}, false
+}
+
+func firstCachedMarketplaceItemByKey(items map[string]types.SkillMarketplaceItem, keys []string) (types.SkillMarketplaceItem, bool) {
+	for _, key := range keys {
+		if item, ok := items[key]; ok {
+			return item, true
+		}
+	}
+	return types.SkillMarketplaceItem{}, false
 }
 
 // ImportSkill 从已上传文件导入 Skill，校验内容后发送给 Worker 并等待完成。
