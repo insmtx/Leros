@@ -14,6 +14,7 @@ export function messageArtifactToProjectArtifact(artifact: MessageArtifact): Pro
 		size: artifact.size,
 		updatedAt: artifact.updatedAt,
 		downloadUrl: artifact.downloadUrl,
+		storageUri: artifact.storageUri,
 		sha256: artifact.sha256,
 	};
 }
@@ -46,7 +47,7 @@ export function mergeProjectArtifacts(
 	}
 	for (const artifact of taskArtifacts) {
 		const existing = merged.get(artifact.id);
-		merged.set(artifact.id, existing ? { ...existing, ...artifact } : artifact);
+		merged.set(artifact.id, existing ? { ...artifact, ...existing } : artifact);
 	}
 	// 中文注释：任务接口与会话消息的文件合并后，统一在这里做“最新优先”排序，避免页面各自处理。
 	return sortProjectArtifactsByNewestFirst([...merged.values()]);

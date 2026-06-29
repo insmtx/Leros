@@ -161,12 +161,14 @@ type ArtifactPayload struct {
 	ArtifactID   string `json:"artifact_id,omitempty"`
 	Title        string `json:"title,omitempty"`
 	Filename     string `json:"filename,omitempty"`
+	OriginalName string `json:"original_name,omitempty"`
 	Description  string `json:"description,omitempty"`
 	MimeType     string `json:"mime_type,omitempty"`
 	ArtifactType string `json:"artifact_type,omitempty"`
 	FileSize     int64  `json:"file_size,omitempty"`
 	RelativePath string `json:"relative_path,omitempty"`
 	StorageKey   string `json:"storage_key,omitempty"`
+	StorageURI   string `json:"storage_uri,omitempty"`
 	Sha256       string `json:"sha256,omitempty"`
 	Source       string `json:"source,omitempty"`
 	Status       string `json:"status,omitempty"`

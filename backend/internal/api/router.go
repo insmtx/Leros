@@ -44,7 +44,7 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 	r.Use(ygmiddleware.Recovery())
 
 	var giteaClient *gitea.Client
-	if cfg.Gitea != nil {
+	if cfg.Gitea != nil && cfg.Gitea.Enabled {
 		var err error
 		giteaClient, err = gitea.NewClient(cfg.Gitea.Endpoint, gitea.SetToken(cfg.Gitea.AccessToken))
 		if err != nil {
@@ -116,7 +116,7 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		handler.RegisterTaskRoutes(v1, taskService)
 		logs.Info("Task routes registered successfully")
 
-		artifactService := service.NewArtifactService(db, giteaClient)
+		artifactService := service.NewArtifactService(db, nil)
 		handler.RegisterArtifactRoutes(v1, artifactService)
 		logs.Info("Artifact routes registered successfully")
 
@@ -145,7 +145,7 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		if !cfg.Server.DisableEventConsumers {
 			// 统一的 run state projector，消费 org.*.session.*.run.state
 			// 替代旧分散的 StartSessionRunStarted + StartSessionArtifactDeclared + StartSessionCompleted
-			go runnable.StartSessionRunStateProjector(context.Background(), sessionService, eventbus, db, giteaClient)
+			go runnable.StartSessionRunStateProjector(context.Background(), sessionService, eventbus, db)
 			logs.Info("Session run state projector started")
 			// Stream projector records the stream lane start seq for SSE replay.
 			go runnable.StartSessionRunStreamProjector(context.Background(), sessionService, eventbus)
@@ -159,8 +159,8 @@ func SetupRouter(cfg config.Config, eventbus eventbus.EventBus, db *gorm.DB) *gi
 		}
 	}
 
-	staticGroup := v1.Group("/static", middleware.StaticAuth(
-		filestore.StaticAPIKey(),
+	staticGroup := v1.Group("/static", middleware.AppAuth(
+		cfg.Server.AppKey,
 		cfg.Server.JWT.Secret,
 		db,
 	))

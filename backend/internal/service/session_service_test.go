@@ -49,6 +49,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		&types.Artifact{},
 		&types.LLMModel{},
 		&types.FileUpload{},
+		&types.ProjectFile{},
 		&types.WorkerDeployment{},
 	); err != nil {
 		t.Fatalf("failed to migrate test database: %v", err)

@@ -8,6 +8,7 @@ export type BackendProjectFileNodeLike = {
 	mod_time?: number;
 	created_at?: number;
 	public_id?: string;
+	storage_uri?: string;
 };
 
 export type ProjectFileNode = {
@@ -20,6 +21,7 @@ export type ProjectFileNode = {
 	modTime: number;
 	createdAt: number;
 	publicId: string;
+	storageUri: string;
 };
 
 // 统一清洗后端文件树结构，避免页面层到处处理空值和字段名差异。
@@ -37,6 +39,7 @@ export function normalizeProjectFileTree(
 		modTime: typeof node.mod_time === "number" ? node.mod_time : 0,
 		createdAt: typeof node.created_at === "number" ? node.created_at : 0,
 		publicId: typeof node.public_id === "string" ? node.public_id : "",
+		storageUri: typeof node.storage_uri === "string" ? node.storage_uri : "",
 		children: normalizeProjectFileTree(node.children),
 	}));
 }

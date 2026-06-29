@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"code.gitea.io/sdk/gitea"
 	"github.com/nats-io/nats.go"
 	"gorm.io/gorm"
 
 	"github.com/insmtx/Leros/backend/agent/runtime/events"
 	"github.com/insmtx/Leros/backend/internal/api/contract"
 	infradb "github.com/insmtx/Leros/backend/internal/infra/db"
+	"github.com/insmtx/Leros/backend/internal/infra/filestore"
 	eventbus "github.com/insmtx/Leros/backend/internal/infra/mq"
 	"github.com/insmtx/Leros/backend/pkg/messaging"
 	"github.com/insmtx/Leros/backend/types"
@@ -31,12 +31,17 @@ import (
 // NOTE: 本 projector 只消费 run.state lane，不依赖 run.stream lane。
 // SSE replay 目前仅订阅 run.stream lane（见 StreamSessionEvents）。
 // 双 lane 回放待未来实现。
-func StartSessionRunStateProjector(ictx context.Context, service contract.SessionService, eb eventbus.EventBus, db *gorm.DB, giteaClient *gitea.Client) {
+func StartSessionRunStateProjector(
+	ictx context.Context,
+	service contract.SessionService,
+	eb eventbus.EventBus,
+	db *gorm.DB,
+) {
 	ctx := logs.WithContextFields(ictx, "runnable", "session_run_state_projector")
 	topic := messaging.RunEventStateWildcard()
 	logs.InfoContextf(ctx, "starting session run state projector: %s", topic)
 
-	persister := &declaredArtifactPersister{db: db, giteaClient: giteaClient}
+	persister := &declaredArtifactPersister{db: db}
 
 	Run(ctx, "session_run_state_projector", func(ctx context.Context) {
 		if err := eb.Subscribe(ctx, topic, messaging.SessionRunStateConsumer(), func(msg *nats.Msg) {
@@ -113,12 +118,14 @@ func handleArtifactDeclaredEvent(ctx context.Context, persister *declaredArtifac
 		ArtifactID:   art.ArtifactID,
 		Title:        art.Title,
 		Filename:     art.Filename,
+		OriginalName: art.OriginalName,
 		Description:  art.Description,
 		MimeType:     art.MimeType,
 		ArtifactType: art.ArtifactType,
 		FileSize:     art.FileSize,
 		RelativePath: art.RelativePath,
 		StorageKey:   art.StorageKey,
+		StorageURI:   art.StorageURI,
 		Sha256:       art.Sha256,
 		Source:       art.Source,
 		Status:       art.Status,
@@ -254,8 +261,12 @@ func messagingArtifactsToMessageArtifacts(artifacts []messaging.ArtifactPayload)
 			ArtifactID:   a.ArtifactID,
 			Title:        a.Title,
 			Filename:     a.Filename,
+			Description:  a.Description,
 			MimeType:     a.MimeType,
 			ArtifactType: a.ArtifactType,
+			FileSize:     a.FileSize,
+			StorageURI:   a.StorageURI,
+			Sha256:       a.Sha256,
 			CreatedAt:    time.Time{},
 		})
 	}
@@ -380,8 +391,7 @@ func recordSkillInvocationsFromMessaging(ctx context.Context, db *gorm.DB, orgID
 
 // declaredArtifactPersister persists declared artifacts to the database.
 type declaredArtifactPersister struct {
-	db          *gorm.DB
-	giteaClient *gitea.Client
+	db *gorm.DB
 }
 
 // PersistDeclaredArtifact persists a declared artifact to the database.
@@ -456,7 +466,15 @@ func (p *declaredArtifactPersister) PersistDeclaredArtifact(ctx context.Context,
 	if filename == "" {
 		filename = item.Title
 	}
-	giteaArtifactURL := projectPublicID + "/" + storageKey
+	originalName := strings.TrimSpace(item.OriginalName)
+	if originalName == "" {
+		originalName = filename
+	}
+	storageURI := strings.TrimSpace(item.StorageURI)
+	fileURL := storageURI
+	if fileURL == "" {
+		fileURL = projectPublicID + "/" + storageKey
+	}
 
 	artifact := &types.Artifact{
 		PublicID:     artifactID,
@@ -469,7 +487,7 @@ func (p *declaredArtifactPersister) PersistDeclaredArtifact(ctx context.Context,
 		Filename:     filename,
 		Description:  strings.TrimSpace(item.Description),
 		ArtifactType: artifactType(item.ArtifactType),
-		FileURL:      giteaArtifactURL,
+		FileURL:      fileURL,
 		FileSize:     item.FileSize,
 		RelativePath: item.RelativePath,
 		StorageKey:   storageKey,
@@ -494,6 +512,36 @@ func (p *declaredArtifactPersister) PersistDeclaredArtifact(ctx context.Context,
 			return nil
 		}
 		return err
+	}
+
+	if storageURI == "" {
+		return nil
+	}
+	fileUpload, err := filestore.RecordUpload(ctx, p.db, filestore.RecordUploadParams{
+		StorageURI:   storageURI,
+		Filename:     filename,
+		OriginalName: originalName,
+		MimeType:     strings.TrimSpace(item.MimeType),
+		OrgID:        session.OrgID,
+		OwnerID:      session.Uin,
+		FileSize:     item.FileSize,
+		Sha256:       item.Sha256,
+		Purpose:      filestore.PurposeArtifact,
+	})
+	if err != nil {
+		return fmt.Errorf("record artifact upload: %w", err)
+	}
+	projectFile := &types.ProjectFile{
+		FilePublicID: fileUpload.PublicID,
+		OrgID:        session.OrgID,
+		ProjectID:    *session.ProjectID,
+		TaskID:       *session.TaskID,
+		ResourceID:   artifact.ID,
+		ResourceType: types.ProjectFileResourceTypeArtifact,
+		Uin:          session.Uin,
+	}
+	if err := infradb.CreateProjectFile(ctx, p.db, projectFile); err != nil {
+		return fmt.Errorf("create artifact project file: %w", err)
 	}
 	return nil
 }

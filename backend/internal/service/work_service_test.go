@@ -47,7 +47,7 @@ func TestWorkServiceNewMessage_PersistsAttachmentsOnFirstMessage(t *testing.T) {
 		OriginalName: "spec.pdf",
 		MimeType:     "application/pdf",
 		FileSize:     1024,
-		StoragePath:  "project-files/spec.pdf",
+		StorageURI:   "project-files/spec.pdf",
 		Purpose:      "project_file",
 		Status:       "active",
 	}
@@ -107,8 +107,21 @@ func TestWorkServiceNewMessage_PersistsAttachmentsOnFirstMessage(t *testing.T) {
 		t.Fatal("expected file upload to exist after new message")
 	}
 
-	projectPublicID, _ := refreshedUpload.Metadata.Extra["project_public_id"].(string)
-	if projectPublicID != resp.ProjectID {
-		t.Fatalf("expected file upload project_public_id %q, got %q", resp.ProjectID, projectPublicID)
+	projectFile, err := dbpkg.GetProjectFileByFilePublicID(context.Background(), database, 1, fileUpload.PublicID)
+	if err != nil {
+		t.Fatalf("reload project file failed: %v", err)
+	}
+	if projectFile == nil {
+		t.Fatal("expected project file association after new message")
+	}
+	if projectFile.ProjectID != project.ID {
+		t.Fatalf("expected project file project_id %d, got %d", project.ID, projectFile.ProjectID)
+	}
+	if projectFile.ResourceType != types.ProjectFileResourceTypeUserUpload {
+		t.Fatalf(
+			"expected project file resource_type %q, got %q",
+			types.ProjectFileResourceTypeUserUpload,
+			projectFile.ResourceType,
+		)
 	}
 }

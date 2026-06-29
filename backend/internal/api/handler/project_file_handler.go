@@ -25,20 +25,18 @@ func NewProjectFileHandler(service contract.ProjectService) *ProjectFileHandler 
 // RegisterRoutes 注册路由
 func (h *ProjectFileHandler) RegisterRoutes(r gin.IRouter) {
 	r.GET("/projects/:project_id/files", h.GetProjectFileTree)
-	r.POST("/projects/:project_id/files/upload", h.UploadProjectFile)
 	r.GET("/projects/:project_id/files/download", h.DownloadProjectFile)
 	r.GET("/projects/:project_id/memory", h.GetProjectMemory)
-	r.POST("/projects/:project_id/AddFile", h.DeprecatedAddProjectFile)
 }
 
 // GetProjectFileTree 获取项目文件树
 // @Summary 获取项目文件树
-// @Description 获取项目 artifacts/ 和 uploads/ 目录的文件树，可通过 path 参数指定子目录。
-// @Description 文件节点包含 created_at 字段（Unix 秒级时间戳），表示该文件在 Gitea 仓库中的首次 commit 时间，未找到时为 0。
+// @Description 获取项目 artifacts/ 和 uploads/ 目录的文件树，可通过 resource_type 参数筛选。
+// @Description 文件节点包含 created_at 字段（Unix 秒级时间戳），表示该文件关联记录创建的时间，未找到时为 0。
 // @Tags Project
 // @Produce json
 // @Param project_id path string true "项目 public_id"
-// @Param path query string false "起始目录相对路径，如 artifacts，默认返回全量"
+// @Param resource_type query string false "资源类型：user_upload | artifact，不传则返回全部"
 // @Success 200 {object} dto.Response "成功响应"
 // @Failure 400 {object} dto.ErrorResponse "请求参数错误"
 // @Failure 401 {object} dto.ErrorResponse "未认证"
@@ -52,9 +50,9 @@ func (h *ProjectFileHandler) GetProjectFileTree(ctx *gin.Context) {
 		return
 	}
 
-	parentPath := strings.TrimSpace(ctx.Query("path"))
+	resourceType := strings.TrimSpace(ctx.Query("resource_type"))
 
-	result, err := h.service.GetProjectFileTree(ctx, projectID, parentPath, 0)
+	result, err := h.service.GetProjectFileTree(ctx, projectID, resourceType)
 	if err != nil {
 		handleProjectFileServiceError(ctx, err)
 		return
@@ -105,48 +103,6 @@ func (h *ProjectFileHandler) DownloadProjectFile(ctx *gin.Context) {
 	}
 }
 
-// UploadProjectFile 上传文件到项目
-// @Summary 上传项目文件
-// @Description 上传文件到项目 Upload 目录，同名文件自动追加序列号
-// @Tags Project
-// @Accept multipart/form-data
-// @Produce json
-// @Param project_id path string true "项目 public_id"
-// @Param file formData file true "上传的文件"
-// @Success 200 {object} dto.Response "成功响应"
-// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
-// @Failure 401 {object} dto.ErrorResponse "未认证"
-// @Failure 404 {object} dto.ErrorResponse "资源不存在"
-// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
-// @Router /projects/{project_id}/files/upload [post]
-func (h *ProjectFileHandler) UploadProjectFile(ctx *gin.Context) {
-	projectID := strings.TrimSpace(ctx.Param("project_id"))
-	if projectID == "" {
-		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, "project_id is required"))
-		return
-	}
-
-	fileHeader, err := ctx.FormFile("file")
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.Error(dto.CodeInvalidParams, "file is required"))
-		return
-	}
-
-	file, err := fileHeader.Open()
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.Error(dto.CodeInternalError, "failed to open uploaded file"))
-		return
-	}
-	defer file.Close()
-
-	result, err := h.service.UploadProjectFile(ctx, projectID, file, fileHeader.Filename)
-	if err != nil {
-		handleProjectFileServiceError(ctx, err)
-		return
-	}
-	ctx.JSON(http.StatusOK, dto.Success(result))
-}
-
 // GetProjectMemory 获取项目记忆
 // @Summary 获取项目记忆
 // @Description 根据 project_id 获取项目的持久记忆条目
@@ -171,24 +127,6 @@ func (h *ProjectFileHandler) GetProjectMemory(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, dto.Success(result))
-}
-
-// AddProjectFile 将已上传文件关联到项目
-// @Summary 关联文件到项目
-// @Description 将已通过 /v1/files/upload 上传的文件关联到指定项目
-// @Tags Project
-// @Accept json
-// @Produce json
-// @Param project_id path string true "项目 public_id"
-// @Param request body contract.AddFileRequest true "文件信息"
-// @Success 200 {object} dto.Response "成功响应"
-// @Failure 400 {object} dto.ErrorResponse "请求参数错误"
-// @Failure 401 {object} dto.ErrorResponse "未认证"
-// @Failure 404 {object} dto.ErrorResponse "资源不存在"
-// @Failure 500 {object} dto.ErrorResponse "内部服务器错误"
-// @Router /projects/{project_id}/AddFile [post]
-func (h *ProjectFileHandler) DeprecatedAddProjectFile(ctx *gin.Context) {
-	ctx.JSON(http.StatusOK, dto.Success(nil))
 }
 
 func handleProjectFileServiceError(ctx *gin.Context, err error) {

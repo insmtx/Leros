@@ -58,6 +58,7 @@ export type ProjectArtifact = {
 	size: string;
 	updatedAt?: number;
 	downloadUrl: string;
+	storageUri?: string;
 	sha256?: string;
 };
 

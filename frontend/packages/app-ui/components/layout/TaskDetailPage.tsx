@@ -517,6 +517,7 @@ export function TaskDetailPage({
 											mimeType: file.mimeType,
 											size: formatBytes(file.size),
 											downloadUrl: "",
+											storageUri: file.storageUri,
 										})
 									}
 								/>

@@ -37,7 +37,7 @@ func TestPresignUploadHandler_Success(t *testing.T) {
 	r := setupStaticTestRouter(t)
 
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("PUT", "/static/test-bucket/path/to/file.txt?presign=1", nil)
+	req, _ := http.NewRequest("GET", "/static/test-bucket/path/to/file.txt?operation=upload", nil)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -55,7 +55,7 @@ func TestPresignDownloadHandler_Success(t *testing.T) {
 	r := setupStaticTestRouter(t)
 
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/static/test-bucket/path/to/file.txt?presign=1", nil)
+	req, _ := http.NewRequest("GET", "/static/test-bucket/path/to/file.txt?operation=download", nil)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -69,11 +69,11 @@ func TestPresignDownloadHandler_Success(t *testing.T) {
 	}
 }
 
-func TestPresignUploadHandler_MissingPresignParam(t *testing.T) {
+func TestPresignUploadHandler_MissingOperationParam(t *testing.T) {
 	r := setupStaticTestRouter(t)
 
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("PUT", "/static/test-bucket/path/to/file.txt", nil)
+	req, _ := http.NewRequest("GET", "/static/test-bucket/path/to/file.txt", nil)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
@@ -81,7 +81,7 @@ func TestPresignUploadHandler_MissingPresignParam(t *testing.T) {
 	}
 }
 
-func TestPresignDownloadHandler_MissingPresignParam(t *testing.T) {
+func TestPresignDownloadHandler_MissingOperationParam(t *testing.T) {
 	r := setupStaticTestRouter(t)
 
 	w := httptest.NewRecorder()
@@ -97,7 +97,7 @@ func TestPresignUploadHandler_EmptyBucket(t *testing.T) {
 	r := setupStaticTestRouter(t)
 
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("PUT", "/static//path/to/file.txt?presign=1", nil)
+	req, _ := http.NewRequest("GET", "/static//path/to/file.txt?operation=upload", nil)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
@@ -109,7 +109,7 @@ func TestPresignUploadHandler_EmptyKey(t *testing.T) {
 	r := setupStaticTestRouter(t)
 
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("PUT", "/static/test-bucket/?presign=1", nil)
+	req, _ := http.NewRequest("GET", "/static/test-bucket/?operation=upload", nil)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {

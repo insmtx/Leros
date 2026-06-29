@@ -70,14 +70,18 @@ func ProjectRunEvent(runEvent messaging.RunEvent) (*dto.SessionEvent, bool) {
 			return nil, false
 		}
 		event.Type = events.EventArtifactDeclared
-		event.Payload = events.ArtifactPayload{
+		event.Payload = publicStreamArtifactPayload(events.ArtifactPayload{
 			ArtifactID:   runEvent.Body.Payload.Artifact.ArtifactID,
 			Title:        runEvent.Body.Payload.Artifact.Title,
 			Filename:     runEvent.Body.Payload.Artifact.Filename,
+			Description:  runEvent.Body.Payload.Artifact.Description,
 			MimeType:     runEvent.Body.Payload.Artifact.MimeType,
 			ArtifactType: runEvent.Body.Payload.Artifact.ArtifactType,
+			FileSize:     runEvent.Body.Payload.Artifact.FileSize,
+			StorageURI:   runEvent.Body.Payload.Artifact.StorageURI,
+			Sha256:       runEvent.Body.Payload.Artifact.Sha256,
 			CreatedAt:    runEvent.CreatedAt,
-		}
+		})
 	case messaging.RunEventRunStarted:
 		event.Type = events.EventStarted
 	case messaging.RunEventRunCompleted:
@@ -272,12 +276,27 @@ func ProjectRunEventRecord(sessionID string, chunk types.MessageChunk) (*contrac
 			return nil, false
 		}
 		event.Type = string(events.EventArtifactDeclared)
-		event.Payload = payload
+		event.Payload = publicStreamArtifactPayload(payload)
 	default:
 		return nil, false
 	}
 
 	return event, true
+}
+
+func publicStreamArtifactPayload(payload events.ArtifactPayload) events.ArtifactPayload {
+	return events.ArtifactPayload{
+		ArtifactID:   payload.ArtifactID,
+		Title:        payload.Title,
+		Filename:     payload.Filename,
+		Description:  payload.Description,
+		MimeType:     payload.MimeType,
+		ArtifactType: payload.ArtifactType,
+		FileSize:     payload.FileSize,
+		CreatedAt:    payload.CreatedAt,
+		StorageURI:   payload.StorageURI,
+		Sha256:       payload.Sha256,
+	}
 }
 
 func decodeChunkPayload[T any](chunk types.MessageChunk) (T, bool) {
@@ -341,12 +360,14 @@ func terminalPayloadFromMessaging(
 			ArtifactID:   artifact.ArtifactID,
 			Title:        artifact.Title,
 			Filename:     artifact.Filename,
+			OriginalName: artifact.OriginalName,
 			Description:  artifact.Description,
 			MimeType:     artifact.MimeType,
 			ArtifactType: artifact.ArtifactType,
 			FileSize:     artifact.FileSize,
 			RelativePath: artifact.RelativePath,
 			StorageKey:   artifact.StorageKey,
+			StorageURI:   artifact.StorageURI,
 			Sha256:       artifact.Sha256,
 			Source:       artifact.Source,
 			Status:       artifact.Status,
