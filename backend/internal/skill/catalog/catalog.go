@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -13,6 +14,12 @@ import (
 )
 
 const skillFileName = "SKILL.md"
+const skillMetadataFileName = ".skill-metadata"
+
+type storedSkillMetadata struct {
+	Source  string `json:"source"`
+	SkillID string `json:"skill_id"`
+}
 
 // ErrSkillNotFound is returned when a skill cannot be found in the catalog.
 type ErrSkillNotFound struct {
@@ -160,13 +167,15 @@ func tryParseSkillFile(path, requestedName string) (*Entry, string) {
 	}
 
 	absDir := filepath.Dir(path)
-	return &Entry{
+	entry := &Entry{
 		Manifest:    *manifest,
 		Body:        body,
 		Dir:         filepath.ToSlash(dirName),
 		Path:        skillFileName,
 		AbsoluteDir: filepath.ToSlash(absDir),
-	}, ""
+	}
+	applyStoredMetadata(entry)
+	return entry, ""
 }
 
 // ReadFile reads a supporting file from a skill directory in the default Leros
@@ -275,6 +284,7 @@ func readAllSkills() (map[string]*Entry, string, error) {
 			Path:        filepath.ToSlash(filepath.Join(subDir, skillFileName)),
 			AbsoluteDir: filepath.ToSlash(filepath.Join(dir, subDir)),
 		}
+		applyStoredMetadata(entry)
 		if _, exists := entries[entry.Manifest.Name]; exists {
 			return fmt.Errorf("duplicate skill name %q", entry.Manifest.Name)
 		}
@@ -286,6 +296,34 @@ func readAllSkills() (map[string]*Entry, string, error) {
 	}
 
 	return entries, dir, nil
+}
+
+func applyStoredMetadata(entry *Entry) {
+	if entry == nil {
+		return
+	}
+	metadata, err := readStoredMetadata(entry.AbsoluteDir)
+	if err != nil {
+		return
+	}
+	if strings.TrimSpace(metadata.Source) != "" {
+		entry.Manifest.Metadata.Source = strings.TrimSpace(metadata.Source)
+	}
+	if strings.TrimSpace(metadata.SkillID) != "" {
+		entry.StoredSkillID = strings.TrimSpace(metadata.SkillID)
+	}
+}
+
+func readStoredMetadata(skillDir string) (*storedSkillMetadata, error) {
+	data, err := os.ReadFile(filepath.Join(filepath.FromSlash(skillDir), skillMetadataFileName))
+	if err != nil {
+		return nil, err
+	}
+	var metadata storedSkillMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return nil, err
+	}
+	return &metadata, nil
 }
 
 // resolveInside resolves a relative path within root and validates that the result

@@ -13,11 +13,11 @@ import {
 	desktopOpenPolicyPdfChannel,
 	type DesktopPolicyDocument,
 } from "../shared/auto-update";
+import { isAppQuitting, markAppQuitting } from "./app-lifecycle";
 import { getDesktopUpdateState, registerDesktopAutoUpdate } from "./auto-update";
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
-let isQuitting = false;
 
 function getPolicyPdfPath(document: DesktopPolicyDocument): string {
 	const fileName = document === "terms" ? "terms-of-service.pdf" : "privacy-policy.pdf";
@@ -58,7 +58,7 @@ function createWindow(): void {
 	});
 
 	mainWindow.on("close", (event) => {
-		if (isQuitting) return;
+		if (isAppQuitting()) return;
 
 		event.preventDefault();
 		hideMainWindow();
@@ -95,7 +95,8 @@ function hideMainWindow(): void {
 function createTray(): void {
 	if (tray) return;
 
-	const icon = nativeImage.createFromPath(join(__dirname, "../../resources/tray-icon.png"));
+	const trayIconFile = process.platform === "darwin" ? "tray-icon.png" : "icon.png";
+	const icon = nativeImage.createFromPath(join(__dirname, "../../resources", trayIconFile));
 	const trayIcon =
 		process.platform === "darwin" ? icon.resize({ width: 18, height: 18 }) : icon.resize({ width: 20, height: 20 });
 
@@ -148,7 +149,7 @@ function formatAvailableVersion(version: string | undefined): string {
 }
 
 function quitApp(): void {
-	isQuitting = true;
+	markAppQuitting();
 	app.quit();
 }
 
@@ -183,5 +184,5 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-	isQuitting = true;
+	markAppQuitting();
 });

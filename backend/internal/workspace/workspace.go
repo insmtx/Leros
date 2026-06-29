@@ -341,9 +341,6 @@ func ensureGitRepo(ctx context.Context, plan *TaskWorkspace) error {
 			if output, err := cmd.CombinedOutput(); err != nil {
 				return fmt.Errorf("git pull: %w: %s", err, strings.TrimSpace(string(output)))
 			}
-			if err := os.MkdirAll(filepath.Join(plan.RepoDir, "artifacts"), 0o755); err != nil {
-				return fmt.Errorf("create artifacts dir: %w", err)
-			}
 			return nil
 		}
 		if err := os.RemoveAll(plan.RepoDir); err != nil {
@@ -355,9 +352,6 @@ func ensureGitRepo(ctx context.Context, plan *TaskWorkspace) error {
 		cmd := exec.CommandContext(ctx, "git", "init", plan.RepoDir)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("git init: %w: %s", err, strings.TrimSpace(string(output)))
-		}
-		if err := os.MkdirAll(filepath.Join(plan.RepoDir, "artifacts"), 0o755); err != nil {
-			return fmt.Errorf("create artifacts dir: %w", err)
 		}
 		if err := os.MkdirAll(filepath.Join(plan.RepoDir, "assets"), 0o755); err != nil {
 			return fmt.Errorf("create assets dir: %w", err)
@@ -389,9 +383,6 @@ func hasRemote(ctx context.Context, repoDir string, remote string) bool {
 // defaultGitignore 定义项目仓库初始化时创建的默认 .gitignore 内容。
 const defaultGitignore = `# Leros runtime
 .leros/tasks/
-
-# Artifact outputs (served from object storage, not committed)
-artifacts/
 
 # User uploads (served from object storage, not committed)
 uploads/
@@ -460,6 +451,13 @@ func PushWorkspace(ctx context.Context, plan *TaskWorkspace) error {
 	addCmd.Dir = plan.RepoDir
 	if output, err := addCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git add: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+
+	diffCmd := exec.CommandContext(ctx, "git", "diff", "--cached", "--quiet")
+	diffCmd.Dir = plan.RepoDir
+	if diffCmd.Run() == nil {
+		logs.InfoContextf(ctx, "skip git commit: no workspace changes (repo_dir=%s)", plan.RepoDir)
+		return nil
 	}
 
 	commitCmd := exec.CommandContext(ctx, "git", "commit", "-m", "task: agent run artifacts")

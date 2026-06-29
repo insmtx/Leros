@@ -587,7 +587,7 @@ function ProjectConfigSidebar({
 			if (selectedSkillCodes.includes(skill.code)) return false;
 			if (!query) return true;
 			// 中文注释：技能弹窗仅按名称搜索。
-			return skill.name.toLowerCase().includes(query);
+			return [skill.name, skill.code].join(" ").toLowerCase().includes(query);
 		});
 	}, [selectedSkillCodes, skillOptions, skillSearch]);
 
@@ -853,7 +853,7 @@ function SkillPickerIcon() {
 function installedSkillToProjectSkill(skill: SkillInstalledItem): ProjectSkill {
 	return {
 		code: skill.name,
-		name: skill.name,
+		name: skill.display_name || skill.name,
 		description: skill.description,
 		category: skill.category,
 		source: skill.source,
@@ -910,6 +910,7 @@ function skillItemFromValue(value: unknown): SkillInstalledItem | null {
 
 	return {
 		name,
+		display_name: stringFromValue(value.display_name),
 		description: stringFromValue(value.description),
 		category: stringFromValue(value.category),
 		source: stringFromValue(value.source || value.source_type),
@@ -1426,9 +1427,6 @@ function ProjectFiles({
 										<div className="min-w-0">
 											<p className="truncate text-[15px] font-semibold text-[var(--leros-text-strong)]">
 												{file.name}
-											</p>
-											<p className="truncate text-xs text-[var(--leros-text-muted)]">
-												/{file.path}
 											</p>
 										</div>
 									</button>

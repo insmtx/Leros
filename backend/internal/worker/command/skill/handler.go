@@ -314,13 +314,15 @@ func (h *Handler) handleDetail(ctx context.Context, wcmd messaging.WorkerCommand
 	// catalog.ListFiles excludes SKILL.md by design; always include it as the primary file.
 	supportingFiles, _ := catalog.ListFiles(name, 0)
 	files := append([]string{"SKILL.md"}, supportingFiles...)
+	summary := entry.Summary()
 
 	data := messaging.SkillDetailData{
+		SkillID:     summary.SkillID,
 		Name:        entry.Manifest.Name,
 		Description: entry.Manifest.Description,
 		Category:    entry.Manifest.Metadata.Category,
-		Source:      entry.Summary().Source,
-		Trust:       entry.Summary().Trust,
+		Source:      summary.Source,
+		Trust:       summary.Trust,
 		Version:     entry.Manifest.Version,
 		SkillMD:     entry.Body,
 		Tags:        entry.Manifest.Metadata.Tags,

@@ -166,6 +166,8 @@ func runInstall(identifier string) error {
 		Content: string(bundle.Content),
 		Files:   files,
 		Force:   skillForce,
+		Source:  meta.Source,
+		SkillID: meta.Identifier,
 	})
 	if err != nil {
 		return fmt.Errorf("install skill: %w", err)

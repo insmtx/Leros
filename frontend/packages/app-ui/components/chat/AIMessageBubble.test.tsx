@@ -65,4 +65,47 @@ describe("AIMessageBubble", () => {
 
 		expect(screen.getByText("正在分析问题", { selector: "div" })).toBeInTheDocument();
 	});
+
+	it("执行过程收起时展示最新的过程摘要", () => {
+		const message = {
+			id: "message-2",
+			conversationId: "conversation-1",
+			role: "assistant" as const,
+			content: "",
+			timestamp: Date.now(),
+			processSteps: [
+				{ id: "tool-call-1", type: "tool_call" as const, toolCallId: "tool-call-1" },
+				{ id: "thinking-1", type: "thinking" as const, content: "正在整理文档结构" },
+			],
+			toolCalls: [
+				{
+					id: "tool-call-1",
+					name: "skill",
+					arguments: {},
+					status: "running" as const,
+				},
+			],
+		};
+
+		const { rerender } = render(<AIMessageBubble message={message} isStreaming={true} />);
+
+		expect(screen.getByText("正在整理文档结构")).toBeInTheDocument();
+		expect(screen.queryByText("调用：skill")).not.toBeInTheDocument();
+
+		rerender(
+			<AIMessageBubble
+				message={{
+					...message,
+					processSteps: [
+						...message.processSteps.slice(0, -1),
+						{ id: "thinking-1", type: "thinking", content: "正在写入最终文档" },
+					],
+				}}
+				isStreaming={true}
+			/>,
+		);
+
+		expect(screen.getByText("正在写入最终文档")).toBeInTheDocument();
+		expect(screen.queryByText("正在整理文档结构")).not.toBeInTheDocument();
+	});
 });
