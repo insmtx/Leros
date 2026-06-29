@@ -194,7 +194,7 @@ function ProcessTimelineBlock({
 			}
 			if (toolCall.name === "web_fetch" || toolCall.name === "webfetch") {
 				const url = typeof args.url === "string" && args.url.trim() ? decodeURIComponent(args.url.trim()) : "";
-				return url ? "浏览 " + url : "浏览";
+				return url ? `浏览 ${url}` : "浏览";
 			}
 			return `调用：${toolCall.name}`;
 		}
@@ -378,12 +378,12 @@ function MessageArtifactList({
 						</div>
 						<div className="min-w-0">
 							<div className="truncate text-sm font-semibold leading-5 text-slate-700">
-								{artifact.title || artifact.name}
+								{artifact.name}
 							</div>
 							<div className="mt-0.5 truncate text-[13px] leading-4 text-slate-400">
-								{artifact.name}
-								{artifact.updatedAt ? ` · ${formatArtifactTime(artifact.updatedAt)}` : ""}
-								{artifact.size ? ` · ${artifact.size}` : ""}
+								{[artifact.size, artifact.updatedAt ? formatArtifactTime(artifact.updatedAt) : ""]
+									.filter(Boolean)
+									.join(" · ")}
 							</div>
 						</div>
 					</button>
