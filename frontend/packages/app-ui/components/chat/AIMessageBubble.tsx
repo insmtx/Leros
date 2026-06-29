@@ -173,32 +173,7 @@ function ProcessTimelineBlock({
 		[toolCalls],
 	);
 	const preview = useMemo(() => {
-		for (const step of steps) {
-			if (step.type === "thinking") {
-				const compact = compactText(step.content);
-				if (compact) return compact;
-				continue;
-			}
-			const toolCall = toolCallMap.get(step.toolCallId);
-			if (!toolCall?.name?.trim()) continue;
-			const args = toolCall.arguments ?? {};
-			if (typeof args.intent === "string" && args.intent.trim())
-				return args.intent.trim();
-			if (typeof args.description === "string" && args.description.trim())
-				return args.description.trim();
-			if (toolCall.name === "write") return "写入文件";
-			if (toolCall.name === "read") return "读取文件";
-			if (toolCall.name === "websearch") {
-				const query = typeof args.query === "string" && args.query.trim() ? args.query.trim() : "";
-				return query ? `搜索 ${query}` : "搜索";
-			}
-			if (toolCall.name === "web_fetch" || toolCall.name === "webfetch") {
-				const url = typeof args.url === "string" && args.url.trim() ? decodeURIComponent(args.url.trim()) : "";
-				return url ? `浏览 ${url}` : "浏览";
-			}
-			return `调用：${toolCall.name}`;
-		}
-		return "";
+		return getLatestProcessPreview(steps, toolCallMap);
 	}, [steps, toolCallMap]);
 
 	useEffect(() => {
@@ -328,6 +303,49 @@ function ProcessStepItem({ step, toolCall }: { step: MessageProcessStep; toolCal
 
 function compactText(value: string): string {
 	return value.replace(/\s+/g, " ").trim();
+}
+
+function getLatestProcessPreview(
+	steps: MessageProcessStep[],
+	toolCallMap: Map<string, ToolCall>,
+): string {
+	for (let index = steps.length - 1; index >= 0; index -= 1) {
+		const step = steps[index];
+		if (!step) continue;
+
+		if (step.type === "thinking") {
+			const compact = compactText(step.content);
+			if (compact) return compact;
+			continue;
+		}
+
+		const preview = getToolCallPreview(toolCallMap.get(step.toolCallId));
+		if (preview) return preview;
+	}
+
+	return "";
+}
+
+function getToolCallPreview(toolCall: ToolCall | undefined): string {
+	if (!toolCall?.name?.trim()) return "";
+
+	const args = toolCall.arguments ?? {};
+	if (typeof args.intent === "string" && args.intent.trim()) return args.intent.trim();
+	if (typeof args.description === "string" && args.description.trim())
+		return args.description.trim();
+	if (toolCall.name === "write") return "写入文件";
+	if (toolCall.name === "read") return "读取文件";
+	if (toolCall.name === "websearch") {
+		const query = typeof args.query === "string" && args.query.trim() ? args.query.trim() : "";
+		return query ? `搜索 ${query}` : "搜索";
+	}
+	if (toolCall.name === "web_fetch" || toolCall.name === "webfetch") {
+		const url =
+			typeof args.url === "string" && args.url.trim() ? decodeURIComponent(args.url.trim()) : "";
+		return url ? `浏览 ${url}` : "浏览";
+	}
+
+	return `调用：${toolCall.name}`;
 }
 
 function MessageArtifactList({
