@@ -77,6 +77,7 @@ function skillItemFromValue(value: unknown): SkillInstalledItem | null {
 
 	return {
 		name,
+		display_name: stringFromValue(value.display_name),
 		description: stringFromValue(value.description),
 		category: stringFromValue(value.category),
 		source: stringFromValue(value.source || value.source_type),
@@ -103,11 +104,12 @@ function normalizeInstalledSkillsPayload(value: unknown): SkillInstalledItem[] {
 }
 
 function installedSkillToOption(skill: SkillInstalledItem): SkillOption {
+	const label = skill.display_name || skill.name;
 	return {
 		code: skill.name,
-		label: skill.name,
+		label,
 		description: skill.description || skill.category || "已安装技能",
-		keywords: [skill.name, skill.description, skill.category, skill.source, skill.trust].filter(
+		keywords: [label, skill.name, skill.description, skill.category, skill.source, skill.trust].filter(
 			Boolean,
 		),
 	};

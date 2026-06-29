@@ -114,6 +114,39 @@ metadata:
 	}
 }
 
+func TestListUsesStoredSkillMetadataSource(t *testing.T) {
+	skillsDir := setupSkillsRoot(t)
+	skillDir := filepath.Join(skillsDir, "market-skill")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, skillFileName), []byte(`---
+name: market-skill
+description: Installed from marketplace.
+---
+# Market Skill
+`), 0o644); err != nil {
+		t.Fatalf("write skill: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, skillMetadataFileName), []byte(`{"source":"Leros","skill_id":"market-skill"}`), 0o644); err != nil {
+		t.Fatalf("write metadata: %v", err)
+	}
+
+	summaries, err := List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(summaries) != 1 {
+		t.Fatalf("expected 1 skill, got %d", len(summaries))
+	}
+	if summaries[0].Source != "Leros" {
+		t.Fatalf("expected source Leros, got %s", summaries[0].Source)
+	}
+	if summaries[0].SkillID != "market-skill" {
+		t.Fatalf("expected skill id market-skill, got %s", summaries[0].SkillID)
+	}
+}
+
 func TestGetCaseInsensitive(t *testing.T) {
 	skillsDir := setupSkillsRoot(t)
 	writeTestSkill(t, skillsDir, "my-skill", "My Skill", "body")
