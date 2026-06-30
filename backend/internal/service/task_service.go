@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/insmtx/Leros/backend/internal/infra/db"
 	"github.com/insmtx/Leros/backend/types"
 	"github.com/ygpkg/yg-go/encryptor/snowflake"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 type taskService struct {
@@ -82,6 +84,10 @@ func (s *taskService) CreateTask(ctx context.Context, req *contract.CreateTaskRe
 
 	if err := db.CreateTask(ctx, s.db, task); err != nil {
 		return nil, err
+	}
+	// 中文注释：在项目内手动创建任务属于项目活跃行为，需要同步刷新项目排序时间。
+	if err := db.TouchProjectUpdatedAt(ctx, s.db, project.ID, time.Now()); err != nil {
+		logs.WarnContextf(ctx, "touch project updated_at after create task %s: %v", task.PublicID, err)
 	}
 	return convertToContractTask(task, project.PublicID), nil
 }

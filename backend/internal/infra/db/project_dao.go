@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -33,6 +34,14 @@ func GetProjectByPublicID(ctx context.Context, db *gorm.DB, orgID uint, publicID
 // UpdateProject 更新项目
 func UpdateProject(ctx context.Context, db *gorm.DB, project *types.Project) error {
 	return db.WithContext(ctx).Save(project).Error
+}
+
+// TouchProjectUpdatedAt 仅刷新项目活跃时间，避免覆盖项目其他字段。
+func TouchProjectUpdatedAt(ctx context.Context, db *gorm.DB, id uint, updatedAt time.Time) error {
+	return db.WithContext(ctx).
+		Model(&types.Project{}).
+		Where("id = ?", id).
+		Update("updated_at", updatedAt).Error
 }
 
 // DeleteProject 删除项目（软删除）
@@ -124,7 +133,8 @@ func ListProjects(ctx context.Context, d *gorm.DB, opt *types.PageQuery) ([]*typ
 	if len(opt.OrderBy) > 0 {
 		query = query.Order(strings.Join(opt.OrderBy, ","))
 	} else {
-		query = query.Order("created_at DESC")
+		// 中文注释：项目列表默认按最近活跃时间排序，避免项目内新增任务/消息后仍停留在旧位置。
+		query = query.Order("updated_at DESC, created_at DESC")
 	}
 
 	query = query.Offset(opt.Offset)

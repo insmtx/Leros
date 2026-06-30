@@ -180,6 +180,10 @@ func (p *MessagePoster) RunNewMessage(
 		logs.ErrorContextf(ctx, "NewMessage PostMessage failed: %v", err)
 		return nil, err
 	}
+	// 中文注释：项目页里通过 NewMessage 创建任务/首条消息后，要立即刷新项目活跃时间，供左侧列表排序使用。
+	if err := infradb.TouchProjectUpdatedAt(ctx, p.db, o.project.ID, time.Now()); err != nil {
+		logs.WarnContextf(ctx, "NewMessage touch project updated_at failed: %v", err)
+	}
 
 	logs.InfoContextf(ctx, "NewMessage completed: project=%s task=%s session=%s message=%d assistant=%d",
 		o.project.PublicID, o.task.PublicID, o.taskSession.PublicID, message.ID, o.taskSession.AllocatedAssistantID)

@@ -351,6 +351,13 @@ func (s *sessionService) AddMessage(ctx context.Context, sessionID string, req *
 		return nil, err
 	}
 
+	if session.ProjectID != nil && *session.ProjectID != 0 && req.Role == string(types.MessageRoleUser) {
+		// 中文注释：只在用户主动发言时刷新项目活跃时间，避免助手流式输出把项目顺序不断顶来顶去。
+		if err := db.TouchProjectUpdatedAt(ctx, s.db, *session.ProjectID, time.Now()); err != nil {
+			logs.WarnContextf(ctx, "touch project updated_at after add message %s: %v", session.PublicID, err)
+		}
+	}
+
 	return convertToContractSessionMessage(message, session.PublicID), nil
 }
 

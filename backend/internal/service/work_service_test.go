@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -123,5 +124,47 @@ func TestWorkServiceNewMessage_PersistsAttachmentsOnFirstMessage(t *testing.T) {
 			types.ProjectFileResourceTypeUserUpload,
 			projectFile.ResourceType,
 		)
+	}
+}
+
+func TestWorkServiceNewMessage_TouchesProjectUpdatedAt(t *testing.T) {
+	service, database := setupTestWorkService(t)
+	ctx := setupTestContextWithCaller(t)
+
+	project := &types.Project{
+		PublicID: "prj_test_new_message_touch",
+		OrgID:    1,
+		OwnerID:  1,
+		Name:     "Touch Project",
+		Status:   string(types.ProjectStatusActive),
+	}
+	if err := database.Create(project).Error; err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	oldUpdatedAt := time.Now().Add(-time.Hour).UTC()
+	if err := database.Model(&types.Project{}).
+		Where("id = ?", project.ID).
+		Update("updated_at", oldUpdatedAt).Error; err != nil {
+		t.Fatalf("set old project updated_at: %v", err)
+	}
+
+	_, err := service.NewMessage(ctx, &contract.NewMessageRequest{
+		ProjectID: project.PublicID,
+		Content:   "请在这个项目里新建一个任务",
+	})
+	if err != nil {
+		t.Fatalf("NewMessage failed: %v", err)
+	}
+
+	refreshedProject, err := dbpkg.GetProjectByID(context.Background(), database, project.ID)
+	if err != nil {
+		t.Fatalf("reload project failed: %v", err)
+	}
+	if refreshedProject == nil {
+		t.Fatal("expected project to exist after NewMessage")
+	}
+	if !refreshedProject.UpdatedAt.After(oldUpdatedAt) {
+		t.Fatalf("expected project updated_at after %v, got %v", oldUpdatedAt, refreshedProject.UpdatedAt)
 	}
 }

@@ -736,6 +736,63 @@ func TestAddMessage_UpdatesSession(t *testing.T) {
 	}
 }
 
+func TestAddMessage_TouchesProjectUpdatedAtForUserMessage(t *testing.T) {
+	database := setupTestDB(t)
+	service := NewSessionService(database, &mockEventBus{}, &mockInferrer{assistantID: 1}, nil, nil, "test")
+	ctx := setupTestContextWithCaller(t)
+
+	project := &types.Project{
+		PublicID: "prj_test_add_message_touch",
+		OrgID:    1,
+		OwnerID:  1,
+		Name:     "Project Chat",
+		Status:   string(types.ProjectStatusActive),
+	}
+	if err := db.CreateProject(ctx, database, project); err != nil {
+		t.Fatalf("CreateProject failed: %v", err)
+	}
+
+	session := &types.Session{
+		PublicID:    "sess_test_add_message_touch",
+		Type:        types.SessionTypeProject,
+		Uin:         1,
+		OrgID:       1,
+		AssistantID: 1,
+		ProjectID:   &project.ID,
+		Status:      string(types.SessionStatusActive),
+		Title:       "项目协作",
+	}
+	if err := db.CreateSession(ctx, database, session); err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+
+	oldUpdatedAt := time.Now().Add(-time.Hour).UTC()
+	if err := database.Model(&types.Project{}).
+		Where("id = ?", project.ID).
+		Update("updated_at", oldUpdatedAt).Error; err != nil {
+		t.Fatalf("set old project updated_at: %v", err)
+	}
+
+	_, err := service.AddMessage(ctx, session.PublicID, &contract.AddMessageRequest{
+		Role:    string(types.MessageRoleUser),
+		Content: "项目里补充一条用户消息",
+	})
+	if err != nil {
+		t.Fatalf("AddMessage failed: %v", err)
+	}
+
+	refreshedProject, err := db.GetProjectByID(ctx, database, project.ID)
+	if err != nil {
+		t.Fatalf("GetProjectByID failed: %v", err)
+	}
+	if refreshedProject == nil {
+		t.Fatal("expected project to exist after AddMessage")
+	}
+	if !refreshedProject.UpdatedAt.After(oldUpdatedAt) {
+		t.Fatalf("expected project updated_at after %v, got %v", oldUpdatedAt, refreshedProject.UpdatedAt)
+	}
+}
+
 func TestAddMessage_AutoSequence(t *testing.T) {
 	service := setupTestService(t)
 	ctx := setupTestContextWithCaller(t)
