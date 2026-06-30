@@ -168,7 +168,16 @@ deploy:
         done
 
         printf '%s' "$APPLE_API_KEY_BASE64" | base64 --decode > "$CI_PROJECT_DIR/AuthKey.p8"
+        printf '%s' "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$CI_PROJECT_DIR/macos-certificate.p12"
         chmod 600 "$CI_PROJECT_DIR/AuthKey.p8"
+        chmod 600 "$CI_PROJECT_DIR/macos-certificate.p12"
+
+        security create-keychain -p "$MACOS_CERTIFICATE_PASSWORD" "$CI_PROJECT_DIR/macos-signing.keychain-db"
+        security set-keychain-settings -lut 21600 "$CI_PROJECT_DIR/macos-signing.keychain-db"
+        security unlock-keychain -p "$MACOS_CERTIFICATE_PASSWORD" "$CI_PROJECT_DIR/macos-signing.keychain-db"
+        security import "$CI_PROJECT_DIR/macos-certificate.p12" -k "$CI_PROJECT_DIR/macos-signing.keychain-db" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_CERTIFICATE_PASSWORD" "$CI_PROJECT_DIR/macos-signing.keychain-db"
+        security find-identity -v -p codesigning "$CI_PROJECT_DIR/macos-signing.keychain-db"
       fi
     - python3 -m venv "$CI_PROJECT_DIR/.coscmd-venv"
     - $CI_PROJECT_DIR/.coscmd-venv/bin/pip install coscmd
@@ -214,7 +223,7 @@ deploy:
       root_prefix="${root_prefix%/}"
       prefix="${DESKTOP_COS_PREFIX#/}"
       prefix="${prefix%/}"
-      printf '%s\n' "$version" > LATEST.txt
+      printf '%s\n' "$version" > "$CI_PROJECT_DIR/LATEST.txt"
 
       upload_dir() {
         local local_dir="$1"
@@ -292,7 +301,7 @@ deploy:
 
       cd "$CI_PROJECT_DIR/frontend"
       if [ "$build_with_signing" = "true" ]; then
-        retry env APPLE_API_KEY="$CI_PROJECT_DIR/AuthKey.p8" CSC_LINK="$MACOS_CERTIFICATE_P12_BASE64" CSC_KEY_PASSWORD="$MACOS_CERTIFICATE_PASSWORD" pnpm run "$build_script"
+        retry env APPLE_API_KEY="$CI_PROJECT_DIR/AuthKey.p8" CSC_LINK="$CI_PROJECT_DIR/macos-certificate.p12" CSC_KEY_PASSWORD="$MACOS_CERTIFICATE_PASSWORD" CSC_KEYCHAIN="$CI_PROJECT_DIR/macos-signing.keychain-db" pnpm run "$build_script"
       else
         RETRY_MAX_ATTEMPTS=6 retry env ELECTRON_MIRROR="$ELECTRON_MIRROR" ELECTRON_BUILDER_BINARIES_MIRROR="$ELECTRON_BUILDER_BINARIES_MIRROR" npm_config_electron_mirror="$npm_config_electron_mirror" npm_config_electron_builder_binaries_mirror="$npm_config_electron_builder_binaries_mirror" pnpm run "$build_script"
       fi
