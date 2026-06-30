@@ -170,9 +170,12 @@ deploy:
         printf '%s' "$APPLE_API_KEY_BASE64" | base64 --decode > "$CI_PROJECT_DIR/AuthKey.p8"
         chmod 600 "$CI_PROJECT_DIR/AuthKey.p8"
       fi
-    - python3 -m pip install --user coscmd
+    - python3 -m venv "$CI_PROJECT_DIR/.coscmd-venv"
+    - $CI_PROJECT_DIR/.coscmd-venv/bin/pip install coscmd
   script:
-    - export PATH="/opt/homebrew/bin:/usr/local/bin:$CI_PROJECT_DIR/.corepack-bin:$(python3 -c 'import site; print(site.USER_BASE + "/bin")'):$HOME/.local/bin:$PATH"
+    - mkdir -p "$CI_PROJECT_DIR/.ci-home"
+    - export HOME="$CI_PROJECT_DIR/.ci-home"
+    - export PATH="/opt/homebrew/bin:/usr/local/bin:$CI_PROJECT_DIR/.corepack-bin:$CI_PROJECT_DIR/.coscmd-venv/bin:$PATH"
     - |
       retry() {
         local attempt=1
