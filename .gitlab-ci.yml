@@ -121,7 +121,7 @@ deploy:
     reports:
       dotenv: deploy.env
 
-desktop-build-and-publish:
+.desktop-build-template:
   stage: desktop_build
   tags:
     - macos
@@ -135,24 +135,59 @@ desktop-build-and-publish:
     ELECTRON_CACHE: "$CI_PROJECT_DIR/.electron-cache"
     electron_config_cache: "$CI_PROJECT_DIR/.electron-cache"
     ELECTRON_BUILDER_CACHE: "$CI_PROJECT_DIR/.electron-builder-cache"
+    ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/"
+    ELECTRON_BUILDER_BINARIES_MIRROR: "https://npmmirror.com/mirrors/electron-builder-binaries/"
+    npm_config_electron_mirror: "https://npmmirror.com/mirrors/electron/"
+    npm_config_electron_builder_binaries_mirror: "https://npmmirror.com/mirrors/electron-builder-binaries/"
   before_script:
     - mkdir -p "$CI_PROJECT_DIR/.corepack-bin" "$CI_PROJECT_DIR/.corepack-home"
-    - export PATH="$CI_PROJECT_DIR/.corepack-bin:$PATH"
+    - export PATH="/opt/homebrew/bin:/usr/local/bin:$CI_PROJECT_DIR/.corepack-bin:$PATH"
+    - |
+      if ! command -v node >/dev/null 2>&1; then
+        echo "Node.js is required on the macOS runner. Install Node 22 and make sure /opt/homebrew/bin or /usr/local/bin is visible to gitlab-runner."
+        exit 1
+      fi
+    - node --version
     - export COREPACK_HOME="$CI_PROJECT_DIR/.corepack-home"
     - corepack enable --install-directory "$CI_PROJECT_DIR/.corepack-bin"
     - corepack prepare pnpm@10.28.2 --activate
     - |
-      for variable in VITE_LEROS_API_BASE_URL APPLE_API_KEY_BASE64 APPLE_API_KEY_ID APPLE_API_ISSUER MACOS_CERTIFICATE_P12_BASE64 MACOS_CERTIFICATE_PASSWORD COS_SECRET_ID COS_SECRET_KEY COS_BUCKET COS_REGION DESKTOP_COS_ROOT_PREFIX DESKTOP_COS_PREFIX; do
+      for variable in VITE_LEROS_API_BASE_URL COS_SECRET_ID COS_SECRET_KEY COS_BUCKET COS_REGION DESKTOP_COS_ROOT_PREFIX DESKTOP_COS_PREFIX DESKTOP_TARGET; do
         if [ -z "$(eval echo \$$variable)" ]; then
           echo "Required desktop variable is missing: ${variable}"
           exit 1
         fi
       done
-    - printf '%s' "$APPLE_API_KEY_BASE64" | base64 --decode > "$CI_PROJECT_DIR/AuthKey.p8"
-    - chmod 600 "$CI_PROJECT_DIR/AuthKey.p8"
+    - |
+      if [ "$DESKTOP_TARGET" = "mac-arm64" ] || [ "$DESKTOP_TARGET" = "mac-x64" ]; then
+        for variable in APPLE_API_KEY_BASE64 APPLE_API_KEY_ID APPLE_API_ISSUER MACOS_CERTIFICATE_P12_BASE64 MACOS_CERTIFICATE_PASSWORD; do
+          if [ -z "$(eval echo \$$variable)" ]; then
+            echo "Required mac desktop variable is missing: ${variable}"
+            exit 1
+          fi
+        done
+
+        printf '%s' "$APPLE_API_KEY_BASE64" | base64 --decode > "$CI_PROJECT_DIR/AuthKey.p8"
+        chmod 600 "$CI_PROJECT_DIR/AuthKey.p8"
+      fi
     - python3 -m pip install --user coscmd
   script:
-    - export PATH="$CI_PROJECT_DIR/.corepack-bin:$(python3 -c 'import site; print(site.USER_BASE + "/bin")'):$HOME/.local/bin:$PATH"
+    - export PATH="/opt/homebrew/bin:/usr/local/bin:$CI_PROJECT_DIR/.corepack-bin:$(python3 -c 'import site; print(site.USER_BASE + "/bin")'):$HOME/.local/bin:$PATH"
+    - |
+      retry() {
+        local attempt=1
+        local max_attempts="${RETRY_MAX_ATTEMPTS:-3}"
+
+        until "$@"; do
+          if [ "$attempt" -ge "$max_attempts" ]; then
+            return 1
+          fi
+
+          echo "Command failed, retrying (${attempt}/${max_attempts}): $*"
+          attempt=$((attempt + 1))
+          sleep 15
+        done
+      }
     - export DESKTOP_VERSION="${CI_COMMIT_TAG#v}"
     - |
       if [ -z "$DESKTOP_VERSION" ]; then
@@ -169,30 +204,6 @@ desktop-build-and-publish:
     - node -e 'const fs = require("node:fs"); const version = process.argv[1]; const path = "package.json"; const pkg = JSON.parse(fs.readFileSync(path, "utf8")); pkg.version = version; fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);' "$DESKTOP_VERSION"
     - cd ../..
     - pnpm --filter @leros/desktop typecheck
-    - APPLE_API_KEY="$CI_PROJECT_DIR/AuthKey.p8" CSC_LINK="$MACOS_CERTIFICATE_P12_BASE64" CSC_KEY_PASSWORD="$MACOS_CERTIFICATE_PASSWORD" pnpm run dist:desktop:mac:arm64
-    - cd "$CI_PROJECT_DIR"
-    - mkdir -p desktop-release/mac-arm64
-    - cp "frontend/apps/desktop/dist/Lework-${DESKTOP_VERSION}-mac-arm64.dmg" desktop-release/mac-arm64/
-    - cp "frontend/apps/desktop/dist/Lework-${DESKTOP_VERSION}-mac-arm64.zip" desktop-release/mac-arm64/
-    - cp "frontend/apps/desktop/dist/Lework-${DESKTOP_VERSION}-mac-arm64.dmg.blockmap" desktop-release/mac-arm64/
-    - cp "frontend/apps/desktop/dist/Lework-${DESKTOP_VERSION}-mac-arm64.zip.blockmap" desktop-release/mac-arm64/
-    - cp frontend/apps/desktop/dist/latest-mac.yml desktop-release/mac-arm64/
-    - cd frontend
-    - APPLE_API_KEY="$CI_PROJECT_DIR/AuthKey.p8" CSC_LINK="$MACOS_CERTIFICATE_P12_BASE64" CSC_KEY_PASSWORD="$MACOS_CERTIFICATE_PASSWORD" pnpm run dist:desktop:mac:x64
-    - cd "$CI_PROJECT_DIR"
-    - mkdir -p desktop-release/mac-x64
-    - cp "frontend/apps/desktop/dist/Lework-${DESKTOP_VERSION}-mac-x64.dmg" desktop-release/mac-x64/
-    - cp "frontend/apps/desktop/dist/Lework-${DESKTOP_VERSION}-mac-x64.zip" desktop-release/mac-x64/
-    - cp "frontend/apps/desktop/dist/Lework-${DESKTOP_VERSION}-mac-x64.dmg.blockmap" desktop-release/mac-x64/
-    - cp "frontend/apps/desktop/dist/Lework-${DESKTOP_VERSION}-mac-x64.zip.blockmap" desktop-release/mac-x64/
-    - cp frontend/apps/desktop/dist/latest-mac.yml desktop-release/mac-x64/
-    - cd frontend
-    - pnpm run dist:desktop:win:x64
-    - cd "$CI_PROJECT_DIR"
-    - mkdir -p desktop-release/win-x64
-    - cp "frontend/apps/desktop/dist/Lework-${DESKTOP_VERSION}-win-x64.exe" desktop-release/win-x64/
-    - cp "frontend/apps/desktop/dist/Lework-${DESKTOP_VERSION}-win-x64.exe.blockmap" desktop-release/win-x64/
-    - cp frontend/apps/desktop/dist/latest.yml desktop-release/win-x64/
     - coscmd config -a "$COS_SECRET_ID" -s "$COS_SECRET_KEY" -b "$COS_BUCKET" -r "$COS_REGION"
     - |
       version="$DESKTOP_VERSION"
@@ -229,13 +240,85 @@ desktop-build-and-publish:
         coscmd upload "$file_path" "${target_dir}/$(basename "$file_path")"
       }
 
-      upload_dir "desktop-release/mac-arm64" "darwin/arm64"
-      upload_dir "desktop-release/mac-x64" "darwin/x64"
-      upload_dir "desktop-release/win-x64" "win32/x64"
-      upload_file "desktop-release/mac-arm64/Lework-${version}-mac-arm64.dmg" "$root_prefix"
-      upload_file "desktop-release/mac-x64/Lework-${version}-mac-x64.dmg" "$root_prefix"
-      upload_file "desktop-release/win-x64/Lework-${version}-win-x64.exe" "$root_prefix"
+      case "$DESKTOP_TARGET" in
+        mac-arm64)
+          build_script="dist:desktop:mac:arm64"
+          release_dir="desktop-release/mac-arm64"
+          cos_target_dir="darwin/arm64"
+          latest_file="latest-mac.yml"
+          root_installer="Lework-${version}-mac-arm64.dmg"
+          build_with_signing="true"
+          payload_files="
+            Lework-${version}-mac-arm64.dmg
+            Lework-${version}-mac-arm64.zip
+            Lework-${version}-mac-arm64.dmg.blockmap
+            Lework-${version}-mac-arm64.zip.blockmap
+          "
+          ;;
+        mac-x64)
+          build_script="dist:desktop:mac:x64"
+          release_dir="desktop-release/mac-x64"
+          cos_target_dir="darwin/x64"
+          latest_file="latest-mac.yml"
+          root_installer="Lework-${version}-mac-x64.dmg"
+          build_with_signing="true"
+          payload_files="
+            Lework-${version}-mac-x64.dmg
+            Lework-${version}-mac-x64.zip
+            Lework-${version}-mac-x64.dmg.blockmap
+            Lework-${version}-mac-x64.zip.blockmap
+          "
+          ;;
+        win-x64)
+          build_script="dist:desktop:win:x64"
+          release_dir="desktop-release/win-x64"
+          cos_target_dir="win32/x64"
+          latest_file="latest.yml"
+          root_installer="Lework-${version}-win-x64.exe"
+          build_with_signing="false"
+          payload_files="
+            Lework-${version}-win-x64.exe
+            Lework-${version}-win-x64.exe.blockmap
+          "
+          ;;
+        *)
+          echo "Unsupported DESKTOP_TARGET: $DESKTOP_TARGET"
+          exit 1
+          ;;
+      esac
+
+      cd "$CI_PROJECT_DIR/frontend"
+      if [ "$build_with_signing" = "true" ]; then
+        retry env APPLE_API_KEY="$CI_PROJECT_DIR/AuthKey.p8" CSC_LINK="$MACOS_CERTIFICATE_P12_BASE64" CSC_KEY_PASSWORD="$MACOS_CERTIFICATE_PASSWORD" pnpm run "$build_script"
+      else
+        RETRY_MAX_ATTEMPTS=6 retry env ELECTRON_MIRROR="$ELECTRON_MIRROR" ELECTRON_BUILDER_BINARIES_MIRROR="$ELECTRON_BUILDER_BINARIES_MIRROR" npm_config_electron_mirror="$npm_config_electron_mirror" npm_config_electron_builder_binaries_mirror="$npm_config_electron_builder_binaries_mirror" pnpm run "$build_script"
+      fi
+
+      cd "$CI_PROJECT_DIR"
+      mkdir -p "$release_dir"
+      for payload_file in $payload_files; do
+        cp "frontend/apps/desktop/dist/${payload_file}" "$release_dir/"
+      done
+      cp "frontend/apps/desktop/dist/${latest_file}" "$release_dir/"
+
+      upload_dir "$release_dir" "$cos_target_dir"
+      upload_file "${release_dir}/${root_installer}" "$root_prefix"
       upload_file "LATEST.txt" "$root_prefix"
+
+desktop-build-mac-arm64:
+  extends: .desktop-build-template
+  variables:
+    DESKTOP_TARGET: mac-arm64
+
+desktop-build-mac-x64:
+  extends: .desktop-build-template
+  variables:
+    DESKTOP_TARGET: mac-x64
+
+desktop-build-win-x64:
+  extends: .desktop-build-template
+  variables:
+    DESKTOP_TARGET: win-x64
 
 notify:
   stage: notify
