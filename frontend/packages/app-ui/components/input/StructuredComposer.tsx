@@ -14,6 +14,8 @@ import { cn } from "@leros/ui/lib/utils";
 import { Bot, Sparkles } from "lucide-react";
 import {
 	forwardRef,
+	type ClipboardEvent,
+	type KeyboardEvent,
 	type MouseEvent,
 	useCallback,
 	useEffect,
@@ -65,6 +67,8 @@ type EditorSnapshot = {
 	tokens: InsertedToken[];
 };
 
+const VIRTUAL_SKILL_DIRECTIVES = new Set(["skill-creator"]);
+
 export type StructuredComposerHandle = {
 	openAssistantPicker: () => void;
 	openCommandPicker: () => void;
@@ -79,7 +83,7 @@ type StructuredComposerProps = {
 	value: string;
 	onChange: (value: string) => void;
 	onSubmit: () => void;
-	onPasteFiles: (event: React.ClipboardEvent<HTMLElement>) => void;
+	onPasteFiles: (event: ClipboardEvent<HTMLElement>) => void;
 	onFocus: () => void;
 	onBlur: () => void;
 	placeholder: string;
@@ -210,9 +214,35 @@ function commandPickerValue(option: CommandOption): string {
 	return `${option.kind}:${option.item.code}`;
 }
 
+function resolveVirtualSkillTokens(value: string, tokens: InsertedToken[]): InsertedToken[] {
+	const result: InsertedToken[] = [];
+	const matches = value.matchAll(/(?:^|\s)\/([a-z0-9-]+)(?=\s|$)/g);
+
+	for (const match of matches) {
+		const skillName = match[1] ?? "";
+		if (!VIRTUAL_SKILL_DIRECTIVES.has(skillName)) continue;
+
+		const matchedText = match[0] ?? "";
+		const start = (match.index ?? 0) + (matchedText.startsWith("/") ? 0 : 1);
+		const end = start + skillName.length + 1;
+		const overlapsExistingToken = tokens.some((token) => start < token.end && end > token.start);
+		if (overlapsExistingToken) continue;
+
+		result.push({
+			label: `/${skillName}`,
+			start,
+			end,
+			kind: "skill",
+		});
+	}
+
+	return result;
+}
+
 function resolveDisplayTokens(value: string, tokens: InsertedToken[]): InsertedToken[] {
-	// 中文注释：只有通过弹窗/按钮明确选中的队友和技能才渲染成 token，普通文本里的 @ 或 / 保持原样。
-	return sortTokens(tokens.filter((token) => value.slice(token.start, token.end) === token.label));
+	const explicitTokens = tokens.filter((token) => value.slice(token.start, token.end) === token.label);
+	// 中文注释：常规 token 仍只来自弹窗/按钮选择；skill-creator 是技能库创作入口注入的虚拟指令。
+	return sortTokens([...explicitTokens, ...resolveVirtualSkillTokens(value, explicitTokens)]);
 }
 
 function isCursorInsideToken(cursor: number, tokens: InsertedToken[]): boolean {
@@ -859,7 +889,7 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 		}, [directivesDisabled, getActiveTrigger, onChange]);
 
 		const handlePaste = useCallback(
-			(event: React.ClipboardEvent<HTMLDivElement>) => {
+			(event: ClipboardEvent<HTMLDivElement>) => {
 				const clipboardFiles = Array.from(event.clipboardData.files);
 				if (clipboardFiles.length > 0) {
 					// 粘贴图片/文件时只走附件上传，不把浏览器生成的富文本或文件占位节点塞进输入框。
@@ -1151,7 +1181,7 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 		);
 
 		const handleKeyDown = useCallback(
-			(event: React.KeyboardEvent<HTMLDivElement>) => {
+			(event: KeyboardEvent<HTMLDivElement>) => {
 				if (trigger) {
 					if (event.key === "ArrowDown" || event.key === "ArrowUp") {
 						event.preventDefault();
@@ -1245,7 +1275,7 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 												key={assistant.code}
 												value={assistantPickerValue(assistant)}
 												data-picker-item-value={assistantPickerValue(assistant)}
-												onMouseDown={(event: MouseEvent) => event.preventDefault()}
+												onMouseDown={(event: MouseEvent<HTMLElement>) => event.preventDefault()}
 												onSelect={() => selectToken("assistant", assistant, trigger)}
 												className={cn(
 													"rounded-xl px-2.5 py-2",
@@ -1285,7 +1315,7 @@ export const StructuredComposer = forwardRef<StructuredComposerHandle, Structure
 													kind: "skill",
 													item: skill,
 												})}
-												onMouseDown={(event: MouseEvent) => event.preventDefault()}
+												onMouseDown={(event: MouseEvent<HTMLElement>) => event.preventDefault()}
 												onSelect={() => selectToken("skill", skill, trigger)}
 												className={cn(
 													"rounded-xl px-2.5 py-2",
