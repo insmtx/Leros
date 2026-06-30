@@ -1,23 +1,19 @@
 import { join } from "node:path";
 import { electronApp, is, optimizer } from "@electron-toolkit/utils";
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray } from "electron";
+import { desktopOpenPolicyPdfChannel, type DesktopPolicyDocument } from "../shared/auto-update";
 import {
-	app,
-	BrowserWindow,
-	ipcMain,
-	Menu,
-	nativeImage,
-	shell,
-	Tray,
-} from "electron";
-import {
-	desktopOpenPolicyPdfChannel,
-	type DesktopPolicyDocument,
-} from "../shared/auto-update";
-import { isAppQuitting, markAppQuitting } from "./app-lifecycle";
+	isAppQuitPrepared,
+	isAppQuitting,
+	markAppQuitting,
+	prepareForAppQuit,
+	prepareWindowForHide,
+} from "./app-lifecycle";
 import { getDesktopUpdateState, registerDesktopAutoUpdate } from "./auto-update";
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let mainWindowHideInProgress = false;
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
 if (!gotSingleInstanceLock) {
@@ -67,7 +63,7 @@ function createWindow(): void {
 		if (isAppQuitting()) return;
 
 		event.preventDefault();
-		hideMainWindow();
+		void hideMainWindow();
 	});
 
 	mainWindow.on("closed", () => {
@@ -101,10 +97,20 @@ function focusMainWindow(): void {
 	}
 }
 
-function hideMainWindow(): void {
+async function hideMainWindow(): Promise<void> {
 	if (!mainWindow || mainWindow.isDestroyed()) return;
+	if (mainWindowHideInProgress) return;
 
-	mainWindow.hide();
+	mainWindowHideInProgress = true;
+	const window = mainWindow;
+	try {
+		await prepareWindowForHide(window);
+		if (!window.isDestroyed()) {
+			window.hide();
+		}
+	} finally {
+		mainWindowHideInProgress = false;
+	}
 }
 
 function createTray(): void {
@@ -113,7 +119,9 @@ function createTray(): void {
 	const trayIconFile = process.platform === "darwin" ? "tray-icon.png" : "icon.png";
 	const icon = nativeImage.createFromPath(join(__dirname, "../../resources", trayIconFile));
 	const trayIcon =
-		process.platform === "darwin" ? icon.resize({ width: 18, height: 18 }) : icon.resize({ width: 20, height: 20 });
+		process.platform === "darwin"
+			? icon.resize({ width: 18, height: 18 })
+			: icon.resize({ width: 20, height: 20 });
 
 	tray = new Tray(trayIcon);
 	tray.setToolTip("Lework");
@@ -163,8 +171,9 @@ function formatAvailableVersion(version: string | undefined): string {
 	return `${version}（重启服务后生效）`;
 }
 
-function quitApp(): void {
+async function quitApp(): Promise<void> {
 	markAppQuitting();
+	await prepareForAppQuit();
 	app.quit();
 }
 
@@ -202,6 +211,15 @@ app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", () => {
+app.on("before-quit", (event) => {
 	markAppQuitting();
+
+	if (isAppQuitPrepared()) {
+		return;
+	}
+
+	event.preventDefault();
+	void prepareForAppQuit().finally(() => {
+		app.quit();
+	});
 });

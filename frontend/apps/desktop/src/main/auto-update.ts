@@ -13,11 +13,12 @@ import {
 	desktopUpdateGetStateChannel,
 	desktopUpdateRestartChannel,
 } from "../shared/auto-update";
-import { markAppQuitting } from "./app-lifecycle";
+import { markAppQuitting, prepareForAppQuit } from "./app-lifecycle";
 
 const autoUpdateIntervalMs = 30 * 60 * 1000;
 const initialAutoUpdateDelayMs = 1 * 1000;
-const desktopUpdateBaseURL = "https://leros-1395325824.cos.ap-beijing.myqcloud.com/application/stable";
+const desktopUpdateBaseURL =
+	"https://leros-1395325824.cos.ap-beijing.myqcloud.com/application/stable";
 const enableDevAutoUpdate = !app.isPackaged;
 
 let updateState: DesktopUpdateState = createState({
@@ -95,7 +96,10 @@ function markUnsupported(message: string) {
 }
 
 function canUseAutoUpdate(): boolean {
-	return (app.isPackaged || enableDevAutoUpdate) && (process.platform === "darwin" || process.platform === "win32");
+	return (
+		(app.isPackaged || enableDevAutoUpdate) &&
+		(process.platform === "darwin" || process.platform === "win32")
+	);
 }
 
 function getUpdateFeedURL(): string {
@@ -281,7 +285,7 @@ export function registerDesktopAutoUpdate() {
 	ipcMain.handle(desktopUpdateCheckChannel, async () => {
 		return checkForUpdates({ manual: true });
 	});
-	ipcMain.handle(desktopUpdateRestartChannel, () => {
+	ipcMain.handle(desktopUpdateRestartChannel, async () => {
 		if (!updateState.canRestart) {
 			return false;
 		}
@@ -292,6 +296,7 @@ export function registerDesktopAutoUpdate() {
 		}
 
 		markAppQuitting();
+		await prepareForAppQuit();
 		updater.quitAndInstall();
 		return true;
 	});
